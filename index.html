@@ -6,6 +6,7 @@
 <title>TradEdge Trading Journal</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 /* ── RESET & ROOT ─────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -255,6 +256,7 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
   animation:mIn .22s ease;
 }
 @keyframes mIn{from{opacity:0;transform:translateY(16px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .m-head{
   display:flex;align-items:center;justify-content:space-between;
   padding:20px 24px 16px;border-bottom:1px solid var(--b1);
@@ -299,19 +301,25 @@ select.fi{cursor:pointer}
 .pdot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px}
 
 /* ════════════════════════════════════════════
-   CHART MODAL (TradingView-style)
+   CHART MODAL (TradingView Lightweight Charts)
 ════════════════════════════════════════════ */
-.chart-modal{max-width:1000px}
+.chart-modal{max-width:1100px}
 #tv-chart-container{
-  height:480px;background:var(--bg3);border-radius:10px;overflow:hidden;
-  position:relative;
+  height:500px;background:#0C1219;border-radius:10px;overflow:hidden;
+  position:relative;border:1px solid var(--b1);
 }
-#tv-chart-canvas{width:100%!important;height:100%!important}
 .chart-legend{
-  display:flex;gap:16px;flex-wrap:wrap;padding:12px 0;font-size:11px;color:var(--t3);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:8px 0 0;font-size:11px;color:var(--t3);
 }
 .leg-item{display:flex;align-items:center;gap:5px}
 .leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.leg-dash{border-radius:2px;height:3px;width:14px}
+.tf-btn{
+  padding:3px 10px;border-radius:6px;border:1px solid var(--b1);background:transparent;
+  color:var(--t3);font-size:11px;cursor:pointer;font-family:Outfit,sans-serif;transition:all .15s;
+}
+.tf-btn:hover{background:var(--bg3);color:var(--t1)}
+.tf-btn.active{background:var(--y);color:#05080D;border-color:var(--y);font-weight:700}
 
 /* ════════════════════════════════════════════
    SYNC PANEL
@@ -933,6 +941,7 @@ select.fi{cursor:pointer}
         <div class="fsec-title">🛡 Risk & Journal</div>
         <div class="fg2">
           <div class="fg"><label class="fl">Stop Loss (₹)</label><input type="number" class="fi" id="f-sl" placeholder="0.00" step="0.01"></div>
+          <div class="fg"><label class="fl">Target (₹)</label><input type="number" class="fi" id="f-target" placeholder="0.00" step="0.01"></div>
           <div class="fg"><label class="fl">Plan Followed?</label><select class="fi" id="f-plan"><option value="">—</option><option>Yes</option><option>No</option><option>Partial</option></select></div>
           <div class="fg"><label class="fl">Exit Trigger</label><input class="fi" id="f-trigger" placeholder="SL hit, Target reached…"></div>
           <div class="fg"><label class="fl">Growth Areas</label><input class="fi" id="f-growth" placeholder="Entry timing, sizing…"></div>
@@ -951,19 +960,29 @@ select.fi{cursor:pointer}
 <div class="overlay" id="m-chart">
   <div class="modal chart-modal">
     <div class="m-head">
-      <div class="m-title" id="m-chart-title">Chart — SYMBOL</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="m-title" id="m-chart-title">Chart — SYMBOL</div>
+        <div style="display:flex;gap:4px" id="chart-tf-btns">
+          <button class="tf-btn active" onclick="setChartTF('1D',this)">1D</button>
+          <button class="tf-btn" onclick="setChartTF('1W',this)">1W</button>
+          <button class="tf-btn" onclick="setChartTF('1M',this)">1M</button>
+        </div>
+      </div>
       <button class="m-x" onclick="closeM('m-chart')">✕</button>
     </div>
-    <div class="m-body">
+    <div class="m-body" style="padding-top:8px">
       <div id="tv-chart-container">
-        <canvas id="tv-chart-canvas"></canvas>
+        <div id="tv-chart-status" style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:13px;gap:8px">
+          <span id="tv-chart-status-text">Loading chart…</span>
+        </div>
       </div>
-      <div class="chart-legend">
+      <div class="chart-legend" style="margin-top:10px">
         <div class="leg-item"><div class="leg-dot" style="background:#00E5A0"></div>Entry</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#3B8BFF"></div>Pyramid Add</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#FF4560"></div>Exit / Partial Exit</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#F5C542;opacity:.4"></div>Stop Loss</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#A855F7;opacity:.5"></div>Avg Entry</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#FF4560"></div>Exit</div>
+        <div class="leg-item"><div class="leg-dot leg-dash" style="background:#F5C542"></div>Stop Loss</div>
+        <div class="leg-item"><div class="leg-dot leg-dash" style="background:#A855F7"></div>Avg Entry</div>
+        <div class="leg-item"><div class="leg-dot leg-dash" style="background:#22D3EE"></div>Target</div>
+        <div id="chart-data-note" style="margin-left:auto;color:var(--t4);font-size:10px"></div>
       </div>
     </div>
   </div>
@@ -1271,6 +1290,7 @@ function openAdd(){
   document.getElementById('f-side').value='Buy';
   document.getElementById('f-status').value='Open';
   document.getElementById('f-sl').value='';
+  document.getElementById('f-target').value='';
   document.getElementById('f-plan').value='';
   document.getElementById('f-trigger').value='';
   document.getElementById('f-growth').value='';
@@ -1292,6 +1312,7 @@ function editTrade(id){
   document.getElementById('f-side').value=t.side||'Buy';
   document.getElementById('f-status').value=t.status||'Open';
   document.getElementById('f-sl').value=t.sl||'';
+  document.getElementById('f-target').value=t.target||'';
   document.getElementById('f-plan').value=t.plan||'';
   document.getElementById('f-trigger').value=t.exitTrigger||'';
   document.getElementById('f-growth').value=t.growth||'';
@@ -1336,6 +1357,7 @@ function saveTrade(){
     side:document.getElementById('f-side').value,
     status:document.getElementById('f-status').value,
     sl:+document.getElementById('f-sl').value||0,
+    target:+document.getElementById('f-target').value||0,
     plan:document.getElementById('f-plan').value,
     exitTrigger:document.getElementById('f-trigger').value,
     growth:document.getElementById('f-growth').value,
@@ -1385,132 +1407,224 @@ function confirmDelete(id){
 // ══════════════════════════════════════════════════
 // TRADINGVIEW-STYLE CHART MODAL
 // ══════════════════════════════════════════════════
+// ── TradingView Lightweight Chart ─────────────────────────────────────────────
+let _lwChart = null, _lwSeries = null, _currentChartTrade = null, _currentTF = '1D';
+
+function setChartTF(tf, btn){
+  _currentTF = tf;
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(_currentChartTrade) loadChartData(_currentChartTrade);
+}
+
 function openChart(id){
-  const raw=trades.find(t=>t.id===id); if(!raw) return;
-  const t=calc({...raw});
-  document.getElementById('m-chart-title').textContent=`Chart — ${t.symbol}`;
+  const raw = trades.find(t=>t.id===id); if(!raw) return;
+  const t = calc({...raw});
+  _currentChartTrade = t;
+  document.getElementById('m-chart-title').textContent = `Chart — ${t.symbol}`;
   document.getElementById('m-chart').classList.add('open');
+  // Reset TF to 1D
+  _currentTF = '1D';
+  document.querySelectorAll('.tf-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+  loadChartData(t);
+}
 
-  // Destroy previous
-  if(tvChart){tvChart.destroy();tvChart=null;}
+function loadChartData(t){
+  const container = document.getElementById('tv-chart-container');
 
-  // Build synthetic price series from entries/exits
-  const pts=[];
+  // Show loading state
+  if(_lwChart){ try{_lwChart.remove();}catch(e){} _lwChart=null; _lwSeries=null; }
+  container.innerHTML = `<div id="tv-lw-chart" style="width:100%;height:100%"></div>
+    <div id="tv-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0C1219;z-index:10;color:var(--t3);font-size:13px;gap:8px">
+      <span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> Fetching ${t.symbol} data…
+    </div>`;
+
+  // Build Yahoo Finance symbol — NSE stocks need .NS suffix
+  const yfSym = t.symbol.includes('.') ? t.symbol : t.symbol + '.NS';
+
+  // Determine date range: 20 days before first entry to 20 days after last exit (or today)
+  const entryDates = (t.entries||[]).filter(e=>e.date).map(e=>new Date(e.date));
+  const exitDates  = (t.exits||[]).filter(e=>e.date).map(e=>new Date(e.date));
+  const allDates   = [...entryDates, ...exitDates];
+
+  let rangeStart, rangeEnd;
+  if(allDates.length){
+    const minD = new Date(Math.min(...allDates));
+    const maxD = new Date(Math.max(...allDates));
+    rangeStart = new Date(minD); rangeStart.setDate(rangeStart.getDate()-30);
+    rangeEnd   = new Date(maxD); rangeEnd.setDate(rangeEnd.getDate()+20);
+    if(rangeEnd > new Date()) rangeEnd = new Date();
+  } else {
+    rangeEnd = new Date();
+    rangeStart = new Date(); rangeStart.setMonth(rangeStart.getMonth()-3);
+  }
+
+  const period1 = Math.floor(rangeStart.getTime()/1000);
+  const period2 = Math.floor(rangeEnd.getTime()/1000);
+  const interval = _currentTF==='1D'?'1d':_currentTF==='1W'?'1wk':'1mo';
+
+  // Fetch via Yahoo Finance (works from real HTTPS origin)
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yfSym}?period1=${period1}&period2=${period2}&interval=${interval}&events=history`;
+
+  fetch(url)
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(data=>{
+      const res = data?.chart?.result?.[0];
+      if(!res) throw new Error('No data returned');
+      renderLWChart(t, res);
+    })
+    .catch(err=>{
+      console.warn('[Chart] Yahoo fetch failed:', err.message, '— using synthetic data');
+      renderLWChartSynthetic(t);
+    });
+}
+
+function renderLWChart(t, yahooResult){
+  const container = document.getElementById('tv-lw-chart');
+  const loading   = document.getElementById('tv-loading');
+
+  const timestamps = yahooResult.timestamp || [];
+  const ohlc       = yahooResult.indicators?.quote?.[0] || {};
+  const opens=ohlc.open||[], highs=ohlc.high||[], lows=ohlc.low||[], closes=ohlc.close||[];
+
+  // Build candle data
+  const candles = [];
+  timestamps.forEach((ts,i)=>{
+    if(!closes[i]) return;
+    candles.push({
+      time: ts,
+      open:  +(opens[i]||closes[i]).toFixed(2),
+      high:  +(highs[i]||closes[i]).toFixed(2),
+      low:   +(lows[i]||closes[i]).toFixed(2),
+      close: +(closes[i]).toFixed(2),
+    });
+  });
+
+  if(!candles.length){ renderLWChartSynthetic(t); return; }
+
+  // Create chart
+  _lwChart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: container.clientHeight,
+    layout: { background:{color:'#0C1219'}, textColor:'#8BA0B8' },
+    grid:   { vertLines:{color:'#162130'}, horzLines:{color:'#162130'} },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor:'#243548', scaleMargins:{top:0.1,bottom:0.1} },
+    timeScale: { borderColor:'#243548', timeVisible:true, secondsVisible:false },
+  });
+
+  _lwSeries = _lwChart.addCandlestickSeries({
+    upColor:'#00E5A0', downColor:'#FF4560',
+    borderUpColor:'#00E5A0', borderDownColor:'#FF4560',
+    wickUpColor:'#00E5A0',  wickDownColor:'#FF4560',
+  });
+  _lwSeries.setData(candles);
+
+  // Price lines
+  if(t.sl && t.sl > 0){
+    _lwSeries.createPriceLine({ price:t.sl, color:'#F5C542', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, axisLabelVisible:true, title:'SL' });
+  }
+  if(t.avgEntry && t.avgEntry > 0){
+    _lwSeries.createPriceLine({ price:t.avgEntry, color:'#A855F7', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, axisLabelVisible:true, title:'Avg Entry' });
+  }
+  if(t.target && t.target > 0){
+    _lwSeries.createPriceLine({ price:t.target, color:'#22D3EE', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, axisLabelVisible:true, title:'Target' });
+  }
+
+  // Entry markers
+  const markers = [];
+  (t.entries||[]).forEach((e,i)=>{
+    if(!e.date||!e.price) return;
+    const ts = Math.floor(new Date(e.date).getTime()/1000);
+    markers.push({ time:ts, position:'belowBar', color: ENTRY_COLORS[i]||'#00E5A0', shape:'arrowUp', text:`E${i+1} ₹${e.price}` });
+  });
+  (t.exits||[]).forEach((e,i)=>{
+    if(!e.date||!e.price) return;
+    const ts = Math.floor(new Date(e.date).getTime()/1000);
+    markers.push({ time:ts, position:'aboveBar', color: EXIT_COLORS[i]||'#FF4560', shape:'arrowDown', text:`X${i+1} ₹${e.price}` });
+  });
+  markers.sort((a,b)=>a.time-b.time);
+  if(markers.length) _lwSeries.setMarkers(markers);
+
+  // Fit content
+  _lwChart.timeScale().fitContent();
+
+  // Handle resize
+  const ro = new ResizeObserver(()=>{
+    if(_lwChart) _lwChart.applyOptions({ width:container.clientWidth, height:container.clientHeight });
+  });
+  ro.observe(container);
+
+  // Remove loading overlay
+  if(loading) loading.remove();
+  document.getElementById('chart-data-note').textContent = 'Live data via Yahoo Finance';
+}
+
+function renderLWChartSynthetic(t){
+  // Fallback: synthetic candlestick data built from entry/exit prices
+  const container = document.getElementById('tv-lw-chart');
+  const loading   = document.getElementById('tv-loading');
+
+  const pts = [];
   (t.entries||[]).forEach((e,i)=>{ if(e.date&&e.price) pts.push({date:e.date,price:+e.price,type:'entry',idx:i}); });
   (t.exits||[]).forEach((e,i)=>{ if(e.date&&e.price) pts.push({date:e.date,price:+e.price,type:'exit',idx:i}); });
   pts.sort((a,b)=>a.date.localeCompare(b.date));
 
   if(!pts.length){
-    document.getElementById('tv-chart-container').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:13px">No entry/exit data to chart</div>';
+    if(loading) loading.innerHTML='<span style="color:var(--t3)">No entry/exit data to chart</span>';
     return;
   }
 
-  // Generate synthetic OHLC-style background price
-  const allPrices=pts.map(p=>p.price);
-  const minP=Math.min(...allPrices)*0.97;
-  const maxP=Math.max(...allPrices)*1.03;
-  const range=maxP-minP;
+  const allPrices = pts.map(p=>p.price);
+  const minP = Math.min(...allPrices)*0.97;
+  const maxP = Math.max(...allPrices)*1.03;
+  const range = maxP - minP;
 
-  // Build date range
-  const startDate=new Date(pts[0].date);
-  const endDate=pts[pts.length-1].date?new Date(pts[pts.length-1].date):new Date();
-  endDate.setDate(endDate.getDate()+10);
-  const labels=[];
-  const d=new Date(startDate);d.setDate(d.getDate()-5);
-  while(d<=endDate){labels.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
+  const startD = new Date(pts[0].date); startD.setDate(startD.getDate()-5);
+  const endD   = new Date(pts[pts.length-1].date); endD.setDate(endD.getDate()+10);
+  const candles = [];
+  let prev = (minP+maxP)/2;
+  for(let d=new Date(startD); d<=endD; d.setDate(d.getDate()+1)){
+    if([0,6].includes(d.getDay())) continue; // skip weekends
+    const dateStr = d.toISOString().slice(0,10);
+    const ts = Math.floor(d.getTime()/1000);
+    const ptMatch = pts.find(p=>p.date===dateStr);
+    const close = ptMatch ? ptMatch.price : +(prev + (Math.random()-0.48)*range*0.025).toFixed(2);
+    const open  = prev;
+    const high  = +(Math.max(open,close)*(1+Math.random()*0.005)).toFixed(2);
+    const low   = +(Math.min(open,close)*(1-Math.random()*0.005)).toFixed(2);
+    candles.push({time:ts, open, high, low, close});
+    prev = close;
+  }
 
-  // Synthetic price using sine wave bounded by range
-  const prices=labels.map((l,i)=>{
-    const pct=i/labels.length;
-    const base=(minP+maxP)/2;
-    const wave=Math.sin(pct*Math.PI*3)*range*0.15;
-    const trend=t.side==='Buy'?(t.realisedPL>0?range*0.1*pct:-range*0.08*pct):0;
-    return +(base+wave+trend).toFixed(2);
+  _lwChart = LightweightCharts.createChart(container, {
+    width:container.clientWidth, height:container.clientHeight,
+    layout:{ background:{color:'#0C1219'}, textColor:'#8BA0B8' },
+    grid:{ vertLines:{color:'#162130'}, horzLines:{color:'#162130'} },
+    crosshair:{ mode:LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale:{ borderColor:'#243548' },
+    timeScale:{ borderColor:'#243548', timeVisible:true },
   });
-
-  // Snap real prices at their dates
-  pts.forEach(pt=>{
-    const i=labels.indexOf(pt.date);
-    if(i>=0) prices[i]=pt.price;
+  _lwSeries = _lwChart.addCandlestickSeries({
+    upColor:'#00E5A0', downColor:'#FF4560',
+    borderUpColor:'#00E5A0', borderDownColor:'#FF4560',
+    wickUpColor:'#00E5A0', wickDownColor:'#FF4560',
   });
+  _lwSeries.setData(candles);
 
-  // Entry / Exit annotations
-  const entryPoints={}, exitPoints={};
-  pts.forEach(pt=>{
-    const i=labels.indexOf(pt.date);
-    if(i<0) return;
-    if(pt.type==='entry') entryPoints[i]=pt.price;
-    else exitPoints[i]=pt.price;
-  });
+  if(t.sl>0) _lwSeries.createPriceLine({price:t.sl,color:'#F5C542',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:'SL'});
+  if(t.avgEntry>0) _lwSeries.createPriceLine({price:t.avgEntry,color:'#A855F7',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:'Avg Entry'});
+  if(t.target>0) _lwSeries.createPriceLine({price:t.target,color:'#22D3EE',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:'Target'});
 
-  // SL line
-  const slData=t.sl ? labels.map(()=>t.sl) : null;
-  // Avg entry line
-  const avgData=t.avgEntry ? labels.map(()=>t.avgEntry) : null;
+  const markers=[];
+  (t.entries||[]).forEach((e,i)=>{ if(e.date&&e.price) markers.push({time:Math.floor(new Date(e.date).getTime()/1000),position:'belowBar',color:ENTRY_COLORS[i]||'#00E5A0',shape:'arrowUp',text:`E${i+1} ₹${e.price}`}); });
+  (t.exits||[]).forEach((e,i)=>{ if(e.date&&e.price) markers.push({time:Math.floor(new Date(e.date).getTime()/1000),position:'aboveBar',color:EXIT_COLORS[i]||'#FF4560',shape:'arrowDown',text:`X${i+1} ₹${e.price}`}); });
+  markers.sort((a,b)=>a.time-b.time);
+  if(markers.length) _lwSeries.setMarkers(markers);
+  _lwChart.timeScale().fitContent();
 
-  const ctx=document.getElementById('tv-chart-canvas');
-  ctx.parentElement.innerHTML='<canvas id="tv-chart-canvas"></canvas>';
-  const newCtx=document.getElementById('tv-chart-canvas');
-
-  tvChart=new Chart(newCtx,{
-    type:'line',
-    data:{
-      labels,
-      datasets:[
-        {label:'Price',data:prices,borderColor:'#4A6882',borderWidth:1.5,fill:false,tension:0.3,pointRadius:0,pointHoverRadius:3,order:4},
-        avgData&&{label:'Avg Entry',data:avgData,borderColor:'#A855F788',borderWidth:1,borderDash:[4,4],fill:false,pointRadius:0,tension:0,order:3},
-        slData&&{label:'Stop Loss',data:slData,borderColor:'#F5C54255',borderWidth:1,borderDash:[3,6],fill:false,pointRadius:0,tension:0,order:2},
-        {
-          label:'Entries',
-          data:labels.map((_,i)=>entryPoints[i]!==undefined?entryPoints[i]:null),
-          borderColor:'transparent',
-          pointBackgroundColor:labels.map((_,i)=>{
-            if(entryPoints[i]===undefined) return 'transparent';
-            const pidx=pts.findIndex(p=>p.date===labels[i]&&p.type==='entry');
-            return ENTRY_COLORS[pidx]||ENTRY_COLORS[0];
-          }),
-          pointBorderColor:'#080D14',
-          pointBorderWidth:2,
-          pointRadius:labels.map((_,i)=>entryPoints[i]!==undefined?8:0),
-          pointHoverRadius:10,
-          showLine:false,order:1,
-        },
-        {
-          label:'Exits',
-          data:labels.map((_,i)=>exitPoints[i]!==undefined?exitPoints[i]:null),
-          borderColor:'transparent',
-          pointBackgroundColor:labels.map((_,i)=>{
-            if(exitPoints[i]===undefined) return 'transparent';
-            const pidx=pts.filter(p=>p.type==='exit').findIndex(p=>p.date===labels[i]);
-            return EXIT_COLORS[pidx]||EXIT_COLORS[0];
-          }),
-          pointBorderColor:'#080D14',
-          pointBorderWidth:2,
-          pointRadius:labels.map((_,i)=>exitPoints[i]!==undefined?8:0),
-          pointHoverRadius:10,
-          showLine:false,order:0,
-        },
-      ].filter(Boolean),
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      animation:{duration:400},
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          backgroundColor:'#111820',borderColor:'#2E4055',borderWidth:1,
-          titleColor:'#8BA0B8',bodyColor:'#EDF2F7',padding:10,
-          titleFont:{family:'Outfit'},bodyFont:{family:'IBM Plex Mono',size:11},
-          filter:(i)=>i.parsed.y!==null,
-        },
-      },
-      scales:{
-        x:{grid:{color:'#162130',drawBorder:false},ticks:{color:'#4A6882',font:{family:'Outfit',size:10},maxTicksLimit:10},border:{display:false}},
-        y:{grid:{color:'#162130',drawBorder:false},ticks:{color:'#4A6882',font:{family:'IBM Plex Mono',size:10},callback:v=>'₹'+v.toLocaleString('en-IN')},border:{display:false}},
-      },
-    },
-  });
+  if(loading) loading.remove();
+  document.getElementById('chart-data-note').textContent = 'Synthetic data (Yahoo Finance unavailable)';
 }
 
 // ══════════════════════════════════════════════════
