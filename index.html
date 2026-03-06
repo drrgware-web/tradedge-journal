@@ -1421,14 +1421,23 @@ const lineSeries = chart.addLineSeries({
     lineWidth: 2 
 });
 chart.priceScale('right').applyOptions({ autoScale: true });
-// 2. Map trade points and create a background line
-    lineSeries.setData(chartData);
+// 2. Create a price series to act as the foundation
+    const areaSeries = chart.addAreaSeries({
+        lineColor: '#2962FF',
+        topColor: 'rgba(41, 98, 255, 0.3)',
+        bottomColor: 'rgba(41, 98, 255, 0)',
+        lineWidth: 2,
+    });
 
-    // 3. Set the Buy/Sell arrows
-    lineSeries.setMarkers(markers);
+    // 3. Load the data and markers
+    areaSeries.setData(chartData);
+    areaSeries.setMarkers(markers);
 
-    // 4. Zoom to fit the trade perfectly
+    // 4. Force a scale update and fit
     setTimeout(() => {
+        chart.timeScale().fitContent();
+        chart.priceScale('right').applyOptions({ autoScale: true });
+    }, 100);
         chart.timeScale().fitContent();
     }, 100);
 // ------------------------------------------
