@@ -6,6 +6,7 @@
 <title>TradEdge Trading Journal</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 /* ── RESET & ROOT ─────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -1387,7 +1388,38 @@ function openChart(id){
     document.getElementById('tv-chart-container').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:13px">No entry/exit data to chart</div>';
     return;
   }
+// --- Lightweight Charts Implementation ---
+const chartContainer = document.getElementById('tv-chart-container');
+chartContainer.innerHTML = ''; // Clear previous
 
+const chart = LightweightCharts.createChart(chartContainer, {
+    width: chartContainer.clientWidth,
+    height: 400,
+    layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+    grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+});
+
+const candleSeries = chart.addCandlestickSeries();
+
+// Map your 'pts' array to the chart format
+const chartData = pts.map(p => ({
+    time: p.date,
+    value: p.price
+}));
+
+// Add markers for Buy/Sell
+const markers = pts.map(p => ({
+    time: p.date,
+    position: p.type === 'entry' ? 'belowBar' : 'aboveBar',
+    color: p.type === 'entry' ? '#22c55e' : '#ef4444',
+    shape: p.type === 'entry' ? 'arrowUp' : 'arrowDown',
+    text: (p.type === 'entry' ? 'Buy @' : 'Sell @') + p.price
+}));
+
+candleSeries.setData(chartData);
+candleSeries.setMarkers(markers);
+chart.timeScale().fitContent();
+// ------------------------------------------
   // Generate synthetic OHLC-style background price
   const allPrices=pts.map(p=>p.price);
   const minP=Math.min(...allPrices)*0.97;
