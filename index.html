@@ -445,6 +445,11 @@ select.fi{cursor:pointer}
 .sym-opt-name{font-size:10.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .sym-opt-sector{font-size:10px;color:var(--t4);margin-left:auto;flex-shrink:0;padding-left:8px}
 
+
+@keyframes slideInRight {
+  from { transform:translateX(120%); opacity:0; }
+  to   { transform:translateX(0);    opacity:1; }
+}
 </style>
 </head>
 <body>
@@ -468,6 +473,10 @@ select.fi{cursor:pointer}
   </div>
   <div class="sb-item" id="nav-fund" data-tip="Fund Management" onclick="nav('fund')">
     <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+  </div>
+  <div class="sb-item" id="nav-alerts" data-tip="Price Alerts" onclick="nav('alerts')" style="position:relative">
+    <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+    <span id="alert-badge" style="display:none;position:absolute;top:6px;right:6px;width:8px;height:8px;background:var(--r);border-radius:50%;border:1.5px solid var(--bg1)"></span>
   </div>
   <div class="sb-spacer"></div>
   <div class="sb-item" id="nav-settings" data-tip="Settings & Sync" onclick="nav('settings')">
@@ -622,6 +631,98 @@ select.fi{cursor:pointer}
           <tbody id="fund-tbody"></tbody>
           <tfoot id="fund-tfoot"></tfoot>
         </table>
+      </div>
+    </div>
+
+
+    <!-- ══ PRICE ALERTS ══ -->
+    <div class="page" id="page-alerts">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--t1)">🔔 Price Alerts</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">Get notified when stocks hit your key levels. Prices refresh every 5 minutes.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span id="alert-refresh-status" style="font-size:11px;color:var(--t3);font-family:'IBM Plex Mono',monospace"></span>
+          <button class="btn btn-ghost" onclick="requestAlertPermission()" id="notif-perm-btn" style="display:none">
+            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            Enable Notifications
+          </button>
+          <button class="btn btn-ghost" onclick="manualAlertRefresh()">
+            <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Refresh Now
+          </button>
+          <button class="btn btn-y" onclick="openAddAlertModal()">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Alert
+          </button>
+        </div>
+      </div>
+
+      <!-- Auto-alert pills for open trades -->
+      <div id="trade-alerts-section" style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Auto-Alerts from Open Trades</div>
+        <div id="trade-alerts-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
+      <!-- Custom alerts -->
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Custom Alerts</div>
+        <div id="custom-alerts-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div id="no-custom-alerts" style="color:var(--t3);font-size:13px;padding:20px;text-align:center;border:1px dashed var(--b2);border-radius:10px;display:none">
+          No custom alerts yet. Click <b style="color:var(--t1)">Add Alert</b> to create one.
+        </div>
+      </div>
+
+      <!-- Triggered alerts log -->
+      <div style="margin-top:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Recent Triggers</div>
+          <button class="btn btn-ghost btn-xs" onclick="clearAlertLog()" style="font-size:10px">Clear</button>
+        </div>
+        <div id="alert-log-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto"></div>
+        <div id="no-alert-log" style="color:var(--t3);font-size:12px;text-align:center;padding:16px">No alerts triggered yet</div>
+      </div>
+    </div>
+
+    <!-- ══ ADD ALERT MODAL ══ -->
+    <div class="modal-bg" id="m-add-alert" onclick="if(event.target===this)closeM('m-add-alert')">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-hdr">
+          <div class="modal-title">New Price Alert</div>
+          <button class="modal-x" onclick="closeM('m-add-alert')">×</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+          <div class="fg f-full">
+            <label class="fl">Stock Symbol</label>
+            <input class="fi" id="al-symbol" placeholder="e.g. RELIANCE" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="fg f-full">
+            <label class="fl">Alert Type</label>
+            <select class="fi" id="al-type" onchange="updateAlertTypeHint()">
+              <option value="above">Price rises ABOVE</option>
+              <option value="below">Price falls BELOW</option>
+            </select>
+          </div>
+          <div class="fg f-full">
+            <label class="fl">Target Price (₹)</label>
+            <input class="fi" id="al-price" type="number" placeholder="0.00">
+          </div>
+          <div class="fg f-full">
+            <label class="fl">Note (optional)</label>
+            <input class="fi" id="al-note" placeholder="e.g. Breakout level, Support zone...">
+          </div>
+          <div id="al-hint" style="font-size:11px;color:var(--t3);padding:8px 10px;background:var(--bg3);border-radius:6px">
+            Alert will trigger when price <b style="color:var(--t1)">rises above</b> the target.
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="closeM('m-add-alert')">Cancel</button>
+          <button class="btn btn-y" onclick="saveCustomAlert()">
+            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            Set Alert
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1208,7 +1309,7 @@ function save(){
 // ══════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════
-const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',settings:'Settings & Sync'};
+const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',alerts:'Price Alerts',settings:'Settings & Sync'};
 function nav(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.sb-item[id^=nav-]').forEach(x=>x.classList.remove('active'));
@@ -1221,6 +1322,7 @@ function nav(p){
   if(p==='calendar')renderCal();
   if(p==='settings')loadSettings();
   if(p==='fund')renderFund();
+  if(p==='alerts')renderAlerts();
 }
 
 // ══════════════════════════════════════════════════
@@ -2738,6 +2840,359 @@ function toggleLiveAuto(on) {
   }, 3 * 60 * 1000); // every 3 min
 }
 
+
+// ══════════════════════════════════════════════════
+// PRICE ALERTS ENGINE
+// ══════════════════════════════════════════════════
+
+let customAlerts = JSON.parse(localStorage.getItem('te_alerts') || '[]');
+let alertLog     = JSON.parse(localStorage.getItem('te_alert_log') || '[]');
+let alertTimer   = null;
+let triggeredSet = new Set(JSON.parse(localStorage.getItem('te_triggered') || '[]'));
+
+function saveAlerts() {
+  localStorage.setItem('te_alerts', JSON.stringify(customAlerts));
+  localStorage.setItem('te_alert_log', JSON.stringify(alertLog));
+  localStorage.setItem('te_triggered', JSON.stringify([...triggeredSet]));
+}
+
+// ── Notification permission ──────────────────────
+async function requestAlertPermission() {
+  if (!('Notification' in window)) { toast('Notifications not supported in this browser', '⚠️'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') { toast('Notifications enabled! 🔔', '✅'); }
+  else { toast('Notification permission denied', '⚠️'); }
+  renderAlerts();
+  document.getElementById('notif-perm-btn').style.display = 'none';
+}
+
+function checkNotifPermission() {
+  const btn = document.getElementById('notif-perm-btn');
+  if (!btn) return;
+  if (!('Notification' in window)) { btn.style.display = 'none'; return; }
+  btn.style.display = (Notification.permission === 'default') ? '' : 'none';
+}
+
+// ── Sound effect ──────────────────────────────────
+function playAlertSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523, 659, 784];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
+      gain.gain.linearRampToValueAtTime(0, t + 0.25);
+      osc.start(t); osc.stop(t + 0.3);
+    });
+  } catch(e) {}
+}
+
+// ── Fire an alert ────────────────────────────────
+function fireAlert(symbol, price, level, label, color) {
+  const key = `${symbol}_${label}_${level}`;
+  if (triggeredSet.has(key)) return;
+  triggeredSet.add(key);
+
+  // Sound
+  playAlertSound();
+
+  // Browser notification
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try {
+      new Notification(`🔔 TradEdge Alert: ${symbol}`, {
+        body: `${label} hit at ₹${price.toFixed(2)} (level: ₹${level.toFixed(2)})`,
+        icon: 'https://tradedge-myjournalapp.netlify.app/favicon.ico',
+        tag: key,
+      });
+    } catch(e) {}
+  }
+
+  // In-app banner toast
+  showAlertBanner(symbol, price, level, label, color);
+
+  // Log entry
+  alertLog.unshift({
+    ts: Date.now(),
+    symbol, price, level, label, color
+  });
+  if (alertLog.length > 50) alertLog = alertLog.slice(0, 50);
+  saveAlerts();
+  updateAlertBadge();
+  renderAlerts();
+}
+
+function showAlertBanner(symbol, price, level, label, color) {
+  const id = 'alert-banner-' + Date.now();
+  const banner = document.createElement('div');
+  banner.id = id;
+  banner.style.cssText = `
+    position:fixed;top:70px;right:20px;z-index:9999;
+    background:var(--bg3);border:1px solid ${color};border-left:3px solid ${color};
+    border-radius:10px;padding:12px 16px;min-width:260px;max-width:320px;
+    box-shadow:0 4px 24px rgba(0,0,0,.5);animation:slideInRight .3s ease;
+    font-family:'Outfit',sans-serif;
+  `;
+  banner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:20px">🔔</span>
+      <div style="flex:1">
+        <div style="font-weight:700;color:${color};font-size:13px">${symbol} — ${label}</div>
+        <div style="color:var(--t2);font-size:12px;margin-top:2px">CMP ₹${price.toFixed(2)} · Level ₹${level.toFixed(2)}</div>
+      </div>
+      <button onclick="document.getElementById('${id}').remove()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0;line-height:1">×</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+  setTimeout(() => { if(document.getElementById(id)) document.getElementById(id).remove(); }, 8000);
+}
+
+// ── Build alert levels from open trades ──────────
+function getTradeAlertLevels() {
+  const levels = [];
+  trades.filter(t => t.status !== 'Closed').forEach(t => {
+    const ct = calc({...t});
+    const sym = t.symbol;
+    if (!sym) return;
+    const avgE = ct.avgEntry || 0;
+    const sl   = +(t.sl || 0);
+    const tgt  = +(t.target || 0);
+    if (sl   > 0) levels.push({ symbol:sym, tradeId:t.id, level:sl,   label:'Stop Loss',   type:'below', color:'var(--r)', auto:true });
+    if (tgt  > 0) levels.push({ symbol:sym, tradeId:t.id, level:tgt,  label:'Target',      type:'above', color:'var(--c)', auto:true });
+    if (avgE > 0) levels.push({ symbol:sym, tradeId:t.id, level:avgE, label:'Avg Entry',   type:'below', color:'var(--y)', auto:true });
+  });
+  return levels;
+}
+
+// ── Check all alerts against CMPs ────────────────
+function checkAllAlerts(prices) {
+  const tradeAlerts = getTradeAlertLevels();
+  const allAlerts = [...tradeAlerts, ...customAlerts];
+  
+  allAlerts.forEach(a => {
+    const cmp = prices[a.symbol];
+    if (cmp == null) return;
+    const triggered = a.type === 'above' ? cmp >= a.level : cmp <= a.level;
+    if (triggered) {
+      const c = a.color || (a.type === 'above' ? 'var(--g)' : 'var(--r)');
+      fireAlert(a.symbol, cmp, a.level, a.label, c);
+    }
+  });
+}
+
+// ── Fetch prices for all alert symbols ───────────
+async function fetchAlertPrices() {
+  const tradeAlerts = getTradeAlertLevels();
+  const allAlerts   = [...tradeAlerts, ...customAlerts];
+  const syms = [...new Set(allAlerts.map(a => a.symbol))];
+  if (!syms.length) return {};
+  
+  const prices = {};
+  for (const sym of syms) {
+    const cmp = await fetchCMP(sym);
+    if (cmp != null) prices[sym] = cmp;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return prices;
+}
+
+// ── Main alert check cycle ────────────────────────
+async function runAlertCheck() {
+  const statusEl = document.getElementById('alert-refresh-status');
+  if (statusEl) statusEl.textContent = 'Checking…';
+  
+  try {
+    const prices = await fetchAlertPrices();
+    // Update CMP on trades too
+    Object.keys(prices).forEach(sym => {
+      trades.forEach(t => { if(t.symbol === sym && t.status !== 'Closed') t.cmp = prices[sym]; });
+    });
+    checkAllAlerts(prices);
+    const now = new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+    if (statusEl) statusEl.textContent = 'Last checked: ' + now;
+    renderAlerts();
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Check failed';
+  }
+}
+
+async function manualAlertRefresh() {
+  toast('Checking prices…', '🔄');
+  await runAlertCheck();
+  toast('Alert check complete', '✅');
+}
+
+// ── Start/stop 5-minute alert timer ──────────────
+function startAlertTimer() {
+  if (alertTimer) clearInterval(alertTimer);
+  alertTimer = setInterval(() => {
+    const ist = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Kolkata'}));
+    const h = ist.getHours(), mi = ist.getMinutes(), day = ist.getDay();
+    const mktOpen = day>=1&&day<=5&&(h>9||(h===9&&mi>=15))&&(h<15||(h===15&&mi<=30));
+    if (mktOpen) runAlertCheck();
+  }, 5 * 60 * 1000);
+}
+
+// ── Add custom alert modal ────────────────────────
+function openAddAlertModal() {
+  document.getElementById('al-symbol').value = '';
+  document.getElementById('al-price').value  = '';
+  document.getElementById('al-note').value   = '';
+  document.getElementById('al-type').value   = 'above';
+  updateAlertTypeHint();
+  openM('m-add-alert');
+  setTimeout(() => document.getElementById('al-symbol').focus(), 100);
+}
+
+function updateAlertTypeHint() {
+  const t = document.getElementById('al-type').value;
+  const h = document.getElementById('al-hint');
+  if (h) h.innerHTML = t === 'above'
+    ? 'Alert will trigger when price <b style="color:var(--g)">rises above</b> the target.'
+    : 'Alert will trigger when price <b style="color:var(--r)">falls below</b> the target.';
+}
+
+function saveCustomAlert() {
+  const sym   = (document.getElementById('al-symbol').value || '').trim().toUpperCase();
+  const price = +(document.getElementById('al-price').value || 0);
+  const type  = document.getElementById('al-type').value;
+  const note  = (document.getElementById('al-note').value || '').trim();
+  if (!sym) { toast('Enter a stock symbol', '⚠️'); return; }
+  if (!price) { toast('Enter a target price', '⚠️'); return; }
+  customAlerts.push({
+    id: Date.now() + Math.random().toString(36).slice(2),
+    symbol: sym, level: price, type, label: note || (type === 'above' ? 'Above ₹'+price : 'Below ₹'+price),
+    color: type === 'above' ? 'var(--g)' : 'var(--r)', auto: false,
+    createdAt: Date.now()
+  });
+  saveAlerts();
+  closeM('m-add-alert');
+  renderAlerts();
+  toast(`Alert set: ${sym} ${type === 'above' ? '▲' : '▼'} ₹${price}`, '🔔');
+}
+
+function deleteCustomAlert(id) {
+  customAlerts = customAlerts.filter(a => a.id !== id);
+  saveAlerts();
+  renderAlerts();
+  toast('Alert deleted', '🗑');
+}
+
+function resetAlert(symbol, label) {
+  const key = [...triggeredSet].find(k => k.startsWith(symbol + '_' + label));
+  if (key) { triggeredSet.delete(key); saveAlerts(); renderAlerts(); toast('Alert re-armed','✅'); }
+}
+
+function clearAlertLog() {
+  alertLog = [];
+  saveAlerts();
+  renderAlerts();
+  toast('Alert log cleared','🗑');
+}
+
+function updateAlertBadge() {
+  const badge = document.getElementById('alert-badge');
+  if (!badge) return;
+  const hasNew = alertLog.length > 0 && (Date.now() - alertLog[0].ts) < 5*60*1000;
+  badge.style.display = hasNew ? '' : 'none';
+}
+
+// ── Render alerts page ────────────────────────────
+function renderAlerts() {
+  checkNotifPermission();
+  updateAlertBadge();
+  
+  // Trade alerts
+  const tradeAlerts = getTradeAlertLevels();
+  const tradeEl = document.getElementById('trade-alerts-list');
+  if (tradeEl) {
+    if (!tradeAlerts.length) {
+      tradeEl.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:10px 0">No open trades with SL/Target/Avg Entry set.</div>';
+    } else {
+      tradeEl.innerHTML = tradeAlerts.map(a => {
+        const key = `${a.symbol}_${a.label}_${a.level}`;
+        const fired = triggeredSet.has(key);
+        const cmp = (trades.find(t => t.symbol === a.symbol) || {}).cmp;
+        const cmpStr = cmp ? `CMP ₹${(+cmp).toFixed(2)}` : '';
+        const diff = cmp ? ((a.type==='above'?a.level-cmp:cmp-a.level)) : null;
+        const diffStr = diff!=null ? (diff>0?`₹${diff.toFixed(2)} away`:'⚡ Near/triggered') : '';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${a.color};border-radius:8px;${fired?'opacity:.5':''}">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-weight:700;color:var(--t1)">${a.symbol}</span>
+              <span style="font-size:11px;color:${a.color};background:${a.color.replace('var(--','var(--').replace(')','')}1a);padding:2px 7px;border-radius:20px">${a.label}</span>
+              <span style="font-size:11px;color:var(--t3)">${a.type==='above'?'▲ Above':'▼ Below'} ₹${a.level.toFixed(2)}</span>
+              ${cmpStr?`<span style="font-size:11px;color:var(--t2);font-family:'IBM Plex Mono',monospace">${cmpStr}</span>`:''}
+              ${diffStr?`<span style="font-size:11px;color:var(--t3)">${diffStr}</span>`:''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${fired?`<button class="btn btn-ghost btn-xs" onclick="resetAlert('${a.symbol}','${a.label}')" title="Re-arm alert">🔁</button>`:'<span style="font-size:11px;color:var(--g);padding:3px 8px">Armed</span>'}
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // Custom alerts
+  const customEl = document.getElementById('custom-alerts-list');
+  const noCustomEl = document.getElementById('no-custom-alerts');
+  if (customEl) {
+    if (!customAlerts.length) {
+      customEl.innerHTML = '';
+      if (noCustomEl) noCustomEl.style.display = '';
+    } else {
+      if (noCustomEl) noCustomEl.style.display = 'none';
+      customEl.innerHTML = customAlerts.map(a => {
+        const key = `${a.symbol}_${a.label}_${a.level}`;
+        const fired = triggeredSet.has(key);
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${a.color};border-radius:8px;${fired?'opacity:.5':''}">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-weight:700;color:var(--t1)">${a.symbol}</span>
+              <span style="font-size:11px;color:${a.color};padding:2px 7px;border-radius:20px;background:${a.color.replace('var(--','var(--').replace(')','')}1a">${a.label}</span>
+              <span style="font-size:11px;color:var(--t3)">${a.type==='above'?'▲ Above':'▼ Below'} ₹${a.level.toFixed(2)}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${fired?`<button class="btn btn-ghost btn-xs" onclick="resetAlert('${a.symbol}','${a.label}')" title="Re-arm">🔁</button>`:'<span style="font-size:11px;color:var(--g);padding:3px 8px">Armed</span>'}
+            <button class="btn btn-ghost btn-xs" onclick="deleteCustomAlert('${a.id}')" title="Delete" style="color:var(--r)">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // Alert log
+  const logEl = document.getElementById('alert-log-list');
+  const noLogEl = document.getElementById('no-alert-log');
+  if (logEl) {
+    if (!alertLog.length) {
+      logEl.innerHTML = '';
+      if (noLogEl) noLogEl.style.display = '';
+    } else {
+      if (noLogEl) noLogEl.style.display = 'none';
+      logEl.innerHTML = alertLog.slice(0, 20).map(e => {
+        const t = new Date(e.ts).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+        const d = new Date(e.ts).toLocaleDateString('en-IN', {day:'2-digit',month:'short'});
+        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--bg2);border-radius:7px;border:1px solid var(--b1)">
+          <span style="font-size:16px">🔔</span>
+          <div style="flex:1">
+            <span style="font-weight:600;color:${e.color||'var(--y)'}">${e.symbol}</span>
+            <span style="color:var(--t2);font-size:12px"> — ${e.label} hit at ₹${(+e.price).toFixed(2)} (level ₹${(+e.level).toFixed(2)})</span>
+          </div>
+          <span style="font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace;white-space:nowrap">${d} ${t}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
 // ══════════════════════════════════════════════════
 // DEFINEDGE (RZONE) SYNC
 // ══════════════════════════════════════════════════
@@ -3461,6 +3916,11 @@ if(localStorage.getItem('sb_auto')) sbAutoEnabled = true;
 
 // Render initial page
 renderDash();
+
+// Start price alert polling (5 min)
+startAlertTimer();
+// Initial check after 10s to not slow down startup
+setTimeout(() => runAlertCheck(), 10000);
 
 // Auto-fix status of all existing trades based on qty
 (function fixTradeStatuses(){
