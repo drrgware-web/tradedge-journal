@@ -6,7 +6,6 @@
 <title>TradEdge Trading Journal</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 /* ── RESET & ROOT ─────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -914,7 +913,7 @@ select.fi{cursor:pointer}
           </div>
           <div class="fg"><label class="fl">Setup</label><input class="fi" id="f-setup" placeholder="BearTrap, DTB, Breakout…"></div>
           <div class="fg"><label class="fl">Side *</label><select class="fi" id="f-side"><option value="Buy">Buy (Long)</option><option value="Sell">Sell (Short)</option></select></div>
-          <div class="fg"><label class="fl">Status</label><select class="fi" id="f-status"><option value="Open">Open</option><option value="Partial">Partial</option><option value="Closed">Closed</option></select></div>
+          <div class="fg"><label class="fl">Status <span style="color:var(--t4);font-weight:400">(auto)</span></label><select class="fi" id="f-status" disabled style="opacity:.5;cursor:not-allowed"><option value="Open">Open</option><option value="Partial">Partial</option><option value="Closed">Closed</option></select></div>
         </div>
       </div>
       <!-- Pyramid Entries -->
@@ -1169,6 +1168,14 @@ function calc(t) {
   const lastExit = t.exits&&t.exits.length ? new Date(t.exits[t.exits.length-1].date) : null;
   const endDate = t.status==='Closed'&&lastExit ? lastExit : new Date();
   t.holdDays = start ? Math.max(0,Math.round((endDate-start)/86400000)) : 0;
+
+  // Auto-derive status from quantities — overrides manual status
+  if(tQty > 0){
+    if(eQty <= 0)          t.status = 'Open';
+    else if(eQty >= tQty)  t.status = 'Closed';
+    else                   t.status = 'Partial';
+  }
+
   return t;
 }
 function save(){
@@ -1336,6 +1343,15 @@ function saveTrade(){
     source:'manual',entries,exits,cmp:0,
   };
 
+  // Auto-derive status from qty — don't rely on manual dropdown
+  const tQty = entries.reduce((s,e)=>s+(+e.qty||0),0);
+  const eQty = exits.reduce((s,e)=>s+(+e.qty||0),0);
+  if(tQty > 0){
+    if(eQty <= 0)         t.status = 'Open';
+    else if(eQty >= tQty) t.status = 'Closed';
+    else                  t.status = 'Partial';
+  }
+
   if(editId){const i=trades.findIndex(x=>x.id===editId);if(i>=0)trades[i]=t;}
   else trades.push(t);
   save();
@@ -1388,51 +1404,7 @@ function openChart(id){
     document.getElementById('tv-chart-container').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:13px">No entry/exit data to chart</div>';
     return;
   }
-// --- Lightweight Charts Implementation ---
-const chartContainer = document.getElementById('tv-chart-container');
-chartContainer.innerHTML = ''; // Clear previous
 
-const chart = LightweightCharts.createChart(chartContainer, {
-    width: chartContainer.clientWidth,
-    height: 400,
-    layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
-    grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
-});
-
-const candleSeries = chart.addCandlestickSeries();
-
-// Map your 'pts' array to the chart format
-const chartData = pts.map(p => ({
-    time: p.date,
-    value: p.price
-}));
-
-// Add markers for Buy/Sell
-const markers = pts.map(p => ({
-    time: p.date,
-    position: p.type === 'entry' ? 'belowBar' : 'aboveBar',
-    color: p.type === 'entry' ? '#22c55e' : '#ef4444',
-    shape: p.type === 'entry' ? 'arrowUp' : 'arrowDown',
-    text: (p.type === 'entry' ? 'Buy @' : 'Sell @') + p.price
-}));
-// 1. Create the visual series
-const lineSeries = chart.addLineSeries({ 
-    color: '#2962FF', 
-    lineWidth: 2 
-});
-
-// 2. Load the trade points
-lineSeries.setData(chartData);
-
-// 3. Set the Buy/Sell arrows
-lineSeries.setMarkers(markers);
-
-// 4. Zoom to fit the trade perfectly
-chart.timeScale().fitContent();
-candleSeries.setData(chartData);
-candleSeries.setMarkers(markers);
-chart.timeScale().fitContent();
-// ------------------------------------------
   // Generate synthetic OHLC-style background price
   const allPrices=pts.map(p=>p.price);
   const minP=Math.min(...allPrices)*0.97;
@@ -3375,6 +3347,20 @@ if(localStorage.getItem('sb_auto')) sbAutoEnabled = true;
 
 // Render initial page
 renderDash();
+
+// Auto-fix status of all existing trades based on qty
+(function fixTradeStatuses(){
+  let changed = false;
+  trades.forEach(t => {
+    const tQty = (t.entries||[]).reduce((s,e)=>s+(+e.qty||0),0);
+    const eQty = (t.exits||[]).reduce((s,e)=>s+(+e.qty||0),0);
+    if(tQty > 0){
+      const correct = eQty <= 0 ? 'Open' : eQty >= tQty ? 'Closed' : 'Partial';
+      if(t.status !== correct){ t.status = correct; changed = true; }
+    }
+  });
+  if(changed){ localStorage.setItem('te_trades', JSON.stringify(trades)); }
+})();
 
 // Auto-pull on load — if local is empty, fetch from cloud
 setTimeout(()=>{
