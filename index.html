@@ -701,6 +701,15 @@ select.fi{cursor:pointer}
         </div>
       </div>
 
+      <!-- API Key bar -->
+      <div id="ai-key-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:12px 14px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;flex-shrink:0;stroke:var(--y);fill:none;stroke-width:1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <input class="fi" id="ai-api-key" type="password" placeholder="Paste your Anthropic API key (sk-ant-…)" style="flex:1;font-size:12px;font-family:'IBM Plex Mono',monospace;background:transparent;border:none;outline:none;color:var(--t1)" oninput="saveAIKey()">
+        <button class="btn btn-ghost btn-xs" onclick="toggleKeyVisibility()" id="ai-key-eye" title="Show/hide key" style="flex-shrink:0">👁</button>
+        <span id="ai-key-status" style="font-size:11px;color:var(--t3);white-space:nowrap;flex-shrink:0"></span>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" style="font-size:11px;color:var(--b);white-space:nowrap;flex-shrink:0;text-decoration:none">Get key →</a>
+      </div>
+
       <!-- Quick question bar -->
       <div style="display:flex;gap:8px;margin-bottom:20px">
         <input class="fi" id="ai-question" placeholder="Ask anything… e.g. 'Why do I lose on Fridays?' or 'Which setup is most profitable?'" style="flex:1">
@@ -3116,6 +3125,7 @@ function renderAIPage() {
   document.getElementById('ai-output-card').style.display = 'none';
   document.getElementById('ai-loading').style.display = 'none';
   document.getElementById('ai-empty').style.display = '';
+  loadAIKey();
 }
 
 function buildTradeContext(mode) {
@@ -3287,9 +3297,18 @@ function askChip(q) {
 }
 
 async function callClaudeAPI(prompt) {
+  const apiKey = localStorage.getItem('ai_api_key') || '';
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    throw new Error('No API key set. Paste your Anthropic API key in the field above.');
+  }
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
@@ -3302,6 +3321,34 @@ async function callClaudeAPI(prompt) {
   }
   const data = await response.json();
   return data.content?.map(b => b.text || '').join('') || 'No response received.';
+}
+
+function saveAIKey() {
+  const key = document.getElementById('ai-api-key').value.trim();
+  localStorage.setItem('ai_api_key', key);
+  const status = document.getElementById('ai-key-status');
+  if (status) {
+    if (key.startsWith('sk-ant-') || key.startsWith('sk-')) {
+      status.textContent = '✅ Key saved';
+      status.style.color = 'var(--g)';
+    } else if (key.length > 0) {
+      status.textContent = '⚠ Invalid format';
+      status.style.color = 'var(--y)';
+    } else {
+      status.textContent = '';
+    }
+  }
+}
+
+function toggleKeyVisibility() {
+  const inp = document.getElementById('ai-api-key');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function loadAIKey() {
+  const key = localStorage.getItem('ai_api_key') || '';
+  const inp = document.getElementById('ai-api-key');
+  if (inp && key) { inp.value = key; saveAIKey(); }
 }
 
 function showAILoading(msg) {
