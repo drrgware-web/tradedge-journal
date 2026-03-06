@@ -1420,26 +1420,18 @@ const lineSeries = chart.addLineSeries({
     color: '#2962FF', 
     lineWidth: 2 
 });
-chart.priceScale('right').applyOptions({ autoScale: true });
-// 2. Create a price series to act as the foundation
-    const areaSeries = chart.addAreaSeries({
-        lineColor: '#2962FF',
-        topColor: 'rgba(41, 98, 255, 0.3)',
-        bottomColor: 'rgba(41, 98, 255, 0)',
-        lineWidth: 2,
-    });
 
-    // 3. Load the data and markers
-    areaSeries.setData(chartData);
-    areaSeries.setMarkers(markers);
+// 2. Load the trade points
+lineSeries.setData(chartData);
 
-    // 4. Force a scale update and fit
-    setTimeout(() => {
-        chart.timeScale().fitContent();
-        chart.priceScale('right').applyOptions({ autoScale: true });
-    }, 100);
-        chart.timeScale().fitContent();
-    }, 100);
+// 3. Set the Buy/Sell arrows
+lineSeries.setMarkers(markers);
+
+// 4. Zoom to fit the trade perfectly
+chart.timeScale().fitContent();
+candleSeries.setData(chartData);
+candleSeries.setMarkers(markers);
+chart.timeScale().fitContent();
 // ------------------------------------------
   // Generate synthetic OHLC-style background price
   const allPrices=pts.map(p=>p.price);
