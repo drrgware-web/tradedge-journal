@@ -913,13 +913,13 @@ select.fi{cursor:pointer}
     </div>
 
     <!-- ══ ADD ALERT MODAL ══ -->
-    <div class="modal-bg" id="m-add-alert" onclick="if(event.target===this)closeM('m-add-alert')">
+    <div class="overlay" id="m-add-alert" onclick="if(event.target===this)closeM('m-add-alert')">
       <div class="modal" style="max-width:420px">
-        <div class="modal-hdr">
-          <div class="modal-title">New Price Alert</div>
-          <button class="modal-x" onclick="closeM('m-add-alert')">×</button>
+        <div class="m-head">
+          <div class="m-title">🔔 New Price Alert</div>
+          <button class="m-x" onclick="closeM('m-add-alert')">✕</button>
         </div>
-        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+        <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
           <div class="fg f-full">
             <label class="fl">Stock Symbol</label>
             <input class="fi" id="al-symbol" placeholder="e.g. RELIANCE" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
@@ -943,7 +943,7 @@ select.fi{cursor:pointer}
             Alert will trigger when price <b style="color:var(--t1)">rises above</b> the target.
           </div>
         </div>
-        <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+        <div class="m-foot">
           <button class="btn btn-ghost" onclick="closeM('m-add-alert')">Cancel</button>
           <button class="btn btn-y" onclick="saveCustomAlert()">
             <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -3387,6 +3387,7 @@ function setDot(id,state){const el=document.getElementById(id);if(!el)return;el.
 function setLog(id,msg){const el=document.getElementById(id);if(el)el.textContent=msg;}
 function openSync(){updateSyncStatuses();document.getElementById('m-sync').classList.add('open');}
 function closeM(id){document.getElementById(id).classList.remove('open');}
+function openM(id){document.getElementById(id).classList.add('open');}
 
 // ══════════════════════════════════════════════════
 // EXPORT
@@ -3839,7 +3840,7 @@ function showAlertBanner(symbol, price, level, label, color) {
   const banner = document.createElement('div');
   banner.id = id;
   banner.style.cssText = `
-    position:fixed;top:70px;right:20px;z-index:9999;
+    position:fixed;top:70px;right:20px;z-index:99999;
     background:var(--bg3);border:1px solid ${color};border-left:3px solid ${color};
     border-radius:10px;padding:12px 16px;min-width:260px;max-width:320px;
     box-shadow:0 4px 24px rgba(0,0,0,.5);animation:slideInRight .3s ease;
@@ -3852,11 +3853,19 @@ function showAlertBanner(symbol, price, level, label, color) {
         <div style="font-weight:700;color:${color};font-size:13px">${symbol} — ${label}</div>
         <div style="color:var(--t2);font-size:12px;margin-top:2px">CMP ₹${price.toFixed(2)} · Level ₹${level.toFixed(2)}</div>
       </div>
-      <button onclick="document.getElementById('${id}').remove()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0;line-height:1">×</button>
+      <button class="alert-close-btn" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:20px;padding:4px 6px;line-height:1;border-radius:4px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='none'">×</button>
     </div>
   `;
+  // Use addEventListener — reliable, no inline template literal issues
+  banner.querySelector('.alert-close-btn').addEventListener('click', function() {
+    banner.remove();
+  });
   document.body.appendChild(banner);
-  setTimeout(() => { if(document.getElementById(id)) document.getElementById(id).remove(); }, 8000);
+  const autoClose = setTimeout(() => { if(banner.parentNode) banner.remove(); }, 8000);
+  // Clear auto-close if manually dismissed
+  banner.querySelector('.alert-close-btn').addEventListener('click', function() {
+    clearTimeout(autoClose);
+  });
 }
 
 // ── Build alert levels from open trades ──────────
