@@ -458,6 +458,15 @@ select.fi{cursor:pointer}
   cursor:pointer;transition:all .15s;font-family:'Outfit',sans-serif;
 }
 .ai-chip:hover{background:var(--bg4);color:var(--t1);border-color:var(--b3);}
+
+/* Entry type chips */
+.etype-chip{
+  padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;
+  background:var(--bg3);border:1px solid var(--b2);color:var(--t3);
+  cursor:pointer;transition:all .15s;font-family:'Outfit',sans-serif;
+}
+.etype-chip:hover{background:var(--bg4);color:var(--t1);border-color:var(--b3)}
+.etype-chip.active{background:var(--yd);border-color:var(--y);color:var(--y);font-weight:700}
 @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 </style>
 </head>
@@ -489,6 +498,15 @@ select.fi{cursor:pointer}
   <div class="sb-item" id="nav-alerts" data-tip="Price Alerts" onclick="nav('alerts')" style="position:relative">
     <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
     <span id="alert-badge" style="display:none;position:absolute;top:6px;right:6px;width:8px;height:8px;background:var(--r);border-radius:50%;border:1.5px solid var(--bg1)"></span>
+  </div>
+  <div class="sb-item" id="nav-ledger" data-tip="Broker Ledger" onclick="nav('ledger')">
+    <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M6 8h.01M6 12h.01M10 8h8M10 12h8"/></svg>
+  </div>
+  <div class="sb-item" id="nav-possize" data-tip="Position Sizing" onclick="nav('possize')">
+    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+  </div>
+  <div class="sb-item" id="nav-mps" data-tip="MPS Dashboard" onclick="nav('mps')" style="position:relative">
+    <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
   </div>
   <div class="sb-spacer"></div>
   <div class="sb-item" id="nav-settings" data-tip="Settings & Sync" onclick="nav('settings')">
@@ -523,6 +541,95 @@ select.fi{cursor:pointer}
 
   <!-- CONTENT -->
   <div class="content" id="content">
+
+    <!-- ══ MPS DASHBOARD ══ -->
+    <div class="page" id="page-mps" style="height:calc(100vh - var(--topbar));margin:-20px;display:flex;flex-direction:column">
+      <!-- Toolbar -->
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg1);border-bottom:1px solid var(--b1);flex-shrink:0;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:700;color:var(--y)">📡 MPS</span>
+          <span style="font-size:11px;color:var(--t3)">Market Pulse Score</span>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <span id="mps-url-label" style="font-size:10.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <button class="btn btn-ghost btn-xs" onclick="reloadMpsFrame()" title="Reload">
+            <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Reload
+          </button>
+          <button class="btn btn-ghost btn-xs" onclick="openMpsSettings()" title="Configure URL">
+            <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            Settings
+          </button>
+          <a id="mps-open-link" href="#" target="_blank" class="btn btn-ghost btn-xs" title="Open in new tab">
+            <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Open Full
+          </a>
+        </div>
+      </div>
+
+      <!-- iframe container -->
+      <div style="flex:1;position:relative;background:var(--bg0)">
+        <iframe id="mps-frame"
+          style="width:100%;height:100%;border:none;display:block"
+          src="about:blank"
+          allow="fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation">
+        </iframe>
+        <!-- Empty state when no URL configured -->
+        <div id="mps-empty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:var(--bg0)">
+          <div style="font-size:48px">📡</div>
+          <div style="font-size:16px;font-weight:700;color:var(--t1)">MPS Dashboard</div>
+          <div style="font-size:13px;color:var(--t3);text-align:center;max-width:380px;line-height:1.7">
+            Connect your Market Pulse Score dashboard by entering your Google Apps Script URL below.
+          </div>
+          <button class="btn btn-y" onclick="openMpsSettings()">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Configure MPS URL
+          </button>
+          <div style="font-size:11px;color:var(--t4);max-width:420px;text-align:center;line-height:1.6;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-radius:8px">
+            ⚠️ If the dashboard shows a blank page after configuring, Google may be blocking iframe embedding.
+            Use the <b style="color:var(--t2)">Open Full</b> button in the toolbar to view it in a new tab.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MPS SETTINGS MODAL -->
+    <div class="overlay" id="m-mps">
+      <div class="modal" style="max-width:520px">
+        <div class="m-head">
+          <div class="m-title">📡 MPS Dashboard Settings</div>
+          <button class="m-x" onclick="closeM('m-mps')">✕</button>
+        </div>
+        <div class="m-body" style="display:flex;flex-direction:column;gap:16px">
+          <div class="fg">
+            <label class="fl">Google Apps Script URL</label>
+            <input class="fi" id="mps-url-input"
+              placeholder="https://script.google.com/macros/s/…/exec"
+              style="font-family:'IBM Plex Mono',monospace;font-size:11.5px">
+          </div>
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--t3);line-height:1.75">
+            <div style="font-weight:700;color:var(--y);margin-bottom:6px">ℹ️ How to connect</div>
+            <span style="color:var(--t2)">1.</span> Paste your <b style="color:var(--t1)">Google Apps Script /exec URL</b> above<br>
+            <span style="color:var(--t2)">2.</span> Make sure the script is deployed as <b style="color:var(--t1)">Anyone can access</b><br>
+            <span style="color:var(--t2)">3.</span> Click <b style="color:var(--t1)">Save & Load</b> — the dashboard embeds inside TradEdge<br>
+            <span style="color:var(--t2)">4.</span> If it shows blank, Google is blocking iframes — use <b style="color:var(--t1)">Open Full</b> to view in a new tab
+          </div>
+          <div style="background:var(--bg3);border:1px solid rgba(255,69,96,.25);border-radius:8px;padding:10px 14px;font-size:11.5px;color:var(--t3)">
+            <b style="color:var(--r)">Note:</b> Google Apps Script pages often block iframe embedding with <code style="color:var(--y)">X-Frame-Options: SAMEORIGIN</code>.
+            In that case the page will open in a new browser tab — same data, just outside the journal frame.
+          </div>
+        </div>
+        <div class="m-foot">
+          <button class="btn btn-ghost" onclick="closeM('m-mps')">Cancel</button>
+          <button class="btn btn-red btn-sm" onclick="clearMpsUrl()">Clear</button>
+          <button class="btn btn-y" onclick="saveMpsUrl()">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            Save & Load
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- ══ DASHBOARD ══ -->
     <div class="page active" id="page-dashboard">
@@ -845,6 +952,220 @@ select.fi{cursor:pointer}
       </div>
     </div>
 
+    <!-- ══ BROKER LEDGER ══ -->
+    <div class="page" id="page-ledger">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--t1)">🏦 Broker Ledger</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">Track funds across brokers — deposits, withdrawals, charges and net P&L per account.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="document.getElementById('ledger-file-input').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Import CSV / Excel
+          </button>
+          <input type="file" id="ledger-file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleLedgerFile(this)">
+          <button class="btn btn-y" onclick="openAddLedgerEntry()">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Entry
+          </button>
+        </div>
+      </div>
+
+      <!-- Broker tabs -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="ledger-broker-tabs">
+        <div class="pill on" onclick="setLedgerBroker('all',this)" id="ltab-all">All Brokers</div>
+        <div class="pill" onclick="setLedgerBroker('dhan',this)" id="ltab-dhan">Dhan</div>
+        <div class="pill" onclick="setLedgerBroker('zerodha',this)" id="ltab-zerodha">Zerodha</div>
+        <div class="pill" onclick="setLedgerBroker('definedge',this)" id="ltab-definedge">Definedge</div>
+        <div class="pill" onclick="setLedgerBroker('other',this)" id="ltab-other">Other</div>
+      </div>
+
+      <!-- Summary KPIs -->
+      <div class="kpi-row" id="ledger-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px"></div>
+
+      <!-- Ledger table -->
+      <div class="tbl-wrap" id="ledger-tbl-wrap">
+        <div class="tbl-bar" style="justify-content:space-between">
+          <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Transaction History</span>
+          <button class="btn btn-ghost btn-xs" onclick="exportLedgerCSV()">⬇ Export</button>
+        </div>
+        <div id="ledger-tbl"></div>
+      </div>
+    </div>
+
+    <!-- ADD LEDGER ENTRY MODAL -->
+    <div class="overlay" id="m-ledger">
+      <div class="modal" style="max-width:460px">
+        <div class="m-head"><div class="m-title">Add Ledger Entry</div><button class="m-x" onclick="closeM('m-ledger')">✕</button></div>
+        <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
+          <div class="fg2">
+            <div class="fg"><label class="fl">Date</label><input type="date" class="fi" id="led-date"></div>
+            <div class="fg"><label class="fl">Broker</label>
+              <select class="fi" id="led-broker">
+                <option value="dhan">Dhan</option>
+                <option value="zerodha">Zerodha</option>
+                <option value="definedge">Definedge</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg">
+            <label class="fl">Type</label>
+            <select class="fi" id="led-type" onchange="updateLedgerTypeHint()">
+              <option value="deposit">Deposit</option>
+              <option value="withdrawal">Withdrawal</option>
+              <option value="brokerage">Brokerage / Commission</option>
+              <option value="stt">STT</option>
+              <option value="other_charge">Other Charge</option>
+              <option value="interest">Interest / Dividend</option>
+              <option value="adjustment">Manual Adjustment</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">Amount (₹)</label>
+            <input type="number" class="fi" id="led-amount" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="fg">
+            <label class="fl">Reference / Note</label>
+            <input class="fi" id="led-note" placeholder="e.g. Monthly brokerage, Bank transfer…">
+          </div>
+          <div id="led-hint" style="font-size:11px;color:var(--t3);padding:8px 10px;background:var(--bg3);border-radius:6px">
+            Deposits add to your balance. Withdrawals and charges reduce it.
+          </div>
+        </div>
+        <div class="m-foot">
+          <button class="btn btn-ghost" onclick="closeM('m-ledger')">Cancel</button>
+          <button class="btn btn-y" onclick="saveLedgerEntry()">Save Entry</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ POSITION SIZING CALCULATOR ══ -->
+    <div class="page" id="page-possize">
+      <div style="margin-bottom:20px">
+        <div style="font-size:18px;font-weight:700;color:var(--t1)">📐 Position Sizing Calculator</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:3px">Calculate exact position size based on your risk parameters and account equity.</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <!-- Inputs -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Risk Parameters</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+            <div class="fg">
+              <label class="fl">Account Capital (₹)</label>
+              <input type="number" class="fi" id="ps-capital" placeholder="874000" oninput="calcPositionSize()">
+            </div>
+            <div class="fg">
+              <label class="fl">Risk per Trade (%)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="range" id="ps-risk-slider" min="0.1" max="5" step="0.1" value="0.5" oninput="document.getElementById('ps-risk').value=this.value;calcPositionSize()" style="flex:1;accent-color:var(--y)">
+                <input type="number" class="fi" id="ps-risk" placeholder="0.5" step="0.1" min="0.1" max="10" value="0.5" style="width:80px" oninput="document.getElementById('ps-risk-slider').value=this.value;calcPositionSize()">
+              </div>
+            </div>
+            <div class="fg">
+              <label class="fl">Entry Price (₹)</label>
+              <input type="number" class="fi" id="ps-entry" placeholder="0.00" step="0.01" oninput="calcPositionSize()">
+            </div>
+            <div class="fg">
+              <label class="fl">Stop Loss Price (₹)</label>
+              <input type="number" class="fi" id="ps-sl" placeholder="0.00" step="0.01" oninput="calcPositionSize()">
+            </div>
+            <div class="fg">
+              <label class="fl">Target Price (₹) <span style="color:var(--t4);font-size:10px">(optional)</span></label>
+              <input type="number" class="fi" id="ps-target" placeholder="0.00" step="0.01" oninput="calcPositionSize()">
+            </div>
+            <div class="fg">
+              <label class="fl">Brokerage Model</label>
+              <select class="fi" id="ps-brokerage" onchange="calcPositionSize()">
+                <option value="zerodha">Zerodha (₹20 flat / 0.03% STT)</option>
+                <option value="dhan">Dhan (₹20 flat / 0.1% total)</option>
+                <option value="upstox">Upstox (₹20 flat)</option>
+                <option value="custom">Custom</option>
+                <option value="none">No charges</option>
+              </select>
+            </div>
+            <div id="ps-custom-charges" style="display:none">
+              <div class="fg2">
+                <div class="fg"><label class="fl">Brokerage (%)</label><input type="number" class="fi" id="ps-custom-brok" placeholder="0.03" step="0.001" oninput="calcPositionSize()"></div>
+                <div class="fg"><label class="fl">Other Charges (%)</label><input type="number" class="fi" id="ps-custom-other" placeholder="0.05" step="0.001" oninput="calcPositionSize()"></div>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="psLoadFromSettings()">📋 Load from Settings</button>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <!-- Main result card -->
+          <div class="card" id="ps-result-card">
+            <div class="card-head"><span class="card-title">Position Size</span></div>
+            <div class="card-body">
+              <div style="text-align:center;padding:12px 0">
+                <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Recommended Qty</div>
+                <div id="ps-qty" style="font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:700;color:var(--y);line-height:1">–</div>
+                <div id="ps-qty-note" style="font-size:11px;color:var(--t3);margin-top:6px">Enter parameters above</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px" id="ps-breakdown">
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+                  <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Capital at Risk</div>
+                  <div id="ps-risk-amt" style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--r)">–</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+                  <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Position Value</div>
+                  <div id="ps-pos-val" style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--b)">–</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+                  <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Max Loss (₹)</div>
+                  <div id="ps-max-loss" style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--r)">–</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+                  <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Potential Gain (₹)</div>
+                  <div id="ps-max-gain" style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--g)">–</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- R:R and charges -->
+          <div class="card">
+            <div class="card-head"><span class="card-title">Risk/Reward & Charges</span></div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b1)">
+                <span style="font-size:12px;color:var(--t3)">Risk : Reward</span>
+                <span id="ps-rr" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--y);font-weight:700">–</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b1)">
+                <span style="font-size:12px;color:var(--t3)">SL Distance</span>
+                <span id="ps-sl-dist" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--t2)">–</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b1)">
+                <span style="font-size:12px;color:var(--t3)">Brokerage (buy+sell)</span>
+                <span id="ps-charges" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--r)">–</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b1)">
+                <span style="font-size:12px;color:var(--t3)">Net Loss after charges</span>
+                <span id="ps-net-loss" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--r)">–</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:7px 0">
+                <span style="font-size:12px;color:var(--t3)">% of Capital used</span>
+                <span id="ps-cap-pct" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--c)">–</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pyramid levels -->
+          <div class="card">
+            <div class="card-head"><span class="card-title">Pyramid Plan <span style="font-size:10px;font-weight:400;color:var(--t4)">(2 entries)</span></span></div>
+            <div class="card-body">
+              <div id="ps-pyramid" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--t3)">Enter valid parameters to see pyramid suggestion.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ SETTINGS ══ -->
     <div class="page" id="page-settings">
       <div class="settings-wrap">
@@ -1070,6 +1391,10 @@ select.fi{cursor:pointer}
             <div style="font-size:11.5px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.7">
               🔐 Sync your trades across all devices using your own <b style="color:var(--y)">Supabase</b> project. Your data stays in your database.<br>
               <span style="font-size:10.5px">Get your URL &amp; anon key from <b style="color:var(--t1)">supabase.com → Project → Settings → API</b></span>
+              <span id="file-proto-warn" style="display:none;color:var(--r);font-size:10.5px;display:block;margin-top:6px">
+                ⚠️ <b>You are running this file directly (file:// protocol)</b> — browsers block all network requests from local files due to CORS. 
+                Open it via a local server: <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">python -m http.server 8080</code> or VS Code Live Server.
+              </span>
             </div>
             <div class="fg2" style="margin-bottom:14px">
               <div class="fg f-full"><label class="fl">Supabase Project URL</label><input class="fi" id="s-sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
@@ -1085,6 +1410,7 @@ select.fi{cursor:pointer}
                 <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Pull from Cloud
               </button>
+              <button class="btn btn-ghost btn-sm" onclick="sbTestConnection()" title="Test if Supabase is reachable">🔌 Test Connection</button>
               <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3)">
                 <input type="checkbox" id="sb-auto" onchange="toggleSbAuto(this.checked)" style="accent-color:var(--y)"> Auto-sync on every save
               </div>
@@ -1140,6 +1466,18 @@ select.fi{cursor:pointer}
             </div>
           </div>
           <div class="fg"><label class="fl">Setup</label><input class="fi" id="f-setup" placeholder="BearTrap, DTB, Breakout…"></div>
+          <div class="fg f-full">
+            <label class="fl">Entry Type</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px" id="entry-type-chips">
+              <button type="button" class="etype-chip" onclick="setEntryType('Intraday',this)">Intraday</button>
+              <button type="button" class="etype-chip" onclick="setEntryType('Swing',this)">Swing</button>
+              <button type="button" class="etype-chip" onclick="setEntryType('Positional',this)">Positional</button>
+              <button type="button" class="etype-chip" onclick="setEntryType('Scalp',this)">Scalp</button>
+              <button type="button" class="etype-chip" onclick="setEntryType('Options',this)">Options</button>
+              <button type="button" class="etype-chip" onclick="setEntryType('Futures',this)">Futures</button>
+            </div>
+            <input type="hidden" id="f-entry-type" value="">
+          </div>
           <div class="fg"><label class="fl">Side *</label><select class="fi" id="f-side"><option value="Buy">Buy (Long)</option><option value="Sell">Sell (Short)</option></select></div>
           <div class="fg"><label class="fl">Status <span style="color:var(--t4);font-weight:400">(auto)</span></label><select class="fi" id="f-status" disabled style="opacity:.5;cursor:not-allowed"><option value="Open">Open</option><option value="Partial">Partial</option><option value="Closed">Closed</option></select></div>
         </div>
@@ -1428,7 +1766,7 @@ function save(){
 // ══════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════
-const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',alerts:'Price Alerts',ai:'AI Trade Review',settings:'Settings & Sync'};
+const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',alerts:'Price Alerts',ai:'AI Trade Review',settings:'Settings & Sync',ledger:'Broker Ledger',possize:'Position Sizing',mps:'MPS — Market Pulse Score'};
 function nav(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.sb-item[id^=nav-]').forEach(x=>x.classList.remove('active'));
@@ -1443,6 +1781,9 @@ function nav(p){
   if(p==='fund')renderFund();
   if(p==='alerts')renderAlerts();
   if(p==='ai')renderAIPage();
+  if(p==='ledger')renderLedger();
+  if(p==='possize')initPosSize();
+  if(p==='mps')initMpsPage();
 }
 
 // ══════════════════════════════════════════════════
@@ -1504,12 +1845,24 @@ function removeExitRow(i){
 // ══════════════════════════════════════════════════
 // ADD / EDIT TRADE
 // ══════════════════════════════════════════════════
+function setEntryType(val, el){
+  document.getElementById('f-entry-type').value = val;
+  document.querySelectorAll('.etype-chip').forEach(c => c.classList.remove('active'));
+  if(val && el){ el.classList.add('active'); return; }
+  if(val){
+    document.querySelectorAll('.etype-chip').forEach(c => {
+      if(c.textContent.trim() === val) c.classList.add('active');
+    });
+  }
+}
+
 function openAdd(){
   editId=null; entryCount=1; exitCount=0;
   document.getElementById('m-trade-title').textContent='Add Trade';
   document.getElementById('f-sym').value=''; closeSymDrop();
   document.getElementById('f-setup').value='';
-  document.getElementById('f-side').value='Buy';
+  document.getElementById('f-entry-type').value='';
+  document.querySelectorAll('.etype-chip').forEach(c=>c.classList.remove('active'));
   document.getElementById('f-status').value='Open';
   document.getElementById('f-sl').value='';
   document.getElementById('f-target').value='';
@@ -1531,6 +1884,8 @@ function editTrade(id){
   document.getElementById('m-trade-title').textContent='Edit — '+t.symbol;
   document.getElementById('f-sym').value=t.symbol||'';
   document.getElementById('f-setup').value=t.setup||'';
+  document.getElementById('f-entry-type').value=t.entryType||'';
+  setEntryType(t.entryType||'', null);
   document.getElementById('f-side').value=t.side||'Buy';
   document.getElementById('f-status').value=t.status||'Open';
   document.getElementById('f-sl').value=t.sl||'';
@@ -1576,6 +1931,7 @@ function saveTrade(){
   const t={
     id:editId||Date.now()+'',symbol:sym,
     setup:document.getElementById('f-setup').value.trim(),
+    entryType:document.getElementById('f-entry-type').value,
     side:document.getElementById('f-side').value,
     status:document.getElementById('f-status').value,
     sl:+document.getElementById('f-sl').value||0,
@@ -1946,6 +2302,7 @@ function renderTrades(){
       <div class="exp-content" id="ec-${t.id}">
         <div class="exp-grid">
           <div><div class="exp-lbl">Setup</div><div class="exp-val">${t.setup||'—'}</div></div>
+          <div><div class="exp-lbl">Entry Type</div><div class="exp-val">${t.entryType||'—'}</div></div>
           <div><div class="exp-lbl">Plan Followed</div><div class="exp-val">${t.plan||'—'}</div></div>
           <div><div class="exp-lbl">Exit Trigger</div><div class="exp-val">${t.exitTrigger||'—'}</div></div>
           <div><div class="exp-lbl">Source</div><div class="exp-val">${t.source||'manual'}</div></div>
@@ -2642,16 +2999,16 @@ function cleanSym(v){ return String(v||'').replace(/-EQ$|-BE$|-N$|-B$/,'').toUpp
 function smartMergeImport(rawFills, broker){
   let added = 0, pyramided = 0, exited = 0, skipped = 0;
 
-  // Step 1: Dedupe exact fills (same date+sym+side+price+qty already in trades)
+  // Step 1: Dedupe exact fills — key = sym+side+date+qty (price excluded to handle rounding diffs on re-import)
   const existingFillKeys = new Set();
   trades.forEach(t=>{
-    (t.entries||[]).forEach(e=> existingFillKeys.add(`${t.symbol}_${t.side}_${e.date}_${e.price}_${e.qty}`));
-    (t.exits||[]).forEach(e=>   existingFillKeys.add(`${t.symbol}_${t.side}_exit_${e.date}_${e.price}_${e.qty}`));
+    (t.entries||[]).forEach(e=> existingFillKeys.add(`${t.symbol}_${t.side}_${e.date}_${+e.qty}`));
+    (t.exits||[]).forEach(e=>   existingFillKeys.add(`${t.symbol}_${t.side}_exit_${e.date}_${+e.qty}`));
   });
 
   // Step 2: Filter out already-imported fills
   const newFills = rawFills.filter(f=>{
-    const k = `${f.sym}_${f.side}_${f.date}_${f.price}_${f.qty}`;
+    const k = `${f.sym}_${f.side}_${f.date}_${+f.qty}`;
     if(existingFillKeys.has(k)){ skipped++; return false; }
     return true;
   });
@@ -2694,13 +3051,18 @@ function smartMergeImport(rawFills, broker){
 
     } else if(openTrade.side === side){
       // Same side → PYRAMID (add entry to existing trade)
+      // Extra guard: don't add if same date+qty already exists in entries
+      const alreadyIn = (openTrade.entries||[]).some(e=>e.date===date && +e.qty===totalQty);
+      if(alreadyIn){ skipped++; return; }
       openTrade.entries = openTrade.entries || [];
       openTrade.entries.push(entry);
       openTrade.source = broker;
       pyramided++;
 
     } else {
-      // Opposite side → EXIT (add to exits)
+      // Opposite side → EXIT
+      const alreadyIn = (openTrade.exits||[]).some(e=>e.date===date && +e.qty===totalQty);
+      if(alreadyIn){ skipped++; return; }
       openTrade.exits = openTrade.exits || [];
       openTrade.exits.push(entry);
 
@@ -4230,29 +4592,48 @@ function getSbClient(){ return null; }
 async function sbApi(method, path, body){
   const {url, key} = getSbCreds();
   if(!url || !key) throw new Error('Supabase credentials not configured');
-  const isGet = method === 'GET';
-  const sep   = path.includes('?') ? '&' : '?';
-  const fullUrl = isGet
-    ? url.replace(/\/$/, '') + '/rest/v1/' + path + sep + 'apikey=' + encodeURIComponent(key)
-    : url.replace(/\/$/, '') + '/rest/v1/' + path;
-  const opts = isGet
-    ? { method: 'GET' }
-    : {
-        method:  'POST',
-        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-        body:    JSON.stringify(body)
-      };
-  const res  = await fetch(fullUrl, opts);
+
+  const base    = url.replace(/\/$/, '');
+  const fullUrl = base + '/rest/v1/' + path;
+
+  // Both GET and POST need apikey + Authorization headers
+  const headers = {
+    'apikey':        key,
+    'Authorization': 'Bearer ' + key,
+    'Content-Type':  'application/json',
+    'Accept':        'application/json',
+  };
+
+  const opts = { method, headers };
+
+  if(method === 'POST' || method === 'PATCH' || method === 'PUT'){
+    headers['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+    opts.body = JSON.stringify(body);
+  }
+
+  let res;
+  try {
+    res = await fetch(fullUrl, opts);
+  } catch(networkErr){
+    throw new Error('Network error — check your Supabase URL and that the project is active. (' + networkErr.message + ')');
+  }
+
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch(e) {}
-  if(!res.ok) throw new Error('HTTP ' + res.status + ': ' + (json?.message || text));
+
+  if(!res.ok){
+    const msg = (json && (json.message || json.error_description || json.hint)) || text || ('HTTP ' + res.status);
+    throw new Error('Supabase ' + res.status + ': ' + msg);
+  }
   return json ?? [];
 }
 
 async function sbPush(){
   const {url, key} = getSbCreds();
   if(!url || !key){ toast('Configure Supabase in Settings → Cloud Sync','⚠️'); nav('settings'); return; }
+  // Validate URL format
+  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL — must end with .supabase.co','⚠️'); return; }
   setSbStatus('Pushing…', 'sync');
   try{
     await sbApi('POST', 'tradedge_trades?on_conflict=device_id', {
@@ -4265,7 +4646,8 @@ async function sbPush(){
     setSbStatus('Pushed ' + trades.length + ' trades ✅ · ' + ts, 'ok');
     toast('☁️ Pushed ' + trades.length + ' trades to cloud', '☁️');
   }catch(e){
-    setSbStatus('Push failed: ' + e.message, '');
+    const hint = e.message.includes('Network error') ? ' — ensure the app is served over HTTPS (not file://)' : '';
+    setSbStatus('Push failed: ' + e.message + hint, '');
     toast('Push failed: ' + e.message, '❌');
     console.error('[sbPush]', e);
   }
@@ -4274,6 +4656,7 @@ async function sbPush(){
 async function sbPull(){
   const {url, key} = getSbCreds();
   if(!url || !key){ toast('Configure Supabase in Settings → Cloud Sync','⚠️'); nav('settings'); return; }
+  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL — must end with .supabase.co','⚠️'); return; }
   setSbStatus('Pulling…', 'sync');
   try{
     const rows = await sbApi('GET', 'tradedge_trades?device_id=eq.tradedge_main&select=trades_json,updated_at&limit=1');
@@ -4304,6 +4687,49 @@ async function sbPull(){
     setSbStatus('Pull failed: ' + e.message, '');
     toast('Pull failed: ' + e.message, '❌');
     console.error('[sbPull]', e);
+  }
+}
+
+async function sbTestConnection(){
+  const {url, key} = getSbCreds();
+  if(!url || !key){ toast('Enter Supabase URL and Key first','⚠️'); return; }
+  if(!url.includes('.supabase.co')){ toast('URL must be https://xxxx.supabase.co','⚠️'); return; }
+
+  // Warn if running from file://
+  if(location.protocol === 'file:'){
+    setSbStatus('⚠️ Running from file:// — CORS will block all requests. Open via a local server (e.g. VS Code Live Server or python -m http.server).', '');
+    toast('file:// protocol blocks Supabase — use a local server','❌');
+    return;
+  }
+
+  setSbStatus('Testing connection…', 'sync');
+  try {
+    // Just probe the REST endpoint — doesn't need the table to exist
+    const res = await fetch(url.replace(/\/$/, '') + '/rest/v1/', {
+      headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' }
+    });
+    if(res.ok || res.status === 200){
+      setSbStatus('✅ Connection OK — Supabase is reachable', 'ok');
+      toast('✅ Supabase connection successful!', '✅');
+    } else if(res.status === 401){
+      setSbStatus('❌ Invalid API key (401 Unauthorized)', '');
+      toast('Invalid API key — check your Anon key','❌');
+    } else if(res.status === 404){
+      setSbStatus('❌ Project not found — check URL (404)', '');
+      toast('Project URL not found (404)','❌');
+    } else {
+      setSbStatus('⚠️ Got HTTP ' + res.status + ' — check credentials', '');
+      toast('Unexpected response: HTTP ' + res.status, '⚠️');
+    }
+  } catch(e) {
+    if(e.message.includes('Failed to fetch') || e.message.includes('NetworkError')){
+      const isFile = location.protocol === 'file:';
+      setSbStatus('❌ Failed to fetch — ' + (isFile ? 'file:// protocol blocks requests. Use a local server.' : 'Check Supabase URL, internet connection, or CORS settings.'), '');
+      toast('Failed to fetch — ' + (isFile ? 'use a local server' : 'check URL/connection'), '❌');
+    } else {
+      setSbStatus('❌ ' + e.message, '');
+      toast('Connection error: ' + e.message, '❌');
+    }
   }
 }
 
@@ -4428,7 +4854,462 @@ function setFundVal(yr,mKey,val){
 }
 
 // ══════════════════════════════════════════════════
-// Init auto-syncs if previously enabled
+// MPS DASHBOARD
+// ══════════════════════════════════════════════════
+const MPS_DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbzyvwz4MP7MCTcGgzYc7nLaFxsaeMA9cE4YlT3xcR8AQRy0Frg1v_28317BW-PPN175/exec';
+
+function getMpsUrl(){
+  return localStorage.getItem('te_mps_url') || MPS_DEFAULT_URL;
+}
+
+function initMpsPage(){
+  const url = getMpsUrl();
+  const frame   = document.getElementById('mps-frame');
+  const empty   = document.getElementById('mps-empty');
+  const label   = document.getElementById('mps-url-label');
+  const openLink= document.getElementById('mps-open-link');
+
+  if(!url){
+    frame.src = 'about:blank';
+    empty.style.display = 'flex';
+    return;
+  }
+
+  empty.style.display = 'none';
+  label.textContent   = url;
+  openLink.href       = url;
+
+  // Only reload if src changed (avoid flicker on re-nav)
+  if(frame.src !== url){
+    frame.src = url;
+  }
+
+  // Detect X-Frame-Options block — show helpful banner
+  frame.onerror = () => showMpsBlockedBanner(url);
+
+  // Timeout fallback: if iframe stays blank after 8s, show open-in-tab hint
+  clearTimeout(frame._mpsTimer);
+  frame._mpsTimer = setTimeout(()=>{
+    try{
+      // If frame content is about:blank still, likely blocked
+      if(frame.contentDocument && frame.contentDocument.URL === 'about:blank'){
+        showMpsBlockedBanner(url);
+      }
+    }catch(e){
+      // Cross-origin — content loaded (good) or truly blocked
+    }
+  }, 8000);
+}
+
+function showMpsBlockedBanner(url){
+  const frame = document.getElementById('mps-frame');
+  const empty = document.getElementById('mps-empty');
+  empty.innerHTML = `
+    <div style="font-size:40px">🚫</div>
+    <div style="font-size:15px;font-weight:700;color:var(--t1)">Iframe Blocked by Google</div>
+    <div style="font-size:13px;color:var(--t3);text-align:center;max-width:420px;line-height:1.75">
+      Google Apps Script sets <code style="color:var(--y);background:var(--bg3);padding:1px 6px;border-radius:4px">X-Frame-Options: SAMEORIGIN</code>,
+      which prevents embedding in iframes.<br><br>
+      Your dashboard is still accessible — just open it in a new tab:
+    </div>
+    <a href="${url}" target="_blank" class="btn btn-y" style="text-decoration:none">
+      <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      Open MPS Dashboard ↗
+    </a>
+    <div style="font-size:11px;color:var(--t4);max-width:400px;text-align:center;line-height:1.6;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-radius:8px;margin-top:4px">
+      💡 <b style="color:var(--t2)">Fix this permanently:</b> In your Apps Script, add
+      <code style="color:var(--y)">ContentService.createTextOutput(html).setMimeType(ContentService.MimeType.HTML)</code>
+      and remove any <code style="color:var(--y)">X-Frame-Options</code> header. Or use the button above to open in a new tab each time.
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="openMpsSettings()" style="margin-top:4px">⚙ Change URL</button>
+  `;
+  empty.style.display = 'flex';
+}
+
+function reloadMpsFrame(){
+  const frame = document.getElementById('mps-frame');
+  const url   = getMpsUrl();
+  if(!url){ openMpsSettings(); return; }
+  frame.src = 'about:blank';
+  setTimeout(()=>{ frame.src = url; initMpsPage(); }, 200);
+  toast('MPS reloading…','🔄');
+}
+
+function openMpsSettings(){
+  document.getElementById('mps-url-input').value = getMpsUrl();
+  document.getElementById('m-mps').classList.add('open');
+}
+
+function saveMpsUrl(){
+  const val = document.getElementById('mps-url-input').value.trim();
+  if(!val){ toast('Please enter a URL','⚠️'); return; }
+  localStorage.setItem('te_mps_url', val);
+  closeM('m-mps');
+  toast('MPS URL saved — loading…','✅');
+  initMpsPage();
+}
+
+function clearMpsUrl(){
+  localStorage.removeItem('te_mps_url');
+  document.getElementById('mps-url-input').value = '';
+  const frame = document.getElementById('mps-frame');
+  frame.src = 'about:blank';
+  const empty = document.getElementById('mps-empty');
+  empty.innerHTML = `
+    <div style="font-size:48px">📡</div>
+    <div style="font-size:16px;font-weight:700;color:var(--t1)">MPS Dashboard</div>
+    <div style="font-size:13px;color:var(--t3);text-align:center;max-width:380px;line-height:1.7">
+      Connect your Market Pulse Score dashboard by entering your Google Apps Script URL below.
+    </div>
+    <button class="btn btn-y" onclick="openMpsSettings()">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Configure MPS URL
+    </button>`;
+  empty.style.display = 'flex';
+  closeM('m-mps');
+  toast('MPS URL cleared','🗑');
+}
+
+// ══════════════════════════════════════════════════
+// BROKER LEDGER
+// ══════════════════════════════════════════════════
+let ledgerBrokerFilter = 'all';
+function getLedger(){ try{ return JSON.parse(localStorage.getItem('te_ledger')||'[]'); }catch{ return []; } }
+function saveLedger(d){ localStorage.setItem('te_ledger', JSON.stringify(d)); }
+
+function setLedgerBroker(b, el){
+  ledgerBrokerFilter = b;
+  document.querySelectorAll('#ledger-broker-tabs .pill').forEach(p=>p.classList.remove('on'));
+  if(el) el.classList.add('on');
+  renderLedger();
+}
+
+const LEDGER_TYPE_LABELS = {
+  deposit:'Deposit', withdrawal:'Withdrawal', brokerage:'Brokerage',
+  stt:'STT', other_charge:'Charge', interest:'Interest/Div', adjustment:'Adjustment'
+};
+const LEDGER_TYPE_SIGN = {
+  deposit:1, withdrawal:-1, brokerage:-1, stt:-1, other_charge:-1, interest:1, adjustment:1
+};
+const LEDGER_TYPE_COLOR = {
+  deposit:'var(--g)', withdrawal:'var(--r)', brokerage:'var(--r)',
+  stt:'var(--r)', other_charge:'var(--r)', interest:'var(--g)', adjustment:'var(--y)'
+};
+
+function renderLedger(){
+  const all = getLedger();
+  const data = ledgerBrokerFilter === 'all' ? all : all.filter(e=>e.broker===ledgerBrokerFilter);
+  const sorted = [...data].sort((a,b)=> b.date.localeCompare(a.date));
+
+  // KPIs
+  let totalIn=0, totalOut=0, totalCharges=0, netBalance=0;
+  data.forEach(e=>{
+    const sign = LEDGER_TYPE_SIGN[e.type]||1;
+    const amt = +e.amount;
+    netBalance += sign*amt;
+    if(e.type==='deposit'||e.type==='interest') totalIn += amt;
+    else if(e.type==='withdrawal') totalOut += amt;
+    else totalCharges += amt;
+  });
+
+  const fmtINR = n => '₹ '+Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('ledger-kpis').innerHTML = `
+    <div class="kpi"><div class="kpi-accent" style="background:var(--g)"></div><div class="kpi-label">Total Deposited</div><div class="kpi-val col-g">${fmtINR(totalIn)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--r)"></div><div class="kpi-label">Total Withdrawn</div><div class="kpi-val col-r">${fmtINR(totalOut)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--y)"></div><div class="kpi-label">Total Charges</div><div class="kpi-val col-y">${fmtINR(totalCharges)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--b)"></div><div class="kpi-label">Net Balance</div><div class="kpi-val ${netBalance>=0?'col-g':'col-r'}">${netBalance<0?'-':''}${fmtINR(netBalance)}</div></div>
+  `;
+
+  if(!sorted.length){
+    document.getElementById('ledger-tbl').innerHTML = `<div class="empty"><div class="empty-icon">🏦</div><div class="empty-title">No entries yet</div><div>Click <b>Add Entry</b> to start tracking your broker transactions.</div></div>`;
+    return;
+  }
+
+  document.getElementById('ledger-tbl').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Broker</th><th>Type</th><th>Note</th>
+        <th style="text-align:right">Amount (₹)</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(e=>{
+          const sign = LEDGER_TYPE_SIGN[e.type]||1;
+          const col = LEDGER_TYPE_COLOR[e.type]||'var(--t2)';
+          const prefix = sign >= 0 ? '+' : '-';
+          return `<tr>
+            <td style="font-family:'IBM Plex Mono',monospace;font-size:12px">${e.date}</td>
+            <td><span class="bdg" style="background:var(--bg3);color:var(--t2);border:1px solid var(--b2)">${(e.broker||'').charAt(0).toUpperCase()+(e.broker||'').slice(1)}</span></td>
+            <td><span class="bdg" style="background:var(--bg3);color:${col}">${LEDGER_TYPE_LABELS[e.type]||e.type}</span></td>
+            <td style="color:var(--t3);font-size:12px">${e.note||'—'}</td>
+            <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:${col}">${prefix}${fmtINR(+e.amount)}</td>
+            <td><button class="ab dl" onclick="deleteLedgerEntry('${e.id}',event)" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function openAddLedgerEntry(){
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('led-date').value = today;
+  document.getElementById('led-amount').value = '';
+  document.getElementById('led-note').value = '';
+  document.getElementById('led-type').value = 'deposit';
+  updateLedgerTypeHint();
+  document.getElementById('m-ledger').classList.add('open');
+}
+function updateLedgerTypeHint(){
+  const t = document.getElementById('led-type').value;
+  const hints = {
+    deposit: 'Adds funds to your broker account balance.',
+    withdrawal: 'Removes funds from your broker account.',
+    brokerage: 'Flat brokerage or commission charged on trades.',
+    stt: 'Securities Transaction Tax charged by exchange.',
+    other_charge: 'Stamp duty, SEBI charge, DP fees, etc.',
+    interest: 'Interest earned or dividends received.',
+    adjustment: 'Manual balance correction or other entry.'
+  };
+  document.getElementById('led-hint').textContent = hints[t]||'';
+}
+function saveLedgerEntry(){
+  const date   = document.getElementById('led-date').value;
+  const broker = document.getElementById('led-broker').value;
+  const type   = document.getElementById('led-type').value;
+  const amount = +document.getElementById('led-amount').value;
+  const note   = document.getElementById('led-note').value.trim();
+  if(!date||!amount||amount<=0){ toast('Please fill Date and a valid Amount','⚠️'); return; }
+  const ledger = getLedger();
+  ledger.push({ id: Date.now()+'', date, broker, type, amount, note });
+  saveLedger(ledger);
+  closeM('m-ledger');
+  renderLedger();
+  toast('Ledger entry saved','✅');
+}
+function deleteLedgerEntry(id, e){
+  if(e) e.stopPropagation();
+  const ledger = getLedger().filter(x=>x.id!==id);
+  saveLedger(ledger);
+  renderLedger();
+  toast('Entry deleted','🗑');
+}
+function exportLedgerCSV(){
+  const data = ledgerBrokerFilter==='all' ? getLedger() : getLedger().filter(e=>e.broker===ledgerBrokerFilter);
+  if(!data.length){ toast('No entries to export','⚠️'); return; }
+  const rows = [['Date','Broker','Type','Note','Amount','Sign']];
+  data.forEach(e=>{ rows.push([e.date,e.broker,e.type,e.note||'',e.amount,LEDGER_TYPE_SIGN[e.type]||1]); });
+  const csv = rows.map(r=>r.map(x=>`"${x}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = `ledger_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('Ledger exported','✅');
+}
+
+function handleLedgerFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  input.value = '';
+  const isXlsx = /\.xlsx?$/i.test(file.name);
+  if(isXlsx){
+    if(!window.XLSX){
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = () => parseLedgerXlsx(file);
+      document.head.appendChild(s);
+    } else { parseLedgerXlsx(file); }
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => parseLedgerCSV(e.target.result, file.name);
+  reader.readAsText(file);
+}
+
+function parseLedgerXlsx(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const csv = XLSX.utils.sheet_to_csv(ws);
+    parseLedgerCSV(csv, file.name);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseLedgerCSV(raw, fname){
+  // Expected columns (flexible): date, broker, type, note/description, amount
+  const lines = raw.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length < 2){ toast('File appears empty','⚠️'); return; }
+  const headers = lines[0].split(',').map(h=>h.replace(/"/g,'').toLowerCase().trim());
+
+  // Map column indices
+  const ci = {
+    date:    headers.findIndex(h=>h.includes('date')),
+    broker:  headers.findIndex(h=>h.includes('broker')),
+    type:    headers.findIndex(h=>h.includes('type')||h.includes('category')),
+    note:    headers.findIndex(h=>h.includes('note')||h.includes('desc')||h.includes('ref')||h.includes('narr')||h.includes('particular')),
+    amount:  headers.findIndex(h=>h.includes('amount')||h.includes('amt')||h.includes('value')||h.includes('debit')||h.includes('credit')),
+    debit:   headers.findIndex(h=>h.includes('debit')||h.includes('dr')),
+    credit:  headers.findIndex(h=>h.includes('credit')||h.includes('cr')),
+  };
+
+  const VALID_TYPES = ['deposit','withdrawal','brokerage','stt','other_charge','interest','adjustment'];
+  const TYPE_MAP = {
+    'deposit':1,'credit':1,'fund in':1,'received':1,'add':1,
+    'withdrawal':1,'withdraw':1,'debit':1,'fund out':1,'removed':1,
+    'brokerage':1,'commission':1,'charges':1,'fee':1,'stt':1,
+    'interest':1,'dividend':1,'div':1,'other':1,'adjustment':1,'misc':1
+  };
+  function guessType(raw=''){
+    const v = raw.toLowerCase().trim();
+    if(v.includes('deposit')||v.includes('credit')||v.includes('add')) return 'deposit';
+    if(v.includes('withdraw')||v.includes('debit')) return 'withdrawal';
+    if(v.includes('brokerage')||v.includes('commission')||v.includes('fee')) return 'brokerage';
+    if(v.includes('stt')) return 'stt';
+    if(v.includes('interest')||v.includes('dividend')) return 'interest';
+    if(VALID_TYPES.includes(v)) return v;
+    return 'other_charge';
+  }
+
+  let added = 0, skipped = 0;
+  const ledger = getLedger();
+  const existingKeys = new Set(ledger.map(e=>`${e.date}_${e.broker}_${e.amount}`));
+
+  lines.slice(1).forEach(line=>{
+    const cols = line.split(',').map(c=>c.replace(/"/g,'').trim());
+    if(!cols.some(c=>c)) return;
+
+    const rawDate = ci.date>=0 ? cols[ci.date] : '';
+    const date = parseDate(rawDate) || new Date().toISOString().slice(0,10);
+    const broker = ci.broker>=0 ? (cols[ci.broker]||'other').toLowerCase() : 'other';
+    const typeRaw = ci.type>=0 ? cols[ci.type] : '';
+    const type = VALID_TYPES.includes(typeRaw.toLowerCase()) ? typeRaw.toLowerCase() : guessType(typeRaw);
+    const note = ci.note>=0 ? cols[ci.note] : '';
+
+    let amount = 0;
+    if(ci.debit>=0 && ci.credit>=0){
+      const d = +cols[ci.debit]?.replace(/[₹,\s]/g,'')||0;
+      const c = +cols[ci.credit]?.replace(/[₹,\s]/g,'')||0;
+      amount = d>0 ? d : c;
+    } else if(ci.amount>=0){
+      amount = Math.abs(+cols[ci.amount]?.replace(/[₹,\s]/g,'')||0);
+    }
+    if(!amount){ skipped++; return; }
+
+    const key = `${date}_${broker}_${amount}`;
+    if(existingKeys.has(key)){ skipped++; return; }
+    existingKeys.add(key);
+    ledger.push({ id: Date.now()+''+Math.random(), date, broker, type, amount, note });
+    added++;
+  });
+
+  saveLedger(ledger);
+  renderLedger();
+  toast(`✅ Imported ${added} entries · ${skipped} skipped`,'✅');
+}
+
+// ══════════════════════════════════════════════════
+// POSITION SIZING CALCULATOR
+// ══════════════════════════════════════════════════
+function initPosSize(){
+  const cap = document.getElementById('ps-capital');
+  const risk = document.getElementById('ps-risk');
+  if(cap && !cap.value){ cap.value = cfg.cap || 874000; }
+  if(risk && !risk.value){ risk.value = cfg.risk || 0.5; document.getElementById('ps-risk-slider').value = cfg.risk||0.5; }
+  calcPositionSize();
+}
+function psLoadFromSettings(){
+  document.getElementById('ps-capital').value = cfg.cap || 874000;
+  document.getElementById('ps-risk').value = cfg.risk || 0.5;
+  document.getElementById('ps-risk-slider').value = cfg.risk || 0.5;
+  calcPositionSize();
+  toast('Loaded from Settings','✅');
+}
+function calcPositionSize(){
+  const brok = document.getElementById('ps-brokerage').value;
+  document.getElementById('ps-custom-charges').style.display = brok==='custom'?'':'none';
+
+  const capital = +document.getElementById('ps-capital').value || 0;
+  const riskPct = +document.getElementById('ps-risk').value || 0.5;
+  const entry   = +document.getElementById('ps-entry').value || 0;
+  const sl      = +document.getElementById('ps-sl').value || 0;
+  const target  = +document.getElementById('ps-target').value || 0;
+
+  const qEl = document.getElementById('ps-qty');
+  const noteEl = document.getElementById('ps-qty-note');
+
+  if(!capital || !entry || !sl || sl>=entry){
+    qEl.textContent = '–';
+    noteEl.textContent = sl>=entry && entry>0 ? '⚠ SL must be below Entry price' : 'Enter all parameters';
+    ['ps-risk-amt','ps-pos-val','ps-max-loss','ps-max-gain','ps-rr','ps-sl-dist','ps-charges','ps-net-loss','ps-cap-pct'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent='–'; });
+    document.getElementById('ps-pyramid').textContent = 'Enter valid parameters to see pyramid suggestion.';
+    return;
+  }
+
+  const riskAmt = capital * riskPct / 100;
+  const slDist  = entry - sl;
+  const slPct   = slDist / entry * 100;
+
+  // Qty = risk amount / (entry - sl)
+  let qty = Math.floor(riskAmt / slDist);
+  if(qty < 1) qty = 1;
+  const posVal = qty * entry;
+  const maxLoss = qty * slDist;
+
+  // Charges estimate
+  let chargesPct = 0;
+  if(brok==='zerodha')     chargesPct = (20*2)/(posVal||1)*100 + 0.1; // flat ₹20 each way + STT 0.1%
+  else if(brok==='dhan')   chargesPct = (20*2)/(posVal||1)*100 + 0.1;
+  else if(brok==='upstox') chargesPct = (20*2)/(posVal||1)*100 + 0.1;
+  else if(brok==='custom') chargesPct = (+document.getElementById('ps-custom-brok').value||0)*2 + (+document.getElementById('ps-custom-other').value||0);
+  const chargesAmt = posVal * chargesPct / 100;
+  const netLoss    = maxLoss + chargesAmt;
+  const capPct     = posVal / capital * 100;
+
+  // R:R
+  let rr = '–';
+  let maxGain = 0;
+  if(target > entry){
+    maxGain = qty * (target - entry);
+    const rrVal = maxGain / maxLoss;
+    rr = '1 : ' + rrVal.toFixed(2);
+  }
+
+  const fmtINR = n => '₹ '+n.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  qEl.textContent = qty.toLocaleString('en-IN');
+  noteEl.textContent = `${slPct.toFixed(2)}% SL · ₹${riskPct}% risk`;
+  document.getElementById('ps-risk-amt').textContent = fmtINR(riskAmt);
+  document.getElementById('ps-pos-val').textContent  = fmtINR(posVal);
+  document.getElementById('ps-max-loss').textContent = fmtINR(maxLoss);
+  document.getElementById('ps-max-gain').textContent = target>entry ? fmtINR(maxGain) : '–';
+  document.getElementById('ps-rr').textContent       = rr;
+  document.getElementById('ps-sl-dist').textContent  = `₹${slDist.toFixed(2)} (${slPct.toFixed(2)}%)`;
+  document.getElementById('ps-charges').textContent  = fmtINR(chargesAmt);
+  document.getElementById('ps-net-loss').textContent = fmtINR(netLoss);
+  document.getElementById('ps-cap-pct').textContent  = capPct.toFixed(2)+'%';
+
+  // Pyramid plan: 60/40 split
+  const qty1 = Math.floor(qty * 0.6);
+  const qty2 = qty - qty1;
+  const pyEl = document.getElementById('ps-pyramid');
+  pyEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Entry 1 (Initial 60%)</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--g)">${qty1.toLocaleString('en-IN')} shares</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:3px">@ ₹${entry.toFixed(2)} · ${fmtINR(qty1*entry)}</div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:4px">Entry 2 (Pyramid 40%)</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--b)">${qty2.toLocaleString('en-IN')} shares</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:3px">After confirmation · ${fmtINR(qty2*entry)}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--t4);margin-top:8px">💡 Add pyramid entry only after price confirms direction. Move SL to breakeven on initial qty.</div>
+  `;
+}
+
+// ══════════════════════════════════════════════════
 if(localStorage.getItem('auto_dhan')) toggleAuto('dhan',true);
 if(localStorage.getItem('auto_zd'))   toggleAuto('zd',true);
 if(localStorage.getItem('auto_de'))   toggleAuto('de',true);
@@ -4460,6 +5341,19 @@ if(localStorage.getItem('sb_auto')) sbAutoEnabled = true;
 
 // Render initial page
 renderDash();
+
+// Pre-warm MPS iframe in background so it loads faster on first click
+setTimeout(()=>{
+  const url = getMpsUrl();
+  const frame = document.getElementById('mps-frame');
+  if(url && frame && frame.src === 'about:blank') frame.src = url;
+}, 3000);
+
+// Show file:// protocol warning for Supabase
+if(location.protocol === 'file:'){
+  const w = document.getElementById('file-proto-warn');
+  if(w) w.style.display = 'block';
+}
 
 // Start price alert polling (5 min)
 startAlertTimer();
