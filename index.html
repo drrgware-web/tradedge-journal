@@ -23,6 +23,48 @@
   --sidebar:56px;
   --topbar:54px;
 }
+/* ── LIGHT THEME ── */
+body.light{
+  --bg0:#F0F4F8;--bg1:#FFFFFF;--bg2:#F7FAFC;--bg3:#EDF2F7;--bg4:#E2E8F0;
+  --b1:#D1DCE8;--b2:#BDD0E3;--b3:#A0B9CF;
+  --t1:#0A1929;--t2:#3A5570;--t3:#6B8299;--t4:#A0B9CF;
+  --g:#00A070;--g2:#008A60;--gd:rgba(0,160,112,.12);
+  --r:#E02040;--r2:#C01030;--rd:rgba(224,32,64,.12);
+  --y:#C8940A;--yd:rgba(200,148,10,.12);
+  --b:#1A6FD4;--bd:rgba(26,111,212,.12);
+  --p:#7C3AED;--pd:rgba(124,58,237,.12);
+  --c:#0891B2;--cd:rgba(8,145,178,.12);
+}
+
+/* ── CHART IMAGE BOX ── */
+.chart-img-box{
+  background:var(--bg3);border:1.5px dashed var(--b2);border-radius:8px;
+  min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:border-color .2s,background .2s;overflow:hidden;
+}
+.chart-img-box:hover{border-color:var(--y);background:var(--bg4);}
+.chart-img-box.has-img{border-style:solid;border-color:var(--b2);}
+
+/* ── TAGLINE PULSE ── */
+@keyframes taglinePulse {
+  0%,100%{opacity:.2} 50%{opacity:.9}
+}
+.tagline-pulse{
+  animation:taglinePulse 3s ease-in-out infinite;
+  font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--y);text-align:center;padding:8px 0 2px;
+  font-family:'Outfit',sans-serif;pointer-events:none;
+}
+
+/* ── THEME TOGGLE BUTTON ── */
+.theme-toggle{
+  width:34px;height:34px;border-radius:8px;
+  background:var(--bg3);border:1px solid var(--b2);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:16px;flex-shrink:0;transition:all .2s;
+}
+.theme-toggle:hover{background:var(--bg4);transform:scale(1.05);}
+
 html,body{height:100%;overflow:hidden}
 body{font-family:'Outfit',sans-serif;background:var(--bg0);color:var(--t1);display:flex;font-size:14px}
 
@@ -534,6 +576,7 @@ select.fi{cursor:pointer}
       <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
       Auto Sync
     </button>
+    <div class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light theme">🌙</div>
     <button class="btn btn-y btn-sm" onclick="openAdd()">
       <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Add Trade
@@ -666,6 +709,8 @@ select.fi{cursor:pointer}
         <button class="btn btn-ghost btn-xs" onclick="nav('trades')">View All →</button>
       </div>
       <div class="tbl-wrap" id="open-tbl"></div>
+      <!-- Tagline -->
+      <div class="tagline-pulse">✦ &nbsp; Define Your Edge With TradEdge &nbsp; ✦</div>
     </div>
 
     <!-- ══ TRADES ══ -->
@@ -922,7 +967,16 @@ select.fi{cursor:pointer}
         <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
           <div class="fg f-full">
             <label class="fl">Stock Symbol</label>
-            <input class="fi" id="al-symbol" placeholder="e.g. RELIANCE" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+            <div class="sym-wrap" style="position:relative">
+              <input class="fi" id="al-symbol" placeholder="Type e.g. RELI, INFY, TCS…"
+                autocomplete="off" style="text-transform:uppercase"
+                oninput="onAlSymInput(this.value)"
+                onkeydown="onAlSymKey(event)"
+                onfocus="onAlSymInput(this.value)"
+                onblur="setTimeout(closeAlSymDrop,200)">
+              <div class="sym-dropdown" id="al-sym-drop"></div>
+            </div>
+            <div id="al-price-status" style="font-size:10px;color:var(--t3);margin-top:3px;min-height:14px"></div>
           </div>
           <div class="fg f-full">
             <label class="fl">Alert Type</label>
@@ -1054,6 +1108,20 @@ select.fi{cursor:pointer}
         <div class="card">
           <div class="card-head"><span class="card-title">Risk Parameters</span></div>
           <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+            <!-- Symbol search -->
+            <div class="fg">
+              <label class="fl">Symbol <span style="color:var(--t4);font-size:10px">(auto-fetches price)</span></label>
+              <div class="sym-wrap" style="position:relative">
+                <input class="fi" id="ps-symbol" placeholder="Type e.g. RELI, INFY, TCS…"
+                  autocomplete="off" style="text-transform:uppercase"
+                  oninput="onPsSymInput(this.value)"
+                  onkeydown="onPsSymKey(event)"
+                  onfocus="onPsSymInput(this.value)"
+                  onblur="setTimeout(closePsSymDrop,200)">
+                <div class="sym-dropdown" id="ps-sym-drop"></div>
+              </div>
+              <div id="ps-price-status" style="font-size:10px;color:var(--t3);margin-top:4px;min-height:14px"></div>
+            </div>
             <div class="fg">
               <label class="fl">Account Capital (₹)</label>
               <input type="number" class="fi" id="ps-capital" placeholder="874000" oninput="calcPositionSize()">
@@ -1161,6 +1229,32 @@ select.fi{cursor:pointer}
             <div class="card-head"><span class="card-title">Pyramid Plan <span style="font-size:10px;font-weight:400;color:var(--t4)">(2 entries)</span></span></div>
             <div class="card-body">
               <div id="ps-pyramid" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--t3)">Enter valid parameters to see pyramid suggestion.</div>
+            </div>
+          </div>
+          <!-- Add to Trade Log -->
+          <div class="card" style="border:1px solid var(--gd);background:linear-gradient(135deg,var(--bg3),var(--bg4))">
+            <div class="card-body" style="padding:14px">
+              <div style="font-size:12px;color:var(--t2);margin-bottom:10px;font-weight:600">🚀 Ready to trade? Add directly to Trade Log</div>
+              <div class="fg2" style="margin-bottom:10px">
+                <div class="fg"><label class="fl" style="font-size:10px">Side</label>
+                  <select class="fi" id="ps-side" style="font-size:12px">
+                    <option value="Buy">Buy (Long)</option>
+                    <option value="Sell">Sell (Short)</option>
+                  </select>
+                </div>
+                <div class="fg"><label class="fl" style="font-size:10px">Entry Type</label>
+                  <select class="fi" id="ps-etype" style="font-size:12px">
+                    <option value="Swing">Swing</option>
+                    <option value="Intraday">Intraday</option>
+                    <option value="Positional">Positional</option>
+                    <option value="Scalp">Scalp</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-y" style="width:100%;justify-content:center" onclick="psAddToTradeLog()">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add to Trade Log
+              </button>
             </div>
           </div>
         </div>
@@ -1505,6 +1599,46 @@ select.fi{cursor:pointer}
           <div class="fg"><label class="fl">Exit Trigger</label><input class="fi" id="f-trigger" placeholder="SL hit, Target reached…"></div>
           <div class="fg"><label class="fl">Growth Areas</label><input class="fi" id="f-growth" placeholder="Entry timing, sizing…"></div>
           <div class="fg f-full"><label class="fl">Notes</label><input class="fi" id="f-notes" placeholder="Reasoning, observations…"></div>
+        </div>
+      </div>
+      <!-- Chart Screenshots -->
+      <div class="fsec">
+        <div class="fsec-title">📸 Chart Screenshots</div>
+        <div class="fg2">
+          <div class="fg f-full">
+            <label class="fl">Entry Chart</label>
+            <div class="chart-img-box" id="entry-img-box" onclick="document.getElementById('f-entry-img-file').click()">
+              <img id="entry-img-preview" src="" style="display:none;max-height:170px;width:100%;object-fit:contain;border-radius:6px">
+              <div id="entry-img-placeholder" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;color:var(--t3)">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span style="font-size:12px">Click to upload entry chart</span>
+                <span style="font-size:10px;color:var(--t4)">PNG / JPG / WebP</span>
+              </div>
+              <input type="file" id="f-entry-img-file" accept="image/*" style="display:none" onchange="handleChartImg('entry',this)">
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+              <span style="font-size:11px;color:var(--t3);white-space:nowrap">or URL:</span>
+              <input class="fi" id="f-entry-img-url" placeholder="https://i.imgur.com/..." style="flex:1;font-size:11px" oninput="handleChartImgUrl('entry',this.value)">
+              <button class="btn btn-xs btn-red" onclick="clearChartImg('entry')" title="Clear">✕</button>
+            </div>
+          </div>
+          <div class="fg f-full">
+            <label class="fl">Exit Chart</label>
+            <div class="chart-img-box" id="exit-img-box" onclick="document.getElementById('f-exit-img-file').click()">
+              <img id="exit-img-preview" src="" style="display:none;max-height:170px;width:100%;object-fit:contain;border-radius:6px">
+              <div id="exit-img-placeholder" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;color:var(--t3)">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span style="font-size:12px">Click to upload exit chart</span>
+                <span style="font-size:10px;color:var(--t4)">PNG / JPG / WebP</span>
+              </div>
+              <input type="file" id="f-exit-img-file" accept="image/*" style="display:none" onchange="handleChartImg('exit',this)">
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+              <span style="font-size:11px;color:var(--t3);white-space:nowrap">or URL:</span>
+              <input class="fi" id="f-exit-img-url" placeholder="https://i.imgur.com/..." style="flex:1;font-size:11px" oninput="handleChartImgUrl('exit',this.value)">
+              <button class="btn btn-xs btn-red" onclick="clearChartImg('exit')" title="Clear">✕</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2291,6 +2425,7 @@ function renderTrades(){
       <td class="mono">${t.holdDays}d</td>
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
         <button class="ab" onclick="openChart('${t.id}')" title="Chart">📈</button>
+        ${(t.entryImg||t.exitImg)?`<button class="ab" onclick="viewTradeCharts('${t.id}')" title="View chart screenshots" style="color:var(--b)">🖼</button>`:''}
         <button class="ab ed" onclick="editTrade('${t.id}')" title="Edit">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -2309,6 +2444,10 @@ function renderTrades(){
           <div><div class="exp-lbl">Source</div><div class="exp-val">${t.source||'manual'}</div></div>
           <div style="grid-column:1/-1"><div class="exp-lbl">Notes</div><div class="exp-val">${t.notes||'—'}</div></div>
           <div style="grid-column:1/-1"><div class="exp-lbl">Growth Areas</div><div class="exp-val">${t.growth||'—'}</div></div>
+          ${(t.entryImg||t.exitImg)?`<div style="grid-column:1/-1;display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+            ${t.entryImg?`<div><div class="exp-lbl" style="margin-bottom:4px">Entry Chart</div><img src="${t.entryImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:120px;max-width:220px;border-radius:6px;border:1px solid var(--b2);cursor:zoom-in;object-fit:cover"></div>`:''}
+            ${t.exitImg?`<div><div class="exp-lbl" style="margin-bottom:4px">Exit Chart</div><img src="${t.exitImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:120px;max-width:220px;border-radius:6px;border:1px solid var(--b2);cursor:zoom-in;object-fit:cover"></div>`:''}
+          </div>`:''}
         </div>
         ${entriesExitsDetail(t)}
       </div>
@@ -5363,6 +5502,363 @@ setTimeout(()=>{
 if(location.protocol === 'file:'){
   const w = document.getElementById('file-proto-warn');
   if(w) w.style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════
+// FEATURE 1: DARK / LIGHT THEME TOGGLE
+// ══════════════════════════════════════════════════
+(function initTheme(){
+  const saved = localStorage.getItem('te_theme') || 'dark';
+  applyTheme(saved, false);
+})();
+
+function applyTheme(t, save=true){
+  const btn = document.getElementById('theme-btn');
+  if(t === 'light'){
+    document.body.classList.add('light');
+    if(btn) btn.textContent = '☀️';
+  } else {
+    document.body.classList.remove('light');
+    if(btn) btn.textContent = '🌙';
+  }
+  if(save) localStorage.setItem('te_theme', t);
+  // Re-render charts if dashboard is visible
+  try{ if(document.getElementById('page-dashboard').classList.contains('active')) renderDash(); } catch(e){}
+}
+
+function toggleTheme(){
+  const isLight = document.body.classList.contains('light');
+  applyTheme(isLight ? 'dark' : 'light');
+}
+
+// ══════════════════════════════════════════════════
+// FEATURE 2: CHART IMAGE UPLOAD / URL IN ADD TRADE
+// ══════════════════════════════════════════════════
+// Store base64 chart images temporarily during modal session
+let _chartImgs = { entry: null, exit: null };
+
+function handleChartImg(type, input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    _chartImgs[type] = e.target.result; // base64
+    showChartImgPreview(type, e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleChartImgUrl(type, url){
+  if(!url || !url.startsWith('http')){ return; }
+  _chartImgs[type] = url;
+  showChartImgPreview(type, url);
+}
+
+function showChartImgPreview(type, src){
+  const preview = document.getElementById(type+'-img-preview');
+  const placeholder = document.getElementById(type+'-img-placeholder');
+  const box = document.getElementById(type+'-img-box');
+  if(!preview) return;
+  preview.src = src;
+  preview.style.display = 'block';
+  placeholder.style.display = 'none';
+  box.classList.add('has-img');
+}
+
+function clearChartImg(type){
+  _chartImgs[type] = null;
+  const preview = document.getElementById(type+'-img-preview');
+  const placeholder = document.getElementById(type+'-img-placeholder');
+  const box = document.getElementById(type+'-img-box');
+  const urlInput = document.getElementById('f-'+type+'-img-url');
+  const fileInput = document.getElementById('f-'+type+'-img-file');
+  if(preview){ preview.src=''; preview.style.display='none'; }
+  if(placeholder) placeholder.style.display='flex';
+  if(box) box.classList.remove('has-img');
+  if(urlInput) urlInput.value='';
+  if(fileInput) fileInput.value='';
+}
+
+function clearAllChartImgs(){
+  clearChartImg('entry'); clearChartImg('exit');
+}
+
+// Patch openAdd to reset images
+const _origOpenAdd = openAdd;
+openAdd = function(){
+  _origOpenAdd();
+  _chartImgs = { entry:null, exit:null };
+  clearAllChartImgs();
+};
+
+// Patch editTrade to load saved images
+const _origEditTrade = editTrade;
+editTrade = function(id){
+  _origEditTrade(id);
+  const t = trades.find(x=>x.id===id);
+  _chartImgs = { entry: t?.entryImg||null, exit: t?.exitImg||null };
+  clearAllChartImgs();
+  if(t?.entryImg){ showChartImgPreview('entry', t.entryImg); document.getElementById('f-entry-img-url').value = t.entryImg.startsWith('data:') ? '' : t.entryImg; }
+  if(t?.exitImg){  showChartImgPreview('exit',  t.exitImg);  document.getElementById('f-exit-img-url').value  = t.exitImg.startsWith('data:')  ? '' : t.exitImg;  }
+};
+
+// Patch saveTrade to include images
+const _origSaveTrade = saveTrade;
+saveTrade = function(){
+  const wasEditId = editId; // capture before original clears it
+  const sym = document.getElementById('f-sym').value.trim().toUpperCase();
+  if(!sym){ toast('Symbol required','⚠️'); return; }
+  _origSaveTrade();
+  // After save, attach images to the correct trade
+  const t = wasEditId ? trades.find(x=>x.id===wasEditId) : trades[trades.length-1];
+  if(t){
+    if(_chartImgs.entry) t.entryImg = _chartImgs.entry;
+    else delete t.entryImg;
+    if(_chartImgs.exit) t.exitImg = _chartImgs.exit;
+    else delete t.exitImg;
+    save();
+  }
+};
+
+// ══════════════════════════════════════════════════
+// FEATURE 3A: POSSIZE SYMBOL SEARCH + AUTO PRICE FETCH
+// ══════════════════════════════════════════════════
+let psFocusIdx = -1;
+let psCurrentSym = '';
+
+function onPsSymInput(val){
+  const q = val.trim().toUpperCase();
+  psCurrentSym = q;
+  const drop = document.getElementById('ps-sym-drop');
+  if(!q || q.length < 1){ drop.classList.remove('open'); return; }
+
+  function scoreMatch(sym, name, q){
+    if(sym===q) return 100;
+    if(sym.startsWith(q)) return 90-sym.length;
+    if(sym.includes(q)) return 70;
+    if(name.toUpperCase().includes(q)) return 50;
+    let si=0; for(let ci=0;ci<q.length&&si<sym.length;ci++){if(sym[si]===q[ci])si++;} if(si>=q.length)return 20;
+    return -1;
+  }
+  const scored = NSE_SYMBOLS.map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  const matches = scored.map(x=>[x.sym,x.name,x.sector]);
+  psFocusIdx = -1;
+
+  const customRow = `<div class="sym-opt sym-opt-custom" data-sym="${q}" onmousedown="selectPsSym('${q}')">
+    <div class="sym-opt-icon" style="background:var(--yd);border-color:rgba(245,197,66,.3);color:var(--y)">+</div>
+    <div class="sym-opt-info"><div class="sym-opt-sym" style="color:var(--y)">${q}</div><div class="sym-opt-name" style="color:var(--t3)">Use as custom symbol</div></div>
+    <div style="font-size:9px;color:var(--y);border:1px solid rgba(245,197,66,.4);padding:2px 6px;border-radius:4px;font-weight:700">CUSTOM</div></div>`;
+
+  if(!matches.length){
+    drop.innerHTML = `<div class="sym-dropdown-header" style="color:var(--t3)">No NSE match</div>` + customRow;
+  } else {
+    drop.innerHTML = `<div class="sym-dropdown-header">NSE — ${matches.length} found</div>` +
+      matches.map(([sym,name,sector])=>`<div class="sym-opt" data-sym="${sym}" onmousedown="selectPsSym('${sym}')">
+        <div class="sym-opt-icon">${sym.slice(0,3)}</div>
+        <div class="sym-opt-info"><div class="sym-opt-sym">${highlightMatch(sym,q)}</div><div class="sym-opt-name">${name}</div></div>
+        <div style="text-align:right"><div class="sym-opt-sector">${sector}</div><div style="font-size:9px;color:var(--b);font-family:'IBM Plex Mono',monospace">NSE</div></div>
+      </div>`).join('') +
+      `<div style="border-top:1px solid var(--b1)"></div>` + customRow;
+  }
+  drop.classList.add('open');
+}
+
+function closePsSymDrop(){ document.getElementById('ps-sym-drop')?.classList.remove('open'); }
+
+function selectPsSym(sym){
+  document.getElementById('ps-symbol').value = sym;
+  closePsSymDrop();
+  psFetchPrice(sym);
+}
+
+function onPsSymKey(e){
+  const drop = document.getElementById('ps-sym-drop');
+  const opts = drop?.querySelectorAll('.sym-opt');
+  if(!opts?.length) return;
+  if(e.key==='ArrowDown'){e.preventDefault();psFocusIdx=Math.min(psFocusIdx+1,opts.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();psFocusIdx=Math.max(psFocusIdx-1,0);}
+  else if(e.key==='Enter'&&psFocusIdx>=0){e.preventDefault();const s=opts[psFocusIdx].dataset.sym;if(s)selectPsSym(s);return;}
+  else if(e.key==='Escape'){closePsSymDrop();return;}
+  opts.forEach((o,i)=>o.classList.toggle('focused',i===psFocusIdx));
+}
+
+async function psFetchPrice(sym){
+  if(!sym) return;
+  const statusEl = document.getElementById('ps-price-status');
+  if(statusEl) statusEl.textContent = '⏳ Fetching price…';
+  const ticker = sym.includes('.') ? sym : sym+'.NS';
+  try{
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`;
+    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    const d = await r.json();
+    const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice || d?.chart?.result?.[0]?.meta?.previousClose;
+    if(price){
+      const entryEl = document.getElementById('ps-entry');
+      if(entryEl && !entryEl.value){ entryEl.value = price.toFixed(2); calcPositionSize(); }
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--g)">✓ CMP: ₹${price.toFixed(2)}</span> — Entry auto-filled`;
+    } else {
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--y)">⚠ Price unavailable — enter manually</span>`;
+    }
+  } catch(err){
+    if(statusEl) statusEl.innerHTML = `<span style="color:var(--t3)">Price fetch failed — enter manually</span>`;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// FEATURE 3B: POSSIZE → ADD TO TRADE LOG
+// ══════════════════════════════════════════════════
+function psAddToTradeLog(){
+  const sym    = (document.getElementById('ps-symbol').value||'').trim().toUpperCase();
+  const entry  = +document.getElementById('ps-entry').value||0;
+  const sl     = +document.getElementById('ps-sl').value||0;
+  const target = +document.getElementById('ps-target').value||0;
+  const side   = document.getElementById('ps-side').value||'Buy';
+  const etype  = document.getElementById('ps-etype').value||'Swing';
+  const qtyEl  = document.getElementById('ps-qty');
+  const qty    = parseInt(qtyEl?.textContent)||0;
+
+  if(!sym){ toast('Enter a symbol first','⚠️'); return; }
+  if(!entry||!sl){ toast('Enter entry price and stop loss first','⚠️'); return; }
+  if(!qty||qty<=0){ toast('Calculate position size first','⚠️'); return; }
+
+  // Pre-fill and open add trade modal
+  openAdd();
+  setTimeout(()=>{
+    document.getElementById('f-sym').value = sym;
+    document.getElementById('f-side').value = side;
+    setEntryType(etype, null);
+    document.getElementById('f-entry-type').value = etype;
+    document.querySelectorAll('.etype-chip').forEach(c=>{
+      c.classList.toggle('active', c.textContent.trim()===etype);
+    });
+    document.getElementById('f-sl').value = sl||'';
+    document.getElementById('f-target').value = target||'';
+    const today = new Date().toISOString().slice(0,10);
+    const p0el = document.getElementById('e-price-0');
+    const q0el = document.getElementById('e-qty-0');
+    if(p0el) p0el.value = entry;
+    if(q0el) q0el.value = qty;
+    const d0el = document.getElementById('e-date-0');
+    if(d0el) d0el.value = today;
+    toast('Prefilled from Position Sizing','📐');
+  }, 150);
+}
+
+// ══════════════════════════════════════════════════
+// FEATURE 3C: ALERTS SYMBOL SEARCH + AUTO PRICE
+// ══════════════════════════════════════════════════
+let alFocusIdx = -1;
+
+function onAlSymInput(val){
+  const q = val.trim().toUpperCase();
+  const drop = document.getElementById('al-sym-drop');
+  if(!q||q.length<1){ drop.classList.remove('open'); return; }
+
+  function scoreMatch(sym,name,q){
+    if(sym===q)return 100; if(sym.startsWith(q))return 90-sym.length;
+    if(sym.includes(q))return 70; if(name.toUpperCase().includes(q))return 50;
+    let si=0;for(let ci=0;ci<q.length&&si<sym.length;ci++){if(sym[si]===q[ci])si++;}if(si>=q.length)return 20; return -1;
+  }
+  const scored = NSE_SYMBOLS.map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  const matches = scored.map(x=>[x.sym,x.name,x.sector]);
+  alFocusIdx=-1;
+
+  const customRow=`<div class="sym-opt sym-opt-custom" data-sym="${q}" onmousedown="selectAlSym('${q}')">
+    <div class="sym-opt-icon" style="background:var(--yd);border-color:rgba(245,197,66,.3);color:var(--y)">+</div>
+    <div class="sym-opt-info"><div class="sym-opt-sym" style="color:var(--y)">${q}</div><div class="sym-opt-name" style="color:var(--t3)">Use as custom symbol</div></div>
+    <div style="font-size:9px;color:var(--y);border:1px solid rgba(245,197,66,.4);padding:2px 6px;border-radius:4px;font-weight:700">CUSTOM</div></div>`;
+
+  drop.innerHTML = (!matches.length ? `<div class="sym-dropdown-header" style="color:var(--t3)">No NSE match</div>` :
+    `<div class="sym-dropdown-header">NSE — ${matches.length} found</div>` +
+    matches.map(([sym,name,sector])=>`<div class="sym-opt" data-sym="${sym}" onmousedown="selectAlSym('${sym}')">
+      <div class="sym-opt-icon">${sym.slice(0,3)}</div>
+      <div class="sym-opt-info"><div class="sym-opt-sym">${highlightMatch(sym,q)}</div><div class="sym-opt-name">${name}</div></div>
+      <div style="text-align:right"><div class="sym-opt-sector">${sector}</div></div></div>`).join('') +
+    `<div style="border-top:1px solid var(--b1)"></div>`) + customRow;
+  drop.classList.add('open');
+}
+
+function closeAlSymDrop(){ document.getElementById('al-sym-drop')?.classList.remove('open'); }
+
+function selectAlSym(sym){
+  document.getElementById('al-symbol').value = sym;
+  closeAlSymDrop();
+  alFetchPrice(sym);
+}
+
+function onAlSymKey(e){
+  const drop = document.getElementById('al-sym-drop');
+  const opts = drop?.querySelectorAll('.sym-opt');
+  if(!opts?.length) return;
+  if(e.key==='ArrowDown'){e.preventDefault();alFocusIdx=Math.min(alFocusIdx+1,opts.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();alFocusIdx=Math.max(alFocusIdx-1,0);}
+  else if(e.key==='Enter'&&alFocusIdx>=0){e.preventDefault();selectAlSym(opts[alFocusIdx].dataset.sym);return;}
+  else if(e.key==='Escape'){closeAlSymDrop();return;}
+  opts.forEach((o,i)=>o.classList.toggle('focused',i===alFocusIdx));
+}
+
+async function alFetchPrice(sym){
+  if(!sym) return;
+  const statusEl = document.getElementById('al-price-status');
+  if(statusEl) statusEl.textContent = '⏳ Fetching CMP…';
+  const ticker = sym.includes('.') ? sym : sym+'.NS';
+  try{
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`;
+    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    const d = await r.json();
+    const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice || d?.chart?.result?.[0]?.meta?.previousClose;
+    if(price){
+      const priceEl = document.getElementById('al-price');
+      if(priceEl && !priceEl.value) priceEl.value = price.toFixed(2);
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--g)">✓ CMP: ₹${price.toFixed(2)}</span>`;
+    } else {
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--y)">⚠ Price unavailable</span>`;
+    }
+  } catch(err){
+    if(statusEl) statusEl.textContent = 'Price fetch failed';
+  }
+}
+
+// Also reset al-symbol & status when alert modal opens
+const _origOpenAddAlert = openAddAlertModal;
+openAddAlertModal = function(){
+  _origOpenAddAlert();
+  document.getElementById('al-price-status').textContent = '';
+  closeAlSymDrop();
+};
+
+// ══════════════════════════════════════════════════
+// CHART IMAGE LIGHTBOX VIEWER
+// ══════════════════════════════════════════════════
+function viewTradeCharts(id){
+  const t = trades.find(x=>x.id===id);
+  if(!t || (!t.entryImg && !t.exitImg)) return;
+
+  const existing = document.getElementById('chart-img-lightbox');
+  if(existing) existing.remove();
+
+  const lb = document.createElement('div');
+  lb.id = 'chart-img-lightbox';
+  lb.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;cursor:zoom-out';
+  lb.onclick = function(e){ if(e.target===lb) lb.remove(); };
+
+  lb.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:1100px">
+      <div style="font-size:15px;font-weight:700;color:#EDF2F7">${t.symbol} — Chart Screenshots</div>
+      <button onclick="document.getElementById('chart-img-lightbox').remove()" style="background:rgba(255,255,255,.1);border:none;color:#EDF2F7;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px">✕ Close</button>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;max-width:1100px;width:100%">
+      ${t.entryImg?`<div style="flex:1;min-width:280px">
+        <div style="font-size:11px;color:#8BA0B8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">📈 Entry Chart</div>
+        <img src="${t.entryImg}" style="width:100%;max-height:70vh;object-fit:contain;border-radius:10px;border:1px solid rgba(255,255,255,.1)">
+      </div>`:''}
+      ${t.exitImg?`<div style="flex:1;min-width:280px">
+        <div style="font-size:11px;color:#8BA0B8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">🚪 Exit Chart</div>
+        <img src="${t.exitImg}" style="width:100%;max-height:70vh;object-fit:contain;border-radius:10px;border:1px solid rgba(255,255,255,.1)">
+      </div>`:''}
+    </div>`;
+
+  document.body.appendChild(lb);
 }
 
 // Start price alert polling (5 min)
