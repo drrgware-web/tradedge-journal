@@ -6057,7 +6057,6 @@ function renderFundRS(){
 
     frsComputeRS(sym, benchmark, benchLabel, cid);
     frsLoadQuarterly(sym, cid);
-    frsFetchEarnings(sym, cid);
   });
 }
 
@@ -6073,158 +6072,195 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
   };
   const bmTicker = bmYahoo[benchmark] || '^NSEI';
 
-  // Periods to compute RS for
   const periods = [
-    { label:'1W',  range:'5d',  interval:'1d'  },
-    { label:'1M',  range:'1mo', interval:'1d'  },
-    { label:'3M',  range:'3mo', interval:'1wk' },
-    { label:'6M',  range:'6mo', interval:'1wk' },
-    { label:'1Y',  range:'1y',  interval:'1mo' },
+    { label:'1W', range:'5d',  interval:'1d'  },
+    { label:'1M', range:'1mo', interval:'1d'  },
+    { label:'3M', range:'3mo', interval:'1wk' },
+    { label:'6M', range:'6mo', interval:'1wk' },
+    { label:'1Y', range:'1y',  interval:'1mo' },
   ];
 
-  async function getReturn(ticker, range, interval){
-    const url   = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}`;
-    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res   = await fetch(proxy, {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),10000);return c.signal;})()});
-    const d     = await res.json();
-    const parsed= JSON.parse(d.contents);
-    const close = parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
-    if(!close?.length) return null;
-    return (close[close.length-1] - close[0]) / close[0] * 100;
+  // Same proxy pattern as fetchCMP which is proven to work
+  async function yhGet(ticker, range, interval){
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}`;
+    const proxies = [
+      `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    ];
+    for(const px of proxies){
+      try{
+        const res = await fetch(px, {signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),12000);return _c.signal;})()});
+        if(!res.ok) continue;
+        const d = await res.json();
+        const parsed = d.contents ? JSON.parse(d.contents) : d;
+        const result = parsed?.chart?.result?.[0];
+        if(!result) continue;
+        return result;
+      }catch(e){ continue; }
+    }
+    return null;
   }
 
   try{
-    // Fetch all periods for both stock and benchmark in parallel
-    const results = await Promise.all(
-      periods.map(p => Promise.all([
-        getReturn(symbol+'.NS', p.range, p.interval),
-        getReturn(bmTicker,    p.range, p.interval)
-      ]))
-    );
+    // Get earnings + meta from 1d chart (no extra call, piggybacks)
+    const stockDay = await yhGet(symbol+'.NS', '5d', '1d');
+    const meta = stockDay?.meta || {};
 
-    // RS classification table
+    // Update earnings badge from chart meta
+    const earnEl = document.getElementById(`${cid}_earn`);
+    const earnTs = meta.earningsTimestamp;
+    if(earnEl && earnTs){
+      const now  = Date.now();
+      const ts   = earnTs * 1000;
+      const diff = Math.round((ts - now)/86400000);
+      const isPast  = diff < 0;
+      const isSoon  = !isPast && diff <= 14;
+      const isToday = !isPast && diff === 0;
+      const fmt = new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+      const label = isToday?'Earnings TODAY':isPast?`Last E: ${fmt}`:diff<=30?`E in ${diff}d · ${fmt}`:`E: ${fmt}`;
+      earnEl.innerHTML = `<span class="earn-e ${isSoon?'earn-blink':''}">E</span>&nbsp;${label}`;
+      earnEl.style.cssText += ';display:inline-flex;align-items:center;gap:4px';
+      earnEl.style.color      = isToday?'var(--r)':isSoon?'var(--y)':'var(--t3)';
+      earnEl.style.borderColor= isToday?'rgba(255,69,96,.4)':isSoon?'rgba(245,197,66,.4)':'var(--b1)';
+      earnEl.style.background = isToday?'var(--rd)':isSoon?'var(--yd)':'var(--bg3)';
+    }
+
+    // Sequential fetches to avoid Yahoo rate limiting
+    const results = [];
+    for(const p of periods){
+      const [sR, bR] = await Promise.all([
+        yhGet(symbol+'.NS', p.range, p.interval),
+        yhGet(bmTicker,     p.range, p.interval),
+      ]);
+      const sClose = sR?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
+      const bClose = bR?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
+      const sRet = sClose?.length ? (sClose[sClose.length-1]-sClose[0])/sClose[0]*100 : null;
+      const bRet = bClose?.length ? (bClose[bClose.length-1]-bClose[0])/bClose[0]*100 : null;
+      results.push([sRet, bRet]);
+      if(p.label !== '1Y') await new Promise(r=>setTimeout(r,250));
+    }
+
     const RS_TABLE = [
-      // [rsPosition, rsDirection, term, interpretation, termColor, interpColor]
-      ['Above Zero','Rising',   'Leader',    'Dominant Strength (Strong Alpha)', '#4ADE80','#4ADE80'],
-      ['Above Zero','Falling',  'Weakening', 'Losing Momentum (Watch Closely)',  '#F5C542','#F5C542'],
-      ['Below Zero','Rising',   'Improving', 'Potential Turnaround / Early Entry','#60A5FA','#60A5FA'],
-      ['Below Zero','Falling',  'Laggard',   'Underperforming (Avoid / Exit)',    '#FF6B8A','#FF6B8A'],
+      ['Above Zero','Rising',  'Leader',    'Dominant Strength (Strong Alpha)', '#4ADE80','#4ADE80'],
+      ['Above Zero','Falling', 'Weakening', 'Losing Momentum (Watch Closely)',  '#F5C542','#F5C542'],
+      ['Below Zero','Rising',  'Improving', 'Potential Turnaround / Early Entry','#60A5FA','#60A5FA'],
+      ['Below Zero','Falling', 'Laggard',   'Underperforming (Avoid / Exit)',    '#FF6B8A','#FF6B8A'],
     ];
 
-    // Build rows
     let rows = '';
     let overallRsVal = null;
-    let overallDir   = null;
 
     periods.forEach((p, i) => {
       const [sRet, bRet] = results[i];
       if(sRet==null||bRet==null){
         rows += `<tr style="border-bottom:1px solid var(--b1)">
-          <td style="padding:6px 8px;color:var(--t3);font-family:'IBM Plex Mono',monospace;font-size:11px">${p.label}</td>
+          <td style="padding:6px 8px;color:var(--t3);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">${p.label}</td>
           <td colspan="4" style="padding:6px 8px;color:var(--t4);font-size:11px;text-align:center">—</td></tr>`;
         return;
       }
-      const rs     = sRet - bRet;
-      const absPos = rs >= 0 ? 'Above Zero' : 'Below Zero';
+      const rs    = sRet - bRet;
+      const pos   = rs >= 0 ? 'Above Zero' : 'Below Zero';
+      if(i===0) overallRsVal = rs;
 
-      // Direction: compare this period's RS to the next longer period
-      let dir = '—', dirCol = 'var(--t4)';
-      if(i < periods.length-1){
-        const [sR2, bR2] = results[i+1];
-        if(sR2!=null && bR2!=null){
-          const rsLong = sR2 - bR2;
-          dir    = rs > rsLong ? 'Rising' : 'Falling';
-          dirCol = dir==='Rising' ? '#4ADE80' : '#FF6B8A';
-        }
+      let dir = '—';
+      if(i < results.length-1){
+        const [s2,b2] = results[i+1];
+        if(s2!=null&&b2!=null) dir = rs > (s2-b2) ? 'Rising' : 'Falling';
       }
 
-      // Match classification
-      const match = RS_TABLE.find(r => r[0]===absPos && r[1]===dir);
-      const term  = match ? match[2] : absPos;
-      const interp= match ? match[3] : '—';
-      const tCol  = match ? match[4] : 'var(--t3)';
-      const iCol  = match ? match[5] : 'var(--t3)';
+      const match = RS_TABLE.find(r=>r[0]===pos&&r[1]===dir);
+      const term  = match?match[2]:pos;
+      const interp= match?match[3]:'—';
+      const tCol  = match?match[4]:'var(--t3)';
+      const iCol  = match?match[5]:'var(--t3)';
 
-      const sCol  = sRet>=0?'#4ADE80':'#FF6B8A';
-      const bCol  = bRet>=0?'#4ADE80':'#FF6B8A';
-      const rsCol = rs>=0?'#4ADE80':'#FF6B8A';
-
-      if(i===0){ overallRsVal=rs; overallDir=dir; }
+      const sC=sRet>=0?'#4ADE80':'#FF6B8A';
+      const bC=bRet>=0?'#4ADE80':'#FF6B8A';
+      const rC=rs>=0?'#4ADE80':'#FF6B8A';
 
       rows += `<tr style="border-bottom:1px solid var(--b1)">
-        <td style="padding:6px 8px;color:var(--t2);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">${p.label}</td>
-        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px">
-          <span style="color:${sCol}">${sRet>=0?'+':''}${sRet.toFixed(1)}%</span>
-          <span style="color:var(--t4);font-size:9px"> stk</span><br>
-          <span style="color:${bCol}">${bRet>=0?'+':''}${bRet.toFixed(1)}%</span>
-          <span style="color:var(--t4);font-size:9px"> bmk</span>
+        <td style="padding:6px 8px;color:var(--y);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700">${p.label}</td>
+        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.6">
+          <span style="color:${sC}">${sRet>=0?'+':''}${sRet.toFixed(1)}%</span><span style="color:var(--t4)"> stk</span><br>
+          <span style="color:${bC}">${bRet>=0?'+':''}${bRet.toFixed(1)}%</span><span style="color:var(--t4)"> bmk</span>
         </td>
-        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700;color:${rsCol}">${rs>=0?'+':''}${rs.toFixed(1)}%</td>
-        <td style="padding:6px 8px;text-align:center;font-size:11px;color:${tCol};font-weight:600">${term}</td>
-        <td style="padding:6px 8px;font-size:10.5px;color:${iCol};max-width:160px;line-height:1.35">${interp}</td>
+        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:800;color:${rC}">${rs>=0?'+':''}${rs.toFixed(1)}%</td>
+        <td style="padding:6px 8px;text-align:center;font-size:11px;font-weight:700;color:${tCol}">${term}</td>
+        <td style="padding:6px 8px;font-size:10.5px;color:${iCol};line-height:1.35">${interp}</td>
       </tr>`;
     });
 
-    // Overall RS badge for header
-    const rsEl = document.getElementById(`${cid}_sector`);
-    if(rsEl && overallRsVal!==null){
-      const col = overallRsVal>=0?'var(--g)':'var(--r)';
-      const bg  = overallRsVal>=0?'var(--gd)':'var(--rd)';
-      const bdr = overallRsVal>=0?'rgba(0,229,160,.3)':'rgba(255,69,96,.3)';
-      rsEl.textContent = `RS ${overallRsVal>=0?'▲ +':'▼ '}${overallRsVal.toFixed(1)}%`;
-      rsEl.style.color=col; rsEl.style.background=bg; rsEl.style.borderColor=bdr;
+    // Update RS header chip
+    if(overallRsVal !== null){
+      const rsChip = document.getElementById(`${cid}_sector`);
+      if(rsChip && rsChip.textContent === '—'){
+        rsChip.textContent = `RS ${overallRsVal>=0?'▲ +':'▼ '}${overallRsVal.toFixed(1)}%`;
+        rsChip.style.color = overallRsVal>=0?'var(--g)':'var(--r)';
+        rsChip.style.background = overallRsVal>=0?'var(--gd)':'var(--rd)';
+        rsChip.style.borderColor = overallRsVal>=0?'rgba(0,229,160,.3)':'rgba(255,69,96,.3)';
+      }
     }
 
     el.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead>
-          <tr style="color:var(--t4);font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:var(--bg3)">
-            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Period</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--b1)">Returns</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--b1)">RS</th>
-            <th style="text-align:center;padding:6px 8px;border-bottom:2px solid var(--b1)">Term</th>
-            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Interpretation</th>
-          </tr>
-        </thead>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:var(--t4);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--bg3)">
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Period</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--b1)">Returns</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--b1)">RS Alpha</th>
+          <th style="text-align:center;padding:6px 8px;border-bottom:2px solid var(--b1)">RS Position</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Market Interpretation</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="font-size:10px;color:var(--t4);margin-top:6px;text-align:right">vs ${benchLabel} · Yahoo Finance</div>`;
+      <div style="font-size:10px;color:var(--t4);padding:4px 8px;text-align:right;border-top:1px solid var(--b1)">vs ${benchLabel} · Yahoo Finance</div>`;
 
-  } catch(e){
-    el.innerHTML = `<div style="color:var(--t3);font-size:11px;padding:8px">RS unavailable · <a href="https://finance.yahoo.com/quote/${symbol}.NS" target="_blank" style="color:var(--b)">Yahoo ↗</a></div>`;
+  }catch(e){
+    el.innerHTML=`<div style="color:var(--t3);font-size:11px;padding:8px">RS unavailable · <a href="https://finance.yahoo.com/quote/${symbol}.NS" target="_blank" style="color:var(--b)">Yahoo ↗</a></div>`;
   }
 }
 
 // ─── Quarterly fundamentals via Yahoo Finance quoteSummary ────────────────────
 async function frsLoadQuarterly(symbol, cid){
-  const el = document.getElementById(`${cid}_fund`);
-  const ipoEl    = document.getElementById(`${cid}_ipo`);
+  const el    = document.getElementById(`${cid}_fund`);
+  const ipoEl = document.getElementById(`${cid}_ipo`);
   if(!el) return;
+
+  async function yhProxyGet(url){
+    const proxies = [
+      `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    ];
+    for(const px of proxies){
+      try{
+        const res = await fetch(px, {signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),12000);return _c.signal;})()});
+        if(!res.ok) continue;
+        const d = await res.json();
+        return d.contents ? JSON.parse(d.contents) : d;
+      }catch(e){ continue; }
+    }
+    return null;
+  }
 
   try{
     const url    = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=incomeStatementHistoryQuarterly,summaryProfile,summaryDetail`;
-    const proxy  = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res    = await fetch(proxy, {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
-    const d      = await res.json();
-    const parsed = JSON.parse(d.contents);
+    const parsed = await yhProxyGet(url);
     const r      = parsed?.quoteSummary?.result?.[0];
     if(!r) throw new Error('no data');
 
-    // Header chips
     const prof = r.summaryProfile || {};
     const sd   = r.summaryDetail  || {};
+
+    // Update sector chip if RS hasn't set it yet
     const sectorEl = document.getElementById(`${cid}_sector`);
-    // Only update sector if RS hasn't filled it yet
     if(sectorEl && sectorEl.textContent==='—' && prof.sector){
       sectorEl.textContent = prof.sector+(prof.industry?` · ${prof.industry}`:'');
-      sectorEl.style.color = 'var(--t3)';
     }
-    if(ipoEl && prof.country) ipoEl.textContent = prof.country;
+    if(ipoEl) ipoEl.textContent = prof.country || '—';
 
     const qs = r.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
     if(!qs.length) throw new Error('no quarters');
 
-    function fmtCr(v){ return v!=null ? (v/1e7).toFixed(1) : '—'; }
+    function fmtCr(v){ return v!=null?(v/1e7).toFixed(1):'—'; }
     function pct(cur,old){
       if(cur==null||old==null||old===0) return '<span style="color:var(--t4)">—</span>';
       const p=(cur-old)/Math.abs(old)*100;
@@ -6232,20 +6268,23 @@ async function frsLoadQuarterly(symbol, cid){
     }
     function opmCol(v){ return v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
 
-    // Info header like screener
+    // Screener-style info header
     let infoHtml = '';
+    const parts=[], parts2=[];
     if(prof.sector||prof.industry){
-      infoHtml = `<div style="padding:5px 8px 6px;font-size:10.5px;color:var(--t3);border-bottom:1px solid var(--b1);display:flex;gap:8px;flex-wrap:wrap">
-        ${prof.sector?`<span style="color:var(--t2)">${prof.sector}</span>`:''}
-        ${prof.industry?`<span style="color:var(--t4)">| ${prof.industry}</span>`:''}
-        ${sd.marketCap?.raw?`<span style="color:var(--t4)">| mcap ₹${fmtCr(sd.marketCap.raw)} Cr</span>`:''}
+      if(sd.marketCap?.raw) parts.push(`mcap <b style="color:var(--t2)">₹${fmtCr(sd.marketCap.raw)} Cr</b>`);
+      infoHtml = `<div style="padding:5px 10px;font-size:10.5px;color:var(--t3);border-bottom:1px solid var(--b1);display:flex;gap:10px;flex-wrap:wrap">
+        ${parts.join('<span style="color:var(--b1)"> | </span>')}
+      </div>
+      <div style="padding:4px 10px 6px;font-size:10.5px;color:var(--t4);border-bottom:1px solid var(--b1);display:flex;gap:8px;flex-wrap:wrap">
+        ▶ ${prof.sector?`<span style="color:var(--t2)">${prof.sector}</span>`:''}
+           ${prof.industry?`<span>| ${prof.industry}</span>`:''}
       </div>`;
     }
 
-    let rows = '';
+    let rows='';
     qs.slice(0,8).forEach((q,i)=>{
-      const dt   = q.endDate?.fmt||'—';
-      // Format date: "2024-09-30" → "Sep-24"
+      const dt = q.endDate?.fmt||'—';
       let ql = dt;
       if(/\d{4}-\d{2}-\d{2}/.test(dt)){
         const dd=new Date(dt);
@@ -6254,11 +6293,11 @@ async function frsLoadQuarterly(symbol, cid){
       const pat  = q.netIncome?.raw;
       const sal  = q.totalRevenue?.raw;
       const opIn = q.operatingIncome?.raw;
-      const opm  = (opIn!=null&&sal) ? opIn/sal*100 : null;
-      const p4   = qs[i+4]; const pq = qs[i+1];
-      const isLat= i===0;
-      const bg   = isLat?'background:var(--bg4)':'';
-      const qs_  = isLat?'color:var(--y);font-weight:700':'color:var(--t2)';
+      const opm  = (opIn!=null&&sal)?opIn/sal*100:null;
+      const p4=qs[i+4]; const pq=qs[i+1];
+      const isLat=i===0;
+      const bg=isLat?'background:var(--bg4)':'';
+      const qs_=isLat?'color:var(--y);font-weight:700':'color:var(--t2)';
 
       rows+=`<tr style="border-bottom:1px solid var(--b1);${bg}">
         <td style="padding:5px 8px;${qs_};font-family:'IBM Plex Mono',monospace;font-size:11px">${ql}</td>
@@ -6272,9 +6311,8 @@ async function frsLoadQuarterly(symbol, cid){
       </tr>`;
     });
 
-    el.innerHTML = `${infoHtml}
-      <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse">
+    el.innerHTML=`${infoHtml}
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
         <thead><tr style="color:var(--t4);font-size:9.5px;text-transform:uppercase;background:var(--bg3)">
           <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--b1)">FQ</th>
           <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1)">PAT</th>
@@ -6289,21 +6327,17 @@ async function frsLoadQuarterly(symbol, cid){
       </table></div>
       <div style="font-size:10px;color:var(--t4);padding:4px 8px;text-align:right;border-top:1px solid var(--b1)">Cr · Yahoo Finance</div>`;
 
-  } catch(e){
-    el.innerHTML = `<div style="padding:14px;display:flex;flex-direction:column;gap:8px">
-      <div style="font-size:11px;color:var(--t3)">Live data unavailable. Open directly:</div>
+  }catch(e){
+    el.innerHTML=`<div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11px;color:var(--t3)">Live data unavailable:</div>
       <a href="https://www.screener.in/company/${symbol}/consolidated/#quarters" target="_blank"
-         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--b);background:var(--bd);border:1px solid var(--b)">
-         📊 Screener.in ↗</a>
+         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--b);background:var(--bd);border:1px solid var(--b)">📊 Screener.in ↗</a>
       <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank"
-         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--y);background:var(--yd);border:1px solid rgba(245,197,66,.3)">
-         📈 Yahoo Finance ↗</a>
+         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--y);background:var(--yd);border:1px solid rgba(245,197,66,.3)">📈 Yahoo Finance ↗</a>
     </div>`;
   }
 }
 
-
-// ── Earnings date fetch (Yahoo Finance calendarEvents) ────────────
 async function frsFetchEarnings(symbol, cardId){
   const earnEl = document.getElementById(`${cardId}_earn`);
   if(!earnEl) return;
