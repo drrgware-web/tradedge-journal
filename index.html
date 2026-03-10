@@ -1481,7 +1481,7 @@ select.fi{cursor:pointer}
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
           <div>
             <div style="font-size:15px;font-weight:700;color:var(--t1)">🔄 Relative Rotation Graph (RRG)</div>
-            <div style="font-size:11px;color:var(--t3);margin-top:2px">JdK RS-Ratio vs RS-Momentum · open positions vs benchmark · tail = last 5 weeks</div>
+            <div style="font-size:11px;color:var(--t3);margin-top:2px">JdK RS-Ratio vs RS-Momentum · open positions vs benchmark · tail = last 5 periods</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <label style="font-size:11px;color:var(--t4)">Benchmark:</label>
@@ -1504,18 +1504,40 @@ select.fi{cursor:pointer}
               </optgroup>
             </select>
             <label style="font-size:11px;color:var(--t4)">Period:</label>
-            <select id="rrg-period" class="fi" style="width:100px;font-size:12px" onchange="renderRRG()">
+            <select id="rrg-period" class="fi" style="width:110px;font-size:12px" onchange="renderRRG()">
+              <option value="1wk">1 Week</option>
+              <option value="1mo">1 Month</option>
               <option value="3mo">3 Months</option>
               <option value="6mo" selected>6 Months</option>
+              <option value="1y">1 Year</option>
               <option value="1y">1 Year</option>
             </select>
             <button class="btn btn-ghost btn-sm" onclick="renderRRG()">↻ Refresh</button>
           </div>
         </div>
-        <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:420px;display:flex;align-items:center;justify-content:center">
-          <div style="color:var(--t4);font-size:12px">Loading RRG…</div>
+
+        <!-- Chart + Table side by side on wide screens -->
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start">
+
+          <!-- RRG Canvas -->
+          <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:560px;display:flex;flex-direction:column;">
+            <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:12px;padding:30px">Loading RRG…</div>
+          </div>
+
+          <!-- Interpretation Table -->
+          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden">
+            <div style="padding:12px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:12px;font-weight:700;color:var(--t1)">📋 Interpretation</span>
+              <span id="rrg-table-bm" style="font-size:10px;color:var(--t4)"></span>
+            </div>
+            <div id="rrg-table-body" style="overflow-y:auto;max-height:480px">
+              <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">Loading…</div>
+            </div>
+          </div>
+
         </div>
-        <!-- RRG description panel per stock -->
+
+        <!-- Detail card (click dot) -->
         <div id="rrg-desc-panel" style="display:none;margin-top:12px"></div>
       </div>
 
@@ -7295,297 +7317,341 @@ async function renderRRG(){
   const bmTicker  = document.getElementById('rrg-benchmark')?.value || '^NSEI';
   const bmLabel   = document.getElementById('rrg-benchmark')?.selectedOptions[0]?.text || 'Nifty 50';
   const period    = document.getElementById('rrg-period')?.value || '6mo';
+  const periodLabel = document.getElementById('rrg-period')?.selectedOptions[0]?.text || '6 Months';
 
-  // Get all open/partial symbols
   const symbols = [...new Set(
     trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol).filter(Boolean)
   )];
 
   if(!symbols.length){
-    container.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3)"><div style="font-size:32px;margin-bottom:8px">📊</div>No open positions to plot</div>';
+    container.innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)"><div style="font-size:36px;margin-bottom:10px">📊</div>No open positions to plot</div>';
     return;
   }
 
-  container.innerHTML='<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12px;padding:30px"><div class="frs-spin"></div>Computing RRG for '+symbols.length+' symbols…</div>';
+  container.innerHTML=`<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px;padding:60px;justify-content:center"><div class="frs-spin"></div>Computing RRG for ${symbols.length} symbols… (takes ~${symbols.length*2}s)</div>`;
 
-  // ── Fetch weekly closes via proxy ──────────────────────────────────────────
-  async function fetchWeekly(ticker){
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=${period}`;
+  // ── Data fetch ─────────────────────────────────────────────────────────────
+  async function fetchPrices(ticker){
+    const useDaily = period==='5d'||period==='1wk'||period==='1mo';
+    const interval = useDaily ? '1d' : '1wk';
+    const minPts   = useDaily ? 10 : 8;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${period}`;
     const proxies = [
       `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
       `https://corsproxy.io/?${encodeURIComponent(url)}`,
     ];
     for(const px of proxies){
       try{
-        const ctrl = new AbortController();
-        setTimeout(()=>ctrl.abort(), 10000);
-        const res = await fetch(px, {signal: ctrl.signal});
+        const ctrl=new AbortController(); setTimeout(()=>ctrl.abort(),12000);
+        const res=await fetch(px,{signal:ctrl.signal});
         if(!res.ok) continue;
-        const raw = await res.text();
-        let parsed; try{ const w=JSON.parse(raw); parsed=w.contents?JSON.parse(w.contents):w; }catch(e){continue;}
-        const closes = parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
-        const ts     = parsed?.chart?.result?.[0]?.timestamp;
-        if(closes?.length >= 10) return {closes, ts};
+        const raw=await res.text();
+        let parsed; try{const w=JSON.parse(raw);parsed=w.contents?JSON.parse(w.contents):w;}catch(e){continue;}
+        const closes=parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
+        if(closes?.length>=minPts) return closes;
       }catch(e){ continue; }
     }
     return null;
   }
 
-  // ── JdK RS-Ratio & RS-Momentum calculation ────────────────────────────────
-  // RS-Line    = stock_close / benchmark_close * 100
-  // RS-Ratio   = 10-period EMA of RS-Line, normalised to 100
-  // RS-Momentum= 10-period EMA of RS-Ratio momentum (ROC), normalised to 100
-  function ema(arr, period){
-    const k = 2/(period+1);
-    let e = arr[0];
-    return arr.map((v,i)=>{ if(i===0) return e; e=v*k+e*(1-k); return e; });
+  // ── JdK RS computation ─────────────────────────────────────────────────────
+  function ema(arr,n){ const k=2/(n+1);let e=arr[0];return arr.map((v,i)=>i===0?e:(e=v*k+e*(1-k))); }
+
+  function computeJdK(sc,bc){
+    const len=Math.min(sc.length,bc.length);
+    const s=sc.slice(-len), b=bc.slice(-len);
+    const rs=s.map((v,i)=>b[i]>0?(v/b[i])*100:null).filter(v=>v!=null);
+    if(rs.length<6) return null;
+    const n=Math.min(10,Math.floor(rs.length/2));
+    const rsEma=ema(rs,n);
+    const mean=rsEma.reduce((a,x)=>a+x,0)/rsEma.length;
+    const rsRatio=rsEma.map(v=>(v/mean)*100);
+    const roc=rsRatio.map((v,i)=>i===0?100:((v-rsRatio[i-1])/(Math.abs(rsRatio[i-1])||1))*100+100);
+    const rocEma=ema(roc.slice(1),n);
+    const rocMean=rocEma.reduce((a,x)=>a+x,0)/rocEma.length;
+    const rsMom=rocEma.map(v=>(v/rocMean)*100);
+    const TAIL=Math.min(6,rsRatio.length,rsMom.length);
+    const tail=[];
+    for(let i=TAIL;i>0;i--) tail.push({ratio:rsRatio[rsRatio.length-i],mom:rsMom[rsMom.length-i]});
+    return tail;
   }
 
-  function computeJdK(stockCloses, bmCloses){
-    const len = Math.min(stockCloses.length, bmCloses.length);
-    const sc  = stockCloses.slice(-len);
-    const bc  = bmCloses.slice(-len);
-
-    // RS line
-    const rs = sc.map((v,i)=> bc[i]>0 ? (v/bc[i])*100 : null).filter(v=>v!==null);
-    if(rs.length < 12) return null;
-
-    // RS-Ratio = EMA(rs, 10), normalise to 100 mean
-    const rsEma   = ema(rs, 10);
-    const rsMean  = rsEma.reduce((a,b)=>a+b,0)/rsEma.length;
-    const rsRatio = rsEma.map(v=>(v/rsMean)*100);
-
-    // RS-Momentum = EMA of 1-period ROC of rsRatio, normalise to 100 mean
-    const roc     = rsRatio.map((v,i)=>i===0?0:((v-rsRatio[i-1])/rsRatio[i-1])*100+100);
-    const rocEma  = ema(roc.slice(1), 10);
-    const rocMean = rocEma.reduce((a,b)=>a+b,0)/rocEma.length;
-    const rsMom   = rocEma.map(v=>(v/rocMean)*100);
-
-    // Align tail: last N points
-    const TAIL = 5;
-    const n    = Math.min(rsRatio.length, rsMom.length, TAIL);
-    const tail = [];
-    for(let i=n;i>0;i--){
-      tail.push({
-        ratio: rsRatio[rsRatio.length-i],
-        mom:   rsMom[rsMom.length-i],
-      });
-    }
-    return tail; // array of {ratio, mom} — last point is current
+  function getQuadrant(r,m){
+    if(r>=100&&m>=100) return {name:'Leading',   color:'#22c55e',bg:'rgba(34,197,94,.07)'};
+    if(r>=100&&m< 100) return {name:'Weakening', color:'#eab308',bg:'rgba(234,179,8,.07)'};
+    if(r< 100&&m>=100) return {name:'Improving', color:'#60a5fa',bg:'rgba(96,165,250,.07)'};
+    return                    {name:'Lagging',   color:'#f87171',bg:'rgba(248,113,113,.07)'};
   }
 
-  // ── Quadrant classification ────────────────────────────────────────────────
-  function getQuadrant(ratio, mom){
-    if(ratio>=100 && mom>=100) return {name:'Leading',   color:'#22c55e', bg:'rgba(34,197,94,.08)'};
-    if(ratio>=100 && mom< 100) return {name:'Weakening', color:'#eab308', bg:'rgba(234,179,8,.08)'};
-    if(ratio< 100 && mom>=100) return {name:'Improving', color:'#60a5fa', bg:'rgba(96,165,250,.08)'};
-    return                            {name:'Lagging',   color:'#f87171', bg:'rgba(248,113,113,.08)'};
-  }
+  const quadAdvice={
+    Leading:  {icon:'🚀',action:'HOLD / ADD',      msg:'Outperforming & gaining strength. Ideal hold or add on dips. Maintain trailing SL.'},
+    Weakening:{icon:'⚠️',action:'TRAIL SL / WATCH', msg:'Outperforming but momentum fading. Tighten stop-loss. May rotate to Lagging soon.'},
+    Improving:{icon:'📈',action:'WATCH / EARLY BUY',msg:'Underperforming but gaining momentum. Potential early entry — confirm with breakout.'},
+    Lagging:  {icon:'🔴',action:'REDUCE / EXIT',    msg:'Underperforming & losing strength. Consider reducing exposure or exiting.'},
+  };
 
-  // ── Fetch benchmark + all stocks ──────────────────────────────────────────
-  const bmData = await fetchWeekly(bmTicker);
-  if(!bmData){ container.innerHTML='<div style="color:var(--t3);padding:20px;font-size:12px">⚠️ Benchmark data unavailable. <button class="btn btn-ghost btn-xs" onclick="renderRRG()">↻ Retry</button></div>'; return; }
-
-  const stockData = {};
-  for(const sym of symbols){
-    await new Promise(r=>setTimeout(r, 180)); // avoid rate limiting
-    stockData[sym] = await fetchWeekly(sym+'.NS');
-  }
-
-  // ── Compute JdK for each symbol ────────────────────────────────────────────
-  const rrgData = [];
-  for(const sym of symbols){
-    const sd = stockData[sym];
-    if(!sd) continue;
-    const tail = computeJdK(sd.closes, bmData.closes);
-    if(!tail || tail.length < 2) continue;
-    const cur  = tail[tail.length-1];
-    const quad = getQuadrant(cur.ratio, cur.mom);
-    rrgData.push({sym, tail, cur, quad});
-  }
-
-  if(!rrgData.length){
-    container.innerHTML='<div style="color:var(--t3);padding:20px;font-size:12px">⚠️ Could not compute RRG — insufficient data. Try a longer period.</div>';
+  // ── Fetch all data ─────────────────────────────────────────────────────────
+  const bmCloses=await fetchPrices(bmTicker);
+  if(!bmCloses){
+    container.innerHTML='<div style="color:var(--t3);padding:40px;font-size:12px;text-align:center">⚠️ Benchmark data unavailable. <button class="btn btn-ghost btn-xs" onclick="renderRRG()">↻ Retry</button></div>';
     return;
   }
 
-  // ── Build SVG canvas ──────────────────────────────────────────────────────
-  // Find axis range
-  const allRatio = rrgData.flatMap(d=>d.tail.map(p=>p.ratio));
-  const allMom   = rrgData.flatMap(d=>d.tail.map(p=>p.mom));
-  const pad      = 1.5;
-  const rMin = Math.min(Math.min(...allRatio)-pad, 97);
-  const rMax = Math.max(Math.max(...allRatio)+pad, 103);
-  const mMin = Math.min(Math.min(...allMom)-pad, 97);
-  const mMax = Math.max(Math.max(...allMom)+pad, 103);
+  const stockCloses={};
+  for(const sym of symbols){
+    await new Promise(r=>setTimeout(r,220));
+    stockCloses[sym]=await fetchPrices(sym+'.NS');
+  }
 
-  const W=780, H=480, ML=55, MR=20, MT=20, MB=40;
+  const rrgData=[];
+  for(const sym of symbols){
+    const sc=stockCloses[sym]; if(!sc) continue;
+    const tail=computeJdK(sc,bmCloses);
+    if(!tail||tail.length<2) continue;
+    const cur=tail[tail.length-1];
+    rrgData.push({sym,tail,cur,quad:getQuadrant(cur.ratio,cur.mom)});
+  }
+
+  if(!rrgData.length){
+    container.innerHTML='<div style="color:var(--t3);padding:40px;font-size:12px;text-align:center">⚠️ Insufficient data. Try a longer period.</div>';
+    return;
+  }
+
+  window._rrgData=rrgData; window._rrgBmLabel=bmLabel;
+
+  // ── SVG — large, full-width ────────────────────────────────────────────────
+  const W=1200,H=620,ML=58,MR=26,MT=30,MB=52;
   const PW=W-ML-MR, PH=H-MT-MB;
 
-  function px(ratio){ return ML + (ratio-rMin)/(rMax-rMin)*PW; }
-  function py(mom)  { return MT + PH - (mom-mMin)/(mMax-mMin)*PH; }
+  const allR=rrgData.flatMap(d=>d.tail.map(p=>p.ratio));
+  const allM=rrgData.flatMap(d=>d.tail.map(p=>p.mom));
+  const pad=2.5;
+  const rMin=Math.min(Math.min(...allR)-pad,97); const rMax=Math.max(Math.max(...allR)+pad,103);
+  const mMin=Math.min(Math.min(...allM)-pad,97); const mMax=Math.max(Math.max(...allM)+pad,103);
 
-  const cx = px(100), cy = py(100); // centre crosshair at 100,100
+  const px=r=>ML+(r-rMin)/(rMax-rMin)*PW;
+  const py=m=>MT+PH-(m-mMin)/(mMax-mMin)*PH;
+  const cx=px(100),cy=py(100);
 
-  // Colour palette for symbols
-  const PALETTE = ['#00E5A0','#3B8BFF','#F5C542','#FF6B8A','#A78BFA','#22D3EE','#FB923C','#34D399','#F472B6','#FBBF24'];
+  const PALETTE=['#00E5A0','#3B8BFF','#F5C542','#FF6B8A','#A78BFA','#22D3EE','#FB923C','#34D399','#F472B6','#FBBF24','#C084FC','#4ADE80'];
 
-  let svgPaths = '';
-  let svgDots  = '';
-  let svgLabels= '';
+  // Quadrant BG
+  let svg=`
+    <rect x="${ML}" y="${MT}" width="${cx-ML}" height="${cy-MT}" fill="rgba(96,165,250,.055)" rx="3"/>
+    <rect x="${cx}" y="${MT}" width="${ML+PW-cx}" height="${cy-MT}" fill="rgba(34,197,94,.065)" rx="3"/>
+    <rect x="${ML}" y="${cy}" width="${cx-ML}" height="${MT+PH-cy}" fill="rgba(248,113,113,.065)" rx="3"/>
+    <rect x="${cx}" y="${cy}" width="${ML+PW-cx}" height="${MT+PH-cy}" fill="rgba(234,179,8,.055)" rx="3"/>`;
 
-  rrgData.forEach((d, idx)=>{
-    const col = PALETTE[idx % PALETTE.length];
-    const pts = d.tail;
-
-    // Trail line (fading)
-    for(let i=1;i<pts.length;i++){
-      const op = 0.2 + (i/pts.length)*0.7;
-      const sw = 1 + (i/pts.length)*1.5;
-      svgPaths += `<line x1="${px(pts[i-1].ratio).toFixed(1)}" y1="${py(pts[i-1].mom).toFixed(1)}"
-        x2="${px(pts[i].ratio).toFixed(1)}" y2="${py(pts[i].mom).toFixed(1)}"
-        stroke="${col}" stroke-width="${sw.toFixed(1)}" stroke-opacity="${op.toFixed(2)}" stroke-linecap="round"/>`;
-    }
-
-    // Arrow head at current position
-    if(pts.length>=2){
-      const prev=pts[pts.length-2], curr=pts[pts.length-1];
-      const dx=px(curr.ratio)-px(prev.ratio), dy=py(curr.mom)-py(prev.mom);
-      const len=Math.sqrt(dx*dx+dy*dy)||1;
-      const ax=dx/len*8, ay=dy/len*8;
-      const ex=px(curr.ratio).toFixed(1), ey=py(curr.mom).toFixed(1);
-      svgPaths += `<polygon points="${ex},${ey} ${(+ex-ax-ay*0.4).toFixed(1)},${(+ey-ay+ax*0.4).toFixed(1)} ${(+ex-ax+ay*0.4).toFixed(1)},${(+ey-ay-ax*0.4).toFixed(1)}"
-        fill="${col}" opacity="0.9"/>`;
-    }
-
-    // Current dot
-    const cx2=px(d.cur.ratio).toFixed(1), cy2=py(d.cur.mom).toFixed(1);
-    svgDots += `<circle cx="${cx2}" cy="${cy2}" r="6" fill="${col}" stroke="#0f1118" stroke-width="1.5"
-      data-sym="${d.sym}" style="cursor:pointer" onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')"/>`;
-
-    // Label
-    svgLabels += `<text x="${(+cx2+8).toFixed(1)}" y="${(+cy2+4).toFixed(1)}"
-      font-size="10" fill="${col}" font-family="IBM Plex Mono,monospace" font-weight="700"
-      style="pointer-events:none">${d.sym}</text>`;
-  });
-
-  // Quadrant backgrounds
-  const qBG = `
-    <rect x="${ML}" y="${MT}" width="${(cx-ML).toFixed(0)}" height="${(cy-MT).toFixed(0)}" fill="rgba(96,165,250,.05)"/>
-    <rect x="${cx.toFixed(0)}" y="${MT}" width="${(ML+PW-cx).toFixed(0)}" height="${(cy-MT).toFixed(0)}" fill="rgba(34,197,94,.06)"/>
-    <rect x="${ML}" y="${cy.toFixed(0)}" width="${(cx-ML).toFixed(0)}" height="${(MT+PH-cy).toFixed(0)}" fill="rgba(248,113,113,.06)"/>
-    <rect x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" width="${(ML+PW-cx).toFixed(0)}" height="${(MT+PH-cy).toFixed(0)}" fill="rgba(234,179,8,.06)"/>`;
-
-  // Quadrant labels
-  const qLabels = `
-    <text x="${(ML+10).toFixed(0)}" y="${(MT+18).toFixed(0)}" font-size="11" fill="rgba(96,165,250,.5)" font-family="Outfit,sans-serif" font-weight="700">IMPROVING</text>
-    <text x="${(cx+10).toFixed(0)}" y="${(MT+18).toFixed(0)}" font-size="11" fill="rgba(34,197,94,.5)" font-family="Outfit,sans-serif" font-weight="700">LEADING</text>
-    <text x="${(ML+10).toFixed(0)}" y="${(MT+PH-8).toFixed(0)}" font-size="11" fill="rgba(248,113,113,.5)" font-family="Outfit,sans-serif" font-weight="700">LAGGING</text>
-    <text x="${(cx+10).toFixed(0)}" y="${(MT+PH-8).toFixed(0)}" font-size="11" fill="rgba(234,179,8,.5)" font-family="Outfit,sans-serif" font-weight="700">WEAKENING</text>`;
-
-  // Axis lines & ticks
-  let axisTicks = '';
-  for(let v=Math.ceil(rMin);v<=Math.floor(rMax);v++){
-    const x = px(v).toFixed(1);
-    axisTicks += `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT+PH}" stroke="rgba(139,160,184,.08)" stroke-width="1"/>
-      <text x="${x}" y="${MT+PH+14}" font-size="9" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace">${v}</text>`;
+  // Grid
+  for(let v=Math.ceil(rMin*2)/2;v<=rMax+.1;v+=0.5){
+    const x=px(v);
+    const isMaj=Number.isInteger(v);
+    svg+=`<line x1="${x.toFixed(1)}" y1="${MT}" x2="${x.toFixed(1)}" y2="${MT+PH}" stroke="rgba(139,160,184,${isMaj?.12:.06})" stroke-width="${isMaj?1:.5}"/>`;
+    if(isMaj) svg+=`<text x="${x.toFixed(1)}" y="${MT+PH+20}" font-size="10" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace">${v}</text>`;
   }
-  for(let v=Math.ceil(mMin);v<=Math.floor(mMax);v++){
-    const y = py(v).toFixed(1);
-    axisTicks += `<line x1="${ML}" y1="${y}" x2="${ML+PW}" y2="${y}" stroke="rgba(139,160,184,.08)" stroke-width="1"/>
-      <text x="${ML-6}" y="${(+y+3).toFixed(1)}" font-size="9" fill="#8BA0B8" text-anchor="end" font-family="IBM Plex Mono,monospace">${v}</text>`;
+  for(let v=Math.ceil(mMin*2)/2;v<=mMax+.1;v+=0.5){
+    const y=py(v);
+    const isMaj=Number.isInteger(v);
+    svg+=`<line x1="${ML}" y1="${y.toFixed(1)}" x2="${ML+PW}" y2="${y.toFixed(1)}" stroke="rgba(139,160,184,${isMaj?.12:.06})" stroke-width="${isMaj?1:.5}"/>`;
+    if(isMaj) svg+=`<text x="${(ML-8)}" y="${(y+3.5).toFixed(1)}" font-size="10" fill="#8BA0B8" text-anchor="end" font-family="IBM Plex Mono,monospace">${v}</text>`;
   }
 
-  // Cross-hair at 100,100
-  const crosshair = `
-    <line x1="${ML}" y1="${cy.toFixed(1)}" x2="${ML+PW}" y2="${cy.toFixed(1)}" stroke="rgba(139,160,184,.35)" stroke-width="1" stroke-dasharray="4,3"/>
-    <line x1="${cx.toFixed(1)}" y1="${MT}" x2="${cx.toFixed(1)}" y2="${MT+PH}" stroke="rgba(139,160,184,.35)" stroke-width="1" stroke-dasharray="4,3"/>`;
+  // Crosshair
+  svg+=`<line x1="${ML}" y1="${cy.toFixed(1)}" x2="${ML+PW}" y2="${cy.toFixed(1)}" stroke="rgba(255,255,255,.25)" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <line x1="${cx.toFixed(1)}" y1="${MT}" x2="${cx.toFixed(1)}" y2="${MT+PH}" stroke="rgba(255,255,255,.25)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
+
+  // Quadrant labels — big, faded
+  svg+=`
+    <text x="${(ML+18)}" y="${(MT+24)}" font-size="13" fill="rgba(96,165,250,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">IMPROVING</text>
+    <text x="${(cx+18)}" y="${(MT+24)}" font-size="13" fill="rgba(34,197,94,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">LEADING</text>
+    <text x="${(ML+18)}" y="${(MT+PH-14)}" font-size="13" fill="rgba(248,113,113,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">LAGGING</text>
+    <text x="${(cx+18)}" y="${(MT+PH-14)}" font-size="13" fill="rgba(234,179,8,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">WEAKENING</text>`;
 
   // Axis labels
-  const axisLabels = `
-    <text x="${(ML+PW/2).toFixed(0)}" y="${H-4}" font-size="10" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace">JdK RS-RATIO</text>
-    <text x="12" y="${(MT+PH/2).toFixed(0)}" font-size="10" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" transform="rotate(-90,12,${(MT+PH/2).toFixed(0)})">RS-MOMENTUM</text>`;
+  svg+=`<text x="${(ML+PW/2).toFixed(0)}" y="${H-10}" font-size="11" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="600">JdK RS-RATIO →</text>
+    <text x="14" y="${(MT+PH/2).toFixed(0)}" font-size="11" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="600" transform="rotate(-90,14,${(MT+PH/2).toFixed(0)})">RS-MOMENTUM ↑</text>`;
 
-  // Benchmark label
-  const bmLbl = `<text x="${(ML+PW-4).toFixed(0)}" y="${(cy-6).toFixed(0)}" font-size="10" fill="rgba(139,160,184,.6)" text-anchor="end" font-family="Outfit,sans-serif">vs ${bmLabel}</text>`;
+  // Watermark
+  svg+=`<text x="${(ML+PW-10)}" y="${(cy-12).toFixed(0)}" font-size="11" fill="rgba(139,160,184,.35)" text-anchor="end" font-family="Outfit,sans-serif">vs ${bmLabel} · ${periodLabel}</text>`;
 
-  const svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="background:var(--bg2);display:block">
-    ${qBG}${axisTicks}${crosshair}${qLabels}${bmLbl}${axisLabels}
-    ${svgPaths}${svgDots}${svgLabels}
-  </svg>`;
+  // Tails + dots + labels
+  let dots='', labels='';
+  rrgData.forEach((d,idx)=>{
+    const col=PALETTE[idx%PALETTE.length];
+    const pts=d.tail;
+    for(let i=1;i<pts.length;i++){
+      const op=(0.12+i/pts.length*.78).toFixed(2);
+      const sw=(0.8+i/pts.length*2.8).toFixed(1);
+      svg+=`<line x1="${px(pts[i-1].ratio).toFixed(1)}" y1="${py(pts[i-1].mom).toFixed(1)}" x2="${px(pts[i].ratio).toFixed(1)}" y2="${py(pts[i].mom).toFixed(1)}" stroke="${col}" stroke-width="${sw}" stroke-opacity="${op}" stroke-linecap="round"/>`;
+    }
+    // Arrow
+    if(pts.length>=2){
+      const p=pts[pts.length-2],q=pts[pts.length-1];
+      const dx=px(q.ratio)-px(p.ratio),dy=py(q.mom)-py(p.mom);
+      const L=Math.sqrt(dx*dx+dy*dy)||1;
+      const ax=dx/L*10,ay=dy/L*10;
+      const ex=px(q.ratio).toFixed(1),ey=py(q.mom).toFixed(1);
+      svg+=`<polygon points="${ex},${ey} ${(+ex-ax-ay*.45).toFixed(1)},${(+ey-ay+ax*.45).toFixed(1)} ${(+ex-ax+ay*.45).toFixed(1)},${(+ey-ay-ax*.45).toFixed(1)}" fill="${col}" opacity=".95"/>`;
+    }
+    const dx2=px(d.cur.ratio).toFixed(1),dy2=py(d.cur.mom).toFixed(1);
+    dots+=`<circle cx="${dx2}" cy="${dy2}" r="8" fill="${col}" stroke="#0d1117" stroke-width="2.5" style="cursor:pointer" onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')" filter="url(#glow)"><title>${d.sym} · ${d.quad.name}</title></circle>`;
+    labels+=`<text x="${(+dx2+12).toFixed(1)}" y="${(+dy2+4).toFixed(1)}" font-size="11.5" fill="${col}" font-family="IBM Plex Mono,monospace" font-weight="700" style="pointer-events:none;text-shadow:0 1px 3px #000">${d.sym}</text>`;
+  });
 
-  // Legend
-  const legend = rrgData.map((d,i)=>{
-    const col = PALETTE[i%PALETTE.length];
-    return `<div style="display:flex;align-items:center;gap:5px;cursor:pointer" onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')">
-      <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
-      <span style="font-size:11px;font-weight:700;color:var(--t2)">${d.sym}</span>
-      <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${d.quad.color}22;color:${d.quad.color};font-weight:700">${d.quad.name}</span>
-    </div>`;
+  // Glow filter
+  const defs=`<defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+  svg=defs+svg+dots+labels;
+
+  // ── Interpretation table ───────────────────────────────────────────────────
+  const quadOrder={Leading:0,Weakening:1,Improving:2,Lagging:3};
+  const sorted=[...rrgData].sort((a,b)=>quadOrder[a.quad.name]-quadOrder[b.quad.name]);
+
+  const tableRows=sorted.map((d)=>{
+    const col=d.quad.color;
+    const adv=quadAdvice[d.quad.name];
+    const prev=d.tail.length>=2?d.tail[d.tail.length-2]:null;
+    const rDir=prev?(d.cur.ratio>prev.ratio?'<span style="color:var(--g)">▲</span>':'<span style="color:var(--r)">▼</span>'):'';
+    const mDir=prev?(d.cur.mom>prev.mom?'<span style="color:var(--g)">▲</span>':'<span style="color:var(--r)">▼</span>'):'';
+    const trade=trades.find(t=>t.symbol===d.sym);
+    const ct=trade?calc({...trade}):null;
+    const unreal=ct?.unrealisedPL??null;
+    const unrealStr=unreal!=null
+      ?(unreal>=0?`<span style="color:var(--g);font-weight:700">+₹${Math.round(unreal).toLocaleString('en-IN')}</span>`:`<span style="color:var(--r);font-weight:700">−₹${Math.round(Math.abs(unreal)).toLocaleString('en-IN')}</span>`)
+      :'<span style="color:var(--t4)">—</span>';
+    const palCol=PALETTE[rrgData.indexOf(d)%PALETTE.length];
+    return `<tr style="border-bottom:1px solid var(--b1);transition:background .15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <td style="padding:11px 14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${palCol};flex-shrink:0;box-shadow:0 0 6px ${palCol}88"></div>
+          <span style="font-weight:800;color:var(--t1);font-size:13px">${d.sym}</span>
+        </div>
+      </td>
+      <td style="padding:11px 14px">
+        <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;background:${col}22;color:${col};border:1px solid ${col}44">${adv.icon} ${d.quad.name}</span>
+      </td>
+      <td style="padding:11px 14px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${d.cur.ratio>=100?'var(--g)':'var(--r)'}">${d.cur.ratio.toFixed(2)} ${rDir}</td>
+      <td style="padding:11px 14px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${d.cur.mom>=100?'var(--g)':'var(--r)'}">${d.cur.mom.toFixed(2)} ${mDir}</td>
+      <td style="padding:11px 14px">
+        <span style="font-size:11px;font-weight:800;color:${col};background:${col}18;padding:3px 10px;border-radius:6px;white-space:nowrap">${adv.action}</span>
+      </td>
+      <td style="padding:11px 14px;font-size:11.5px;color:var(--t2);line-height:1.5">${adv.msg}</td>
+      <td style="padding:11px 14px">${unrealStr}</td>
+    </tr>`;
   }).join('');
 
-  container.innerHTML = `
-    <div style="padding:0">${svg}</div>
-    <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px;border-top:1px solid var(--b1)">
-      <span style="font-size:10px;color:var(--t4);align-self:center">Click a dot for details →</span>
-      ${legend}
+  const table=`
+    <div>
+      <div style="padding:12px 16px;font-size:11px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);background:var(--bg3)">
+        📋 Interpretation Summary · sorted by quadrant · click a dot on chart for details
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:var(--bg3)">
+              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Symbol</th>
+              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Quadrant</th>
+              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">RS-Ratio</th>
+              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">RS-Mom</th>
+              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Action</th>
+              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Interpretation</th>
+              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Unrealised P&L</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
     </div>`;
 
-  // Store rrgData for desc lookup
-  window._rrgData = rrgData;
-  window._rrgBmLabel = bmLabel;
+  container.innerHTML=`
+    <div style="width:100%;background:var(--bg2)">
+      <svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;min-height:380px">
+        ${svg}
+      </svg>
+    </div>
+    ${table}`;
 
-  // Auto-update RS card descriptions
   updateRSCardsWithRRG(rrgData);
 }
 
 function showRRGDesc(sym, quad, ratio, mom){
   const panel = document.getElementById('rrg-desc-panel');
   if(!panel) return;
+  // Show full table for all stocks + highlight selected
+  renderRRGTable(sym);
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
 
-  const d = (window._rrgData||[]).find(x=>x.sym===sym);
+function renderRRGTable(highlightSym){
+  const panel = document.getElementById('rrg-desc-panel');
+  if(!panel) return;
+  const data = window._rrgData || [];
+  if(!data.length){ panel.style.display='none'; return; }
+
   const quadColors = {Leading:'#22c55e', Weakening:'#eab308', Improving:'#60a5fa', Lagging:'#f87171'};
-  const col = quadColors[quad]||'var(--t2)';
-
-  const quadDesc = {
-    Leading:   'Strong RS-Ratio (>100) with rising momentum. Stock is outperforming the benchmark and gaining strength. Ideal for holding or adding.',
-    Weakening: 'RS-Ratio above 100 but momentum declining. Stock still outperforms but may rotate into Lagging soon. Watch closely — consider tightening stops.',
-    Improving: 'RS-Ratio below 100 but momentum rising. Potential early-entry signal — stock is gaining strength vs benchmark. Confirm with price action.',
-    Lagging:   'Both RS-Ratio and momentum below 100. Underperforming the benchmark. Consider reducing or exiting the position.',
+  const quadIcons  = {Leading:'🚀', Weakening:'⚠️', Improving:'📈', Lagging:'🔴'};
+  const quadDesc   = {
+    Leading:   'Outperforming & gaining strength. Hold / add on dips.',
+    Weakening: 'Outperforming but momentum fading. Tighten stop-loss.',
+    Improving: 'Underperforming but gaining strength. Early entry watch.',
+    Lagging:   'Underperforming & weakening. Review / reduce position.',
   };
+  const actionColor = {Leading:'var(--g)', Weakening:'var(--y)', Improving:'var(--b)', Lagging:'var(--r)'};
 
-  const tail = d?.tail || [];
-  const prev = tail.length>=2 ? tail[tail.length-2] : null;
-  const ratioDir = prev ? (parseFloat(ratio)>prev.ratio?'▲':'▼') : '';
-  const momDir   = prev ? (parseFloat(mom)>prev.mom?'▲':'▼') : '';
+  const rows = data.map(d=>{
+    const col    = quadColors[d.quad.name] || 'var(--t2)';
+    const tail   = d.tail || [];
+    const prev   = tail.length>=2 ? tail[tail.length-2] : null;
+    const ratioN = d.cur.ratio;
+    const momN   = d.cur.mom;
+    const rDir   = prev ? (ratioN>prev.ratio?'▲':'▼') : '—';
+    const mDir   = prev ? (momN>prev.mom?'▲':'▼') : '—';
+    const rDirCol= prev ? (ratioN>prev.ratio?'var(--g)':'var(--r)') : 'var(--t4)';
+    const mDirCol= prev ? (momN>prev.mom?'var(--g)':'var(--r)') : 'var(--t4)';
+    const isHL   = d.sym === highlightSym;
+
+    return `<tr style="cursor:pointer;background:${isHL?'rgba(245,197,66,.06)':'transparent'};border-left:${isHL?'3px solid var(--y)':'3px solid transparent'}"
+      onclick="renderRRGTable('${d.sym}')">
+      <td style="padding:10px 12px;font-weight:800;font-size:13px;color:var(--t1)">${d.sym}</td>
+      <td style="padding:10px 12px">
+        <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${col}22;color:${col}">
+          ${quadIcons[d.quad.name]} ${d.quad.name}
+        </span>
+      </td>
+      <td style="padding:10px 12px;text-align:center">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${ratioN>=100?'var(--g)':'var(--r)'}">${ratioN.toFixed(2)}</span>
+        <span style="font-size:10px;color:${rDirCol};margin-left:3px">${rDir}</span>
+      </td>
+      <td style="padding:10px 12px;text-align:center">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${momN>=100?'var(--g)':'var(--r)'}">${momN.toFixed(2)}</span>
+        <span style="font-size:10px;color:${mDirCol};margin-left:3px">${mDir}</span>
+      </td>
+      <td style="padding:10px 12px;font-size:12px;color:${actionColor[d.quad.name]};font-weight:600">${quadDesc[d.quad.name]}</td>
+    </tr>`;
+  }).join('');
 
   panel.style.display = 'block';
   panel.innerHTML = `
-    <div class="card" style="border-left:4px solid ${col}">
-      <div class="card-body">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
-          <div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <span style="font-size:16px;font-weight:800;color:var(--t1)">${sym}</span>
-              <span style="padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;background:${col}22;color:${col}">${quad}</span>
-              <span style="font-size:11px;color:var(--t3)">vs ${window._rrgBmLabel||'Benchmark'}</span>
-            </div>
-            <div style="font-size:12px;color:var(--t2);max-width:480px;line-height:1.6">${quadDesc[quad]||''}</div>
-          </div>
-          <div style="display:flex;gap:20px">
-            <div style="text-align:center">
-              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:2px">RS-Ratio</div>
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:800;color:${parseFloat(ratio)>=100?'var(--g)':'var(--r)'}">${ratio}</div>
-              <div style="font-size:11px;color:var(--t3)">${ratioDir} vs prev week</div>
-            </div>
-            <div style="text-align:center">
-              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:2px">RS-Momentum</div>
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:800;color:${parseFloat(mom)>=100?'var(--g)':'var(--r)'}">${mom}</div>
-              <div style="font-size:11px;color:var(--t3)">${momDir} vs prev week</div>
-            </div>
-          </div>
+    <div class="card">
+      <div class="card-head" style="display:flex;align-items:center;justify-content:space-between">
+        <span class="card-title">RRG Analysis — All Positions</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:10px;color:var(--t4)">vs ${window._rrgBmLabel||'Benchmark'}</span>
+          <button class="btn btn-ghost btn-xs" onclick="document.getElementById('rrg-desc-panel').style.display='none'">✕</button>
         </div>
-        <button class="btn btn-ghost btn-xs" onclick="document.getElementById('rrg-desc-panel').style.display='none'" style="margin-top:8px">✕ Close</button>
+      </div>
+      <div class="card-body" style="padding:0;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid var(--b1)">
+              <th style="padding:8px 12px;font-size:10px;color:var(--t4);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Stock</th>
+              <th style="padding:8px 12px;font-size:10px;color:var(--t4);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Quadrant</th>
+              <th style="padding:8px 12px;font-size:10px;color:var(--t4);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:.06em">RS-Ratio</th>
+              <th style="padding:8px 12px;font-size:10px;color:var(--t4);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:.06em">RS-Momentum</th>
+              <th style="padding:8px 12px;font-size:10px;color:var(--t4);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Interpretation & Action</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
       </div>
     </div>`;
 }
