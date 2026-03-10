@@ -44,6 +44,16 @@ body.light{
   white-space:nowrap;
 }
 .frs-chip.frs-rs{ font-family:'IBM Plex Mono',monospace; font-weight:600; }
+/* Earnings badge */
+.earn-e{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:4px;
+  background:var(--y);color:#05080D;
+  font-size:9px;font-weight:800;font-family:'IBM Plex Mono',monospace;
+  flex-shrink:0;
+}
+@keyframes earnBlink{0%,100%{opacity:1}50%{opacity:.2}}
+.earn-blink{ animation:earnBlink 1.2s ease-in-out infinite; }
 .frs-stat-chip{
   display:inline-flex;align-items:center;
   padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
@@ -6019,6 +6029,7 @@ function renderFundRS(){
           <span class="frs-chip" id="${cardId}_ff">FF —</span>
           <span class="frs-chip" id="${cardId}_sector">—</span>
           <span class="frs-chip" id="${cardId}_ipo">Listed —</span>
+          <span class="frs-chip frs-earn" id="${cardId}_earn" style="display:none"></span>
           <span class="frs-chip frs-rs" id="${cardId}_rs">RS vs ${benchLabel}: —</span>
         </div>
       </div>
@@ -6058,159 +6069,218 @@ function renderFundRS(){
     // Load data
     frsLoadFundamentals(symbol, cardId);
     frsLoadRS(symbol, benchmark, benchLabel, rsCanId);
+    frsFetchEarnings(symbol, cardId);
   });
 }
 
-// ── Screener.in fundamentals fetch ──────────────────────────────
+// ── Shared proxy fetcher (same pattern as working fetchCMP) ─────
+async function frsFetch(url){
+  // Strategy 1: allorigins /get (returns {contents: "..."})
+  try{
+    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
+    if(r.ok){ const d=await r.json(); if(d.contents) return d.contents; }
+  }catch(e){}
+  // Strategy 2: allorigins /raw
+  try{
+    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
+    if(r.ok) return await r.text();
+  }catch(e){}
+  // Strategy 3: corsproxy.io
+  try{
+    const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`,
+      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
+    if(r.ok) return await r.text();
+  }catch(e){}
+  throw new Error('All proxies failed');
+}
+
+async function frsFetchJSON(url){
+  const text = await frsFetch(url);
+  if(typeof text === 'string') return JSON.parse(text);
+  return text;
+}
+
+// ── NSE India fundamentals fetch ─────────────────────────────────
 async function frsLoadFundamentals(symbol, cardId){
   const tableEl  = document.getElementById(`${cardId}_table`);
   const mcapEl   = document.getElementById(`${cardId}_mcap`);
-  const ffEl     = document.getElementById(`${cardId}_ff`);
   const sectorEl = document.getElementById(`${cardId}_sector`);
   const ipoEl    = document.getElementById(`${cardId}_ipo`);
 
   try{
-    const proxy = 'https://api.allorigins.win/raw?url=';
-    const url   = `https://www.screener.in/company/${symbol}/consolidated/`;
-    const res   = await fetch(proxy + encodeURIComponent(url));
-    const html  = await res.text();
-    const doc   = new DOMParser().parseFromString(html, 'text/html');
+    // NSE India public API — company info + financials
+    const [quoteData, finData] = await Promise.allSettled([
+      frsFetchJSON(`https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(symbol)}`),
+      frsFetchJSON(`https://www.nseindia.com/api/financial-results?index=equities&from=01-01-2022&to=31-12-2024&symbol=${encodeURIComponent(symbol)}`)
+    ]);
 
-    // ── Header info ──────────────────────────────────────
-    const ratios = doc.querySelector('#top-ratios');
-    let mcap='—', ff='—', sector='—', industry='—', ipo='—';
+    // ── Header chips from NSE quote ──────────────────────
+    if(quoteData.status==='fulfilled'){
+      const q = quoteData.value;
+      const info = q?.industryInfo || q?.metadata || {};
+      const mcap = q?.marketDeptOrderBook?.tradeInfo?.totalTradedValue
+                || q?.priceInfo?.weekHighLow?.value || 0;
+      const sector   = info.sector   || info.basicIndustry || '—';
+      const industry = info.industry || info.subSector      || '';
+      const listed   = q?.metadata?.listingDate || q?.info?.listingDate || '';
 
-    // MCap
-    const mcapLi = [...(ratios?.querySelectorAll('li')||[])].find(li=>li.textContent.includes('Market Cap'));
-    if(mcapLi){ const v=mcapLi.querySelector('.number'); if(v) mcap='₹'+v.textContent.trim()+' Cr'; }
-
-    // Sector / industry from company-links
-    const links = [...doc.querySelectorAll('.company-links a, .breadcrumb a')];
-    const sLink = links.find(a=>a.href?.includes('/screen/'));
-    if(sLink) sector = sLink.textContent.trim();
-    // Try peers section header
-    const sectorEl2 = doc.querySelector('[data-field="sector"]');
-    if(sectorEl2) sector = sectorEl2.textContent.trim();
-
-    // IPO date from about section
-    const aboutRows = [...doc.querySelectorAll('.company-profile tr, .about-company tr')];
-    const ipoRow = aboutRows.find(r=>r.textContent.toLowerCase().includes('listed'));
-    if(ipoRow){ const td=ipoRow.querySelector('td:last-child'); if(td) ipo='Listed '+td.textContent.trim(); }
-    const yearMatch = html.match(/listed[^<]{0,30}?(\d{4})/i);
-    if(yearMatch) ipo = 'Listed '+yearMatch[1];
-
-    // ── Quarterly data table ─────────────────────────────
-    // Find the quarterly results table
-    let qTable = doc.querySelector('#quarters table, #quarterly-shp table');
-    if(!qTable){
-      // fallback: first table with "Sep" or "Mar" in headers
-      const allTables = doc.querySelectorAll('table');
-      qTable = [...allTables].find(t=>t.textContent.includes('Sep')||t.textContent.includes('Mar'));
+      if(mcapEl)   mcapEl.textContent   = '🏢 '+sector+(industry?` · ${industry}`:'');
+      if(sectorEl) sectorEl.textContent = sector || '—';
+      if(ipoEl)    ipoEl.textContent    = listed ? 'Listed '+listed.slice(0,4) : '—';
     }
 
-    if(!qTable){ tableEl.innerHTML='<div style="color:var(--t3);font-size:12px;padding:20px">Screener data unavailable for this symbol. Try the NSE/BSE code (e.g. UNIONBANK, HDFCBANK).</div>'; return; }
-
-    const rows   = [...qTable.querySelectorAll('tr')];
-    const heads  = [...(rows[0]?.querySelectorAll('th')||[])].map(th=>th.textContent.trim());
-
-    // Map column indices
-    const qIdx   = heads.findIndex(h=>h.match(/quarter|period|date/i)) >= 0 ? heads.findIndex(h=>h.match(/quarter|period|date/i)) : 0;
-
-    // Extract row data by label
-    function getRow(keyword){ return rows.find(r=>r.querySelector('td')?.textContent?.toLowerCase().includes(keyword.toLowerCase())); }
-    function getVals(row){ return row ? [...row.querySelectorAll('td')].slice(1).map(td=>td.textContent.trim()) : []; }
-
-    const salesRow  = getRow('sales') || getRow('revenue') || getRow('net interest income') || getRow('total income');
-    const patRow    = getRow('net profit') || getRow('PAT') || getRow('profit after');
-    const opmRow    = getRow('OPM') || getRow('operating profit margin') || getRow('operating margin') || getRow('net interest margin');
-    const peRow     = getRow('P/E') || getRow('price to earnings');
-
-    // Quarter headers (skip label col)
-    const quarters  = heads.slice(1).filter(Boolean).slice(0,10);
-    const salesVals = getVals(salesRow).slice(0,10);
-    const patVals   = getVals(patRow).slice(0,10);
-    const opmVals   = getVals(opmRow).slice(0,10);
-    const peVals    = getVals(peRow).slice(0,10);
-
-    // Update header chips
-    if(mcapEl) mcapEl.textContent = 'MCap '+mcap;
-    if(sectorEl) sectorEl.textContent = sector || '—';
-    if(ipoEl)  ipoEl.textContent = ipo;
-
-    // ── Build the screener-style table ───────────────────
-    function pct(vals, i, offset){
-      const cur = parseFloat(vals[i]?.replace(/,/g,''));
-      const old = parseFloat(vals[i+offset]?.replace(/,/g,''));
-      if(isNaN(cur)||isNaN(old)||old===0) return '—';
-      const p = ((cur-old)/Math.abs(old)*100);
-      const s = p>=0?'+':'';
-      return `<span style="color:${p>=0?'#4ADE80':'#FF6B8A'}">${s}${p.toFixed(0)}%</span>`;
-    }
-    function opmColor(v){
-      const n=parseFloat(v);
-      if(isNaN(n)) return 'var(--t3)';
-      if(n>=30) return '#F5C542';
-      if(n>=20) return '#4ADE80';
-      if(n>=10) return '#8BA0B8';
-      return '#FF6B8A';
+    // ── Quarterly results from NSE ───────────────────────
+    if(finData.status==='fulfilled' && finData.value?.data?.length){
+      buildFrsTable(finData.value.data, tableEl, symbol, 'nse');
+      return;
     }
 
-    let tableHTML = `
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:11.5px;font-family:'IBM Plex Mono',monospace">
-          <thead>
-            <tr style="color:var(--t3);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em">
-              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600;min-width:62px">FQ</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600">PAT</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600;color:#4ADE80">YoY</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600;color:#60A5FA">QoQ</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600">Sales</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600;color:#4ADE80">YoY</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600;color:#60A5FA">QoQ</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600;color:var(--y)">OPM%</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);font-weight:600">P/E</th>
-            </tr>
-          </thead>
-          <tbody>`;
+    // ── Fallback: Yahoo Finance summary for ratios ───────
+    const yhData = await frsFetchJSON(
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=financialData,defaultKeyStatistics,incomeStatementHistoryQuarterly,summaryDetail`
+    );
+    const r = yhData?.quoteSummary?.result?.[0];
+    if(!r) throw new Error('No Yahoo data');
+    buildFrsTableFromYahoo(r, tableEl, symbol, mcapEl, ipoEl);
 
-    const maxRows = Math.min(quarters.length, 10);
-    for(let i=0;i<maxRows;i++){
-      const qLabel = quarters[i] || '—';
-      const pat    = patVals[i]   || '—';
-      const sales  = salesVals[i] || '—';
-      const opm    = opmVals[i]   || '—';
-      const pe     = peVals[i]    || '—';
-      const isLatest = i===0;
-
-      tableHTML += `
-        <tr style="border-bottom:1px solid var(--b1);${isLatest?'background:var(--bg4)':''}">
-          <td style="padding:7px 8px;color:${isLatest?'var(--y)':'var(--t2)'};font-weight:${isLatest?'700':'400'}">${qLabel}</td>
-          <td style="padding:7px 8px;text-align:right;color:var(--t1)">${pat}</td>
-          <td style="padding:7px 8px;text-align:right">${patVals.length>4?pct(patVals,i,4):'—'}</td>
-          <td style="padding:7px 8px;text-align:right">${i<patVals.length-1?pct(patVals,i,1):'—'}</td>
-          <td style="padding:7px 8px;text-align:right;color:var(--t1)">${sales}</td>
-          <td style="padding:7px 8px;text-align:right">${salesVals.length>4?pct(salesVals,i,4):'—'}</td>
-          <td style="padding:7px 8px;text-align:right">${i<salesVals.length-1?pct(salesVals,i,1):'—'}</td>
-          <td style="padding:7px 8px;text-align:right;color:${opmColor(opm)};font-weight:600">${opm}${opm!=='—'&&!opm.includes('%')?'%':''}</td>
-          <td style="padding:7px 8px;text-align:right;color:var(--t3)">${pe}</td>
-        </tr>`;
-    }
-    tableHTML += `</tbody></table></div>
-      <div style="font-size:10px;color:var(--t4);margin-top:8px;text-align:right">Source: Screener.in · Values in Cr</div>`;
-
-    tableEl.innerHTML = tableHTML;
-
-  } catch(err){
-    if(tableEl) tableEl.innerHTML=`<div style="color:var(--t3);font-size:12px;padding:20px">⚠ Could not load fundamentals. Check network or try refreshing.<br><span style="font-size:10px;color:var(--t4)">${err.message}</span></div>`;
+  }catch(err){
+    if(tableEl) tableEl.innerHTML=`
+      <div style="padding:20px;color:var(--t3);font-size:12px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+        <div style="color:var(--y);font-size:13px;font-weight:600">📋 Quarterly Data</div>
+        <div style="color:var(--t3)">Live fetch unavailable — NSE/Yahoo blocked by browser security (CORS).</div>
+        <div style="color:var(--t4);font-size:11px">View detailed financials directly:</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="https://www.screener.in/company/${symbol}/" target="_blank" style="color:var(--b);font-size:12px;text-decoration:none;background:var(--bd);border:1px solid var(--b);padding:5px 12px;border-radius:6px">📊 Screener.in</a>
+          <a href="https://www.nseindia.com/get-quotes/equity?symbol=${symbol}" target="_blank" style="color:var(--g);font-size:12px;text-decoration:none;background:var(--gd);border:1px solid var(--g);padding:5px 12px;border-radius:6px">🏛 NSE India</a>
+          <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank" style="color:var(--y);font-size:12px;text-decoration:none;background:var(--yd);border:1px solid var(--y);padding:5px 12px;border-radius:6px">📈 Yahoo Finance</a>
+        </div>
+        <div style="color:var(--t4);font-size:10px;margin-top:4px">RS chart on the left uses Yahoo Finance · Still working if prices load.</div>
+      </div>`;
   }
 }
 
-// ── RS Chart via Yahoo Finance + Chart.js ────────────────────────
+function buildFrsTableFromYahoo(r, tableEl, symbol, mcapEl, ipoEl){
+  const qs = r?.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
+  const fd = r?.financialData || {};
+  const ks = r?.defaultKeyStatistics || {};
+  const sd = r?.summaryDetail || {};
+
+  if(mcapEl && sd.marketCap?.raw){
+    const mc = sd.marketCap.raw;
+    mcapEl.textContent = 'MCap ₹'+(mc>=1e12?(mc/1e12).toFixed(1)+'T':(mc/1e7).toFixed(0)+' Cr');
+  }
+
+  if(!qs.length){ tableEl.innerHTML='<div style="color:var(--t3);padding:16px;font-size:12px">No quarterly data available from Yahoo.</div>'; return; }
+
+  // Build rows from Yahoo quarterly income statements
+  const rows = qs.slice(0,8).map((q,i)=>{
+    const date    = q.endDate?.fmt || '—';
+    const revenue = q.totalRevenue?.raw || 0;
+    const netInc  = q.netIncome?.raw    || 0;
+    const opInc   = q.operatingIncome?.raw || 0;
+    const opm     = revenue>0 ? (opInc/revenue*100) : 0;
+    const prev    = qs[i+4];  // same quarter last year for YoY
+    const prevQ   = qs[i+1];  // previous quarter for QoQ
+    return { date, revenue, netInc, opm, prev, prevQ };
+  });
+
+  function pctChange(cur, old){
+    if(!old||!cur) return '—';
+    const p = (cur-old)/Math.abs(old)*100;
+    const col = p>=0?'#4ADE80':'#FF6B8A';
+    return `<span style="color:${col}">${p>=0?'+':''}${p.toFixed(0)}%</span>`;
+  }
+  function opmCol(v){ return v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
+  function cr(v){ return v ? '₹'+(v/1e7).toFixed(1)+' Cr' : '—'; }
+
+  let html=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;font-family:'IBM Plex Mono',monospace">
+    <thead><tr style="color:var(--t3);font-size:10px;text-transform:uppercase;letter-spacing:.05em">
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1)">Quarter</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">PAT</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">Sales</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:var(--y)">OPM%</th>
+    </tr></thead><tbody>`;
+
+  rows.forEach((row,i)=>{
+    const bg = i===0?'background:var(--bg4)':'';
+    const ql = i===0?`color:var(--y);font-weight:700`:`color:var(--t2)`;
+    html+=`<tr style="border-bottom:1px solid var(--b1);${bg}">
+      <td style="padding:7px 8px;${ql}">${row.date}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${cr(row.netInc)}</td>
+      <td style="padding:7px 8px;text-align:right">${pctChange(row.netInc, row.prev?.netIncome?.raw)}</td>
+      <td style="padding:7px 8px;text-align:right">${pctChange(row.netInc, row.prevQ?.netIncome?.raw)}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${cr(row.revenue)}</td>
+      <td style="padding:7px 8px;text-align:right">${pctChange(row.revenue, row.prev?.totalRevenue?.raw)}</td>
+      <td style="padding:7px 8px;text-align:right">${pctChange(row.revenue, row.prevQ?.totalRevenue?.raw)}</td>
+      <td style="padding:7px 8px;text-align:right;color:${opmCol(row.opm)};font-weight:600">${row.opm.toFixed(1)}%</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>
+    <div style="font-size:10px;color:var(--t4);margin-top:8px;text-align:right">Source: Yahoo Finance · Values in Cr (approx)</div>`;
+  tableEl.innerHTML = html;
+}
+
+function buildFrsTable(data, tableEl, symbol){
+  // NSE financial results format
+  if(!data?.length){ tableEl.innerHTML='<div style="color:var(--t3);padding:16px;font-size:12px">No results data.</div>'; return; }
+
+  function pctChange(cur, old){
+    if(!cur||!old) return '—';
+    const p=(cur-old)/Math.abs(old)*100;
+    return `<span style="color:${p>=0?'#4ADE80':'#FF6B8A'}">${p>=0?'+':''}${p.toFixed(0)}%</span>`;
+  }
+  function opmCol(v){ return v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
+
+  const rows = data.slice(0,8);
+  let html=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;font-family:'IBM Plex Mono',monospace">
+    <thead><tr style="color:var(--t3);font-size:10px;text-transform:uppercase;letter-spacing:.05em">
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1)">Quarter</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">PAT</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">Sales</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:var(--y)">OPM%</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">P/E</th>
+    </tr></thead><tbody>`;
+
+  rows.forEach((d,i)=>{
+    const pat  = parseFloat(d.netProfitLoss||d.pat||0);
+    const sal  = parseFloat(d.totalIncome||d.revenue||d.sales||0);
+    const opm  = parseFloat(d.operatingProfitMargin||d.opm||0);
+    const pe   = d.pe||d.priceEarnings||'—';
+    const qtr  = d.toDate||d.period||d.quarter||'—';
+    const prev = rows[i+4]; const prevQ = rows[i+1];
+    const bg   = i===0?'background:var(--bg4)':'';
+    const ql   = i===0?'color:var(--y);font-weight:700':'color:var(--t2)';
+    html+=`<tr style="border-bottom:1px solid var(--b1);${bg}">
+      <td style="padding:7px 8px;${ql}">${qtr}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${pat?'₹'+pat.toFixed(0)+' Cr':'—'}</td>
+      <td style="padding:7px 8px;text-align:right">${prev?pctChange(pat,parseFloat(prev.netProfitLoss||prev.pat||0)):'—'}</td>
+      <td style="padding:7px 8px;text-align:right">${prevQ?pctChange(pat,parseFloat(prevQ.netProfitLoss||prevQ.pat||0)):'—'}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${sal?'₹'+sal.toFixed(0)+' Cr':'—'}</td>
+      <td style="padding:7px 8px;text-align:right">${prev?pctChange(sal,parseFloat(prev.totalIncome||prev.revenue||prev.sales||0)):'—'}</td>
+      <td style="padding:7px 8px;text-align:right">${prevQ?pctChange(sal,parseFloat(prevQ.totalIncome||prevQ.revenue||prevQ.sales||0)):'—'}</td>
+      <td style="padding:7px 8px;text-align:right;color:${opmCol(opm)};font-weight:600">${opm?opm.toFixed(1)+'%':'—'}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--t3)">${pe}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div><div style="font-size:10px;color:var(--t4);margin-top:8px;text-align:right">Source: NSE India</div>`;
+  tableEl.innerHTML=html;
+}
+
+// ── RS Chart via Yahoo Finance (same proxy as fetchCMP) ──────────
 async function frsLoadRS(symbol, benchmark, benchLabel, canvasId){
   const loaderEl = document.getElementById(canvasId+'_loader');
   const canvas   = document.getElementById(canvasId);
 
-  // Yahoo benchmark ticker map
   const bmMap = {
     'NIFTY50':'^NSEI','BANKNIFTY':'^NSEBANK',
     'CNXIT':'CNXIT.NS','NIFTYMIDCAP100':'NIFTYMIDCAP100.NS',
@@ -6219,25 +6289,33 @@ async function frsLoadRS(symbol, benchmark, benchLabel, canvasId){
   };
   const bmTicker  = bmMap[benchmark] || '^NSEI';
   const symTicker = symbol + '.NS';
-  const proxy     = 'https://api.allorigins.win/raw?url=';
   const params    = '?interval=1wk&range=12mo';
 
+  async function fetchYahoo(ticker){
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}${params}`;
+    // Use the same /get pattern that works for fetchCMP
+    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
+    if(!r.ok) throw new Error('Proxy failed');
+    const d = await r.json();
+    return JSON.parse(d.contents);
+  }
+
   try{
-    const [sRes, bRes] = await Promise.all([
-      fetch(proxy + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symTicker}${params}`)),
-      fetch(proxy + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${bmTicker}${params}`))
+    const [sData, bData] = await Promise.all([
+      fetchYahoo(symTicker),
+      fetchYahoo(bmTicker)
     ]);
-    const [sData, bData] = await Promise.all([sRes.json(), bRes.json()]);
 
     const sResult = sData?.chart?.result?.[0];
     const bResult = bData?.chart?.result?.[0];
-    if(!sResult || !bResult) throw new Error('No data');
+    if(!sResult || !bResult) throw new Error('No chart data');
 
     const timestamps = sResult.timestamp || [];
     const sClose     = sResult.indicators.quote[0].close;
     const bClose     = bResult.indicators.quote[0].close;
 
-    // Normalize both to 100 at start, compute RS ratio
+    // Find first valid values for base normalisation
     const sBase = sClose.find(v=>v!=null);
     const bBase = bClose.find(v=>v!=null);
     const labels=[], rsLine=[], stockLine=[], bmLine=[];
@@ -6245,8 +6323,7 @@ async function frsLoadRS(symbol, benchmark, benchLabel, canvasId){
     const minLen = Math.min(timestamps.length, sClose.length, bClose.length);
     for(let i=0;i<minLen;i++){
       if(sClose[i]==null||bClose[i]==null) continue;
-      const date = new Date(timestamps[i]*1000);
-      labels.push(date.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}));
+      labels.push(new Date(timestamps[i]*1000).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}));
       const sN = (sClose[i]/sBase)*100;
       const bN = (bClose[i]/bBase)*100;
       rsLine.push(+((sN/bN)*100).toFixed(2));
@@ -6254,53 +6331,114 @@ async function frsLoadRS(symbol, benchmark, benchLabel, canvasId){
       bmLine.push(+bN.toFixed(2));
     }
 
-    // RS trend
-    const rsStart = rsLine[0], rsEnd = rsLine[rsLine.length-1];
-    const rsChg = rsEnd - rsStart;
+    if(!rsLine.length) throw new Error('Empty data');
+
+    // RS trend badge
+    const rsChg = rsLine[rsLine.length-1] - rsLine[0];
     const rsEl  = document.getElementById(`frs_${symbol}_rs`);
     if(rsEl){
-      rsEl.textContent = `RS vs ${benchLabel}: ${rsChg>=0?'▲ +':'▼ '}${rsChg.toFixed(1)}%`;
-      rsEl.style.color     = rsChg>=0?'var(--g)':'var(--r)';
-      rsEl.style.background= rsChg>=0?'var(--gd)':'var(--rd)';
+      rsEl.textContent      = `RS vs ${benchLabel}: ${rsChg>=0?'▲ +':'▼ '}${rsChg.toFixed(1)}%`;
+      rsEl.style.color      = rsChg>=0?'var(--g)':'var(--r)';
+      rsEl.style.background = rsChg>=0?'var(--gd)':'var(--rd)';
       rsEl.style.borderColor= rsChg>=0?'rgba(0,229,160,.3)':'rgba(255,69,96,.3)';
     }
 
-    // Hide loader, draw chart
+    // Draw Chart.js
     if(loaderEl) loaderEl.style.display='none';
     if(!canvas) return;
-
-    // Destroy previous chart if exists
     const existing = Chart.getChart(canvas);
     if(existing) existing.destroy();
 
-    new Chart(canvas, {
-      type: 'line',
-      data: {
+    new Chart(canvas,{
+      type:'line',
+      data:{
         labels,
-        datasets: [
-          { label:`${symbol} (norm)`, data:stockLine, borderColor:'#F5C542', borderWidth:1.5, pointRadius:0, tension:0.3, yAxisID:'y' },
-          { label:benchLabel+' (norm)', data:bmLine, borderColor:'#3B8BFF', borderWidth:1.5, pointRadius:0, tension:0.3, yAxisID:'y', borderDash:[4,3] },
-          { label:'RS Ratio', data:rsLine, borderColor:'#00E5A0', borderWidth:2, pointRadius:0, tension:0.3, yAxisID:'y2', fill:false },
+        datasets:[
+          {label:`${symbol}`,       data:stockLine, borderColor:'#F5C542', borderWidth:1.8, pointRadius:0, tension:0.3, yAxisID:'y'},
+          {label:benchLabel,         data:bmLine,    borderColor:'#3B8BFF', borderWidth:1.5, pointRadius:0, tension:0.3, yAxisID:'y', borderDash:[4,3]},
+          {label:'RS Line',          data:rsLine,    borderColor:'#00E5A0', borderWidth:2,   pointRadius:0, tension:0.3, yAxisID:'y2', fill:false},
         ]
       },
       options:{
-        responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
         plugins:{
           legend:{display:true,position:'top',labels:{color:'#8BA0B8',font:{family:'Outfit',size:10},boxWidth:12,padding:10}},
-          tooltip:{backgroundColor:'#111820',titleColor:'#EDF2F7',bodyColor:'#8BA0B8',borderColor:'#1C2A3A',borderWidth:1}
+          tooltip:{backgroundColor:'#111820',titleColor:'#EDF2F7',bodyColor:'#8BA0B8',borderColor:'#1C2A3A',borderWidth:1,
+            callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`}}
         },
         scales:{
           x:{ticks:{color:'#4A6882',font:{size:9},maxTicksLimit:8},grid:{color:'rgba(28,42,58,.5)'},border:{display:false}},
-          y:{position:'left',ticks:{color:'#4A6882',font:{size:9}},grid:{color:'rgba(28,42,58,.5)'},border:{display:false},title:{display:true,text:'Price (norm 100)',color:'#4A6882',font:{size:9}}},
-          y2:{position:'right',ticks:{color:'#00E5A0',font:{size:9}},grid:{display:false},border:{display:false},title:{display:true,text:'RS Ratio',color:'#00E5A0',font:{size:9}}}
+          y:{position:'left',ticks:{color:'#4A6882',font:{size:9}},grid:{color:'rgba(28,42,58,.5)'},border:{display:false},
+            title:{display:true,text:'Price (base 100)',color:'#4A6882',font:{size:9}}},
+          y2:{position:'right',ticks:{color:'#00E5A0',font:{size:9}},grid:{display:false},border:{display:false},
+            title:{display:true,text:'RS Ratio',color:'#00E5A0',font:{size:9}}}
         }
       }
     });
 
-  } catch(err){
-    if(loaderEl) loaderEl.innerHTML=`<div style="color:var(--r);font-size:11px;text-align:center;padding:20px">⚠ RS data unavailable<br><span style="color:var(--t4);font-size:10px">${err.message}</span></div>`;
+  }catch(err){
+    if(loaderEl) loaderEl.innerHTML=`
+      <div style="color:var(--r);font-size:11px;text-align:center;padding:20px">
+        ⚠ RS chart unavailable<br>
+        <span style="color:var(--t4);font-size:10px">${err.message}</span><br>
+        <a href="https://finance.yahoo.com/chart/${symbol}.NS" target="_blank"
+           style="color:var(--b);font-size:11px;margin-top:8px;display:inline-block">Open in Yahoo Finance ↗</a>
+      </div>`;
   }
 }
+
+
+// ── Earnings date fetch (Yahoo Finance calendarEvents) ────────────
+async function frsFetchEarnings(symbol, cardId){
+  const earnEl = document.getElementById(`${cardId}_earn`);
+  if(!earnEl) return;
+
+  try{
+    const url  = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=calendarEvents`;
+    const raw  = await frsFetch(url);
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const cal  = data?.quoteSummary?.result?.[0]?.calendarEvents;
+    const dates= cal?.earnings?.earningsDate || [];
+
+    if(!dates.length){ return; }
+
+    // Find the nearest upcoming or most recent past date
+    const now     = Date.now();
+    const parsed  = dates.map(d => ({
+      ts:  (d.raw || 0) * 1000,
+      fmt: d.fmt || ''
+    })).sort((a,b) => a.ts - b.ts);
+
+    // Prefer next upcoming; fall back to most recent past
+    const upcoming = parsed.find(d => d.ts >= now);
+    const target   = upcoming || parsed[parsed.length - 1];
+    if(!target || !target.fmt) return;
+
+    const diffDays = Math.round((target.ts - now) / 86400000);
+    const isPast   = diffDays < 0;
+    const isSoon   = !isPast && diffDays <= 14;
+    const isToday  = !isPast && diffDays === 0;
+
+    const label = isToday
+      ? 'Earnings TODAY'
+      : isPast
+        ? `Last E: ${target.fmt}`
+        : diffDays <= 30
+          ? `E in ${diffDays}d · ${target.fmt}`
+          : `E: ${target.fmt}`;
+
+    earnEl.innerHTML = `<span class="earn-e ${isSoon ? 'earn-blink' : ''}">E</span>&nbsp;${label}`;
+    earnEl.style.display     = 'inline-flex';
+    earnEl.style.alignItems  = 'center';
+    earnEl.style.gap         = '4px';
+    earnEl.style.color       = isToday ? 'var(--r)' : isSoon ? 'var(--y)' : 'var(--t3)';
+    earnEl.style.borderColor = isToday ? 'rgba(255,69,96,.4)' : isSoon ? 'rgba(245,197,66,.4)' : 'var(--b1)';
+    earnEl.style.background  = isToday ? 'var(--rd)' : isSoon ? 'var(--yd)' : 'var(--bg3)';
+
+  } catch(e){ /* silently skip */ }
+}
+
 </script>
 </body>
 </html>
