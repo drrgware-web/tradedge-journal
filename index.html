@@ -1510,7 +1510,6 @@ select.fi{cursor:pointer}
               <option value="3mo">3 Months</option>
               <option value="6mo" selected>6 Months</option>
               <option value="1y">1 Year</option>
-              <option value="1y">1 Year</option>
             </select>
             <button class="btn btn-ghost btn-sm" onclick="renderRRG()">↻ Refresh</button>
           </div>
@@ -7311,30 +7310,33 @@ function setPbmMode(mode){
 // ══════════════════════════════════════════════════════════════════════════════
 
 async function renderRRG(){
-  const container = document.getElementById('rrg-container');
+  const container  = document.getElementById('rrg-container');
+  const tableBody  = document.getElementById('rrg-table-body');
+  const tableBmLbl = document.getElementById('rrg-table-bm');
   if(!container) return;
 
-  const bmTicker  = document.getElementById('rrg-benchmark')?.value || '^NSEI';
-  const bmLabel   = document.getElementById('rrg-benchmark')?.selectedOptions[0]?.text || 'Nifty 50';
-  const period    = document.getElementById('rrg-period')?.value || '6mo';
-  const periodLabel = document.getElementById('rrg-period')?.selectedOptions[0]?.text || '6 Months';
+  const bmTicker   = document.getElementById('rrg-benchmark')?.value || '^NSEI';
+  const bmLabel    = document.getElementById('rrg-benchmark')?.selectedOptions[0]?.text || 'Nifty 50';
+  const period     = document.getElementById('rrg-period')?.value || '6mo';
+  const periodLabel= document.getElementById('rrg-period')?.selectedOptions[0]?.text || '6 Months';
 
   const symbols = [...new Set(
     trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol).filter(Boolean)
   )];
 
-  if(!symbols.length){
-    container.innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)"><div style="font-size:36px;margin-bottom:10px">📊</div>No open positions to plot</div>';
-    return;
-  }
+  const loadMsg = (msg) => {
+    container.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12px;padding:60px;justify-content:center"><div class="frs-spin"></div>${msg}</div>`;
+    if(tableBody) tableBody.innerHTML = `<div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">${msg}</div>`;
+  };
 
-  container.innerHTML=`<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px;padding:60px;justify-content:center"><div class="frs-spin"></div>Computing RRG for ${symbols.length} symbols… (takes ~${symbols.length*2}s)</div>`;
+  if(!symbols.length){ loadMsg('No open positions to plot'); return; }
+  if(tableBmLbl) tableBmLbl.textContent = `vs ${bmLabel} · ${periodLabel}`;
+  loadMsg(`Computing for ${symbols.length} symbols…`);
 
-  // ── Data fetch ─────────────────────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────────────────────────
   async function fetchPrices(ticker){
-    const useDaily = period==='5d'||period==='1wk'||period==='1mo';
-    const interval = useDaily ? '1d' : '1wk';
-    const minPts   = useDaily ? 10 : 8;
+    const useDaily = period==='1wk'||period==='1mo';
+    const interval = useDaily?'1d':'1wk';
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${period}`;
     const proxies = [
       `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
@@ -7343,18 +7345,17 @@ async function renderRRG(){
     for(const px of proxies){
       try{
         const ctrl=new AbortController(); setTimeout(()=>ctrl.abort(),12000);
-        const res=await fetch(px,{signal:ctrl.signal});
-        if(!res.ok) continue;
+        const res=await fetch(px,{signal:ctrl.signal}); if(!res.ok) continue;
         const raw=await res.text();
-        let parsed; try{const w=JSON.parse(raw);parsed=w.contents?JSON.parse(w.contents):w;}catch(e){continue;}
-        const closes=parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
-        if(closes?.length>=minPts) return closes;
+        let p; try{const w=JSON.parse(raw);p=w.contents?JSON.parse(w.contents):w;}catch(e){continue;}
+        const closes=p?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
+        if(closes?.length>=6) return closes;
       }catch(e){ continue; }
     }
     return null;
   }
 
-  // ── JdK RS computation ─────────────────────────────────────────────────────
+  // ── JdK RS-Ratio & RS-Momentum ───────────────────────────────────────────
   function ema(arr,n){ const k=2/(n+1);let e=arr[0];return arr.map((v,i)=>i===0?e:(e=v*k+e*(1-k))); }
 
   function computeJdK(sc,bc){
@@ -7377,25 +7378,22 @@ async function renderRRG(){
   }
 
   function getQuadrant(r,m){
-    if(r>=100&&m>=100) return {name:'Leading',   color:'#22c55e',bg:'rgba(34,197,94,.07)'};
-    if(r>=100&&m< 100) return {name:'Weakening', color:'#eab308',bg:'rgba(234,179,8,.07)'};
-    if(r< 100&&m>=100) return {name:'Improving', color:'#60a5fa',bg:'rgba(96,165,250,.07)'};
-    return                    {name:'Lagging',   color:'#f87171',bg:'rgba(248,113,113,.07)'};
+    if(r>=100&&m>=100) return {name:'Leading',   color:'#22c55e'};
+    if(r>=100&&m< 100) return {name:'Weakening', color:'#eab308'};
+    if(r< 100&&m>=100) return {name:'Improving', color:'#60a5fa'};
+    return                    {name:'Lagging',   color:'#f87171'};
   }
 
   const quadAdvice={
-    Leading:  {icon:'🚀',action:'HOLD / ADD',      msg:'Outperforming & gaining strength. Ideal hold or add on dips. Maintain trailing SL.'},
-    Weakening:{icon:'⚠️',action:'TRAIL SL / WATCH', msg:'Outperforming but momentum fading. Tighten stop-loss. May rotate to Lagging soon.'},
-    Improving:{icon:'📈',action:'WATCH / EARLY BUY',msg:'Underperforming but gaining momentum. Potential early entry — confirm with breakout.'},
-    Lagging:  {icon:'🔴',action:'REDUCE / EXIT',    msg:'Underperforming & losing strength. Consider reducing exposure or exiting.'},
+    Leading:  {icon:'🚀', action:'HOLD / ADD',       msg:'Outperforming & gaining strength. Hold or add on dips. Keep trailing SL.'},
+    Weakening:{icon:'⚠️', action:'TRAIL SL / WATCH',  msg:'Outperforming but momentum fading. Tighten stop-loss. Rotation to Lagging possible.'},
+    Improving:{icon:'📈', action:'WATCH / EARLY BUY', msg:'Underperforming but gaining momentum. Early entry signal — confirm with price breakout.'},
+    Lagging:  {icon:'🔴', action:'REDUCE / EXIT',     msg:'Underperforming & losing strength. Reduce exposure or exit.'},
   };
 
-  // ── Fetch all data ─────────────────────────────────────────────────────────
+  // ── Fetch all data ────────────────────────────────────────────────────────
   const bmCloses=await fetchPrices(bmTicker);
-  if(!bmCloses){
-    container.innerHTML='<div style="color:var(--t3);padding:40px;font-size:12px;text-align:center">⚠️ Benchmark data unavailable. <button class="btn btn-ghost btn-xs" onclick="renderRRG()">↻ Retry</button></div>';
-    return;
-  }
+  if(!bmCloses){ loadMsg('⚠️ Benchmark unavailable — <button class="btn btn-ghost btn-xs" onclick="renderRRG()">↻ Retry</button>'); return; }
 
   const stockCloses={};
   for(const sym of symbols){
@@ -7403,78 +7401,75 @@ async function renderRRG(){
     stockCloses[sym]=await fetchPrices(sym+'.NS');
   }
 
+  const PALETTE=['#00E5A0','#3B8BFF','#F5C542','#FF6B8A','#A78BFA','#22D3EE','#FB923C','#34D399','#F472B6','#FBBF24','#C084FC','#4ADE80'];
+
   const rrgData=[];
   for(const sym of symbols){
     const sc=stockCloses[sym]; if(!sc) continue;
     const tail=computeJdK(sc,bmCloses);
     if(!tail||tail.length<2) continue;
     const cur=tail[tail.length-1];
-    rrgData.push({sym,tail,cur,quad:getQuadrant(cur.ratio,cur.mom)});
+    rrgData.push({sym, tail, cur, quad:getQuadrant(cur.ratio,cur.mom)});
   }
 
-  if(!rrgData.length){
-    container.innerHTML='<div style="color:var(--t3);padding:40px;font-size:12px;text-align:center">⚠️ Insufficient data. Try a longer period.</div>';
-    return;
-  }
+  if(!rrgData.length){ loadMsg('⚠️ Insufficient data. Try a longer period.'); return; }
 
   window._rrgData=rrgData; window._rrgBmLabel=bmLabel;
 
-  // ── SVG — large, full-width ────────────────────────────────────────────────
-  const W=1200,H=620,ML=58,MR=26,MT=30,MB=52;
+  // ════════════════════════════════════════════════════════════════════════════
+  // SVG CHART
+  // ════════════════════════════════════════════════════════════════════════════
+  const W=1100,H=580,ML=58,MR=20,MT=28,MB=48;
   const PW=W-ML-MR, PH=H-MT-MB;
 
   const allR=rrgData.flatMap(d=>d.tail.map(p=>p.ratio));
   const allM=rrgData.flatMap(d=>d.tail.map(p=>p.mom));
   const pad=2.5;
-  const rMin=Math.min(Math.min(...allR)-pad,97); const rMax=Math.max(Math.max(...allR)+pad,103);
-  const mMin=Math.min(Math.min(...allM)-pad,97); const mMax=Math.max(Math.max(...allM)+pad,103);
+  const rMin=Math.min(Math.min(...allR)-pad,97.5); const rMax=Math.max(Math.max(...allR)+pad,102.5);
+  const mMin=Math.min(Math.min(...allM)-pad,97.5); const mMax=Math.max(Math.max(...allM)+pad,102.5);
 
   const px=r=>ML+(r-rMin)/(rMax-rMin)*PW;
   const py=m=>MT+PH-(m-mMin)/(mMax-mMin)*PH;
-  const cx=px(100),cy=py(100);
+  const cx=px(100), cy=py(100);
 
-  const PALETTE=['#00E5A0','#3B8BFF','#F5C542','#FF6B8A','#A78BFA','#22D3EE','#FB923C','#34D399','#F472B6','#FBBF24','#C084FC','#4ADE80'];
+  let svg=`<defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 
-  // Quadrant BG
-  let svg=`
-    <rect x="${ML}" y="${MT}" width="${cx-ML}" height="${cy-MT}" fill="rgba(96,165,250,.055)" rx="3"/>
-    <rect x="${cx}" y="${MT}" width="${ML+PW-cx}" height="${cy-MT}" fill="rgba(34,197,94,.065)" rx="3"/>
-    <rect x="${ML}" y="${cy}" width="${cx-ML}" height="${MT+PH-cy}" fill="rgba(248,113,113,.065)" rx="3"/>
-    <rect x="${cx}" y="${cy}" width="${ML+PW-cx}" height="${MT+PH-cy}" fill="rgba(234,179,8,.055)" rx="3"/>`;
+  // Quadrant backgrounds
+  svg+=`
+    <rect x="${ML}" y="${MT}" width="${cx-ML}" height="${cy-MT}" fill="rgba(96,165,250,.055)" rx="2"/>
+    <rect x="${cx}" y="${MT}" width="${ML+PW-cx}" height="${cy-MT}" fill="rgba(34,197,94,.065)" rx="2"/>
+    <rect x="${ML}" y="${cy}" width="${cx-ML}" height="${MT+PH-cy}" fill="rgba(248,113,113,.065)" rx="2"/>
+    <rect x="${cx}" y="${cy}" width="${ML+PW-cx}" height="${MT+PH-cy}" fill="rgba(234,179,8,.055)" rx="2"/>`;
 
-  // Grid
+  // Grid lines
   for(let v=Math.ceil(rMin*2)/2;v<=rMax+.1;v+=0.5){
-    const x=px(v);
-    const isMaj=Number.isInteger(v);
-    svg+=`<line x1="${x.toFixed(1)}" y1="${MT}" x2="${x.toFixed(1)}" y2="${MT+PH}" stroke="rgba(139,160,184,${isMaj?.12:.06})" stroke-width="${isMaj?1:.5}"/>`;
+    const x=px(v), isMaj=Number.isInteger(v);
+    svg+=`<line x1="${x.toFixed(1)}" y1="${MT}" x2="${x.toFixed(1)}" y2="${MT+PH}" stroke="rgba(139,160,184,${isMaj?.12:.05})" stroke-width="${isMaj?1:.5}"/>`;
     if(isMaj) svg+=`<text x="${x.toFixed(1)}" y="${MT+PH+20}" font-size="10" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace">${v}</text>`;
   }
   for(let v=Math.ceil(mMin*2)/2;v<=mMax+.1;v+=0.5){
-    const y=py(v);
-    const isMaj=Number.isInteger(v);
-    svg+=`<line x1="${ML}" y1="${y.toFixed(1)}" x2="${ML+PW}" y2="${y.toFixed(1)}" stroke="rgba(139,160,184,${isMaj?.12:.06})" stroke-width="${isMaj?1:.5}"/>`;
-    if(isMaj) svg+=`<text x="${(ML-8)}" y="${(y+3.5).toFixed(1)}" font-size="10" fill="#8BA0B8" text-anchor="end" font-family="IBM Plex Mono,monospace">${v}</text>`;
+    const y=py(v), isMaj=Number.isInteger(v);
+    svg+=`<line x1="${ML}" y1="${y.toFixed(1)}" x2="${ML+PW}" y2="${y.toFixed(1)}" stroke="rgba(139,160,184,${isMaj?.12:.05})" stroke-width="${isMaj?1:.5}"/>`;
+    if(isMaj) svg+=`<text x="${ML-8}" y="${(y+3.5).toFixed(1)}" font-size="10" fill="#8BA0B8" text-anchor="end" font-family="IBM Plex Mono,monospace">${v}</text>`;
   }
 
-  // Crosshair
-  svg+=`<line x1="${ML}" y1="${cy.toFixed(1)}" x2="${ML+PW}" y2="${cy.toFixed(1)}" stroke="rgba(255,255,255,.25)" stroke-width="1.5" stroke-dasharray="6,4"/>
-    <line x1="${cx.toFixed(1)}" y1="${MT}" x2="${cx.toFixed(1)}" y2="${MT+PH}" stroke="rgba(255,255,255,.25)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
+  // Crosshair at 100,100
+  svg+=`<line x1="${ML}" y1="${cy.toFixed(1)}" x2="${ML+PW}" y2="${cy.toFixed(1)}" stroke="rgba(255,255,255,.22)" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <line x1="${cx.toFixed(1)}" y1="${MT}" x2="${cx.toFixed(1)}" y2="${MT+PH}" stroke="rgba(255,255,255,.22)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
 
-  // Quadrant labels — big, faded
+  // Quadrant labels
   svg+=`
-    <text x="${(ML+18)}" y="${(MT+24)}" font-size="13" fill="rgba(96,165,250,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">IMPROVING</text>
-    <text x="${(cx+18)}" y="${(MT+24)}" font-size="13" fill="rgba(34,197,94,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">LEADING</text>
-    <text x="${(ML+18)}" y="${(MT+PH-14)}" font-size="13" fill="rgba(248,113,113,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">LAGGING</text>
-    <text x="${(cx+18)}" y="${(MT+PH-14)}" font-size="13" fill="rgba(234,179,8,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">WEAKENING</text>`;
+    <text x="${ML+16}" y="${MT+22}" font-size="13" fill="rgba(96,165,250,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">IMPROVING</text>
+    <text x="${cx+16}" y="${MT+22}" font-size="13" fill="rgba(34,197,94,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">LEADING</text>
+    <text x="${ML+16}" y="${MT+PH-12}" font-size="13" fill="rgba(248,113,113,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">LAGGING</text>
+    <text x="${cx+16}" y="${MT+PH-12}" font-size="13" fill="rgba(234,179,8,.4)" font-family="Outfit,sans-serif" font-weight="800" letter-spacing="2">WEAKENING</text>`;
 
   // Axis labels
-  svg+=`<text x="${(ML+PW/2).toFixed(0)}" y="${H-10}" font-size="11" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="600">JdK RS-RATIO →</text>
-    <text x="14" y="${(MT+PH/2).toFixed(0)}" font-size="11" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="600" transform="rotate(-90,14,${(MT+PH/2).toFixed(0)})">RS-MOMENTUM ↑</text>`;
+  svg+=`<text x="${(ML+PW/2).toFixed(0)}" y="${H-8}" font-size="11" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="600">JdK  RS-RATIO  →</text>
+    <text x="14" y="${(MT+PH/2).toFixed(0)}" font-size="11" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="600" transform="rotate(-90,14,${(MT+PH/2).toFixed(0)})">RS-MOMENTUM  ↑</text>
+    <text x="${ML+PW-8}" y="${(cy-10).toFixed(0)}" font-size="10" fill="rgba(139,160,184,.35)" text-anchor="end" font-family="Outfit,sans-serif">vs ${bmLabel} · ${periodLabel}</text>`;
 
-  // Watermark
-  svg+=`<text x="${(ML+PW-10)}" y="${(cy-12).toFixed(0)}" font-size="11" fill="rgba(139,160,184,.35)" text-anchor="end" font-family="Outfit,sans-serif">vs ${bmLabel} · ${periodLabel}</text>`;
-
-  // Tails + dots + labels
+  // Tails + arrows + dots + labels
   let dots='', labels='';
   rrgData.forEach((d,idx)=>{
     const col=PALETTE[idx%PALETTE.length];
@@ -7484,91 +7479,83 @@ async function renderRRG(){
       const sw=(0.8+i/pts.length*2.8).toFixed(1);
       svg+=`<line x1="${px(pts[i-1].ratio).toFixed(1)}" y1="${py(pts[i-1].mom).toFixed(1)}" x2="${px(pts[i].ratio).toFixed(1)}" y2="${py(pts[i].mom).toFixed(1)}" stroke="${col}" stroke-width="${sw}" stroke-opacity="${op}" stroke-linecap="round"/>`;
     }
-    // Arrow
     if(pts.length>=2){
       const p=pts[pts.length-2],q=pts[pts.length-1];
-      const dx=px(q.ratio)-px(p.ratio),dy=py(q.mom)-py(p.mom);
+      const dx=px(q.ratio)-px(p.ratio), dy=py(q.mom)-py(p.mom);
       const L=Math.sqrt(dx*dx+dy*dy)||1;
-      const ax=dx/L*10,ay=dy/L*10;
-      const ex=px(q.ratio).toFixed(1),ey=py(q.mom).toFixed(1);
+      const ax=dx/L*10, ay=dy/L*10;
+      const ex=px(q.ratio).toFixed(1), ey=py(q.mom).toFixed(1);
       svg+=`<polygon points="${ex},${ey} ${(+ex-ax-ay*.45).toFixed(1)},${(+ey-ay+ax*.45).toFixed(1)} ${(+ex-ax+ay*.45).toFixed(1)},${(+ey-ay-ax*.45).toFixed(1)}" fill="${col}" opacity=".95"/>`;
     }
-    const dx2=px(d.cur.ratio).toFixed(1),dy2=py(d.cur.mom).toFixed(1);
-    dots+=`<circle cx="${dx2}" cy="${dy2}" r="8" fill="${col}" stroke="#0d1117" stroke-width="2.5" style="cursor:pointer" onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')" filter="url(#glow)"><title>${d.sym} · ${d.quad.name}</title></circle>`;
-    labels+=`<text x="${(+dx2+12).toFixed(1)}" y="${(+dy2+4).toFixed(1)}" font-size="11.5" fill="${col}" font-family="IBM Plex Mono,monospace" font-weight="700" style="pointer-events:none;text-shadow:0 1px 3px #000">${d.sym}</text>`;
+    const dx2=px(d.cur.ratio).toFixed(1), dy2=py(d.cur.mom).toFixed(1);
+    dots+=`<circle cx="${dx2}" cy="${dy2}" r="8" fill="${col}" stroke="#0d1117" stroke-width="2.5" style="cursor:pointer" filter="url(#glow)" onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')"><title>${d.sym} · ${d.quad.name}</title></circle>`;
+    labels+=`<text x="${(+dx2+12).toFixed(1)}" y="${(+dy2+4).toFixed(1)}" font-size="11" fill="${col}" font-family="IBM Plex Mono,monospace" font-weight="700" style="pointer-events:none">${d.sym}</text>`;
   });
+  svg+=dots+labels;
 
-  // Glow filter
-  const defs=`<defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
-  svg=defs+svg+dots+labels;
+  container.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;background:var(--bg2)">${svg}</svg>`;
 
-  // ── Interpretation table ───────────────────────────────────────────────────
-  const quadOrder={Leading:0,Weakening:1,Improving:2,Lagging:3};
-  const sorted=[...rrgData].sort((a,b)=>quadOrder[a.quad.name]-quadOrder[b.quad.name]);
+  // ════════════════════════════════════════════════════════════════════════════
+  // INTERPRETATION TABLE (right panel)
+  // ════════════════════════════════════════════════════════════════════════════
+  if(tableBmLbl) tableBmLbl.textContent=`vs ${bmLabel} · ${periodLabel}`;
 
-  const tableRows=sorted.map((d)=>{
-    const col=d.quad.color;
-    const adv=quadAdvice[d.quad.name];
-    const prev=d.tail.length>=2?d.tail[d.tail.length-2]:null;
-    const rDir=prev?(d.cur.ratio>prev.ratio?'<span style="color:var(--g)">▲</span>':'<span style="color:var(--r)">▼</span>'):'';
-    const mDir=prev?(d.cur.mom>prev.mom?'<span style="color:var(--g)">▲</span>':'<span style="color:var(--r)">▼</span>'):'';
-    const trade=trades.find(t=>t.symbol===d.sym);
-    const ct=trade?calc({...trade}):null;
-    const unreal=ct?.unrealisedPL??null;
-    const unrealStr=unreal!=null
-      ?(unreal>=0?`<span style="color:var(--g);font-weight:700">+₹${Math.round(unreal).toLocaleString('en-IN')}</span>`:`<span style="color:var(--r);font-weight:700">−₹${Math.round(Math.abs(unreal)).toLocaleString('en-IN')}</span>`)
-      :'<span style="color:var(--t4)">—</span>';
-    const palCol=PALETTE[rrgData.indexOf(d)%PALETTE.length];
-    return `<tr style="border-bottom:1px solid var(--b1);transition:background .15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
-      <td style="padding:11px 14px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:10px;height:10px;border-radius:50%;background:${palCol};flex-shrink:0;box-shadow:0 0 6px ${palCol}88"></div>
-          <span style="font-weight:800;color:var(--t1);font-size:13px">${d.sym}</span>
+  if(tableBody){
+    const quadOrder={Leading:0,Improving:1,Weakening:2,Lagging:3};
+    const sorted=[...rrgData].sort((a,b)=>quadOrder[a.quad.name]-quadOrder[b.quad.name]);
+
+    tableBody.innerHTML = sorted.map((d,i)=>{
+      const col  = d.quad.color;
+      const adv  = quadAdvice[d.quad.name];
+      const palC = PALETTE[rrgData.indexOf(d)%PALETTE.length];
+      const prev = d.tail.length>=2?d.tail[d.tail.length-2]:null;
+      const rDir = prev?(d.cur.ratio>prev.ratio?'<span style="color:var(--g);font-size:10px">▲</span>':'<span style="color:var(--r);font-size:10px">▼</span>'):'';
+      const mDir = prev?(d.cur.mom>prev.mom?'<span style="color:var(--g);font-size:10px">▲</span>':'<span style="color:var(--r);font-size:10px">▼</span>'):'';
+      const trade= trades.find(t=>t.symbol===d.sym);
+      const ct   = trade?calc({...trade}):null;
+      const unreal= ct?.unrealisedPL??null;
+      const unrealStr= unreal!=null
+        ?(unreal>=0?`+₹${Math.round(unreal).toLocaleString('en-IN')}`:`−₹${Math.round(Math.abs(unreal)).toLocaleString('en-IN')}`)
+        :'—';
+      const unrealCol= unreal==null?'var(--t4)':unreal>=0?'var(--g)':'var(--r)';
+
+      return `<div style="padding:12px 14px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .15s"
+        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''"
+        onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')">
+
+        <!-- Symbol row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="width:9px;height:9px;border-radius:50%;background:${palC};box-shadow:0 0 5px ${palC}88;flex-shrink:0"></div>
+            <span style="font-size:13px;font-weight:800;color:var(--t1)">${d.sym}</span>
+          </div>
+          <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:${col}22;color:${col};border:1px solid ${col}44">${adv.icon} ${d.quad.name}</span>
         </div>
-      </td>
-      <td style="padding:11px 14px">
-        <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;background:${col}22;color:${col};border:1px solid ${col}44">${adv.icon} ${d.quad.name}</span>
-      </td>
-      <td style="padding:11px 14px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${d.cur.ratio>=100?'var(--g)':'var(--r)'}">${d.cur.ratio.toFixed(2)} ${rDir}</td>
-      <td style="padding:11px 14px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${d.cur.mom>=100?'var(--g)':'var(--r)'}">${d.cur.mom.toFixed(2)} ${mDir}</td>
-      <td style="padding:11px 14px">
-        <span style="font-size:11px;font-weight:800;color:${col};background:${col}18;padding:3px 10px;border-radius:6px;white-space:nowrap">${adv.action}</span>
-      </td>
-      <td style="padding:11px 14px;font-size:11.5px;color:var(--t2);line-height:1.5">${adv.msg}</td>
-      <td style="padding:11px 14px">${unrealStr}</td>
-    </tr>`;
-  }).join('');
 
-  const table=`
-    <div>
-      <div style="padding:12px 16px;font-size:11px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);background:var(--bg3)">
-        📋 Interpretation Summary · sorted by quadrant · click a dot on chart for details
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse">
-          <thead>
-            <tr style="background:var(--bg3)">
-              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Symbol</th>
-              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Quadrant</th>
-              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">RS-Ratio</th>
-              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">RS-Mom</th>
-              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Action</th>
-              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Interpretation</th>
-              <th style="padding:9px 14px;font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;text-align:left">Unrealised P&L</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-    </div>`;
+        <!-- RS values -->
+        <div style="display:flex;gap:14px;margin-bottom:6px">
+          <div>
+            <div style="font-size:9px;color:var(--t4);text-transform:uppercase;margin-bottom:1px">RS-Ratio</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${d.cur.ratio>=100?'var(--g)':'var(--r)'}">${d.cur.ratio.toFixed(2)} ${rDir}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--t4);text-transform:uppercase;margin-bottom:1px">RS-Mom</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${d.cur.mom>=100?'var(--g)':'var(--r)'}">${d.cur.mom.toFixed(2)} ${mDir}</div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-size:9px;color:var(--t4);text-transform:uppercase;margin-bottom:1px">Unrealised</div>
+            <div style="font-size:12px;font-weight:700;color:${unrealCol}">${unrealStr}</div>
+          </div>
+        </div>
 
-  container.innerHTML=`
-    <div style="width:100%;background:var(--bg2)">
-      <svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;min-height:380px">
-        ${svg}
-      </svg>
-    </div>
-    ${table}`;
+        <!-- Action badge -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+          <span style="font-size:10px;font-weight:800;color:${col};background:${col}18;padding:2px 9px;border-radius:5px;white-space:nowrap">${adv.action}</span>
+          <span style="font-size:10px;color:var(--t3);line-height:1.4">${adv.msg}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
 
   updateRSCardsWithRRG(rrgData);
 }
