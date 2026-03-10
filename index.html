@@ -2016,16 +2016,20 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
         <div class="fg2">
           <div class="fg f-full">
             <label class="fl">Entry Chart</label>
-            <div class="chart-img-box" id="entry-img-box"
+            <div class="chart-img-box" id="entry-img-box" tabindex="0"
               onclick="document.getElementById('f-entry-img-file').click()"
               ondragover="event.preventDefault();this.style.borderColor='var(--b)'"
               ondragleave="this.style.borderColor=''"
-              ondrop="handleChartDrop('entry',event)">
+              ondrop="handleChartDrop('entry',event)"
+              onpaste="handleChartPaste('entry',event)"
+              onfocus="this.style.outline='2px solid var(--b)'"
+              onblur="this.style.outline=''"
+              style="cursor:pointer;outline:none">
               <img id="entry-img-preview" src="" style="display:none;max-height:170px;width:100%;object-fit:contain;border-radius:6px">
               <div id="entry-img-placeholder" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;color:var(--t3)">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 <span style="font-size:12px;font-weight:600">Click · Drag · Paste</span>
-                <span style="font-size:10px;color:var(--t4)">PNG / JPG / WebP · Ctrl+V to paste</span>
+                <span style="font-size:10px;color:var(--t4)">Click box to focus → then Ctrl+V / Cmd+V</span>
               </div>
               <input type="file" id="f-entry-img-file" accept="image/*" style="display:none" onchange="handleChartImg('entry',this)">
             </div>
@@ -2037,7 +2041,15 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
           </div>
           <div class="fg f-full">
             <label class="fl">Exit Chart</label>
-            <div class="chart-img-box" id="exit-img-box" onclick="document.getElementById('f-exit-img-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--b)'" ondragleave="this.style.borderColor=''" ondrop="handleChartDrop('exit',event)">
+            <div class="chart-img-box" id="exit-img-box" tabindex="0"
+              onclick="document.getElementById('f-exit-img-file').click()"
+              ondragover="event.preventDefault();this.style.borderColor='var(--b)'"
+              ondragleave="this.style.borderColor=''"
+              ondrop="handleChartDrop('exit',event)"
+              onpaste="handleChartPaste('exit',event)"
+              onfocus="this.style.outline='2px solid var(--b)'"
+              onblur="this.style.outline=''"
+              style="cursor:pointer;outline:none">
               <img id="exit-img-preview" src="" style="display:none;max-height:170px;width:100%;object-fit:contain;border-radius:6px">
               <div id="exit-img-placeholder" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;color:var(--t3)">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -6440,6 +6452,72 @@ function handleChartImg(type, input){
   reader.readAsDataURL(file);
 }
 
+// ── CHART DRAG-DROP ──────────────────────────────────────────────────────
+function handleChartDrop(type, e){
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '';
+  const file = e.dataTransfer?.files?.[0];
+  if(file && file.type.startsWith('image/')){
+    const reader = new FileReader();
+    reader.onload = ev => {
+      _chartImgs[type] = ev.target.result;
+      showChartImgPreview(type, ev.target.result);
+      toast('🖼 Chart dropped into ' + type + ' slot', '✅');
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// ── CHART PASTE (Ctrl+V / Cmd+V) ────────────────────────────────────────
+// Track which chart slot was last clicked
+let _pasteTarget = 'entry';
+
+function _tradeModalOpen(){
+  const m = document.getElementById('m-trade');
+  return m && getComputedStyle(m).display !== 'none';
+}
+
+function _initChartPaste(){
+  // Track which slot was last clicked/focused
+  document.addEventListener('click', function(e){
+    if(e.target.closest('#entry-img-box')){ _pasteTarget='entry'; }
+    if(e.target.closest('#exit-img-box')) { _pasteTarget='exit';  }
+  });
+
+  // Capture-phase paste — fires before browser default download behaviour
+  document.addEventListener('paste', function(e){
+    if(!_tradeModalOpen()) return;          // only when trade modal is open
+    const items = e.clipboardData?.items;
+    if(!items) return;
+    for(const item of items){
+      if(item.type.startsWith('image/')){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const file = item.getAsFile();
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          _chartImgs[_pasteTarget] = ev.target.result;
+          showChartImgPreview(_pasteTarget, ev.target.result);
+          // Highlight the target box briefly
+          const box = document.getElementById(_pasteTarget+'-img-box');
+          if(box){ box.style.borderColor='var(--g)'; setTimeout(()=>box.style.borderColor='',1000); }
+          toast('📋 Chart pasted → ' + (_pasteTarget==='entry'?'Entry':'Exit') + ' slot', '✅');
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  }, true);  // ← true = capture phase, runs before any other handler
+}
+// Run after DOM ready
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', _initChartPaste);
+} else {
+  _initChartPaste();
+}
+
+
 function handleChartImgUrl(type, url){
   if(!url || !url.startsWith('http')){ return; }
   _chartImgs[type] = url;
@@ -8531,6 +8609,45 @@ function getTgtPrice(){
   return side.includes('Long')||side.includes('Buy')
     ? entryPrice*(1 + raw/100)
     : entryPrice*(1 - raw/100);
+}
+
+// ── CHART DRAG-DROP & PASTE ───────────────────────────────────────────────
+function handleChartDrop(type, e){
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.style.borderColor = '';
+  const file = e.dataTransfer?.files?.[0];
+  if(file && file.type.startsWith('image/')){
+    const reader = new FileReader();
+    reader.onload = ev => {
+      _chartImgs[type] = ev.target.result;
+      showChartImgPreview(type, ev.target.result);
+      toast('🖼 ' + (type==='entry'?'Entry':'Exit') + ' chart added', '✅');
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function handleChartPaste(type, e){
+  e.preventDefault();
+  e.stopPropagation();
+  const items = e.clipboardData?.items;
+  if(!items) return;
+  for(const item of items){
+    if(item.type.startsWith('image/')){
+      const file = item.getAsFile();
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        _chartImgs[type] = ev.target.result;
+        showChartImgPreview(type, ev.target.result);
+        toast('📋 ' + (type==='entry'?'Entry':'Exit') + ' chart pasted!', '✅');
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+  }
+  toast('No image found in clipboard', '⚠️');
 }
 
 </script>
