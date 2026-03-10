@@ -6015,8 +6015,13 @@ if(localStorage.getItem('live_auto')) toggleLiveAuto(true);
 updateSyncStatuses();
 if(localStorage.getItem('sb_auto')) sbAutoEnabled = true;
 
-// Render initial page
-renderDash();
+// Load AI keys + provider state
+loadAIKey();
+
+// Activate dashboard page and render everything
+nav('dashboard');
+renderTrades();
+setTimeout(renderPerfVsBm, 800);
 
 // Pre-warm MPS iframe in background so it loads faster on first click
 setTimeout(()=>{
