@@ -2563,6 +2563,36 @@ function renderDash(){
   const avgR=closed.length?closed.reduce((s,t)=>s+t.rr,0)/closed.length:0;
   const totalPL=all.reduce((s,t)=>s+t.totalPL,0);
 
+  // ── Empty state: no trades at all ──────────────────────────────────────────
+  if(!trades.length){
+    document.getElementById('kpi-row').innerHTML=`
+      <div style="grid-column:1/-1;text-align:center;padding:32px 20px;color:var(--t3)">
+        <div style="font-size:42px;margin-bottom:10px">📊</div>
+        <div style="font-size:16px;font-weight:700;color:var(--t2);margin-bottom:6px">Welcome to TradEdge!</div>
+        <div style="font-size:13px;max-width:360px;margin:0 auto 16px">Add your first trade to start tracking your performance.</div>
+        <button class="btn btn-y" onclick="openM('m-add')">＋ Add Trade</button>
+        <span style="margin:0 10px;color:var(--t4)">or</span>
+        <button class="btn btn-ghost" onclick="openM('m-import')">⬇ Import CSV</button>
+      </div>`;
+    // Show empty chart placeholders
+    ['eqChart','wlChart','monthChart','rChart'].forEach(id=>{
+      const canvas = document.getElementById(id);
+      if(canvas){
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = 'rgba(139,160,184,0.08)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = 'rgba(139,160,184,0.3)';
+        ctx.font = '12px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No data yet', canvas.width/2, canvas.height/2);
+      }
+    });
+    const el=document.getElementById('open-tbl');
+    if(el) el.innerHTML='<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No open positions</div></div>';
+    return;
+  }
+
   const kpis=[
     {l:'Total P&L',v:fmt(totalPL),c:totalPL>=0?'col-g':'col-r',ac:'var(--g)',s:`Realised: ${fmt(closed.reduce((s,t)=>s+t.realisedPL,0))}`},
     {l:'Unrealised P&L',v:fmt(open.reduce((s,t)=>s+t.unrealisedPL,0)),c:open.reduce((s,t)=>s+t.unrealisedPL,0)>=0?'col-g':'col-r',ac:'var(--b)',s:`${open.length} open positions`},
@@ -5990,38 +6020,46 @@ if(localStorage.getItem('auto_dhan')) toggleAuto('dhan',true);
 if(localStorage.getItem('auto_zd'))   toggleAuto('zd',true);
 if(localStorage.getItem('auto_de'))   toggleAuto('de',true);
 if(localStorage.getItem('live_auto')) toggleLiveAuto(true);
-// Auto-refresh live prices on load if market is open
-(function(){
-  const ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
-  const h=ist.getHours(),mi=ist.getMinutes(),day=ist.getDay();
-  const mktOpen=day>=1&&day<=5&&(h>9||(h===9&&mi>=15))&&(h<15||(h===15&&mi<=30));
-  if(mktOpen) setTimeout(()=>refreshLivePrices(false), 2000);
-})();
+// (live price refresh moved to deferred boot sequence)
 
 // ── HARDCODED SUPABASE CREDENTIALS ──────────────────
 (function(){
   const SB_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
   const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzY5MDIsImV4cCI6MjA4ODM1MjkwMn0.eExEFw1XGAlYBGECqCpl928UvXv5Jchuyr1YYkcrbdw';
-  // Always write — ensures stale/empty values never block sync
-  localStorage.setItem('sb_url', SB_URL);
-  localStorage.setItem('sb_key', SB_KEY);
-  if(!localStorage.getItem('sb_auto_set')){
-    localStorage.setItem('sb_auto','1');
-    localStorage.setItem('sb_auto_set','1');
-  }
+  // Only set credentials once — don't overwrite user settings on every reload
+  if(!localStorage.getItem('sb_url')) localStorage.setItem('sb_url', SB_URL);
+  if(!localStorage.getItem('sb_key')) localStorage.setItem('sb_key', SB_KEY);
 })();
 
-// Load saved credentials into sync status
+// ── BOOT ─────────────────────────────────────────────
+// 1. Render UI immediately (synchronous, no network)
+loadAIKey();
 updateSyncStatuses();
 if(localStorage.getItem('sb_auto')) sbAutoEnabled = true;
-
-// Load AI keys + provider state
-loadAIKey();
-
-// Activate dashboard page and render everything
 nav('dashboard');
 renderTrades();
-setTimeout(renderPerfVsBm, 800);
+
+// 2. Defer ALL network calls so UI is never blocked
+setTimeout(() => {
+  // Performance vs benchmark (Yahoo Finance)
+  renderPerfVsBm();
+}, 1200);
+
+setTimeout(() => {
+  // Supabase cloud sync (only if enabled)
+  if(localStorage.getItem('sb_auto') && sbAutoEnabled){
+    if(trades.length === 0) sbPull();
+    else updateSyncStatuses();
+  }
+}, 3000);
+
+setTimeout(() => {
+  // Live price refresh (only during market hours)
+  const ist = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  const h=ist.getHours(), mi=ist.getMinutes(), day=ist.getDay();
+  const mktOpen = day>=1&&day<=5&&(h>9||(h===9&&mi>=15))&&(h<15||(h===15&&mi<=30));
+  if(mktOpen && trades.some(t=>t.status!=='Closed')) refreshLivePrices(false);
+}, 4000);
 
 // Pre-warm MPS iframe in background so it loads faster on first click
 setTimeout(()=>{
@@ -6412,13 +6450,7 @@ setTimeout(() => runAlertCheck(), 10000);
   if(changed){ localStorage.setItem('te_trades', JSON.stringify(trades)); }
 })();
 
-// Auto-pull on load — if local is empty, fetch from cloud
-setTimeout(()=>{
-  if(localStorage.getItem('sb_url') && localStorage.getItem('sb_key')){
-    if(trades.length === 0) sbPull();
-    else updateSyncStatuses();
-  }
-}, 1500);
+// (auto-pull moved to deferred boot sequence above)
 
 // ══════════════════════════════════════════════════
 // FUNDAMENTALS & RS
