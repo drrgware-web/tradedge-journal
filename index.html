@@ -1516,15 +1516,15 @@ select.fi{cursor:pointer}
         </div>
 
         <!-- Chart + Table side by side on wide screens -->
-        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start">
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:stretch">
 
           <!-- RRG Canvas -->
-          <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:560px;display:flex;flex-direction:column;">
+          <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:560px;display:flex;flex-direction:column">
             <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:12px;padding:30px">Loading RRG…</div>
           </div>
 
           <!-- Interpretation Table -->
-          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden">
+          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
             <div style="padding:12px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:12px;font-weight:700;color:var(--t1)">📋 Interpretation</span>
               <span id="rrg-table-bm" style="font-size:10px;color:var(--t4)"></span>
@@ -2200,7 +2200,7 @@ function nav(p){
   if(p==='ledger')renderLedger();
   if(p==='possize')initPosSize();
   if(p==='mps')initMpsPage();
-  if(p==='fundrs'){initFundRS();setTimeout(renderRRG,600);}
+  if(p==='fundrs'){initFundRS();setTimeout(()=>renderRRG(false),400);}
 }
 
 // ══════════════════════════════════════════════════
@@ -6119,6 +6119,49 @@ setTimeout(() => {
   setPbmMode(savedMode);
 }, 1200);
 
+// ── FundRS background prefetch on boot (so page is instant when you open it) ──
+setTimeout(() => {
+  if(trades.filter(t=>t.status==='Open'||t.status==='Partial').length > 0){
+    console.log('[FundRS] Background prefetch on boot…');
+    // Check cache age — only prefetch if stale
+    const CACHE_KEY = 'te_frs_cache';
+    const benchmark = localStorage.getItem('te_frs_prefs')
+      ? (JSON.parse(localStorage.getItem('te_frs_prefs')||'{}').benchmark || 'NIFTY50')
+      : 'NIFTY50';
+    const syms = [...new Set(trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol).filter(Boolean))];
+    const cacheKey = benchmark + '_' + [...syms].sort().join(',');
+    let cache = {};
+    try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); }catch(e){}
+    const cached = cache[cacheKey];
+    const age = cached ? Date.now() - cached.ts : Infinity;
+    if(age > 5*60*1000){
+      // Stale — silently prefetch into cache without touching UI
+      frsBackgroundFetch(syms, benchmark);
+    } else {
+      console.log('[FundRS] Cache fresh (', Math.round(age/1000)+'s old), skip prefetch');
+    }
+  }
+}, 5000);
+
+// Auto-refresh FundRS every 5 minutes
+setInterval(() => {
+  const CACHE_KEY = 'te_frs_cache';
+  const benchmark = localStorage.getItem('te_frs_prefs')
+    ? (JSON.parse(localStorage.getItem('te_frs_prefs')||'{}').benchmark || 'NIFTY50')
+    : 'NIFTY50';
+  const syms = [...new Set(trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol).filter(Boolean))];
+  if(!syms.length) return;
+  console.log('[FundRS] Auto-refresh timer fired');
+  // If on fundrs page → full re-render; else silent background fetch
+  const onPage = document.getElementById('page-fundrs')?.classList.contains('active');
+  if(onPage){
+    renderFundRS(true);
+    setTimeout(renderRRG, 400);
+  } else {
+    frsBackgroundFetch(syms, benchmark);
+  }
+}, 5 * 60 * 1000);
+
 setTimeout(() => {
   // Supabase cloud sync (only if enabled)
   if(localStorage.getItem('sb_auto') && sbAutoEnabled){
@@ -6531,6 +6574,8 @@ setTimeout(() => runAlertCheck(), 10000);
 // ══════════════════════════════════════════════════
 
 function saveFrsPrefs(){
+  // Bust cache when benchmark changes
+  try{ localStorage.removeItem('te_frs_cache'); }catch(e){}
   const b = document.getElementById('frs-benchmark')?.value || 'NIFTY50';
   localStorage.setItem('te_frs_prefs', JSON.stringify({benchmark:b}));
 }
@@ -6540,10 +6585,11 @@ function initFundRS(){
     const prefs = JSON.parse(localStorage.getItem('te_frs_prefs')||'{}');
     if(prefs.benchmark){ const el=document.getElementById('frs-benchmark'); if(el) el.value=prefs.benchmark; }
   }catch(e){}
-  renderFundRS();
+  // Show cached data instantly, then refresh if stale
+  renderFundRS(false);
 }
 
-function renderFundRS(){
+function renderFundRS(forceRefresh=true){
   const container = document.getElementById('frs-container');
   if(!container) return;
   const benchmark  = document.getElementById('frs-benchmark')?.value || 'NIFTY50';
@@ -6562,8 +6608,23 @@ function renderFundRS(){
     return;
   }
 
+  const CACHE_KEY = 'te_frs_cache';
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  const cacheKey  = benchmark + '_' + symbols.sort().join(',');
+  let   cache     = {};
+  try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); }catch(e){}
+
+  const cached    = cache[cacheKey];
+  const cacheAge  = cached ? Date.now() - cached.ts : Infinity;
+  const cacheOk   = cached && cacheAge < CACHE_TTL && !forceRefresh;
+
+  // ── Build card shells ──────────────────────────────────────────────────────
   container.innerHTML = '';
-  symbols.forEach(sym => {
+  const symbolOrder = [...new Set(
+    trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol).filter(Boolean)
+  )];
+
+  symbolOrder.forEach(sym => {
     const t    = trades.find(t=>(t.status==='Open'||t.status==='Partial')&&t.symbol===sym);
     const ct   = t ? calc(t) : null;
     const side = t?.side||'Buy';
@@ -6572,14 +6633,19 @@ function renderFundRS(){
     const pnlC = pnl>=0?'var(--g)':'var(--r)';
     const sign = pnl>=0?'+':'';
     const status = t?.status||'Open';
-    const cid  = `frs_${sym}`;
+    const cid  = `frs_${sym.replace(/[^a-zA-Z0-9]/g,'_')}`;
+
+    const cachedSym  = cacheOk ? cached.data[sym] : null;
+    const rsHtml     = cachedSym?.rsHtml  || `<div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:11px"><div class="frs-spin"></div>Computing RS…</div>`;
+    const fundHtml   = cachedSym?.fundHtml|| `<div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:11px"><div class="frs-spin"></div>Loading…</div>`;
+    const rsChipHtml = cachedSym?.rsChip  || '';
+    const earnHtml   = cachedSym?.earn    || '';
 
     const card = document.createElement('div');
     card.id = cid;
     card.className = 'card';
     card.style.cssText = 'margin-bottom:20px;overflow:hidden';
     card.innerHTML = `
-      <!-- header -->
       <div style="padding:12px 16px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:34px;height:34px;border-radius:8px;background:var(--yd);border:1px solid rgba(245,197,66,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;color:var(--y);font-family:'IBM Plex Mono',monospace">${sym.slice(0,4)}</div>
@@ -6593,43 +6659,107 @@ function renderFundRS(){
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <span class="frs-chip frs-rs-chip" id="${cid}_rs_chip" style="display:none"></span>
-          <span class="frs-chip frs-earn" id="${cid}_earn" style="display:none"></span>
+          <span class="frs-chip frs-rs-chip" id="${cid}_rs_chip" style="${rsChipHtml?'':'display:none'}">${rsChipHtml}</span>
+          <span class="frs-chip frs-earn"    id="${cid}_earn"    style="${earnHtml?'':'display:none'}">${earnHtml}</span>
           <a href="https://www.screener.in/company/${sym}/consolidated/" target="_blank"
              style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;text-decoration:none;color:var(--b);border:1px solid var(--b);background:var(--bd)">↗ Screener</a>
         </div>
       </div>
-
-      <!-- two tables side by side -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
-
-        <!-- LEFT: RS table -->
         <div style="border-right:1px solid var(--b1)">
-          <div style="padding:8px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+          <div style="padding:8px 14px;border-bottom:1px solid var(--b1)">
             <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Relative Strength vs ${benchLabel}</span>
           </div>
-          <div id="${cid}_rs" style="padding:10px 14px">
-            <div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:11px"><div class="frs-spin"></div>Computing RS…</div>
-          </div>
+          <div id="${cid}_rs" style="padding:10px 14px">${rsHtml}</div>
         </div>
-
-        <!-- RIGHT: Fundamentals table -->
         <div>
           <div style="padding:8px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
             <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Quarterly Financials</span>
             <a href="https://www.screener.in/company/${sym}/consolidated/#quarters" target="_blank"
                style="font-size:10px;color:var(--b);text-decoration:none">Full data ↗</a>
           </div>
-          <div id="${cid}_fund" style="padding:10px 14px">
-            <div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:11px"><div class="frs-spin"></div>Loading…</div>
-          </div>
+          <div id="${cid}_fund" style="padding:10px 14px">${fundHtml}</div>
         </div>
       </div>`;
     container.appendChild(card);
-
-    frsComputeRS(sym, benchmark, benchLabel, cid);
-    frsLoadQuarterly(sym, cid);
   });
+
+  // Update status bar
+  frsUpdateStatusBar(cacheOk, cacheAge, benchmark);
+
+  // If cache is valid → render from cache, no network
+  if(cacheOk){
+    console.log('[FundRS] Served from cache, age:', Math.round(cacheAge/1000)+'s');
+    // Still push RRG badges from any existing window._rrgData
+    if(window._rrgData) updateRSCardsWithRRG(window._rrgData);
+    return;
+  }
+
+  // ── Background fetch for all symbols ──────────────────────────────────────
+  console.log('[FundRS] Fetching fresh data for', symbolOrder.length, 'symbols…');
+  const newCacheData = cached?.data ? {...cached.data} : {};
+
+  (async () => {
+    for(const sym of symbolOrder){
+      const cid = `frs_${sym.replace(/[^a-zA-Z0-9]/g,'_')}`;
+      await frsComputeRS(sym, benchmark, benchLabel, cid);
+      await frsLoadQuarterly(sym, cid);
+
+      // Snapshot rendered HTML into cache
+      const rsEl   = document.getElementById(`${cid}_rs`);
+      const fundEl = document.getElementById(`${cid}_fund`);
+      const chipEl = document.getElementById(`${cid}_rs_chip`);
+      const earnEl = document.getElementById(`${cid}_earn`);
+      newCacheData[sym] = {
+        rsHtml:   rsEl?.innerHTML   || '',
+        fundHtml: fundEl?.innerHTML || '',
+        rsChip:   chipEl?.innerHTML || '',
+        earn:     earnEl?.innerHTML || '',
+      };
+
+      // Save partial cache after each symbol so partial results survive page switch
+      try{
+        const partial = { ts: Date.now(), bm: benchmark, data: newCacheData };
+        localStorage.setItem(CACHE_KEY, JSON.stringify({[cacheKey]: partial}));
+      }catch(e){}
+    }
+
+    // Final save + update status
+    try{
+      const full = { ts: Date.now(), bm: benchmark, data: newCacheData };
+      localStorage.setItem(CACHE_KEY, JSON.stringify({[cacheKey]: full}));
+    }catch(e){}
+    frsUpdateStatusBar(true, 0, benchmark);
+    console.log('[FundRS] Cache updated ✅');
+    if(window._rrgData) updateRSCardsWithRRG(window._rrgData);
+  })();
+}
+
+function frsUpdateStatusBar(fromCache, ageMs, benchmark){
+  // Inject/update a small status bar at top of frs-container
+  let bar = document.getElementById('frs-status-bar');
+  if(!bar){
+    const container = document.getElementById('frs-container');
+    if(!container) return;
+    bar = document.createElement('div');
+    bar.id = 'frs-status-bar';
+    bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 14px;margin-bottom:8px;border-radius:8px;font-size:11px;background:var(--bg3);border:1px solid var(--b1)';
+    container.insertBefore(bar, container.firstChild);
+  }
+  const nextRefresh = fromCache ? Math.max(0, Math.round((5*60*1000 - ageMs)/1000)) : 0;
+  const timeStr = fromCache && ageMs > 0
+    ? `cached ${Math.round(ageMs/1000)}s ago · next refresh in ${nextRefresh}s`
+    : 'fresh data';
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="width:7px;height:7px;border-radius:50%;background:${fromCache?'var(--y)':'var(--g)'}"></div>
+      <span style="color:var(--t3)">${fromCache?'⚡ Loaded from cache':'🔄 Fetching live data…'}</span>
+      <span style="color:var(--t4)">· ${timeStr}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="color:var(--t4)">Auto-refresh every 5 min</span>
+      <button class="btn btn-ghost btn-xs" onclick="renderFundRS(true);renderRRG();" style="font-size:10px">↻ Force refresh</button>
+    </div>`;
 }
 
 // ─── RS computation using Yahoo Finance (same proxy as fetchCMP) ─────────────
@@ -7335,9 +7465,11 @@ async function renderRRG(){
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   async function fetchPrices(ticker){
-    const useDaily = period==='1wk'||period==='1mo';
-    const interval = useDaily?'1d':'1wk';
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${period}`;
+    const isShort  = period==='1wk'||period==='1mo';
+    const interval = isShort ? '1d' : '1wk';
+    // Fetch enough history for EMA — 3mo daily for short periods
+    const fetchRange = isShort ? '3mo' : period;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${fetchRange}`;
     const proxies = [
       `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
       `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -7371,7 +7503,8 @@ async function renderRRG(){
     const rocEma=ema(roc.slice(1),n);
     const rocMean=rocEma.reduce((a,x)=>a+x,0)/rocEma.length;
     const rsMom=rocEma.map(v=>(v/rocMean)*100);
-    const TAIL=Math.min(6,rsRatio.length,rsMom.length);
+    const tailLen = period==="1wk"?5:period==="1mo"?10:6;
+    const TAIL=Math.min(tailLen,rsRatio.length,rsMom.length);
     const tail=[];
     for(let i=TAIL;i>0;i--) tail.push({ratio:rsRatio[rsRatio.length-i],mom:rsMom[rsMom.length-i]});
     return tail;
