@@ -81,7 +81,7 @@ body.light{
 
 /* ── TAGLINE PULSE ── */
 @keyframes taglinePulse {
-  0%,100%{opacity:.2} 50%{opacity:.9}
+  0%,100%{opacity:.55} 50%{opacity:1}
 }
 .tagline-pulse{
   animation:taglinePulse 3s ease-in-out infinite;
@@ -153,7 +153,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg0);color:var(--t1);displ
   flex-shrink:0;position:relative;
 }
 .topbar-title{font-size:15px;font-weight:700;color:var(--t1)}
-.topbar-tagline{position:absolute;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t4);white-space:nowrap;pointer-events:none;animation:taglinePulse 3s ease-in-out infinite;}
+.topbar-tagline{position:absolute;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#F5C542;white-space:nowrap;pointer-events:none;animation:taglinePulse 3s ease-in-out infinite;text-shadow:0 0 18px rgba(245,197,66,.35);}
 .market-chip{
   font-family:'IBM Plex Mono',monospace;font-size:11px;
   padding:4px 10px;border-radius:20px;border:1px solid var(--b2);
@@ -6081,7 +6081,6 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
     { label:'1Y', range:'1y',  interval:'1mo' },
   ];
 
-  // Same proxy pattern as fetchCMP which is proven to work
   async function yhGet(ticker, range, interval){
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}`;
     const proxies = [
@@ -6090,43 +6089,26 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
     ];
     for(const px of proxies){
       try{
-        const res = await fetch(px, {signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),12000);return _c.signal;})()});
+        const res = await fetch(px,{signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),12000);return _c.signal;})()});
         if(!res.ok) continue;
         const d = await res.json();
         const parsed = d.contents ? JSON.parse(d.contents) : d;
         const result = parsed?.chart?.result?.[0];
-        if(!result) continue;
-        return result;
+        if(result) return result;
       }catch(e){ continue; }
     }
     return null;
   }
 
   try{
-    // Get earnings + meta from 1d chart (no extra call, piggybacks)
-    const stockDay = await yhGet(symbol+'.NS', '5d', '1d');
+    // Fetch 1D chart for meta (earnings timestamp etc)
+    const stockDay = await yhGet(symbol+'.NS','5d','1d');
     const meta = stockDay?.meta || {};
 
-    // Update earnings badge from chart meta
-    const earnEl = document.getElementById(`${cid}_earn`);
-    const earnTs = meta.earningsTimestamp || meta.earningsTimestampStart || meta.earningsTimestampEnd;
-    if(earnEl && earnTs){
-      const now  = Date.now();
-      const ts   = earnTs * 1000;
-      const diff = Math.round((ts - now)/86400000);
-      const isPast  = diff < 0;
-      const isSoon  = !isPast && diff <= 14;
-      const isToday = !isPast && diff === 0;
-      const fmt = new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
-      const label = isToday?'Earnings TODAY':isPast?`Last E: ${fmt}`:diff<=30?`E in ${diff}d · ${fmt}`:`E: ${fmt}`;
-      earnEl.innerHTML = `<span class="earn-e ${isSoon?'earn-blink':''}">E</span>&nbsp;${label}`;
-      earnEl.style.cssText += ';display:inline-flex;align-items:center;gap:4px';
-      earnEl.style.color      = isToday?'var(--r)':isSoon?'var(--y)':'var(--t3)';
-      earnEl.style.borderColor= isToday?'rgba(255,69,96,.4)':isSoon?'rgba(245,197,66,.4)':'var(--b1)';
-      earnEl.style.background = isToday?'var(--rd)':isSoon?'var(--yd)':'var(--bg3)';
-    }
+    // Try to set earnings badge from chart meta
+    frsSetEarnBadge(cid, meta);
 
-    // Sequential fetches to avoid Yahoo rate limiting
+    // Sequential period fetches to avoid Yahoo rate limiting
     const results = [];
     for(const p of periods){
       const [sR, bR] = await Promise.all([
@@ -6135,10 +6117,10 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
       ]);
       const sClose = sR?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
       const bClose = bR?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
-      const sRet = sClose?.length ? (sClose[sClose.length-1]-sClose[0])/sClose[0]*100 : null;
-      const bRet = bClose?.length ? (bClose[bClose.length-1]-bClose[0])/bClose[0]*100 : null;
+      const sRet = sClose?.length>=2 ? (sClose[sClose.length-1]-sClose[0])/sClose[0]*100 : null;
+      const bRet = bClose?.length>=2 ? (bClose[bClose.length-1]-bClose[0])/bClose[0]*100 : null;
       results.push([sRet, bRet]);
-      if(p.label !== '1Y') await new Promise(r=>setTimeout(r,250));
+      if(p.label !== '1Y') await new Promise(r=>setTimeout(r,200));
     }
 
     const RS_TABLE = [
@@ -6159,8 +6141,8 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
           <td colspan="4" style="padding:6px 8px;color:var(--t4);font-size:11px;text-align:center">—</td></tr>`;
         return;
       }
-      const rs    = sRet - bRet;
-      const pos   = rs >= 0 ? 'Above Zero' : 'Below Zero';
+      const rs  = sRet - bRet;
+      const pos = rs >= 0 ? 'Above Zero' : 'Below Zero';
       if(i===0) overallRsVal = rs;
 
       let dir = '—';
@@ -6174,16 +6156,15 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
       const interp= match?match[3]:'—';
       const tCol  = match?match[4]:'var(--t3)';
       const iCol  = match?match[5]:'var(--t3)';
-
       const sC=sRet>=0?'#4ADE80':'#FF6B8A';
       const bC=bRet>=0?'#4ADE80':'#FF6B8A';
       const rC=rs>=0?'#4ADE80':'#FF6B8A';
 
       rows += `<tr style="border-bottom:1px solid var(--b1)">
         <td style="padding:6px 8px;color:var(--y);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700">${p.label}</td>
-        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.6">
-          <span style="color:${sC}">${sRet>=0?'+':''}${sRet.toFixed(1)}%</span><span style="color:var(--t4)"> stk</span><br>
-          <span style="color:${bC}">${bRet>=0?'+':''}${bRet.toFixed(1)}%</span><span style="color:var(--t4)"> bmk</span>
+        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.7">
+          <span style="color:${sC}">${sRet>=0?'+':''}${sRet.toFixed(1)}%</span><span style="color:var(--t4);font-size:9px"> stk</span><br>
+          <span style="color:${bC}">${bRet>=0?'+':''}${bRet.toFixed(1)}%</span><span style="color:var(--t4);font-size:9px"> bmk</span>
         </td>
         <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:800;color:${rC}">${rs>=0?'+':''}${rs.toFixed(1)}%</td>
         <td style="padding:6px 8px;text-align:center;font-size:11px;font-weight:700;color:${tCol}">${term}</td>
@@ -6191,41 +6172,13 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
       </tr>`;
     });
 
-    // Build earnings row for RS table
-    let earnRow = '';
-    {
-      const _earnTs = meta.earningsTimestamp || meta.earningsTimestampStart || meta.earningsTimestampEnd;
-      if(_earnTs){
-        const now=Date.now(), ts=_earnTs*1000;
-        const diff=Math.round((ts-now)/86400000);
-        const isPast=diff<0, isSoon=!isPast&&diff<=14, isToday=!isPast&&diff===0;
-        const fmt=new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}).replace(' ','-');
-        const label=isToday?'🔴 Earnings TODAY':isPast?`Last Earnings: ${fmt}`:diff<=7?`⚡ Earnings in ${diff}d · ${fmt}`:isSoon?`⏰ Earnings in ${diff}d · ${fmt}`:`Earnings: ${fmt}`;
-        const bg=isToday?'rgba(255,69,96,.1)':isSoon?'rgba(245,197,66,.08)':'transparent';
-        const col=isToday?'#FF6B8A':isSoon?'var(--y)':'var(--t4)';
-        earnRow=`<tr style="background:${bg};border-top:2px solid var(--b1)">
-          <td colspan="5" style="padding:7px 10px;font-size:11px;color:${col};display:flex;align-items:center;gap:6px">
-            <span class="earn-e ${(isSoon||isToday)?'earn-blink':''}">E</span>
-            <span style="font-weight:${isSoon||isToday?'700':'500'}">${label}</span>
-          </td>
-        </tr>`;
-
-        // Also update header badge
-        const earnEl2 = document.getElementById(`${cid}_earn`);
-        if(earnEl2 && earnEl2.style.display==='none'){
-          earnEl2.innerHTML=`<span class="earn-e ${isSoon?'earn-blink':''}">E</span>&nbsp;${isPast?`Last E: ${fmt}`:diff<=30?`E in ${diff}d`:fmt}`;
-          earnEl2.style.cssText='display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;border:1px solid';
-          earnEl2.style.color=isToday?'var(--r)':isSoon?'var(--y)':'var(--t3)';
-          earnEl2.style.borderColor=isToday?'rgba(255,69,96,.4)':isSoon?'rgba(245,197,66,.4)':'var(--b1)';
-          earnEl2.style.background=isToday?'var(--rd)':isSoon?'var(--yd)':'var(--bg3)';
-        }
-      }
-    }
+    // Earnings row at bottom of RS table
+    const earnRow = frsEarnRow(meta);
 
     // Update RS header chip
     if(overallRsVal !== null){
       const rsChip = document.getElementById(`${cid}_sector`);
-      if(rsChip && rsChip.textContent === '—'){
+      if(rsChip && rsChip.textContent==='—'){
         rsChip.textContent = `RS ${overallRsVal>=0?'▲ +':'▼ '}${overallRsVal.toFixed(1)}%`;
         rsChip.style.color = overallRsVal>=0?'var(--g)':'var(--r)';
         rsChip.style.background = overallRsVal>=0?'var(--gd)':'var(--rd)';
@@ -6242,7 +6195,8 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
           <th style="text-align:center;padding:6px 8px;border-bottom:2px solid var(--b1)">RS Position</th>
           <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Market Interpretation</th>
         </tr></thead>
-        <tbody>${rows}${earnRow}</tbody>
+        <tbody>${rows}</tbody>
+        ${earnRow}
       </table>
       <div style="font-size:10px;color:var(--t4);padding:4px 8px;text-align:right;border-top:1px solid var(--b1)">vs ${benchLabel} · Yahoo Finance</div>`;
 
@@ -6251,7 +6205,58 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
   }
 }
 
-// ─── Quarterly fundamentals via Yahoo Finance quoteSummary ────────────────────
+// ─── Shared earnings helpers ──────────────────────────────────────────────────
+function frsParseEarnTs(meta){
+  // Yahoo returns earningsTimestampStart for scheduled, earningsTimestamp for confirmed
+  const ts = (meta.earningsTimestampStart && meta.earningsTimestampStart > 0 ? meta.earningsTimestampStart :
+               meta.earningsTimestamp      && meta.earningsTimestamp > 0      ? meta.earningsTimestamp      :
+               meta.earningsTimestampEnd   && meta.earningsTimestampEnd > 0   ? meta.earningsTimestampEnd   : 0);
+  return ts ? ts * 1000 : null;
+}
+
+function frsSetEarnBadge(cid, meta){
+  const earnEl = document.getElementById(`${cid}_earn`);
+  if(!earnEl || earnEl.style.display !== 'none') return;  // already set
+  const tsMs = frsParseEarnTs(meta);
+  if(!tsMs) return;
+  const now=Date.now(), diff=Math.round((tsMs-now)/86400000);
+  const isPast=diff<0, isSoon=!isPast&&diff<=14, isToday=diff===0&&!isPast;
+  const fmt=new Date(tsMs).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+  const label=isToday?'TODAY':isPast?`Last: ${fmt}`:diff<=30?`in ${diff}d`:fmt;
+  earnEl.innerHTML=`<span class="earn-e ${isSoon?'earn-blink':''}">E</span>&nbsp;${label}`;
+  earnEl.style.display='inline-flex'; earnEl.style.alignItems='center'; earnEl.style.gap='4px';
+  earnEl.style.color=isToday?'var(--r)':isSoon?'var(--y)':'var(--t3)';
+  earnEl.style.borderColor=isToday?'rgba(255,69,96,.4)':isSoon?'rgba(245,197,66,.4)':'var(--b1)';
+  earnEl.style.background=isToday?'var(--rd)':isSoon?'var(--yd)':'var(--bg3)';
+}
+
+function frsEarnRow(meta){
+  const tsMs = frsParseEarnTs(meta);
+  if(!tsMs) return '';
+  const now=Date.now(), diff=Math.round((tsMs-now)/86400000);
+  const isPast=diff<0, isSoon=!isPast&&diff<=14, isToday=diff===0&&!isPast;
+  const isVSoon=!isPast&&diff<=7;
+  const fmt=new Date(tsMs).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+  const icon=isToday?'🔴':isVSoon?'⚡':isSoon?'⏰':'📅';
+  const label=isToday?`Earnings TODAY`
+    :isPast?`Last Earnings: ${fmt}`
+    :isVSoon?`Earnings in ${diff}d · ${fmt}`
+    :isSoon?`Earnings in ${diff}d · ${fmt}`
+    :`Next Earnings: ${fmt}`;
+  const bg=isToday?'rgba(255,69,96,.12)':isVSoon?'rgba(245,197,66,.1)':isSoon?'rgba(245,197,66,.06)':'transparent';
+  const col=isToday?'#FF6B8A':isSoon?'var(--y)':'var(--t3)';
+  const bdr=isToday?'rgba(255,69,96,.3)':isSoon?'rgba(245,197,66,.25)':'var(--b1)';
+  return `<tfoot><tr style="background:${bg};border-top:2px solid ${bdr}">
+    <td colspan="5" style="padding:8px 12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px">${icon}</span>
+        <span class="earn-e ${(isToday||isSoon)?'earn-blink':''}">E</span>
+        <span style="font-size:11.5px;font-weight:${isSoon?700:500};color:${col}">${label}</span>
+      </div>
+    </td>
+  </tr></tfoot>`;
+}
+
 async function frsLoadQuarterly(symbol, cid){
   const el = document.getElementById(`${cid}_fund`);
   if(!el) return;
@@ -6263,7 +6268,7 @@ async function frsLoadQuarterly(symbol, cid){
     ];
     for(const px of proxies){
       try{
-        const res = await fetch(px,{signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),12000);return _c.signal;})()});
+        const res = await fetch(px,{signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),14000);return _c.signal;})()});
         if(!res.ok) continue;
         const d = await res.json();
         const p = d.contents ? JSON.parse(d.contents) : d;
@@ -6290,6 +6295,7 @@ async function frsLoadQuarterly(symbol, cid){
   }
 
   function renderTable(quarters, source){
+    if(!quarters.length){ showFallback(); return; }
     let rows='';
     quarters.forEach((q,i)=>{
       const p4=quarters[i+4]; const pq=quarters[i+1];
@@ -6326,49 +6332,44 @@ async function frsLoadQuarterly(symbol, cid){
 
   function showFallback(){
     el.innerHTML=`
-      <div style="padding:10px 12px;border-bottom:1px solid var(--b1);font-size:10.5px;color:var(--t3)">
-        Open quarterly data in one click:
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px;padding:12px">
+      <div style="padding:8px 12px 6px;font-size:10.5px;color:var(--t3)">Open quarterly data:</div>
+      <div style="display:flex;flex-direction:column;gap:6px;padding:6px 12px 12px">
         <a href="https://www.screener.in/company/${symbol}/consolidated/#quarters" target="_blank"
-           style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);transition:border-color .2s"
+           style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);transition:border-color .15s"
            onmouseover="this.style.borderColor='var(--b)'" onmouseout="this.style.borderColor='var(--b1)'">
-          <span style="font-size:18px">📊</span>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--t1)">Screener.in</div>
-            <div style="font-size:10px;color:var(--t3);margin-top:1px">${symbol} · Quarterly P&L, Balance Sheet, Cash Flow</div>
-          </div>
-          <span style="margin-left:auto;color:var(--t4);font-size:12px">↗</span>
-        </a>
+          <span style="font-size:16px">📊</span>
+          <div><div style="font-size:12px;font-weight:700;color:var(--t1)">Screener.in</div>
+               <div style="font-size:10px;color:var(--t3)">Quarterly P&L · Balance Sheet · Cash Flow</div></div>
+          <span style="margin-left:auto;color:var(--t4)">↗</span></a>
         <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank"
-           style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);transition:border-color .2s"
-           onmouseover="this.style.borderColor='rgba(245,197,66,.4)'" onmouseout="this.style.borderColor='var(--b1)'">
-          <span style="font-size:18px">📈</span>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--y)">Yahoo Finance</div>
-            <div style="font-size:10px;color:var(--t3);margin-top:1px">${symbol}.NS · Income Statement, Revenue Growth</div>
-          </div>
-          <span style="margin-left:auto;color:var(--t4);font-size:12px">↗</span>
-        </a>
-        <a href="https://www.moneycontrol.com/stocks/company_info/stocks_news.php?sc_id=MC" target="_blank"
-           onclick="window.open('https://www.moneycontrol.com/india/stockpricequote/'+encodeURIComponent('${symbol}'.toLowerCase()),'_blank');return false;"
-           style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);color:var(--t1)"
+           style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);transition:border-color .15s"
+           onmouseover="this.style.borderColor='rgba(245,197,66,.5)'" onmouseout="this.style.borderColor='var(--b1)'">
+          <span style="font-size:16px">📈</span>
+          <div><div style="font-size:12px;font-weight:700;color:var(--y)">Yahoo Finance</div>
+               <div style="font-size:10px;color:var(--t3)">Income Statement · Revenue Growth</div></div>
+          <span style="margin-left:auto;color:var(--t4)">↗</span></a>
+        <a href="https://www.moneycontrol.com/financials/${symbol.toLowerCase()}/" target="_blank"
+           style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);transition:border-color .15s"
            onmouseover="this.style.borderColor='#60A5FA'" onmouseout="this.style.borderColor='var(--b1)'">
-          <span style="font-size:18px">🔵</span>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:#60A5FA">MoneyControl</div>
-            <div style="font-size:10px;color:var(--t3);margin-top:1px">${symbol} · Financials, Results, News</div>
-          </div>
-          <span style="margin-left:auto;color:var(--t4);font-size:12px">↗</span>
-        </a>
+          <span style="font-size:16px">🔵</span>
+          <div><div style="font-size:12px;font-weight:700;color:#60A5FA">MoneyControl</div>
+               <div style="font-size:10px;color:var(--t3)">Quarterly Results · Financials</div></div>
+          <span style="margin-left:auto;color:var(--t4)">↗</span></a>
       </div>`;
   }
 
   try{
-    // Try v10 with single module - smallest possible request
+    // Strategy 1: Yahoo v10 — most complete quarterly data
     const v10 = await tryGet(
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=incomeStatementHistoryQuarterly`
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=incomeStatementHistoryQuarterly,summaryProfile`
     );
+
+    // Also grab earnings from profile for badge (if RS hasn't set it yet)
+    const summProfile = v10?.quoteSummary?.result?.[0]?.summaryProfile || {};
+    const sEl = document.getElementById(`${cid}_sector`);
+    if(sEl && sEl.textContent==='—' && summProfile.sector)
+      sEl.textContent = summProfile.sector + (summProfile.industry ? ` · ${summProfile.industry}` : '');
+
     const hist = v10?.quoteSummary?.result?.[0]?.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
     if(hist.length >= 2){
       renderTable(hist.slice(0,10).map(q=>({
@@ -6380,24 +6381,24 @@ async function frsLoadQuarterly(symbol, cid){
       return;
     }
 
-    // Try fundamentals timeseries
-    const ts = await tryGet(
-      `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${symbol}.NS?type=quarterlyTotalRevenue,quarterlyNetIncome,quarterlyOperatingIncome&period1=1420070400&period2=${Math.floor(Date.now()/1000)}`
-    );
+    // Strategy 2: Yahoo fundamentals timeseries
+    const tsUrl = `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${symbol}.NS?type=quarterlyTotalRevenue,quarterlyNetIncome,quarterlyOperatingIncome&period1=1451606400&period2=${Math.floor(Date.now()/1000)}`;
+    const ts = await tryGet(tsUrl);
     if(ts){
-      const arr = ts?.timeseries?.result || [];
-      const revA = arr.find(t=>t.meta?.type?.includes('TotalRevenue'))?.quarterlyTotalRevenue||[];
-      const patA = arr.find(t=>t.meta?.type?.includes('NetIncome'))?.quarterlyNetIncome||[];
-      const opA  = arr.find(t=>t.meta?.type?.includes('OperatingIncome'))?.quarterlyOperatingIncome||[];
-      const map={};
-      revA.forEach(d=>{if(d.reportedValue?.raw!=null){map[d.asOfDate]={...(map[d.asOfDate]||{}),rev:d.reportedValue.raw,date:d.asOfDate};}});
-      patA.forEach(d=>{if(d.reportedValue?.raw!=null){map[d.asOfDate]={...(map[d.asOfDate]||{}),pat:d.reportedValue.raw,date:d.asOfDate};}});
-      opA.forEach(d=> {if(d.reportedValue?.raw!=null){map[d.asOfDate]={...(map[d.asOfDate]||{}),op: d.reportedValue.raw, date:d.asOfDate};}});
-      const quarters=Object.values(map).filter(q=>q.date).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
-      if(quarters.length>=2){ renderTable(quarters,'Yahoo Finance'); return; }
+      const arr  = ts?.timeseries?.result || [];
+      const revA = arr.find(t=>t.meta?.type?.includes('TotalRevenue'))?.quarterlyTotalRevenue    || [];
+      const patA = arr.find(t=>t.meta?.type?.includes('NetIncome'))?.quarterlyNetIncome           || [];
+      const opA  = arr.find(t=>t.meta?.type?.includes('OperatingIncome'))?.quarterlyOperatingIncome || [];
+      const map  = {};
+      const addVal = (arr, key) => arr.forEach(d=>{ if(d.reportedValue?.raw!=null){ map[d.asOfDate]={...(map[d.asOfDate]||{}), [key]:d.reportedValue.raw, date:d.asOfDate}; }});
+      addVal(revA,'rev'); addVal(patA,'pat'); addVal(opA,'op');
+      const quarters = Object.values(map).filter(q=>q.date).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
+      if(quarters.length >= 2){ renderTable(quarters, 'Yahoo Finance'); return; }
     }
 
+    // All API strategies failed — show nice fallback links
     showFallback();
+
   }catch(e){ showFallback(); }
 }
 
