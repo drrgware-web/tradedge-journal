@@ -36,6 +36,14 @@ body.light{
   --c:#0891B2;--cd:rgba(8,145,178,.12);
 }
 
+/* ── FUNDAMENTALS & RS ── */
+.frs-stat-chip{
+  display:inline-flex;align-items:center;
+  padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
+  background:var(--bg4);color:var(--t2);border:1px solid var(--b1);
+  font-family:'IBM Plex Mono',monospace;white-space:nowrap;
+}
+
 /* ── CHART IMAGE BOX ── */
 .chart-img-box{
   background:var(--bg3);border:1.5px dashed var(--b2);border-radius:8px;
@@ -550,6 +558,9 @@ select.fi{cursor:pointer}
   </div>
   <div class="sb-item" id="nav-mps" data-tip="MPS Dashboard" onclick="nav('mps')" style="position:relative">
     <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+  </div>
+  <div class="sb-item" id="nav-fundrs" data-tip="Fundamentals & RS" onclick="nav('fundrs')">
+    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/><circle cx="19" cy="10" r="1" fill="currentColor" stroke="none"/></svg>
   </div>
   <div class="sb-spacer"></div>
   <div class="sb-item" id="nav-settings" data-tip="Settings & Sync" onclick="nav('settings')">
@@ -1261,6 +1272,37 @@ select.fi{cursor:pointer}
       </div>
     </div>
 
+    <!-- ══ FUNDAMENTALS & RS ══ -->
+    <div class="page" id="page-fundrs">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--t1)">📊 Fundamentals & Relative Strength</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">Open & partial positions · Sales · EPS · OPM trends · RS ratio vs benchmark</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label class="fl" style="margin:0;font-size:11px">Benchmark:</label>
+          <select id="frs-benchmark" class="fi" style="width:160px;font-size:12px" onchange="saveFrsPrefs();renderFundRS()">
+            <option value="NSE:NIFTY50">Nifty 50</option>
+            <option value="NSE:BANKNIFTY">Bank Nifty</option>
+            <option value="NSE:CNXIT">Nifty IT</option>
+            <option value="NSE:NIFTYMIDCAP100">Midcap 100</option>
+            <option value="NSE:NIFTYSMALLCAP100">Smallcap 100</option>
+            <option value="NSE:NIFTYFMCG">Nifty FMCG</option>
+            <option value="NSE:NIFTYPHARMA">Nifty Pharma</option>
+          </select>
+          <select id="frs-period" class="fi" style="width:120px;font-size:12px" onchange="saveFrsPrefs();renderFundRS()">
+            <option value="quarterly">Quarterly</option>
+            <option value="annual">Annual</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="renderFundRS()">
+            <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+      <div id="frs-container"></div>
+    </div>
+
     <!-- ══ SETTINGS ══ -->
     <div class="page" id="page-settings">
       <div class="settings-wrap">
@@ -1901,7 +1943,7 @@ function save(){
 // ══════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════
-const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',alerts:'Price Alerts',ai:'AI Trade Review',settings:'Settings & Sync',ledger:'Broker Ledger',possize:'Position Sizing',mps:'MPS — Market Pulse Score'};
+const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',alerts:'Price Alerts',ai:'AI Trade Review',settings:'Settings & Sync',ledger:'Broker Ledger',possize:'Position Sizing',mps:'MPS — Market Pulse Score',fundrs:'Fundamentals & RS'};
 function nav(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.sb-item[id^=nav-]').forEach(x=>x.classList.remove('active'));
@@ -1919,6 +1961,7 @@ function nav(p){
   if(p==='ledger')renderLedger();
   if(p==='possize')initPosSize();
   if(p==='mps')initMpsPage();
+  if(p==='fundrs')initFundRS();
 }
 
 // ══════════════════════════════════════════════════
@@ -5887,6 +5930,229 @@ setTimeout(()=>{
     else updateSyncStatuses();
   }
 }, 1500);
+
+// ══════════════════════════════════════════════════
+// FUNDAMENTALS & RELATIVE STRENGTH PAGE
+// ══════════════════════════════════════════════════
+
+function saveFrsPrefs(){
+  const b = document.getElementById('frs-benchmark')?.value || 'NSE:NIFTY50';
+  const p = document.getElementById('frs-period')?.value   || 'quarterly';
+  localStorage.setItem('te_frs_prefs', JSON.stringify({benchmark:b, period:p}));
+}
+
+function initFundRS(){
+  // Restore saved prefs
+  try{
+    const prefs = JSON.parse(localStorage.getItem('te_frs_prefs')||'{}');
+    if(prefs.benchmark){ const el=document.getElementById('frs-benchmark'); if(el) el.value=prefs.benchmark; }
+    if(prefs.period)   { const el=document.getElementById('frs-period');    if(el) el.value=prefs.period;    }
+  }catch(e){}
+  renderFundRS();
+}
+
+function renderFundRS(){
+  const container  = document.getElementById('frs-container');
+  if(!container) return;
+
+  const benchmark  = document.getElementById('frs-benchmark')?.value || 'NSE:NIFTY50';
+  const benchLabel = document.getElementById('frs-benchmark')?.selectedOptions[0]?.text || 'Nifty 50';
+  const period     = document.getElementById('frs-period')?.value    || 'quarterly';
+  const isLight    = document.body.classList.contains('light');
+  const tvTheme    = isLight ? 'light' : 'dark';
+  const tvBg       = isLight ? 'rgba(247,250,252,0)' : 'rgba(5,8,13,0)'; // transparent
+
+  // Get unique open/partial symbols
+  const symbols = [...new Set(
+    trades
+      .filter(t => t.status === 'Open' || t.status === 'Partial')
+      .map(t => t.symbol)
+      .filter(Boolean)
+  )];
+
+  if(!symbols.length){
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;color:var(--t3)">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".4">
+          <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/>
+        </svg>
+        <div style="font-size:15px;font-weight:600;color:var(--t2)">No open positions</div>
+        <div style="font-size:13px">Add a trade with Open or Partial status to see fundamentals & RS analysis.</div>
+        <button class="btn btn-y btn-sm" onclick="openAdd()">+ Add Trade</button>
+      </div>`;
+    return;
+  }
+
+  // Clear & rebuild
+  container.innerHTML = '';
+
+  symbols.forEach((symbol, idx) => {
+    // Find trade data for this symbol for context
+    const symTrades = trades.filter(t => (t.status==='Open'||t.status==='Partial') && t.symbol===symbol);
+    const ct = symTrades.length ? calc(symTrades[0]) : null;
+    const side  = symTrades[0]?.side || 'Buy';
+    const pnl   = ct?.unrealisedPL ?? 0;
+    const pnlPct= ct?.unrealisedPct ?? 0;
+    const pnlColor = pnl >= 0 ? 'var(--g)' : 'var(--r)';
+    const pnlSign  = pnl >= 0 ? '+' : '';
+    const status   = symTrades[0]?.status || 'Open';
+    const dotColor = status==='Open' ? 'var(--g)' : 'var(--y)';
+    const tvSym    = `NSE:${symbol}`;
+    const rsSym    = `${tvSym}/${benchmark}`;
+
+    // Unique IDs for this card's widgets
+    const rsId  = `frs_rs_${symbol}_${idx}`;
+    const finId = `frs_fin_${symbol}_${idx}`;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = 'margin-bottom:24px;overflow:hidden';
+    card.innerHTML = `
+      <!-- Card header -->
+      <div style="padding:16px 20px 12px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:36px;height:36px;border-radius:9px;background:var(--yd);border:1px solid rgba(245,197,66,.25);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:var(--y);font-family:'IBM Plex Mono',monospace">${symbol.slice(0,4)}</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--t1)">${symbol}</div>
+            <div style="font-size:11px;color:var(--t3);display:flex;align-items:center;gap:6px;margin-top:1px">
+              <span style="display:inline-flex;align-items:center;gap:4px">
+                <span style="width:6px;height:6px;border-radius:50%;background:${dotColor};display:inline-block"></span>${status}
+              </span>
+              <span>·</span>
+              <span style="color:${side==='Buy'?'var(--g)':'var(--r)'}">${side}</span>
+              ${ct ? `<span>·</span><span style="font-family:'IBM Plex Mono',monospace;color:${pnlColor}">${pnlSign}₹${Math.abs(pnl).toLocaleString('en-IN',{maximumFractionDigits:0})} (${pnlSign}${pnlPct.toFixed(2)}%)</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:11px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:6px;padding:4px 10px">
+            📈 RS vs <b style="color:var(--t2)">${benchLabel}</b>
+          </div>
+          <div style="font-size:11px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:6px;padding:4px 10px">
+            📋 ${period === 'quarterly' ? 'Quarterly' : 'Annual'} Financials
+          </div>
+        </div>
+      </div>
+
+      <!-- Two-column widget layout -->
+      <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:0;min-height:480px">
+
+        <!-- LEFT: RS Ratio Chart -->
+        <div style="border-right:1px solid var(--b1);display:flex;flex-direction:column">
+          <div style="padding:10px 16px 8px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Relative Strength Ratio</span>
+            <span style="font-size:10px;color:var(--t4);font-family:'IBM Plex Mono',monospace">${symbol} ÷ ${benchLabel}</span>
+          </div>
+          <div style="padding:10px 14px 6px;display:flex;gap:12px">
+            <div class="frs-stat-chip" id="${rsId}-trend">—</div>
+            <div class="frs-stat-chip" id="${rsId}-note" style="color:var(--t3);font-size:10px">Loading RS data…</div>
+          </div>
+          <div id="${rsId}" style="flex:1;min-height:380px"></div>
+        </div>
+
+        <!-- RIGHT: Financials Widget -->
+        <div style="display:flex;flex-direction:column">
+          <div style="padding:10px 16px 8px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Financials</span>
+            <span style="font-size:10px;color:var(--t4)">Sales · EPS · OPM — QoQ &amp; YoY %</span>
+          </div>
+          <div id="${finId}" style="flex:1;min-height:420px;padding:4px"></div>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+
+    // ── 1. TradingView Mini Chart for RS Ratio ───────────────
+    const rsScript = document.createElement('script');
+    rsScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+    rsScript.async = true;
+    rsScript.innerHTML = JSON.stringify({
+      symbol: rsSym,
+      width:  '100%',
+      height: '100%',
+      locale: 'en',
+      dateRange: '12M',
+      colorTheme: tvTheme,
+      isTransparent: true,
+      autosize: true,
+      largeChartUrl: `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(rsSym)}`,
+      noTimeScale: false,
+      chartOnly: false,
+    });
+    document.getElementById(rsId).appendChild(rsScript);
+
+    // ── 2. TradingView Financials Widget ────────────────────
+    // Wrap in iframe-like div required by TV embed
+    const finWrap = document.createElement('div');
+    finWrap.className = 'tradingview-widget-container';
+    finWrap.style.cssText = 'width:100%;height:100%';
+    finWrap.innerHTML = `<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>`;
+    document.getElementById(finId).appendChild(finWrap);
+
+    const finScript = document.createElement('script');
+    finScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-financials.js';
+    finScript.async = true;
+    finScript.innerHTML = JSON.stringify({
+      isTransparent: true,
+      displayMode: 'regular',
+      width: '100%',
+      height: '100%',
+      colorTheme: tvTheme,
+      symbol: tvSym,
+      locale: 'en',
+      financialsType: period === 'quarterly' ? 'INCOME_STATEMENT' : 'INCOME_STATEMENT',
+      showBottomToolbar: true,
+    });
+    finWrap.appendChild(finScript);
+
+    // ── 3. RS trend badge — fetch 1Y price data and compute RS trend ──
+    computeRSTrend(symbol, benchmark, rsId);
+  });
+}
+
+// Compute RS trend from Yahoo Finance prices (stock vs benchmark 3M performance)
+async function computeRSTrend(symbol, benchmark, rsId){
+  const trendEl = document.getElementById(rsId+'-trend');
+  const noteEl  = document.getElementById(rsId+'-note');
+  if(!trendEl || !noteEl) return;
+
+  // Extract benchmark ticker for Yahoo
+  const bmMap = {
+    'NSE:NIFTY50':'^NSEI','NSE:BANKNIFTY':'^NSEBANK',
+    'NSE:CNXIT':'CNXIT.NS','NSE:NIFTYMIDCAP100':'NIFTYMIDCAP100.NS',
+    'NSE:NIFTYSMALLCAP100':'NIFTYSMALLCAP100.NS',
+    'NSE:NIFTYFMCG':'NIFTYFMCG.NS','NSE:NIFTYPHARMA':'NIFTYPHARMA.NS'
+  };
+  const bmTicker  = bmMap[benchmark] || '^NSEI';
+  const symTicker = symbol + '.NS';
+  const proxy     = 'https://api.allorigins.win/raw?url=';
+  const params    = `?interval=1mo&range=4mo`;
+
+  try{
+    const [sRes, bRes] = await Promise.all([
+      fetch(proxy + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symTicker}${params}`)),
+      fetch(proxy + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${bmTicker}${params}`))
+    ]);
+    const [sData, bData] = await Promise.all([sRes.json(), bRes.json()]);
+
+    const sClose = sData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(Boolean);
+    const bClose = bData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(Boolean);
+
+    if(!sClose?.length || !bClose?.length){ noteEl.textContent='RS data unavailable'; return; }
+
+    const sRet = (sClose[sClose.length-1] - sClose[0]) / sClose[0] * 100;
+    const bRet = (bClose[bClose.length-1] - bClose[0]) / bClose[0] * 100;
+    const rs   = sRet - bRet; // relative outperformance
+
+    const isOut = rs >= 0;
+    trendEl.style.color = isOut ? 'var(--g)' : 'var(--r)';
+    trendEl.style.background = isOut ? 'var(--gd)' : 'var(--rd)';
+    trendEl.textContent = isOut ? `▲ Outperforming +${rs.toFixed(1)}%` : `▼ Underperforming ${rs.toFixed(1)}%`;
+    noteEl.textContent = `3M: Stock ${sRet>=0?'+':''}${sRet.toFixed(1)}% · Benchmark ${bRet>=0?'+':''}${bRet.toFixed(1)}%`;
+  } catch(e){
+    noteEl.textContent = 'RS fetch error';
+  }
+}
 </script>
 </body>
 </html>
