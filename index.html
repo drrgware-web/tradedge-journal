@@ -7797,6 +7797,121 @@ function updateRSCardsWithRRG(rrgData){
 }
 
 
+// ══════════════════════════════════════════════════════════════════════════════
+// BACKGROUND FETCH — runs silently every 5 min, fires RS/RRG alerts
+// ══════════════════════════════════════════════════════════════════════════════
+async function frsBackgroundFetch(symbols, benchmark){
+  const CACHE_KEY = 'te_frs_cache';
+  const cacheKey  = benchmark + '_' + [...symbols].sort().join(',');
+  const bmYahooMap = {
+    'NIFTY50':'^NSEI','NIFTY100':'NIFTY100.NS','NIFTY500':'NIFTY500.NS','SENSEX':'^BSESN',
+    'NIFTYMIDCAP100':'NIFTYMIDCAP100.NS','NIFTYSMALLCAP100':'NIFTYSMALLCAP100.NS',
+    'BANKNIFTY':'^NSEBANK','CNXIT':'CNXIT.NS','NIFTYPHARMA':'NIFTYPHARMA.NS',
+    'NIFTYMIDCAP50':'NIFTYMIDCAP50.NS','NIFTYMIDCAP150':'NIFTYMIDCAP150.NS',
+    'NIFTYSMALLCAP50':'NIFTYSMALLCAP50.NS','NIFTYSMALLCAP250':'NIFTYSMALLCAP250.NS',
+  };
+  const benchLabelMap = {
+    'NIFTY50':'Nifty 50','NIFTY100':'Nifty 100','NIFTY500':'Nifty 500','SENSEX':'Sensex',
+    'NIFTYMIDCAP100':'Midcap 100','NIFTYSMALLCAP100':'Smallcap 100',
+    'BANKNIFTY':'Bank Nifty','CNXIT':'Nifty IT','NIFTYPHARMA':'Nifty Pharma',
+  };
+  const benchLabel = benchLabelMap[benchmark] || benchmark;
+
+  // Use a hidden ghost container for DOM-based rendering
+  let ghost = document.getElementById('frs-ghost');
+  if(!ghost){
+    ghost = document.createElement('div');
+    ghost.id = 'frs-ghost';
+    ghost.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;visibility:hidden';
+    document.body.appendChild(ghost);
+  }
+
+  let cache = {};
+  try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); }catch(e){}
+  const newData = cache[cacheKey]?.data ? {...cache[cacheKey].data} : {};
+
+  for(const sym of symbols){
+    const cid = 'ghost_' + sym.replace(/[^a-zA-Z0-9]/g,'_');
+    ghost.innerHTML = `
+      <div id="${cid}_rs"></div>
+      <span id="${cid}_rs_chip" style="display:none"></span>
+      <span id="${cid}_earn"    style="display:none"></span>
+      <div id="${cid}_fund"></div>`;
+    try{
+      await frsComputeRS(sym, benchmark, benchLabel, cid);   // ← calls checkRSAlert internally
+      await frsLoadQuarterly(sym, cid);
+      newData[sym] = {
+        rsHtml:   document.getElementById(`${cid}_rs`)?.innerHTML   || '',
+        fundHtml: document.getElementById(`${cid}_fund`)?.innerHTML || '',
+        rsChip:   document.getElementById(`${cid}_rs_chip`)?.innerHTML || '',
+        earn:     document.getElementById(`${cid}_earn`)?.innerHTML  || '',
+      };
+      // Save partial cache after each symbol
+      cache[cacheKey] = { ts: Date.now(), bm: benchmark, data: newData };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    }catch(e){ console.warn('[FundRS BG]', sym, e); }
+    await new Promise(r=>setTimeout(r,300));
+  }
+
+  // Final save
+  cache[cacheKey] = { ts: Date.now(), bm: benchmark, data: newData };
+  try{ localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); }catch(e){}
+  console.log('[FundRS BG] ✅ Done —', symbols.length, 'symbols, benchmark:', benchmark);
+
+  // If RRG data is fresh, also check RRG Lagging alerts
+  if(window._rrgData?.length) checkRRGAlerts(window._rrgData);
+
+  // If user is now viewing the fundrs page, refresh it instantly from new cache
+  if(document.getElementById('page-fundrs')?.classList.contains('active')){
+    renderFundRS(false);
+  }
+}
+
+// ── RRG Lagging → alert ────────────────────────────────────────────────────
+function checkRRGAlerts(rrgData){
+  rrgData.forEach(d=>{
+    const alertId = `rrg_lagging_${d.sym}`;
+    const now     = Date.now();
+    const existing = customAlerts.find(a=>a.id===alertId);
+
+    if(d.quad.name === 'Lagging'){
+      if(!existing){
+        customAlerts.push({
+          id: alertId, symbol: d.sym,
+          level: d.cur.ratio,
+          type: 'rrg_lagging',
+          label: `RRG Lagging · RS-Ratio ${d.cur.ratio.toFixed(1)} RS-Mom ${d.cur.mom.toFixed(1)}`,
+          color: '#f87171',
+          auto: true, rsAlert: true, triggered: true, silenced: false,
+          createdAt: now, updatedAt: now,
+        });
+        saveAlerts(); renderAlerts();
+        playRSWarningBeep();
+        showRSAlertBanner(d.sym, d.cur.ratio - 100, window._rrgBmLabel||'Benchmark');
+        updateAlertBadge();
+        toast(`⚠️ ${d.sym} moved to RRG Lagging quadrant`, '🔴');
+      } else if(!existing.silenced){
+        // Re-alert if ratio deteriorated by >1 point
+        if(d.cur.ratio < (existing.level||100) - 1){
+          existing.level = d.cur.ratio;
+          existing.label = `RRG Lagging · RS-Ratio ${d.cur.ratio.toFixed(1)} RS-Mom ${d.cur.mom.toFixed(1)}`;
+          existing.updatedAt = now;
+          saveAlerts(); renderAlerts();
+          playRSWarningBeep();
+          toast(`📉 ${d.sym} RRG Lagging deepening — RS-Ratio: ${d.cur.ratio.toFixed(1)}`, '🔴');
+        }
+      }
+    } else {
+      // Recovered from Lagging
+      if(existing){
+        customAlerts = customAlerts.filter(a=>a.id!==alertId);
+        saveAlerts(); renderAlerts();
+        toast(`✅ ${d.sym} exited RRG Lagging → ${d.quad.name}`, '📈');
+      }
+    }
+  });
+}
+
 </script>
 </body>
 </html>
