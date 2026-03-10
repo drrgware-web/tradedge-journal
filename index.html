@@ -94,6 +94,32 @@ body.light{
 .info-tip-body{ font-size:11px;color:#8BA0B8;line-height:1.55; }
 .info-tip-good{ font-size:10px;color:#4ADE80;margin-top:5px;font-weight:600; }
 
+
+/* ── AUTOCOMPLETE DROPDOWN ── */
+.ac-wrap{ position:relative; }
+.ac-drop{
+  position:absolute;top:100%;left:0;right:0;z-index:9999;
+  background:var(--bg3);border:1px solid rgba(59,139,255,.35);
+  border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);display:none;
+}
+.ac-drop.open{ display:block; }
+.ac-item{
+  padding:7px 12px;font-size:12px;color:var(--t2);cursor:pointer;
+  border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;
+}
+.ac-item:last-child{ border-bottom:none; }
+.ac-item:hover,.ac-item.ac-sel{ background:rgba(59,139,255,.15);color:var(--t1); }
+.ac-item .ac-del{ color:var(--t4);font-size:10px;padding:2px 5px;border-radius:4px;opacity:0;transition:opacity .15s; }
+.ac-item:hover .ac-del{ opacity:1; }
+.ac-item .ac-del:hover{ background:var(--rd);color:#fff; }
+/* SL dual input */
+.sl-wrap{ display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--b2);background:var(--bg2); }
+.sl-wrap input{ border:none!important;border-radius:0!important;background:transparent;flex:1;min-width:0; }
+.sl-wrap input:focus{ outline:none;box-shadow:none; }
+.sl-mode-btn{ padding:0 10px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:var(--bg3);color:var(--t3);border-left:1px solid var(--b2);transition:all .15s;white-space:nowrap; }
+.sl-mode-btn.active{ background:var(--yd);color:var(--y); }
+
 /* ── CHART IMAGE BOX ── */
 .chart-img-box{
   background:var(--bg3);border:1.5px dashed var(--b2);border-radius:8px;
@@ -1899,17 +1925,20 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
               <div class="sym-dropdown" id="sym-drop"></div>
             </div>
           </div>
-          <div class="fg"><label class="fl">Setup</label><input class="fi" id="f-setup" placeholder="BearTrap, DTB, Breakout…"></div>
+          <div class="fg"><label class="fl">Setup</label>
+            <div class="ac-wrap" id="setup-ac-wrap">
+              <input class="fi" id="f-setup" placeholder="DTB, BullTrap, Breakout… (auto-saved)" autocomplete="off"
+                oninput="acFilter('setup')" onkeydown="acKey(event,'setup')" onfocus="acFilter('setup')" onblur="setTimeout(()=>acClose('setup'),200)">
+              <div class="ac-drop" id="setup-ac-drop"></div>
+            </div></div>
           <div class="fg f-full">
-            <label class="fl">Entry Type</label>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px" id="entry-type-chips">
-              <button type="button" class="etype-chip" onclick="setEntryType('Intraday',this)">Intraday</button>
-              <button type="button" class="etype-chip" onclick="setEntryType('Swing',this)">Swing</button>
-              <button type="button" class="etype-chip" onclick="setEntryType('Positional',this)">Positional</button>
-              <button type="button" class="etype-chip" onclick="setEntryType('Scalp',this)">Scalp</button>
-              <button type="button" class="etype-chip" onclick="setEntryType('Options',this)">Options</button>
-              <button type="button" class="etype-chip" onclick="setEntryType('Futures',this)">Futures</button>
+            <label class="fl">Entry Type <span style="font-size:9px;color:var(--t4);font-weight:400">(auto-saved to your list)</span></label>
+            <div class="ac-wrap" id="etype-ac-wrap">
+              <input class="fi" id="f-entry-type-text" placeholder="e.g. DTB 0.5%, BullTrap, BO-retest…" autocomplete="off"
+                oninput="acFilter('etype')" onkeydown="acKey(event,'etype')" onfocus="acFilter('etype')" onblur="setTimeout(()=>acClose('etype'),200)">
+              <div class="ac-drop" id="etype-ac-drop"></div>
             </div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px" id="etype-quick-chips"></div>
             <input type="hidden" id="f-entry-type" value="">
           </div>
           <div class="fg"><label class="fl">Side *</label><select class="fi" id="f-side"><option value="Buy">Buy (Long)</option><option value="Sell">Sell (Short)</option></select></div>
@@ -1932,12 +1961,53 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
       <div class="fsec">
         <div class="fsec-title">🛡 Risk & Journal</div>
         <div class="fg2">
-          <div class="fg"><label class="fl">Stop Loss (₹)</label><input type="number" class="fi" id="f-sl" placeholder="0.00" step="0.01"></div>
-          <div class="fg"><label class="fl">Target (₹)</label><input type="number" class="fi" id="f-target" placeholder="0.00" step="0.01"></div>
+          <div class="fg">
+            <label class="fl">Stop Loss
+              <span id="sl-mode-label" style="font-size:9px;color:var(--y);margin-left:4px">₹ price</span>
+            </label>
+            <div class="sl-wrap">
+              <input type="number" class="fi" id="f-sl" placeholder="0.00" step="0.01" oninput="slSyncOther()">
+              <button type="button" class="sl-mode-btn active" id="sl-btn-inr" onclick="slSetMode('inr')">₹</button>
+              <button type="button" class="sl-mode-btn" id="sl-btn-pct" onclick="slSetMode('pct')">%</button>
+            </div>
+            <div id="sl-other" style="font-size:10px;color:var(--t4);margin-top:3px;min-height:14px"></div>
+          </div>
+          <div class="fg">
+            <label class="fl">Target
+              <span id="tgt-mode-label" style="font-size:9px;color:var(--g);margin-left:4px">₹ price</span>
+            </label>
+            <div class="sl-wrap">
+              <input type="number" class="fi" id="f-target" placeholder="0.00" step="0.01" oninput="tgtSyncOther()">
+              <button type="button" class="sl-mode-btn active" id="tgt-btn-inr" onclick="tgtSetMode('inr')" style="color:var(--g)">₹</button>
+              <button type="button" class="sl-mode-btn" id="tgt-btn-pct" onclick="tgtSetMode('pct')" style="color:var(--g)">%</button>
+            </div>
+            <div id="tgt-other" style="font-size:10px;color:var(--t4);margin-top:3px;min-height:14px"></div>
+          </div>
           <div class="fg"><label class="fl">Plan Followed?</label><select class="fi" id="f-plan"><option value="">—</option><option>Yes</option><option>No</option><option>Partial</option></select></div>
-          <div class="fg"><label class="fl">Exit Trigger</label><input class="fi" id="f-trigger" placeholder="SL hit, Target reached…"></div>
-          <div class="fg"><label class="fl">Growth Areas</label><input class="fi" id="f-growth" placeholder="Entry timing, sizing…"></div>
-          <div class="fg f-full"><label class="fl">Notes</label><input class="fi" id="f-notes" placeholder="Reasoning, observations…"></div>
+          <div class="fg">
+            <label class="fl">Exit Trigger</label>
+            <div class="ac-wrap">
+              <input class="fi" id="f-trigger" placeholder="SL hit, Target reached…" autocomplete="off"
+                oninput="acFilter('trigger')" onkeydown="acKey(event,'trigger')" onfocus="acFilter('trigger')" onblur="setTimeout(()=>acClose('trigger'),200)">
+              <div class="ac-drop" id="trigger-ac-drop"></div>
+            </div>
+          </div>
+          <div class="fg">
+            <label class="fl">Growth Areas</label>
+            <div class="ac-wrap">
+              <input class="fi" id="f-growth" placeholder="Entry timing, sizing…" autocomplete="off"
+                oninput="acFilter('growth')" onkeydown="acKey(event,'growth')" onfocus="acFilter('growth')" onblur="setTimeout(()=>acClose('growth'),200)">
+              <div class="ac-drop" id="growth-ac-drop"></div>
+            </div>
+          </div>
+          <div class="fg f-full">
+            <label class="fl">Notes</label>
+            <div class="ac-wrap">
+              <input class="fi" id="f-notes" placeholder="Reasoning, observations…" autocomplete="off"
+                oninput="acFilter('notes')" onkeydown="acKey(event,'notes')" onfocus="acFilter('notes')" onblur="setTimeout(()=>acClose('notes'),200)">
+              <div class="ac-drop" id="notes-ac-drop"></div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Chart Screenshots -->
@@ -1946,12 +2016,16 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
         <div class="fg2">
           <div class="fg f-full">
             <label class="fl">Entry Chart</label>
-            <div class="chart-img-box" id="entry-img-box" onclick="document.getElementById('f-entry-img-file').click()">
+            <div class="chart-img-box" id="entry-img-box"
+              onclick="document.getElementById('f-entry-img-file').click()"
+              ondragover="event.preventDefault();this.style.borderColor='var(--b)'"
+              ondragleave="this.style.borderColor=''"
+              ondrop="handleChartDrop('entry',event)">
               <img id="entry-img-preview" src="" style="display:none;max-height:170px;width:100%;object-fit:contain;border-radius:6px">
               <div id="entry-img-placeholder" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;color:var(--t3)">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span style="font-size:12px">Click to upload entry chart</span>
-                <span style="font-size:10px;color:var(--t4)">PNG / JPG / WebP</span>
+                <span style="font-size:12px;font-weight:600">Click · Drag · Paste</span>
+                <span style="font-size:10px;color:var(--t4)">PNG / JPG / WebP · Ctrl+V to paste</span>
               </div>
               <input type="file" id="f-entry-img-file" accept="image/*" style="display:none" onchange="handleChartImg('entry',this)">
             </div>
@@ -1963,11 +2037,11 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
           </div>
           <div class="fg f-full">
             <label class="fl">Exit Chart</label>
-            <div class="chart-img-box" id="exit-img-box" onclick="document.getElementById('f-exit-img-file').click()">
+            <div class="chart-img-box" id="exit-img-box" onclick="document.getElementById('f-exit-img-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--b)'" ondragleave="this.style.borderColor=''" ondrop="handleChartDrop('exit',event)">
               <img id="exit-img-preview" src="" style="display:none;max-height:170px;width:100%;object-fit:contain;border-radius:6px">
               <div id="exit-img-placeholder" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;color:var(--t3)">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span style="font-size:12px">Click to upload exit chart</span>
+                <span style="font-size:12px;font-weight:600">Click · Drag · Paste</span>
                 <span style="font-size:10px;color:var(--t4)">PNG / JPG / WebP</span>
               </div>
               <input type="file" id="f-exit-img-file" accept="image/*" style="display:none" onchange="handleChartImg('exit',this)">
@@ -2362,6 +2436,10 @@ function openAdd(){
   document.getElementById('f-sym').value=''; closeSymDrop();
   document.getElementById('f-setup').value='';
   document.getElementById('f-entry-type').value='';
+  document.getElementById('f-entry-type-text').value='';
+  _slMode='inr'; slSetMode('inr');
+  _tgtMode='inr'; tgtSetMode('inr');
+  setTimeout(()=>renderEtypeChips(''),50);
   document.querySelectorAll('.etype-chip').forEach(c=>c.classList.remove('active'));
   document.getElementById('f-status').value='Open';
   document.getElementById('f-sl').value='';
@@ -2385,11 +2463,16 @@ function editTrade(id){
   document.getElementById('f-sym').value=t.symbol||'';
   document.getElementById('f-setup').value=t.setup||'';
   document.getElementById('f-entry-type').value=t.entryType||'';
+  document.getElementById('f-entry-type-text').value=t.entryType||'';
+  if(t.slMode) { _slMode=t.slMode; slSetMode(t.slMode); }
+  setTimeout(()=>renderEtypeChips(t.entryType||''),50);
   setEntryType(t.entryType||'', null);
   document.getElementById('f-side').value=t.side||'Buy';
   document.getElementById('f-status').value=t.status||'Open';
-  document.getElementById('f-sl').value=t.sl||'';
-  document.getElementById('f-target').value=t.target||'';
+  if(t.slMode){ _slMode=t.slMode; slSetMode(t.slMode); }
+  document.getElementById('f-sl').value = t.slMode==='pct' && t.slPct ? t.slPct : (t.sl||'');
+  if(t.tgtMode){ _tgtMode=t.tgtMode; tgtSetMode(t.tgtMode); }
+  document.getElementById('f-target').value = t.target||'';
   document.getElementById('f-plan').value=t.plan||'';
   document.getElementById('f-trigger').value=t.exitTrigger||'';
   document.getElementById('f-growth').value=t.growth||'';
@@ -2431,11 +2514,13 @@ function saveTrade(){
   const t={
     id:editId||Date.now()+'',symbol:sym,
     setup:document.getElementById('f-setup').value.trim(),
-    entryType:document.getElementById('f-entry-type').value,
+    entryType:(document.getElementById('f-entry-type').value||document.getElementById('f-entry-type-text').value).trim(),
     side:document.getElementById('f-side').value,
     status:document.getElementById('f-status').value,
-    sl:+document.getElementById('f-sl').value||0,
-    target:+document.getElementById('f-target').value||0,
+    sl:getSlPrice(),
+    slMode:_slMode,
+    target:getTgtPrice(),
+    tgtMode:_tgtMode,
     plan:document.getElementById('f-plan').value,
     exitTrigger:document.getElementById('f-trigger').value,
     growth:document.getElementById('f-growth').value,
@@ -8150,6 +8235,303 @@ function renderChartsGallery(){
   document.addEventListener('scroll', window.hideInfoTip, true);
   document.addEventListener('click',  window.hideInfoTip, true);
 })();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTOCOMPLETE SYSTEM — Setup & Entry Type
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Default seed lists
+const DEFAULT_SETUPS = [
+  'Breakout','Breakdown','BullTrap','BearTrap','DTB','DTSell',
+  'Reversal','Pullback','Retest','BO-Retest','BD-Retest',
+  'Flag','Pennant','CupHandle','InverseHS','HeadShoulders',
+  'DoubleBottom','DoubleTop','TriangleBreak','GapUp','GapDown',
+  'MomentumContinuation','FakeBreakout','VolumeSpike','52WHigh'
+];
+const DEFAULT_ETYPES = [
+  'DTB 0.5%','DTB 1%','DTB 2%','DTS 0.5%','DTS 1%','DTS 2%',
+  'BullTrap','BearTrap','BO 0.5%','BO 1%','BO 2%','BD 0.5%','BD 1%',
+  'OB 0.5%','OB 1%','OB 2%','Catapult Buy','Catapult Sell',
+  'Bull Spread','Bear Spread','Anchor Column','Pole','Congestion BO',
+  'Swing Long','Swing Short','Positional Long','Positional Short',
+  'Intraday Long','Intraday Short','Scalp Long','Scalp Short',
+  'Options CE Buy','Options PE Buy','Futures Long','Futures Short'
+];
+
+function getSetupList(){
+  const saved = JSON.parse(localStorage.getItem('te_setup_list') || 'null');
+  if(!saved){
+    localStorage.setItem('te_setup_list', JSON.stringify(DEFAULT_SETUPS));
+    return [...DEFAULT_SETUPS];
+  }
+  return saved;
+}
+function getEtypeList(){
+  const saved = JSON.parse(localStorage.getItem('te_etype_list') || 'null');
+  if(!saved){
+    localStorage.setItem('te_etype_list', JSON.stringify(DEFAULT_ETYPES));
+    return [...DEFAULT_ETYPES];
+  }
+  return saved;
+}
+function saveSetupList(arr){ localStorage.setItem('te_setup_list', JSON.stringify(arr)); }
+function saveEtypeList(arr){ localStorage.setItem('te_etype_list', JSON.stringify(arr)); }
+
+function addToSetupList(val){
+  if(!val) return;
+  const list = getSetupList();
+  if(!list.find(x=>x.toLowerCase()===val.toLowerCase())){ list.unshift(val); saveSetupList(list); }
+}
+function addToEtypeList(val){
+  if(!val) return;
+  const list = getEtypeList();
+  if(!list.find(x=>x.toLowerCase()===val.toLowerCase())){ list.unshift(val); saveEtypeList(list); }
+}
+
+// acFilter — called oninput/onfocus
+// Map type → {inputId, dropId, getList, saveList}
+function acGetConfig(type){
+  const configs = {
+    setup:   { inp:'f-setup',            drop:'setup-ac-drop',   get:getSetupList,   save:saveSetupList   },
+    etype:   { inp:'f-entry-type-text',  drop:'etype-ac-drop',   get:getEtypeList,   save:saveEtypeList   },
+    trigger: { inp:'f-trigger',          drop:'trigger-ac-drop', get:getTriggerList, save:saveTriggerList },
+    growth:  { inp:'f-growth',           drop:'growth-ac-drop',  get:getGrowthList,  save:saveGrowthList  },
+    notes:   { inp:'f-notes',            drop:'notes-ac-drop',   get:getNotesList,   save:saveNotesList   },
+  };
+  return configs[type] || null;
+}
+
+function getTriggerList(){
+  const d = ['SL Hit','Target Reached','Partial Target','Trailing SL Hit','Manual Exit','Gap Down Exit',
+             'Reversal Signal','Time Stop','News Exit','Break of Structure','CMP Exit','Booking Partial'];
+  return JSON.parse(localStorage.getItem('te_trigger_list') || JSON.stringify(d));
+}
+function saveTriggerList(a){ localStorage.setItem('te_trigger_list', JSON.stringify(a)); }
+
+function getGrowthList(){
+  const d = ['Entry Timing','Sizing Too Small','Sizing Too Large','Exited Too Early','Held Too Long',
+             'Missed SL Placement','Poor Setup Selection','Emotion-driven Exit','No Trailing SL',
+             'Ignored Market Trend','FOMO Entry','Revenge Trade','Skipped Trade (Fear)'];
+  return JSON.parse(localStorage.getItem('te_growth_list') || JSON.stringify(d));
+}
+function saveGrowthList(a){ localStorage.setItem('te_growth_list', JSON.stringify(a)); }
+
+function getNotesList(){
+  const d = ['Strong volume confirmation','Weak volume on breakout','Gap up entry','Sector momentum',
+             'Market was choppy','Strong relative strength','Earning play','FII buying seen',
+             'Support held well','Resistance rejection','Higher high higher low','52W breakout'];
+  return JSON.parse(localStorage.getItem('te_notes_list') || JSON.stringify(d));
+}
+function saveNotesList(a){ localStorage.setItem('te_notes_list', JSON.stringify(a)); }
+
+function acFilter(type){
+  const cfg = acGetConfig(type);
+  if(!cfg) return;
+  const inp  = document.getElementById(cfg.inp);
+  const drop = document.getElementById(cfg.drop);
+  if(!inp||!drop) return;
+  const q = inp.value.trim().toLowerCase();
+  const list = cfg.get();
+  const filtered = q ? list.filter(x=>x.toLowerCase().includes(q)) : list;
+  if(!filtered.length && !q){ drop.classList.remove('open'); return; }
+  drop.innerHTML = filtered.slice(0,12).map((item,i)=>
+    `<div class="ac-item" data-val="${item}" onmousedown="acPick('${type}','${item.replace(/'/g,"\\'")}')">
+      <span>${item}</span>
+      <span class="ac-del" onmousedown="event.stopPropagation();acDelete('${type}','${item.replace(/'/g,"\\'")}')">✕</span>
+    </div>`
+  ).join('') +
+  (q && !list.find(x=>x.toLowerCase()===q) ?
+    `<div class="ac-item" style="color:var(--g)" data-val="${inp.value}" onmousedown="acPick('${type}','${inp.value.replace(/'/g,"\\'")}',true)">
+      <span>➕ Add "<b>${inp.value}</b>" to list</span>
+    </div>` : '');
+  drop.classList.add('open');
+}
+
+function acPick(type, val, addNew=false){
+  const cfg = acGetConfig(type);
+  if(!cfg) return;
+  const inp = document.getElementById(cfg.inp);
+  if(inp) inp.value = val;
+  if(type==='etype'){
+    document.getElementById('f-entry-type').value = val;
+    renderEtypeChips(val);
+  }
+  if(addNew){
+    const list = cfg.get();
+    if(!list.find(x=>x.toLowerCase()===val.toLowerCase())){ list.unshift(val); cfg.save(list); }
+  }
+  acClose(type);
+}
+
+function acDelete(type, val){
+  const cfg = acGetConfig(type);
+  if(!cfg) return;
+  const list = cfg.get().filter(x=>x!==val);
+  cfg.save(list); acFilter(type);
+}
+
+function acClose(type){
+  const cfg = acGetConfig(type);
+  if(!cfg) return;
+  const drop = document.getElementById(cfg.drop);
+  if(drop) drop.classList.remove('open');
+  const inp = document.getElementById(cfg.inp);
+  const val = inp?.value.trim();
+  if(val){
+    if(type==='etype') document.getElementById('f-entry-type').value = val;
+    const list = cfg.get();
+    if(!list.find(x=>x.toLowerCase()===val.toLowerCase())){ list.unshift(val); cfg.save(list); }
+  }
+}
+
+function acKey(e, type){
+  const cfg = acGetConfig(type);
+  const drop = document.getElementById(cfg?.drop||'setup-ac-drop');
+  const items = drop?.querySelectorAll('.ac-item');
+  if(!items||!items.length) return;
+  let sel = drop.querySelector('.ac-sel');
+  let idx = sel ? [...items].indexOf(sel) : -1;
+  if(e.key==='ArrowDown'){ e.preventDefault(); if(sel) sel.classList.remove('ac-sel'); items[Math.min(idx+1,items.length-1)].classList.add('ac-sel'); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); if(sel) sel.classList.remove('ac-sel'); items[Math.max(idx-1,0)].classList.add('ac-sel'); }
+  else if(e.key==='Enter'){ e.preventDefault(); const s=drop.querySelector('.ac-sel'); if(s) s.dispatchEvent(new MouseEvent('mousedown')); }
+  else if(e.key==='Escape'){ acClose(type); }
+}
+
+// Render quick-chips below entry type input (recently used)
+function renderEtypeChips(activeVal){
+  const container = document.getElementById('etype-quick-chips');
+  if(!container) return;
+  const recent = getEtypeList().slice(0,8);
+  container.innerHTML = recent.map(x=>`
+    <button type="button" class="etype-chip ${x===activeVal?'active':''}" 
+      onclick="document.getElementById('f-entry-type-text').value='${x.replace(/'/g,"\\'")}';document.getElementById('f-entry-type').value='${x.replace(/'/g,"\\'")}';renderEtypeChips('${x.replace(/'/g,"\\'")}')">
+      ${x}
+    </button>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SL DUAL MODE — ₹ price ↔ % from entry
+// ══════════════════════════════════════════════════════════════════════════════
+let _slMode = 'inr'; // 'inr' or 'pct'
+
+function slSetMode(mode){
+  _slMode = mode;
+  document.getElementById('sl-btn-inr').classList.toggle('active', mode==='inr');
+  document.getElementById('sl-btn-pct').classList.toggle('active', mode==='pct');
+  const lbl = document.getElementById('sl-mode-label');
+  if(lbl) lbl.textContent = mode==='inr' ? '₹ price' : '% from entry';
+  document.getElementById('f-sl').placeholder = mode==='inr' ? 'e.g. 245.50' : 'e.g. 2.5';
+  document.getElementById('f-sl').value = '';
+  document.getElementById('sl-other').textContent = '';
+}
+
+function slSyncOther(){
+  const val = parseFloat(document.getElementById('f-sl').value);
+  const other = document.getElementById('sl-other');
+  if(!val||isNaN(val)){ other.textContent=''; return; }
+
+  // Get entry price from first entry row
+  const entryInputs = document.querySelectorAll('.entry-row .entry-price');
+  const entryPrice = entryInputs.length ? parseFloat(entryInputs[0].value) : 0;
+
+  if(_slMode==='inr'){
+    if(entryPrice>0){
+      const pct = Math.abs((entryPrice - val)/entryPrice*100);
+      other.textContent = `= ${pct.toFixed(2)}% from entry ₹${entryPrice}`;
+      other.style.color = 'var(--y)';
+    } else {
+      other.textContent = 'Enter entry price to see % equivalent';
+      other.style.color = 'var(--t4)';
+    }
+  } else {
+    if(entryPrice>0){
+      const side = document.getElementById('f-side')?.value||'Long';
+      const slPrice = side.includes('Long') || side.includes('Buy')
+        ? entryPrice*(1 - val/100)
+        : entryPrice*(1 + val/100);
+      other.textContent = `= ₹${slPrice.toFixed(2)} (entry: ₹${entryPrice})`;
+      other.style.color = 'var(--y)';
+      // Write price back to hidden so save picks it up
+      document.getElementById('f-sl').dataset.priceVal = slPrice.toFixed(2);
+    } else {
+      other.textContent = 'Enter entry price above to auto-calculate ₹ SL';
+      other.style.color = 'var(--t4)';
+    }
+  }
+}
+
+// Get actual SL price regardless of mode
+function getSlPrice(){
+  const raw = parseFloat(document.getElementById('f-sl').value);
+  if(!raw||isNaN(raw)) return 0;
+  if(_slMode==='inr') return raw;
+  // pct mode — compute from entry
+  const entryInputs = document.querySelectorAll('.entry-row .entry-price');
+  const entryPrice = entryInputs.length ? parseFloat(entryInputs[0].value) : 0;
+  if(!entryPrice) return raw; // fallback
+  const side = document.getElementById('f-side')?.value||'Long';
+  return side.includes('Long')||side.includes('Buy')
+    ? entryPrice*(1 - raw/100)
+    : entryPrice*(1 + raw/100);
+}
+
+// ── TARGET DUAL MODE ─────────────────────────────────────────────────────
+let _tgtMode = 'inr';
+
+function tgtSetMode(mode){
+  _tgtMode = mode;
+  document.getElementById('tgt-btn-inr').classList.toggle('active', mode==='inr');
+  document.getElementById('tgt-btn-pct').classList.toggle('active', mode==='pct');
+  const lbl = document.getElementById('tgt-mode-label');
+  if(lbl) lbl.textContent = mode==='inr' ? '₹ price' : '% from entry';
+  document.getElementById('f-target').placeholder = mode==='inr' ? 'e.g. 280.00' : 'e.g. 5.0';
+  document.getElementById('f-target').value = '';
+  document.getElementById('tgt-other').textContent = '';
+}
+
+function tgtSyncOther(){
+  const val = parseFloat(document.getElementById('f-target').value);
+  const other = document.getElementById('tgt-other');
+  if(!val||isNaN(val)){ other.textContent=''; return; }
+  const entryInputs = document.querySelectorAll('.entry-row .entry-price');
+  const entryPrice = entryInputs.length ? parseFloat(entryInputs[0].value) : 0;
+  if(_tgtMode==='inr'){
+    if(entryPrice>0){
+      const pct = Math.abs((val - entryPrice)/entryPrice*100);
+      other.textContent = `= +${pct.toFixed(2)}% from entry ₹${entryPrice}`;
+      other.style.color = 'var(--g)';
+    } else {
+      other.textContent = 'Enter entry price to see % equivalent';
+      other.style.color = 'var(--t4)';
+    }
+  } else {
+    if(entryPrice>0){
+      const side = document.getElementById('f-side')?.value||'Long';
+      const tgtPrice = side.includes('Long')||side.includes('Buy')
+        ? entryPrice*(1 + val/100)
+        : entryPrice*(1 - val/100);
+      other.textContent = `= ₹${tgtPrice.toFixed(2)} (entry: ₹${entryPrice})`;
+      other.style.color = 'var(--g)';
+      document.getElementById('f-target').dataset.priceVal = tgtPrice.toFixed(2);
+    } else {
+      other.textContent = 'Enter entry price above to auto-calculate ₹ target';
+      other.style.color = 'var(--t4)';
+    }
+  }
+}
+
+function getTgtPrice(){
+  const raw = parseFloat(document.getElementById('f-target').value);
+  if(!raw||isNaN(raw)) return 0;
+  if(_tgtMode==='inr') return raw;
+  const entryInputs = document.querySelectorAll('.entry-row .entry-price');
+  const entryPrice = entryInputs.length ? parseFloat(entryInputs[0].value) : 0;
+  if(!entryPrice) return raw;
+  const side = document.getElementById('f-side')?.value||'Long';
+  return side.includes('Long')||side.includes('Buy')
+    ? entryPrice*(1 + raw/100)
+    : entryPrice*(1 - raw/100);
+}
 
 </script>
 </body>
