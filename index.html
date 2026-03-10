@@ -7032,16 +7032,31 @@ async function renderPerfVsBm(){
   el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:12px"><div class="frs-spin"></div>Fetching benchmark data…</div>';
 
   async function getReturn(ticker){
-    const url   = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
-    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    try{
-      const res = await fetch(proxy,{signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),12000);return _c.signal;})()});
-      const d = await res.json();
-      const parsed = JSON.parse(d.contents);
-      const closes = parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
-      if(!closes?.length) return null;
-      return (closes[closes.length-1] - closes[0]) / closes[0] * 100;
-    }catch(e){ return null; }
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
+    const proxies = [
+      `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    ];
+    for(const proxy of proxies){
+      try{
+        const ctrl = new AbortController();
+        const tid  = setTimeout(()=>ctrl.abort(), 10000);
+        const res  = await fetch(proxy, {signal: ctrl.signal});
+        clearTimeout(tid);
+        if(!res.ok) continue;
+        const raw  = await res.text();
+        // allorigins wraps in {contents:...}, others return raw JSON
+        let parsed;
+        try{ const wrap=JSON.parse(raw); parsed = wrap.contents ? JSON.parse(wrap.contents) : wrap; }
+        catch(e){ continue; }
+        const closes = parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
+        if(closes?.length >= 2){
+          return (closes[closes.length-1] - closes[0]) / closes[0] * 100;
+        }
+      }catch(e){ continue; }
+    }
+    return null;
   }
 
   // Compute portfolio return for the period using trade entry prices vs current CMP
@@ -7067,7 +7082,10 @@ async function renderPerfVsBm(){
   const portRet = getPortfolioReturn();
 
   if(bmRet===null){
-    el.innerHTML='<div style="color:var(--t3);font-size:12px">Benchmark data unavailable</div>';
+    el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12px">
+      <span>⚠️ Benchmark data unavailable (proxy blocked)</span>
+      <button class="btn btn-ghost btn-xs" onclick="renderPerfVsBm()">↻ Retry</button>
+    </div>`;
     return;
   }
 
