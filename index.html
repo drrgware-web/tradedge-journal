@@ -857,7 +857,25 @@ select.fi{cursor:pointer}
       </div>
     </div>
 
-    <!-- ══ CALENDAR ══ -->
+    <!-- ══ CHARTS GALLERY ══ -->
+<div id="charts-gallery-section" style="margin-top:28px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-size:15px;font-weight:700;color:var(--t1)">📸 Chart Screenshots Gallery</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:2px">All uploaded entry & exit charts from your trades</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="gallery-filter" class="fi" style="width:120px;font-size:12px" onchange="renderChartsGallery()">
+        <option value="all">All Trades</option>
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+  </div>
+  <div id="charts-gallery-container"></div>
+</div>
+
+<!-- ══ CALENDAR ══ -->
     <div class="page" id="page-calendar">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
         <button class="btn btn-ghost btn-sm" onclick="calShift(-1)">←</button>
@@ -1516,7 +1534,7 @@ select.fi{cursor:pointer}
         </div>
 
         <!-- Chart + Table side by side on wide screens -->
-        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:stretch">
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start">
 
           <!-- RRG Canvas -->
           <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:560px;display:flex;flex-direction:column">
@@ -1524,12 +1542,12 @@ select.fi{cursor:pointer}
           </div>
 
           <!-- Interpretation Table -->
-          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column;align-self:stretch">
+          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
             <div style="padding:12px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:12px;font-weight:700;color:var(--t1)">📋 Interpretation</span>
               <span id="rrg-table-bm" style="font-size:10px;color:var(--t4)"></span>
             </div>
-            <div id="rrg-table-body" style="overflow-y:auto;flex:1;min-height:0">
+            <div id="rrg-table-body" style="overflow-y:auto;max-height:560px;scrollbar-width:thin">
               <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">Loading…</div>
             </div>
           </div>
@@ -1793,12 +1811,28 @@ select.fi{cursor:pointer}
             </div>
             <div id="sb-log" style="font-size:11px;color:var(--t3);margin-top:4px;min-height:16px"></div>
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b1);font-size:10.5px;color:var(--t4);line-height:1.7">
-              ⚠️ The <b style="color:var(--t3)">tradedge_trades</b> table must exist in your Supabase project with columns:
-              <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;color:var(--y)">device_id TEXT PRIMARY KEY</code>,
-              <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;color:var(--y)">trades_json TEXT</code>,
-              <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;color:var(--y)">updated_at TIMESTAMPTZ</code>.
-              Row Level Security should be enabled with an allow-all policy for anon key access.
-            </div>
+              ⚠️ The <b style="color:var(--t3t3)">tradedge_trades</b> table — run this SQL once in Supabase → SQL Editor:
+              <pre style="background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:10px;font-size:10px;color:var(--y);overflow-x:auto;margin-top:8px;line-height:1.7">-- ① Fresh install: create table
+CREATE TABLE IF NOT EXISTS tradedge_trades (
+  device_id   TEXT PRIMARY KEY,
+  trades_json TEXT,
+  ledger_json TEXT,
+  cfg_json    TEXT,
+  fund_json   TEXT,
+  alerts_json TEXT,
+  prefs_json  TEXT,
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE tradedge_trades ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON tradedge_trades
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- ② Existing table: add missing columns (run if ledger not syncing)
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS ledger_json TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS cfg_json    TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS fund_json   TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS alerts_json TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div>
           </div>
         </div>
 
@@ -2737,7 +2771,7 @@ function renderTrades(){
       <td class="mono">${t.holdDays}d</td>
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
         <button class="ab" onclick="openChart('${t.id}')" title="Chart">📈</button>
-        ${(t.entryImg||t.exitImg)?`<button class="ab" onclick="viewTradeCharts('${t.id}')" title="View chart screenshots" style="color:var(--b)">🖼</button>`:''}
+        ${(t.entryImg||t.exitImg)?`<button class="ab" onclick="viewTradeCharts('${t.id}')" title="View chart screenshots" style="background:rgba(59,139,255,.18);border:1px solid rgba(59,139,255,.35);color:#3B8BFF;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:11px;font-weight:700">🖼 Charts</button>`:''}
         <button class="ab ed" onclick="editTrade('${t.id}')" title="Edit">
           <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -2756,7 +2790,7 @@ function renderTrades(){
           <div><div class="exp-lbl">Source</div><div class="exp-val">${t.source||'manual'}</div></div>
           <div style="grid-column:1/-1"><div class="exp-lbl">Notes</div><div class="exp-val">${t.notes||'—'}</div></div>
           <div style="grid-column:1/-1"><div class="exp-lbl">Growth Areas</div><div class="exp-val">${t.growth||'—'}</div></div>
-          ${(t.entryImg||t.exitImg)?`<div style="grid-column:1/-1;display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+          ${(t.entryImg||t.exitImg)?`<div style="grid-column:1/-1;display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--b1)"><div style=\"width:100%;font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px\">📸 Chart Screenshots · click to enlarge</div>
             ${t.entryImg?`<div><div class="exp-lbl" style="margin-bottom:4px">Entry Chart</div><img src="${t.entryImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:120px;max-width:220px;border-radius:6px;border:1px solid var(--b2);cursor:zoom-in;object-fit:cover"></div>`:''}
             ${t.exitImg?`<div><div class="exp-lbl" style="margin-bottom:4px">Exit Chart</div><img src="${t.exitImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:120px;max-width:220px;border-radius:6px;border:1px solid var(--b2);cursor:zoom-in;object-fit:cover"></div>`:''}
           </div>`:''}
@@ -5411,23 +5445,40 @@ async function sbApi(method, path, body){
 async function sbPush(){
   const {url, key} = getSbCreds();
   if(!url || !key){ toast('Configure Supabase in Settings → Cloud Sync','⚠️'); nav('settings'); return; }
-  // Validate URL format
-  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL — must end with .supabase.co','⚠️'); return; }
+  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL','⚠️'); return; }
   setSbStatus('Pushing…', 'sync');
   try{
-    await sbApi('POST', 'tradedge_trades?on_conflict=device_id', {
+    const ledger   = localStorage.getItem('te_ledger')    || '[]';
+    const cfg      = localStorage.getItem('te_cfg')       || '{}';
+    const fund     = localStorage.getItem('te_fund')      || '{}';
+    const alerts   = localStorage.getItem('te_alerts')    || '[]';
+    const frsPrefs = localStorage.getItem('te_frs_prefs') || '{}';
+    const mpsUrl   = localStorage.getItem('te_mps_url')   || '';
+    const theme    = localStorage.getItem('te_theme')     || 'dark';
+    // trades array already contains entryImg/exitImg (base64 charts)
+    const payload = {
       device_id:   'tradedge_main',
       trades_json: JSON.stringify(trades),
+      ledger_json: ledger,
+      cfg_json:    cfg,
+      fund_json:   fund,
+      alerts_json: alerts,
+      prefs_json:  JSON.stringify({frsPrefs:JSON.parse(frsPrefs), mpsUrl, theme}),
       updated_at:  new Date().toISOString()
-    });
+    };
+    const sizeKB = Math.round(JSON.stringify(payload).length/1024);
+    if(sizeKB > 4000) toast(`⚠️ Large upload (${sizeKB}KB) — charts included, may take a moment`, 'ℹ️');
+    await sbApi('POST', 'tradedge_trades?on_conflict=device_id', payload);
     localStorage.setItem('te_last_save', String(Date.now()));
     const ts = new Date().toLocaleTimeString('en-IN');
-    setSbStatus('Pushed ' + trades.length + ' trades ✅ · ' + ts, 'ok');
-    toast('☁️ Pushed ' + trades.length + ' trades to cloud', '☁️');
+    const lc = JSON.parse(ledger).length;
+    const cc = trades.filter(t=>t.entryImg||t.exitImg).length;
+    setSbStatus(`Pushed ${trades.length} trades · ${lc} ledger · ${cc} charts · ${sizeKB}KB ✅ · ${ts}`, 'ok');
+    toast(`☁️ ${trades.length} trades + ${lc} ledger + ${cc} charts pushed (${sizeKB}KB)`, '☁️');
   }catch(e){
-    const hint = e.message.includes('Network error') ? ' — ensure the app is served over HTTPS (not file://)' : '';
-    setSbStatus('Push failed: ' + e.message + hint, '');
-    toast('Push failed: ' + e.message, '❌');
+    const hint = e.message.includes('Network') ? ' — use HTTPS not file://' : '';
+    setSbStatus('Push failed: '+e.message+hint, '');
+    toast('Push failed: '+e.message, '❌');
     console.error('[sbPush]', e);
   }
 }
@@ -5435,37 +5486,48 @@ async function sbPush(){
 async function sbPull(){
   const {url, key} = getSbCreds();
   if(!url || !key){ toast('Configure Supabase in Settings → Cloud Sync','⚠️'); nav('settings'); return; }
-  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL — must end with .supabase.co','⚠️'); return; }
+  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL','⚠️'); return; }
   setSbStatus('Pulling…', 'sync');
   try{
-    const rows = await sbApi('GET', 'tradedge_trades?device_id=eq.tradedge_main&select=trades_json,updated_at&limit=1');
-    if(!rows || !rows.length){
-      setSbStatus('No cloud data yet — push first', '');
-      toast('No cloud data found — push first', 'ℹ️');
-      return;
-    }
-    const cloudTrades = JSON.parse(rows[0].trades_json || '[]');
-    const cloudTime   = new Date(rows[0].updated_at || 0).getTime();
-    const localTime   = +(localStorage.getItem('te_last_save') || 0);
-    if(cloudTrades.length === 0 && trades.length > 0){
-      setSbStatus('Cloud empty — keeping local', ''); return;
-    }
-    if(cloudTime >= localTime || trades.length === 0){
+    const rows = await sbApi('GET','tradedge_trades?device_id=eq.tradedge_main&select=trades_json,ledger_json,cfg_json,fund_json,alerts_json,prefs_json,updated_at&limit=1');
+    if(!rows||!rows.length){ setSbStatus('No cloud data — push first',''); toast('No cloud data — push first','ℹ️'); return; }
+    const row         = rows[0];
+    const cloudTrades = JSON.parse(row.trades_json||'[]');
+    const cloudTime   = new Date(row.updated_at||0).getTime();
+    const localTime   = +(localStorage.getItem('te_last_save')||0);
+    if(cloudTrades.length===0 && trades.length>0){ setSbStatus('Cloud empty — keeping local',''); return; }
+    if(cloudTime >= localTime || trades.length===0){
+      // Restore all data
       trades = cloudTrades;
-      localStorage.setItem('te_trades', JSON.stringify(trades));
+      localStorage.setItem('te_trades',  JSON.stringify(trades));
+      if(row.ledger_json) localStorage.setItem('te_ledger',    row.ledger_json);
+      if(row.cfg_json)    localStorage.setItem('te_cfg',       row.cfg_json);
+      if(row.fund_json)   localStorage.setItem('te_fund',      row.fund_json);
+      if(row.alerts_json) localStorage.setItem('te_alerts',    row.alerts_json);
+      if(row.prefs_json){
+        try{
+          const prefs=JSON.parse(row.prefs_json);
+          if(prefs.frsPrefs) localStorage.setItem('te_frs_prefs', JSON.stringify(prefs.frsPrefs));
+          if(prefs.mpsUrl)   localStorage.setItem('te_mps_url',   prefs.mpsUrl);
+          if(prefs.theme)    localStorage.setItem('te_theme',     prefs.theme);
+        }catch(e2){}
+      }
       localStorage.setItem('te_last_save', String(cloudTime));
       renderDash(); renderTrades();
+      try{ renderAlerts(); }catch(e2){}
+      const lc = JSON.parse(row.ledger_json||'[]').length;
+      const cc = cloudTrades.filter(t=>t.entryImg||t.exitImg).length;
       const ts = new Date().toLocaleTimeString('en-IN');
-      setSbStatus('Pulled ' + cloudTrades.length + ' trades ✅ · ' + ts, 'ok');
-      toast('☁️ Pulled ' + cloudTrades.length + ' trades', '☁️');
+      setSbStatus(`Pulled ${cloudTrades.length} trades · ${lc} ledger · ${cc} charts ✅ · ${ts}`,'ok');
+      toast(`☁️ Pulled ${cloudTrades.length} trades + ${lc} ledger + ${cc} charts`,'☁️');
     } else {
-      setSbStatus('Already up to date ✅', 'ok');
-      toast('Already up to date', 'ℹ️');
+      setSbStatus('Already up to date ✅','ok');
+      toast('Already up to date','ℹ️');
     }
   }catch(e){
-    setSbStatus('Pull failed: ' + e.message, '');
-    toast('Pull failed: ' + e.message, '❌');
-    console.error('[sbPull]', e);
+    setSbStatus('Pull failed: '+e.message,'');
+    toast('Pull failed: '+e.message,'❌');
+    console.error('[sbPull]',e);
   }
 }
 
@@ -6529,22 +6591,40 @@ function viewTradeCharts(id){
   lb.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;cursor:zoom-out';
   lb.onclick = function(e){ if(e.target===lb) lb.remove(); };
 
+  const ct = calc({...t});
+  const pnl = ct?.realisedPL ?? ct?.unrealisedPL ?? 0;
+  const pnlColor = pnl >= 0 ? '#4ADE80' : '#FF6B8A';
+  const pnlStr = (pnl>=0?'+':'') + '₹' + Math.abs(Math.round(pnl)).toLocaleString('en-IN');
+  const entryDate = t.entries?.[0]?.date || t.date || '';
+
   lb.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:1100px">
-      <div style="font-size:15px;font-weight:700;color:#EDF2F7">${t.symbol} — Chart Screenshots</div>
-      <button onclick="document.getElementById('chart-img-lightbox').remove()" style="background:rgba(255,255,255,.1);border:none;color:#EDF2F7;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px">✕ Close</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:1200px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:16px;font-weight:800;color:#EDF2F7">${t.symbol}
+          <span style="font-size:12px;font-weight:400;color:#8BA0B8;margin-left:8px">${t.side} · ${entryDate}</span>
+        </div>
+        <div style="font-size:12px;color:${pnlColor};margin-top:2px;font-family:'IBM Plex Mono',monospace;font-weight:700">${pnlStr} P&L · ${t.status}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:#8BA0B8">Press ESC to close</span>
+        <button onclick="document.getElementById('chart-img-lightbox').remove()"
+          style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#EDF2F7;border-radius:8px;padding:6px 16px;cursor:pointer;font-size:13px;font-weight:600">✕ Close</button>
+      </div>
     </div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;max-width:1100px;width:100%">
-      ${t.entryImg?`<div style="flex:1;min-width:280px">
-        <div style="font-size:11px;color:#8BA0B8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">📈 Entry Chart</div>
-        <img src="${t.entryImg}" style="width:100%;max-height:70vh;object-fit:contain;border-radius:10px;border:1px solid rgba(255,255,255,.1)">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;max-width:1200px;width:100%">
+      ${t.entryImg?`<div style="flex:1;min-width:300px;max-width:580px">
+        <div style="font-size:11px;color:#8BA0B8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-weight:700">📈 Entry Chart</div>
+        <img src="${t.entryImg}" style="width:100%;max-height:72vh;object-fit:contain;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.3)">
       </div>`:''}
-      ${t.exitImg?`<div style="flex:1;min-width:280px">
-        <div style="font-size:11px;color:#8BA0B8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">🚪 Exit Chart</div>
-        <img src="${t.exitImg}" style="width:100%;max-height:70vh;object-fit:contain;border-radius:10px;border:1px solid rgba(255,255,255,.1)">
+      ${t.exitImg?`<div style="flex:1;min-width:300px;max-width:580px">
+        <div style="font-size:11px;color:#8BA0B8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-weight:700">🚪 Exit Chart</div>
+        <img src="${t.exitImg}" style="width:100%;max-height:72vh;object-fit:contain;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.3)">
       </div>`:''}
     </div>`;
 
+  // ESC key to close
+  const escHandler = (e) => { if(e.key==='Escape'){ lb.remove(); document.removeEventListener('keydown', escHandler); }};
+  document.addEventListener('keydown', escHandler);
   document.body.appendChild(lb);
 }
 
@@ -7921,6 +8001,63 @@ function checkRRGAlerts(rrgData){
       }
     }
   });
+}
+
+// ── Charts Gallery ────────────────────────────────────────────────────────
+function renderChartsGallery(){
+  const container = document.getElementById('charts-gallery-container');
+  if(!container) return;
+  const filter = document.getElementById('gallery-filter')?.value || 'all';
+  const withCharts = trades.filter(t=>{
+    if(!t.entryImg && !t.exitImg) return false;
+    if(filter==='open')   return t.status==='Open'||t.status==='Partial';
+    if(filter==='closed') return t.status==='Closed';
+    return true;
+  }).sort((a,b)=> new Date(b.entries?.[0]?.date||b.date||0) - new Date(a.entries?.[0]?.date||a.date||0));
+
+  if(!withCharts.length){
+    container.innerHTML=`<div style="text-align:center;padding:40px;color:var(--t3)">
+      <div style="font-size:32px;margin-bottom:8px">📷</div>
+      <div style="font-size:13px">No chart screenshots yet. Upload entry/exit charts when adding trades.</div>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = withCharts.map(t=>{
+    const ct = calc({...t});
+    const pnl = ct?.realisedPL ?? ct?.unrealisedPL ?? 0;
+    const pnlC = pnl>=0?'var(--g)':'var(--r)';
+    const pnlStr = (pnl>=0?'+':'')+'₹'+Math.abs(Math.round(pnl)).toLocaleString('en-IN');
+    const entryDate = t.entries?.[0]?.date || t.date || '';
+    const statusC = t.status==='Closed'?'var(--t3)':t.status==='Open'?'var(--g)':'var(--y)';
+    return `<div class="card" style="margin-bottom:16px;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:30px;height:30px;border-radius:6px;background:var(--yd);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:9px;color:var(--y)">${t.symbol.slice(0,4)}</div>
+          <div>
+            <span style="font-size:13px;font-weight:800;color:var(--t1)">${t.symbol}</span>
+            <span style="font-size:11px;color:var(--t3);margin-left:8px">${t.side} · ${entryDate}</span>
+          </div>
+          <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${t.status==='Open'?'var(--gd)':t.status==='Closed'?'var(--bg4)':'var(--yd)'};color:${statusC};font-weight:700">${t.status}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${pnlC}">${pnlStr}</span>
+          <button onclick="viewTradeCharts('${t.id}')" style="background:rgba(59,139,255,.18);border:1px solid rgba(59,139,255,.35);color:#3B8BFF;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700">🔍 Fullscreen</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;padding:14px">
+        ${t.entryImg?`<div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">📈 Entry Chart</div>
+          <img src="${t.entryImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:200px;max-width:340px;border-radius:8px;border:1px solid var(--b1);object-fit:contain;background:var(--bg2);cursor:zoom-in;transition:transform .2s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform=''">
+        </div>`:''}
+        ${t.exitImg?`<div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">🚪 Exit Chart</div>
+          <img src="${t.exitImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:200px;max-width:340px;border-radius:8px;border:1px solid var(--b1);object-fit:contain;background:var(--bg2);cursor:zoom-in;transition:transform .2s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform=''">
+        </div>`:''}
+        ${!t.entryImg&&!t.exitImg?'<div style="color:var(--t4);font-size:12px;padding:20px">No charts uploaded</div>':''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 </script>
