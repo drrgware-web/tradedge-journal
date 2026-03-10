@@ -1516,20 +1516,20 @@ select.fi{cursor:pointer}
         </div>
 
         <!-- Chart + Table side by side on wide screens -->
-        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:stretch">
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start">
 
           <!-- RRG Canvas -->
-          <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:560px;display:flex;flex-direction:column">
+          <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:560px;display:flex;flex-direction:column;">
             <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:12px;padding:30px">Loading RRG…</div>
           </div>
 
           <!-- Interpretation Table -->
-          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden">
             <div style="padding:12px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:12px;font-weight:700;color:var(--t1)">📋 Interpretation</span>
               <span id="rrg-table-bm" style="font-size:10px;color:var(--t4)"></span>
             </div>
-            <div id="rrg-table-body" style="overflow-y:auto;flex:1;min-height:0">
+            <div id="rrg-table-body" style="overflow-y:auto;max-height:480px">
               <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">Loading…</div>
             </div>
           </div>
