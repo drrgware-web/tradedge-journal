@@ -1316,10 +1316,6 @@ select.fi{cursor:pointer}
             <option value="NSE:NIFTYFMCG">Nifty FMCG</option>
             <option value="NSE:NIFTYPHARMA">Nifty Pharma</option>
           </select>
-          <select id="frs-period" class="fi" style="width:120px;font-size:12px" onchange="saveFrsPrefs();renderFundRS()">
-            <option value="quarterly">Quarterly</option>
-            <option value="annual">Annual</option>
-          </select>
           <button class="btn btn-ghost btn-sm" onclick="renderFundRS()">
             <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
             Refresh
@@ -5958,7 +5954,7 @@ setTimeout(()=>{
 }, 1500);
 
 // ══════════════════════════════════════════════════
-// FUNDAMENTALS & RS — Screener.in style
+// FUNDAMENTALS & RS
 // ══════════════════════════════════════════════════
 
 function saveFrsPrefs(){
@@ -5977,7 +5973,6 @@ function initFundRS(){
 function renderFundRS(){
   const container = document.getElementById('frs-container');
   if(!container) return;
-
   const benchmark  = document.getElementById('frs-benchmark')?.value || 'NIFTY50';
   const benchLabel = document.getElementById('frs-benchmark')?.selectedOptions[0]?.text || 'Nifty 50';
 
@@ -5995,577 +5990,315 @@ function renderFundRS(){
   }
 
   container.innerHTML = '';
-
-  symbols.forEach(symbol => {
-    // Trade context
-    const symT  = trades.find(t=>(t.status==='Open'||t.status==='Partial')&&t.symbol===symbol);
-    const ct    = symT ? calc(symT) : null;
-    const side  = symT?.side||'Buy';
-    const pnl   = ct?.unrealisedPL??0;
-    const pnlP  = ct?.unrealisedPct??0;
-    const pnlC  = pnl>=0?'var(--g)':'var(--r)';
-    const sign  = pnl>=0?'+':'';
-    const status= symT?.status||'Open';
-
-    const cardId  = `frs_${symbol}`;
-    const isLight = document.body.classList.contains('light');
-    const tvTheme = isLight ? 'light' : 'dark';
+  symbols.forEach(sym => {
+    const t    = trades.find(t=>(t.status==='Open'||t.status==='Partial')&&t.symbol===sym);
+    const ct   = t ? calc(t) : null;
+    const side = t?.side||'Buy';
+    const pnl  = ct?.unrealisedPL??0;
+    const pnlP = ct?.unrealisedPct??0;
+    const pnlC = pnl>=0?'var(--g)':'var(--r)';
+    const sign = pnl>=0?'+':'';
+    const status = t?.status||'Open';
+    const cid  = `frs_${sym}`;
 
     const card = document.createElement('div');
-    card.id = cardId;
+    card.id = cid;
     card.className = 'card';
-    card.style.cssText = 'margin-bottom:24px;overflow:hidden';
-
-    const screenerUrl = `https://www.screener.in/company/${symbol}/consolidated/`;
-
+    card.style.cssText = 'margin-bottom:20px;overflow:hidden';
     card.innerHTML = `
-      <!-- ── Card header ── -->
-      <div style="padding:14px 18px 12px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:38px;height:38px;border-radius:9px;background:var(--yd);border:1px solid rgba(245,197,66,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;color:var(--y);font-family:'IBM Plex Mono',monospace">${symbol.slice(0,4)}</div>
+      <!-- header -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:34px;height:34px;border-radius:8px;background:var(--yd);border:1px solid rgba(245,197,66,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;color:var(--y);font-family:'IBM Plex Mono',monospace">${sym.slice(0,4)}</div>
           <div>
-            <div style="font-size:15px;font-weight:700;color:var(--t1)">${symbol}</div>
-            <div style="font-size:11px;color:var(--t3);display:flex;align-items:center;gap:6px;margin-top:1px">
+            <div style="font-size:14px;font-weight:700;color:var(--t1)">${sym}</div>
+            <div style="font-size:11px;color:var(--t3);display:flex;align-items:center;gap:5px;margin-top:1px">
               <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:${status==='Open'?'var(--g)':'var(--y)'};display:inline-block"></span>${status}</span>
               <span>·</span><span style="color:${side==='Buy'?'var(--g)':'var(--r)'}">${side}</span>
-              ${ct?`<span>·</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${pnlC}">${sign}\u20b9${Math.abs(pnl).toLocaleString('en-IN',{maximumFractionDigits:0})} (${sign}${pnlP.toFixed(2)}%)</span>`:''}
+              ${ct?`<span>·</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${pnlC}">${sign}₹${Math.abs(pnl).toLocaleString('en-IN',{maximumFractionDigits:0})} (${sign}${pnlP.toFixed(2)}%)</span>`:''}
             </div>
           </div>
         </div>
-        <div id="${cardId}_meta" style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--t3);align-items:center">
-          <span class="frs-chip" id="${cardId}_mcap">MCap —</span>
-          <span class="frs-chip" id="${cardId}_sector">—</span>
-          <span class="frs-chip" id="${cardId}_ipo">Listed —</span>
-          <span class="frs-chip frs-earn" id="${cardId}_earn" style="display:none"></span>
-          <span class="frs-chip frs-rs" id="${cardId}_rs">RS vs ${benchLabel}: —</span>
-          <a href="${screenerUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;text-decoration:none;color:var(--b);border:1px solid var(--b);background:var(--bd)">↗ Screener</a>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="frs-chip" id="${cid}_sector">—</span>
+          <span class="frs-chip" id="${cid}_ipo">—</span>
+          <span class="frs-chip frs-earn" id="${cid}_earn" style="display:none"></span>
+          <a href="https://www.screener.in/company/${sym}/consolidated/" target="_blank"
+             style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;text-decoration:none;color:var(--b);border:1px solid var(--b);background:var(--bd)">↗ Screener</a>
         </div>
       </div>
 
-      <!-- ── Two column layout ── -->
-      <div style="display:grid;grid-template-columns:3fr 2fr;min-height:460px">
+      <!-- two tables side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
 
-        <!-- LEFT: Price chart + RS toggle -->
-        <div style="border-right:1px solid var(--b1);display:flex;flex-direction:column">
-          <div style="border-bottom:1px solid var(--b1);display:flex">
-            <button onclick="frsSwitchTab('${symbol}','price')" id="tab_${symbol}_price"
-              style="flex:1;padding:9px 0;font-size:11px;font-weight:700;border:none;background:var(--bg4);color:var(--y);cursor:pointer;border-right:1px solid var(--b1);text-transform:uppercase;letter-spacing:.05em">📈 Price</button>
-            <button onclick="frsSwitchTab('${symbol}','rs')" id="tab_${symbol}_rs"
-              style="flex:1;padding:9px 0;font-size:11px;font-weight:600;border:none;background:transparent;color:var(--t3);cursor:pointer;text-transform:uppercase;letter-spacing:.05em">RS Line</button>
+        <!-- LEFT: RS table -->
+        <div style="border-right:1px solid var(--b1)">
+          <div style="padding:8px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Relative Strength vs ${benchLabel}</span>
           </div>
-          <div id="pane_${symbol}_price" style="flex:1;min-height:410px">
-          </div>
-          <div id="pane_${symbol}_rs" style="flex:1;min-height:410px;display:none;padding:12px;position:relative">
-            <canvas id="frs_rs_${symbol}" style="width:100%;height:100%"></canvas>
-            <div id="frs_rs_${symbol}_loader" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--t3);font-size:12px">
-              <div class="frs-spin"></div>Loading RS data…
-            </div>
+          <div id="${cid}_rs" style="padding:10px 14px">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:11px"><div class="frs-spin"></div>Computing RS…</div>
           </div>
         </div>
 
-        <!-- RIGHT: Quarterly financials table -->
-        <div style="display:flex;flex-direction:column;overflow:hidden">
-          <div style="padding:10px 16px 8px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Quarterly Financials</span>
-            <span style="font-size:10px;color:var(--t4)">PAT · Sales · OPM%</span>
+        <!-- RIGHT: Fundamentals table -->
+        <div>
+          <div style="padding:8px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Quarterly Financials</span>
+            <a href="https://www.screener.in/company/${sym}/consolidated/#quarters" target="_blank"
+               style="font-size:10px;color:var(--b);text-decoration:none">Full data ↗</a>
           </div>
-          <div id="${cardId}_table" style="flex:1;overflow-y:auto;min-height:400px">
-            <div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--t3);font-size:12px;gap:8px">
-              <div class="frs-spin"></div>Fetching…
-            </div>
+          <div id="${cid}_fund" style="padding:10px 14px">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:11px"><div class="frs-spin"></div>Loading…</div>
           </div>
         </div>
       </div>`;
     container.appendChild(card);
 
-    // Inject TradingView chart via direct iframe (no popup, works for all NSE symbols)
-    (function(){
-      const pane = card.querySelector('#pane_' + symbol + '_price');
-      const encodedSym = encodeURIComponent(`NSE:${symbol}`);
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://s.tradingview.com/widgetembed/?frameElementId=frs_tv_${symbol}&symbol=${encodedSym}&interval=W&hide_top_toolbar=0&hide_legend=0&save_image=0&theme=${tvTheme}&style=1&timezone=Asia%2FKolkata&withdateranges=1&hideideas=1&hide_side_toolbar=0&locale=en&utm_source=tradedge`;
-      iframe.style.cssText = 'width:100%;height:100%;min-height:410px;border:none;display:block';
-      iframe.setAttribute('allowtransparency','true');
-      iframe.setAttribute('scrolling','no');
-      iframe.id = `frs_tv_${symbol}`;
-      // Replace the whole pane content
-      pane.innerHTML = '';
-      pane.appendChild(iframe);
-    })();
-
-    // Load RS + fundamentals + earnings
-    frsLoadRS(symbol, benchmark, benchLabel, `frs_rs_${symbol}`);
-    frsLoadFundamentals(symbol, cardId);
-    frsFetchEarnings(symbol, cardId);
+    frsComputeRS(sym, benchmark, benchLabel, cid);
+    frsLoadQuarterly(sym, cid);
+    frsFetchEarnings(sym, cid);
   });
 }
 
-// ── Tab switcher for price / RS pane ─────────────────────────────
-function frsSwitchTab(symbol, tab){
-  const pricePane = document.getElementById(`pane_${symbol}_price`);
-  const rsPane    = document.getElementById(`pane_${symbol}_rs`);
-  const priceTab  = document.getElementById(`tab_${symbol}_price`);
-  const rsTab     = document.getElementById(`tab_${symbol}_rs`);
-  if(!pricePane||!rsPane) return;
+// ─── RS computation using Yahoo Finance (same proxy as fetchCMP) ─────────────
+async function frsComputeRS(symbol, benchmark, benchLabel, cid){
+  const el = document.getElementById(`${cid}_rs`);
+  if(!el) return;
 
-  if(tab==='price'){
-    pricePane.style.display='';  rsPane.style.display='none';
-    priceTab.style.background='var(--bg4)'; priceTab.style.color='var(--y)';
-    rsTab.style.background='transparent';   rsTab.style.color='var(--t3)';
-  } else {
-    pricePane.style.display='none'; rsPane.style.display='';
-    rsTab.style.background='var(--bg4)';  rsTab.style.color='var(--y)';
-    priceTab.style.background='transparent'; priceTab.style.color='var(--t3)';
-    // Trigger RS load if canvas is empty
-    const canvas = document.getElementById(`frs_rs_${symbol}`);
-    if(canvas && !Chart.getChart(canvas)){
-      // find benchmark from selector
-      const bm = document.getElementById('frs-benchmark')?.value||'NIFTY50';
-      const bl = document.getElementById('frs-benchmark')?.selectedOptions[0]?.text||'Nifty 50';
-      frsLoadRS(symbol, bm, bl, `frs_rs_${symbol}`);
-    }
-  }
-}
-
-// ── Shared proxy fetcher (same pattern as working fetchCMP) ─────
-async function frsFetch(url){
-  // Strategy 1: allorigins /get (returns {contents: "..."})
-  try{
-    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
-    if(r.ok){ const d=await r.json(); if(d.contents) return d.contents; }
-  }catch(e){}
-  // Strategy 2: allorigins /raw
-  try{
-    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
-    if(r.ok) return await r.text();
-  }catch(e){}
-  // Strategy 3: corsproxy.io
-  try{
-    const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`,
-      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
-    if(r.ok) return await r.text();
-  }catch(e){}
-  throw new Error('All proxies failed');
-}
-
-async function frsFetchJSON(url){
-  const text = await frsFetch(url);
-  if(typeof text === 'string') return JSON.parse(text);
-  return text;
-}
-
-// ── NSE India fundamentals fetch ─────────────────────────────────
-async function frsLoadFundamentals(symbol, cardId){
-  const tableEl  = document.getElementById(`${cardId}_table`);
-  const mcapEl   = document.getElementById(`${cardId}_mcap`);
-  const sectorEl = document.getElementById(`${cardId}_sector`);
-  const ipoEl    = document.getElementById(`${cardId}_ipo`);
-  if(!tableEl) return;
-
-  // Show spinner
-  tableEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:200px;gap:8px;color:var(--t3);font-size:12px"><div class="frs-spin"></div>Loading fundamentals…</div>`;
-
-  try{
-    // Tickertape has CORS headers - works from browser
-    // Step 1: resolve symbol to Tickertape SID
-    const searchRaw = await frsFetch(`https://api.tickertape.in/stocks/search?text=${encodeURIComponent(symbol)}&type=stock`);
-    const searchData = typeof searchRaw==='string' ? JSON.parse(searchRaw) : searchRaw;
-    const match = searchData?.data?.find(s => s.ticker === symbol || s.ticker === symbol.replace('NSE:',''));
-    const sid = match?.sid;
-    if(!sid) throw new Error('Symbol not found on Tickertape');
-
-    // Step 2: fetch financials (quarterly P&L)
-    const [finRaw, infoRaw] = await Promise.all([
-      frsFetch(`https://api.tickertape.in/stocks/${sid}/financials/income?period=quarterly&count=12`),
-      frsFetch(`https://api.tickertape.in/stocks/${sid}/info`)
-    ]);
-    const finData  = typeof finRaw==='string'  ? JSON.parse(finRaw)  : finRaw;
-    const infoData = typeof infoRaw==='string' ? JSON.parse(infoRaw) : infoRaw;
-
-    // Update header chips
-    const info = infoData?.data;
-    if(info){
-      if(mcapEl && info.mktCap)   mcapEl.textContent   = 'MCap \u20b9' + fmtCr(info.mktCap);
-      if(sectorEl && info.sector) sectorEl.textContent = info.sector + (info.industry ? ' · '+info.industry : '');
-      if(ipoEl && info.listingDate) ipoEl.textContent  = 'Listed ' + info.listingDate.slice(0,4);
-    }
-
-    const quarters = finData?.data?.income || finData?.data || [];
-    if(!quarters.length) throw new Error('No quarterly data');
-
-    buildFrsNativeTable(quarters, tableEl, symbol, infoData?.data);
-
-  } catch(e){
-    // Final fallback - clean styled links
-    frsShowFallback(symbol, tableEl);
-  }
-}
-
-function fmtCr(v){
-  if(!v) return '—';
-  if(v >= 1e7)  return (v/1e7).toFixed(0) + ' Cr';
-  if(v >= 1e12) return (v/1e12).toFixed(1) + 'T';
-  return v.toFixed(0);
-}
-
-function buildFrsNativeTable(quarters, tableEl, symbol, info){
-  // quarters: array from Tickertape income API
-  // Each item typically has: period, revenue/sales, pat/netProfit, operatingProfit, opm
-
-  function val(q, ...keys){ for(const k of keys){ if(q[k]!=null) return +q[k]; } return null; }
-  function pctStr(cur, old){
-    if(cur==null||old==null||old===0) return '<span style="color:var(--t4)">—</span>';
-    const p = (cur - old) / Math.abs(old) * 100;
-    const col = p > 0 ? '#4ADE80' : p < 0 ? '#FF6B8A' : 'var(--t4)';
-    return `<span style="color:${col}">${p>0?'+':''}${p.toFixed(0)}%</span>`;
-  }
-  function opmCol(v){ return v==null?'var(--t4)':v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
-  function crStr(v){ return v==null ? '<span style="color:var(--t4)">—</span>' : (v/1e7).toFixed(1); }
-
-  const rows = quarters.slice(0, 10);
-
-  // Header info line
-  let headerLine = '';
-  if(info){
-    const parts = [];
-    if(info.name || symbol) parts.push(`<b style="color:var(--t1)">${info.name||symbol}</b>`);
-    if(info.mktCap)  parts.push(`mcap <b style="color:var(--t2)">\u20b9${fmtCr(info.mktCap)}</b>`);
-    if(info.ffMktCap||info.freeFloatMktCap) parts.push(`ff <b style="color:var(--t2)">\u20b9${fmtCr(info.ffMktCap||info.freeFloatMktCap)}</b>`);
-    headerLine = `<div style="padding:8px 12px;font-size:11px;color:var(--t3);border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      ${parts.join('<span style="color:var(--b1)"> | </span>')}
-    </div>`;
-
-    if(info.sector||info.industry||info.listingDate){
-      const p2 = [];
-      if(info.sector)   p2.push(`<span style="color:var(--t2)">${info.sector}</span>`);
-      if(info.industry) p2.push(`<span style="color:var(--t3)">${info.industry}</span>`);
-      if(info.listingDate) p2.push(`<span style="color:var(--t4)">listed ${info.listingDate.slice(0,4)}</span>`);
-      headerLine += `<div style="padding:6px 12px 8px;font-size:11px;color:var(--t3);border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        ▶ ${p2.join('<span style="color:var(--b1)"> | </span>')}
-      </div>`;
-    }
-  }
-
-  let tableHTML = `
-  ${headerLine}
-  <div style="overflow-x:auto;padding:0">
-    <table style="width:100%;border-collapse:collapse;font-size:11.5px;font-family:'IBM Plex Mono',monospace;white-space:nowrap">
-      <thead>
-        <tr style="color:var(--t4);font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:var(--bg3)">
-          <th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--b1);font-weight:700">FQ</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700">PAT</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#4ADE80">YoY</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#818CF8">QoQ</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700">Sales</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#4ADE80">YoY</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#818CF8">QoQ</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#F5C542">OPM%</th>
-          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700">P/E</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-  rows.forEach((q, i) => {
-    const period = q.period || q.date || q.quarter || '—';
-    // Normalise quarter label: "2023-09-30" → "Sep-23"
-    let qLabel = period;
-    if(/^\d{4}-\d{2}-\d{2}/.test(period)){
-      const d = new Date(period);
-      qLabel = d.toLocaleDateString('en-IN',{month:'short',year:'2-digit'}).replace(' ','-');
-    }
-
-    const pat   = val(q, 'netProfit','pat','profit','netIncome');
-    const sales = val(q, 'revenue','sales','totalRevenue','income');
-    const opInc = val(q, 'operatingProfit','ebit','ebitda');
-    const opm   = opInc!=null && sales ? (opInc/sales*100) : val(q,'opm','operatingMargin');
-    const pe    = val(q, 'pe','priceToEarnings') || '—';
-
-    const prev4  = rows[i+4];  // same quarter last year
-    const prevQ  = rows[i+1];  // previous quarter
-
-    const patPrev4  = prev4 ? val(prev4,'netProfit','pat','profit','netIncome') : null;
-    const patPrevQ  = prevQ ? val(prevQ,'netProfit','pat','profit','netIncome') : null;
-    const salPrev4  = prev4 ? val(prev4,'revenue','sales','totalRevenue','income') : null;
-    const salPrevQ  = prevQ ? val(prevQ,'revenue','sales','totalRevenue','income') : null;
-
-    const isLatest = i === 0;
-    const rowBg    = isLatest ? 'background:var(--bg4)' : (i%2===0?'background:transparent':'background:rgba(255,255,255,.015)');
-    const qStyle   = isLatest ? 'color:var(--y);font-weight:700' : 'color:var(--t2)';
-
-    tableHTML += `
-        <tr style="border-bottom:1px solid var(--b1);${rowBg}">
-          <td style="padding:7px 10px;${qStyle}">${qLabel}</td>
-          <td style="padding:7px 8px;text-align:right;color:var(--t1)">${crStr(pat)}</td>
-          <td style="padding:7px 8px;text-align:right">${pctStr(pat,patPrev4)}</td>
-          <td style="padding:7px 8px;text-align:right">${pctStr(pat,patPrevQ)}</td>
-          <td style="padding:7px 8px;text-align:right;color:var(--t1)">${crStr(sales)}</td>
-          <td style="padding:7px 8px;text-align:right">${pctStr(sales,salPrev4)}</td>
-          <td style="padding:7px 8px;text-align:right">${pctStr(sales,salPrevQ)}</td>
-          <td style="padding:7px 8px;text-align:right;color:${opmCol(opm)};font-weight:700">${opm!=null?opm.toFixed(1)+'%':'<span style="color:var(--t4)">—</span>'}</td>
-          <td style="padding:7px 8px;text-align:right;color:var(--t4)">${pe}</td>
-        </tr>`;
-  });
-
-  tableHTML += `</tbody></table></div>
-  <div style="padding:6px 12px;font-size:10px;color:var(--t4);text-align:right;border-top:1px solid var(--b1)">
-    Values in Cr · Source: Tickertape
-  </div>`;
-
-  tableEl.innerHTML = tableHTML;
-}
-
-function frsShowFallback(symbol, tableEl){
-  if(!tableEl) return;
-  tableEl.innerHTML=`
-    <div style="padding:24px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
-      <div style="font-size:13px;font-weight:700;color:var(--y)">📊 Quarterly Financials</div>
-      <div style="font-size:11px;color:var(--t3);line-height:1.7">
-        Data unavailable in-app. Open directly:
-      </div>
-      <a href="https://www.screener.in/company/${symbol}/consolidated/" target="_blank"
-        style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;width:100%;box-sizing:border-box;
-               text-decoration:none;font-size:12px;font-weight:600;background:var(--bd);color:var(--b);border:1px solid var(--b)">
-        📊 Screener.in — Full Quarterly Data ↗
-      </a>
-      <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank"
-        style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;width:100%;box-sizing:border-box;
-               text-decoration:none;font-size:12px;font-weight:600;background:var(--yd);color:var(--y);border:1px solid rgba(245,197,66,.4)">
-        📈 Yahoo Finance — Income Statement ↗
-      </a>
-      <a href="https://www.tickertape.in/stocks/${symbol}-NSE" target="_blank"
-        style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;width:100%;box-sizing:border-box;
-               text-decoration:none;font-size:12px;font-weight:600;background:var(--gd);color:var(--g);border:1px solid rgba(0,229,160,.3)">
-        🎯 Tickertape — Financials ↗
-      </a>
-    </div>`;
-}
-
-function buildFrsTableFromYahoo(r, tableEl, symbol, mcapEl, ipoEl){
-  const qs = r?.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
-  const fd = r?.financialData || {};
-  const ks = r?.defaultKeyStatistics || {};
-  const sd = r?.summaryDetail || {};
-
-  if(mcapEl && sd.marketCap?.raw){
-    const mc = sd.marketCap.raw;
-    mcapEl.textContent = 'MCap ₹'+(mc>=1e12?(mc/1e12).toFixed(1)+'T':(mc/1e7).toFixed(0)+' Cr');
-  }
-
-  if(!qs.length){ tableEl.innerHTML='<div style="color:var(--t3);padding:16px;font-size:12px">No quarterly data available from Yahoo.</div>'; return; }
-
-  // Build rows from Yahoo quarterly income statements
-  const rows = qs.slice(0,8).map((q,i)=>{
-    const date    = q.endDate?.fmt || '—';
-    const revenue = q.totalRevenue?.raw || 0;
-    const netInc  = q.netIncome?.raw    || 0;
-    const opInc   = q.operatingIncome?.raw || 0;
-    const opm     = revenue>0 ? (opInc/revenue*100) : 0;
-    const prev    = qs[i+4];  // same quarter last year for YoY
-    const prevQ   = qs[i+1];  // previous quarter for QoQ
-    return { date, revenue, netInc, opm, prev, prevQ };
-  });
-
-  function pctChange(cur, old){
-    if(!old||!cur) return '—';
-    const p = (cur-old)/Math.abs(old)*100;
-    const col = p>=0?'#4ADE80':'#FF6B8A';
-    return `<span style="color:${col}">${p>=0?'+':''}${p.toFixed(0)}%</span>`;
-  }
-  function opmCol(v){ return v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
-  function cr(v){ return v ? '₹'+(v/1e7).toFixed(1)+' Cr' : '—'; }
-
-  let html=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;font-family:'IBM Plex Mono',monospace">
-    <thead><tr style="color:var(--t3);font-size:10px;text-transform:uppercase;letter-spacing:.05em">
-      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1)">Quarter</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">PAT</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">Sales</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:var(--y)">OPM%</th>
-    </tr></thead><tbody>`;
-
-  rows.forEach((row,i)=>{
-    const bg = i===0?'background:var(--bg4)':'';
-    const ql = i===0?`color:var(--y);font-weight:700`:`color:var(--t2)`;
-    html+=`<tr style="border-bottom:1px solid var(--b1);${bg}">
-      <td style="padding:7px 8px;${ql}">${row.date}</td>
-      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${cr(row.netInc)}</td>
-      <td style="padding:7px 8px;text-align:right">${pctChange(row.netInc, row.prev?.netIncome?.raw)}</td>
-      <td style="padding:7px 8px;text-align:right">${pctChange(row.netInc, row.prevQ?.netIncome?.raw)}</td>
-      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${cr(row.revenue)}</td>
-      <td style="padding:7px 8px;text-align:right">${pctChange(row.revenue, row.prev?.totalRevenue?.raw)}</td>
-      <td style="padding:7px 8px;text-align:right">${pctChange(row.revenue, row.prevQ?.totalRevenue?.raw)}</td>
-      <td style="padding:7px 8px;text-align:right;color:${opmCol(row.opm)};font-weight:600">${row.opm.toFixed(1)}%</td>
-    </tr>`;
-  });
-  html+=`</tbody></table></div>
-    <div style="font-size:10px;color:var(--t4);margin-top:8px;text-align:right">Source: Yahoo Finance · Values in Cr (approx)</div>`;
-  tableEl.innerHTML = html;
-}
-
-function buildFrsTable(data, tableEl, symbol){
-  // NSE financial results format
-  if(!data?.length){ tableEl.innerHTML='<div style="color:var(--t3);padding:16px;font-size:12px">No results data.</div>'; return; }
-
-  function pctChange(cur, old){
-    if(!cur||!old) return '—';
-    const p=(cur-old)/Math.abs(old)*100;
-    return `<span style="color:${p>=0?'#4ADE80':'#FF6B8A'}">${p>=0?'+':''}${p.toFixed(0)}%</span>`;
-  }
-  function opmCol(v){ return v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
-
-  const rows = data.slice(0,8);
-  let html=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;font-family:'IBM Plex Mono',monospace">
-    <thead><tr style="color:var(--t3);font-size:10px;text-transform:uppercase;letter-spacing:.05em">
-      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1)">Quarter</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">PAT</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">Sales</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#4ADE80">YoY</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:#60A5FA">QoQ</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1);color:var(--y)">OPM%</th>
-      <th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--b1)">P/E</th>
-    </tr></thead><tbody>`;
-
-  rows.forEach((d,i)=>{
-    const pat  = parseFloat(d.netProfitLoss||d.pat||0);
-    const sal  = parseFloat(d.totalIncome||d.revenue||d.sales||0);
-    const opm  = parseFloat(d.operatingProfitMargin||d.opm||0);
-    const pe   = d.pe||d.priceEarnings||'—';
-    const qtr  = d.toDate||d.period||d.quarter||'—';
-    const prev = rows[i+4]; const prevQ = rows[i+1];
-    const bg   = i===0?'background:var(--bg4)':'';
-    const ql   = i===0?'color:var(--y);font-weight:700':'color:var(--t2)';
-    html+=`<tr style="border-bottom:1px solid var(--b1);${bg}">
-      <td style="padding:7px 8px;${ql}">${qtr}</td>
-      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${pat?'₹'+pat.toFixed(0)+' Cr':'—'}</td>
-      <td style="padding:7px 8px;text-align:right">${prev?pctChange(pat,parseFloat(prev.netProfitLoss||prev.pat||0)):'—'}</td>
-      <td style="padding:7px 8px;text-align:right">${prevQ?pctChange(pat,parseFloat(prevQ.netProfitLoss||prevQ.pat||0)):'—'}</td>
-      <td style="padding:7px 8px;text-align:right;color:var(--t1)">${sal?'₹'+sal.toFixed(0)+' Cr':'—'}</td>
-      <td style="padding:7px 8px;text-align:right">${prev?pctChange(sal,parseFloat(prev.totalIncome||prev.revenue||prev.sales||0)):'—'}</td>
-      <td style="padding:7px 8px;text-align:right">${prevQ?pctChange(sal,parseFloat(prevQ.totalIncome||prevQ.revenue||prevQ.sales||0)):'—'}</td>
-      <td style="padding:7px 8px;text-align:right;color:${opmCol(opm)};font-weight:600">${opm?opm.toFixed(1)+'%':'—'}</td>
-      <td style="padding:7px 8px;text-align:right;color:var(--t3)">${pe}</td>
-    </tr>`;
-  });
-  html+=`</tbody></table></div><div style="font-size:10px;color:var(--t4);margin-top:8px;text-align:right">Source: NSE India</div>`;
-  tableEl.innerHTML=html;
-}
-
-// ── RS Chart via Yahoo Finance (same proxy as fetchCMP) ──────────
-async function frsLoadRS(symbol, benchmark, benchLabel, canvasId){
-  const loaderEl = document.getElementById(canvasId+'_loader');
-  const canvas   = document.getElementById(canvasId);
-
-  const bmMap = {
-    'NIFTY50':'^NSEI','BANKNIFTY':'^NSEBANK',
-    'CNXIT':'CNXIT.NS','NIFTYMIDCAP100':'NIFTYMIDCAP100.NS',
-    'NIFTYSMALLCAP100':'NIFTYSMALLCAP100.NS',
+  const bmYahoo = {
+    'NIFTY50':'^NSEI','BANKNIFTY':'^NSEBANK','CNXIT':'CNXIT.NS',
+    'NIFTYMIDCAP100':'NIFTYMIDCAP100.NS','NIFTYSMALLCAP100':'NIFTYSMALLCAP100.NS',
     'NIFTYFMCG':'NIFTYFMCG.NS','NIFTYPHARMA':'NIFTYPHARMA.NS'
   };
-  const bmTicker  = bmMap[benchmark] || '^NSEI';
-  const symTicker = symbol + '.NS';
-  const params    = '?interval=1wk&range=12mo';
+  const bmTicker = bmYahoo[benchmark] || '^NSEI';
 
-  async function fetchYahoo(ticker){
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}${params}`;
-    // Use the same /get pattern that works for fetchCMP
-    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-      {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
-    if(!r.ok) throw new Error('Proxy failed');
-    const d = await r.json();
-    return JSON.parse(d.contents);
+  // Periods to compute RS for
+  const periods = [
+    { label:'1W',  range:'5d',  interval:'1d'  },
+    { label:'1M',  range:'1mo', interval:'1d'  },
+    { label:'3M',  range:'3mo', interval:'1wk' },
+    { label:'6M',  range:'6mo', interval:'1wk' },
+    { label:'1Y',  range:'1y',  interval:'1mo' },
+  ];
+
+  async function getReturn(ticker, range, interval){
+    const url   = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}`;
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res   = await fetch(proxy, {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),10000);return c.signal;})()});
+    const d     = await res.json();
+    const parsed= JSON.parse(d.contents);
+    const close = parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
+    if(!close?.length) return null;
+    return (close[close.length-1] - close[0]) / close[0] * 100;
   }
 
   try{
-    const [sData, bData] = await Promise.all([
-      fetchYahoo(symTicker),
-      fetchYahoo(bmTicker)
-    ]);
+    // Fetch all periods for both stock and benchmark in parallel
+    const results = await Promise.all(
+      periods.map(p => Promise.all([
+        getReturn(symbol+'.NS', p.range, p.interval),
+        getReturn(bmTicker,    p.range, p.interval)
+      ]))
+    );
 
-    const sResult = sData?.chart?.result?.[0];
-    const bResult = bData?.chart?.result?.[0];
-    if(!sResult || !bResult) throw new Error('No chart data');
+    // RS classification table
+    const RS_TABLE = [
+      // [rsPosition, rsDirection, term, interpretation, termColor, interpColor]
+      ['Above Zero','Rising',   'Leader',    'Dominant Strength (Strong Alpha)', '#4ADE80','#4ADE80'],
+      ['Above Zero','Falling',  'Weakening', 'Losing Momentum (Watch Closely)',  '#F5C542','#F5C542'],
+      ['Below Zero','Rising',   'Improving', 'Potential Turnaround / Early Entry','#60A5FA','#60A5FA'],
+      ['Below Zero','Falling',  'Laggard',   'Underperforming (Avoid / Exit)',    '#FF6B8A','#FF6B8A'],
+    ];
 
-    const timestamps = sResult.timestamp || [];
-    const sClose     = sResult.indicators.quote[0].close;
-    const bClose     = bResult.indicators.quote[0].close;
+    // Build rows
+    let rows = '';
+    let overallRsVal = null;
+    let overallDir   = null;
 
-    // Find first valid values for base normalisation
-    const sBase = sClose.find(v=>v!=null);
-    const bBase = bClose.find(v=>v!=null);
-    const labels=[], rsLine=[], stockLine=[], bmLine=[];
+    periods.forEach((p, i) => {
+      const [sRet, bRet] = results[i];
+      if(sRet==null||bRet==null){
+        rows += `<tr style="border-bottom:1px solid var(--b1)">
+          <td style="padding:6px 8px;color:var(--t3);font-family:'IBM Plex Mono',monospace;font-size:11px">${p.label}</td>
+          <td colspan="4" style="padding:6px 8px;color:var(--t4);font-size:11px;text-align:center">—</td></tr>`;
+        return;
+      }
+      const rs     = sRet - bRet;
+      const absPos = rs >= 0 ? 'Above Zero' : 'Below Zero';
 
-    const minLen = Math.min(timestamps.length, sClose.length, bClose.length);
-    for(let i=0;i<minLen;i++){
-      if(sClose[i]==null||bClose[i]==null) continue;
-      labels.push(new Date(timestamps[i]*1000).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}));
-      const sN = (sClose[i]/sBase)*100;
-      const bN = (bClose[i]/bBase)*100;
-      rsLine.push(+((sN/bN)*100).toFixed(2));
-      stockLine.push(+sN.toFixed(2));
-      bmLine.push(+bN.toFixed(2));
-    }
-
-    if(!rsLine.length) throw new Error('Empty data');
-
-    // RS trend badge
-    const rsChg = rsLine[rsLine.length-1] - rsLine[0];
-    const rsEl  = document.getElementById(`frs_${symbol}_rs`);
-    if(rsEl){
-      rsEl.textContent      = `RS vs ${benchLabel}: ${rsChg>=0?'▲ +':'▼ '}${rsChg.toFixed(1)}%`;
-      rsEl.style.color      = rsChg>=0?'var(--g)':'var(--r)';
-      rsEl.style.background = rsChg>=0?'var(--gd)':'var(--rd)';
-      rsEl.style.borderColor= rsChg>=0?'rgba(0,229,160,.3)':'rgba(255,69,96,.3)';
-    }
-
-    // Draw Chart.js
-    if(loaderEl) loaderEl.style.display='none';
-    if(!canvas) return;
-    const existing = Chart.getChart(canvas);
-    if(existing) existing.destroy();
-
-    new Chart(canvas,{
-      type:'line',
-      data:{
-        labels,
-        datasets:[
-          {label:`${symbol}`,       data:stockLine, borderColor:'#F5C542', borderWidth:1.8, pointRadius:0, tension:0.3, yAxisID:'y'},
-          {label:benchLabel,         data:bmLine,    borderColor:'#3B8BFF', borderWidth:1.5, pointRadius:0, tension:0.3, yAxisID:'y', borderDash:[4,3]},
-          {label:'RS Line',          data:rsLine,    borderColor:'#00E5A0', borderWidth:2,   pointRadius:0, tension:0.3, yAxisID:'y2', fill:false},
-        ]
-      },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        interaction:{mode:'index',intersect:false},
-        plugins:{
-          legend:{display:true,position:'top',labels:{color:'#8BA0B8',font:{family:'Outfit',size:10},boxWidth:12,padding:10}},
-          tooltip:{backgroundColor:'#111820',titleColor:'#EDF2F7',bodyColor:'#8BA0B8',borderColor:'#1C2A3A',borderWidth:1,
-            callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`}}
-        },
-        scales:{
-          x:{ticks:{color:'#4A6882',font:{size:9},maxTicksLimit:8},grid:{color:'rgba(28,42,58,.5)'},border:{display:false}},
-          y:{position:'left',ticks:{color:'#4A6882',font:{size:9}},grid:{color:'rgba(28,42,58,.5)'},border:{display:false},
-            title:{display:true,text:'Price (base 100)',color:'#4A6882',font:{size:9}}},
-          y2:{position:'right',ticks:{color:'#00E5A0',font:{size:9}},grid:{display:false},border:{display:false},
-            title:{display:true,text:'RS Ratio',color:'#00E5A0',font:{size:9}}}
+      // Direction: compare this period's RS to the next longer period
+      let dir = '—', dirCol = 'var(--t4)';
+      if(i < periods.length-1){
+        const [sR2, bR2] = results[i+1];
+        if(sR2!=null && bR2!=null){
+          const rsLong = sR2 - bR2;
+          dir    = rs > rsLong ? 'Rising' : 'Falling';
+          dirCol = dir==='Rising' ? '#4ADE80' : '#FF6B8A';
         }
       }
+
+      // Match classification
+      const match = RS_TABLE.find(r => r[0]===absPos && r[1]===dir);
+      const term  = match ? match[2] : absPos;
+      const interp= match ? match[3] : '—';
+      const tCol  = match ? match[4] : 'var(--t3)';
+      const iCol  = match ? match[5] : 'var(--t3)';
+
+      const sCol  = sRet>=0?'#4ADE80':'#FF6B8A';
+      const bCol  = bRet>=0?'#4ADE80':'#FF6B8A';
+      const rsCol = rs>=0?'#4ADE80':'#FF6B8A';
+
+      if(i===0){ overallRsVal=rs; overallDir=dir; }
+
+      rows += `<tr style="border-bottom:1px solid var(--b1)">
+        <td style="padding:6px 8px;color:var(--t2);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">${p.label}</td>
+        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px">
+          <span style="color:${sCol}">${sRet>=0?'+':''}${sRet.toFixed(1)}%</span>
+          <span style="color:var(--t4);font-size:9px"> stk</span><br>
+          <span style="color:${bCol}">${bRet>=0?'+':''}${bRet.toFixed(1)}%</span>
+          <span style="color:var(--t4);font-size:9px"> bmk</span>
+        </td>
+        <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700;color:${rsCol}">${rs>=0?'+':''}${rs.toFixed(1)}%</td>
+        <td style="padding:6px 8px;text-align:center;font-size:11px;color:${tCol};font-weight:600">${term}</td>
+        <td style="padding:6px 8px;font-size:10.5px;color:${iCol};max-width:160px;line-height:1.35">${interp}</td>
+      </tr>`;
     });
 
-  }catch(err){
-    if(loaderEl) loaderEl.innerHTML=`
-      <div style="color:var(--r);font-size:11px;text-align:center;padding:20px">
-        ⚠ RS chart unavailable<br>
-        <span style="color:var(--t4);font-size:10px">${err.message}</span><br>
-        <a href="https://finance.yahoo.com/chart/${symbol}.NS" target="_blank"
-           style="color:var(--b);font-size:11px;margin-top:8px;display:inline-block">Open in Yahoo Finance ↗</a>
+    // Overall RS badge for header
+    const rsEl = document.getElementById(`${cid}_sector`);
+    if(rsEl && overallRsVal!==null){
+      const col = overallRsVal>=0?'var(--g)':'var(--r)';
+      const bg  = overallRsVal>=0?'var(--gd)':'var(--rd)';
+      const bdr = overallRsVal>=0?'rgba(0,229,160,.3)':'rgba(255,69,96,.3)';
+      rsEl.textContent = `RS ${overallRsVal>=0?'▲ +':'▼ '}${overallRsVal.toFixed(1)}%`;
+      rsEl.style.color=col; rsEl.style.background=bg; rsEl.style.borderColor=bdr;
+    }
+
+    el.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="color:var(--t4);font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:var(--bg3)">
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Period</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--b1)">Returns</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--b1)">RS</th>
+            <th style="text-align:center;padding:6px 8px;border-bottom:2px solid var(--b1)">Term</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="font-size:10px;color:var(--t4);margin-top:6px;text-align:right">vs ${benchLabel} · Yahoo Finance</div>`;
+
+  } catch(e){
+    el.innerHTML = `<div style="color:var(--t3);font-size:11px;padding:8px">RS unavailable · <a href="https://finance.yahoo.com/quote/${symbol}.NS" target="_blank" style="color:var(--b)">Yahoo ↗</a></div>`;
+  }
+}
+
+// ─── Quarterly fundamentals via Yahoo Finance quoteSummary ────────────────────
+async function frsLoadQuarterly(symbol, cid){
+  const el = document.getElementById(`${cid}_fund`);
+  const ipoEl    = document.getElementById(`${cid}_ipo`);
+  if(!el) return;
+
+  try{
+    const url    = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=incomeStatementHistoryQuarterly,summaryProfile,summaryDetail`;
+    const proxy  = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res    = await fetch(proxy, {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),12000);return c.signal;})()});
+    const d      = await res.json();
+    const parsed = JSON.parse(d.contents);
+    const r      = parsed?.quoteSummary?.result?.[0];
+    if(!r) throw new Error('no data');
+
+    // Header chips
+    const prof = r.summaryProfile || {};
+    const sd   = r.summaryDetail  || {};
+    const sectorEl = document.getElementById(`${cid}_sector`);
+    // Only update sector if RS hasn't filled it yet
+    if(sectorEl && sectorEl.textContent==='—' && prof.sector){
+      sectorEl.textContent = prof.sector+(prof.industry?` · ${prof.industry}`:'');
+      sectorEl.style.color = 'var(--t3)';
+    }
+    if(ipoEl && prof.country) ipoEl.textContent = prof.country;
+
+    const qs = r.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
+    if(!qs.length) throw new Error('no quarters');
+
+    function fmtCr(v){ return v!=null ? (v/1e7).toFixed(1) : '—'; }
+    function pct(cur,old){
+      if(cur==null||old==null||old===0) return '<span style="color:var(--t4)">—</span>';
+      const p=(cur-old)/Math.abs(old)*100;
+      return `<span style="color:${p>=0?'#4ADE80':'#FF6B8A'}">${p>=0?'+':''}${p.toFixed(0)}%</span>`;
+    }
+    function opmCol(v){ return v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
+
+    // Info header like screener
+    let infoHtml = '';
+    if(prof.sector||prof.industry){
+      infoHtml = `<div style="padding:5px 8px 6px;font-size:10.5px;color:var(--t3);border-bottom:1px solid var(--b1);display:flex;gap:8px;flex-wrap:wrap">
+        ${prof.sector?`<span style="color:var(--t2)">${prof.sector}</span>`:''}
+        ${prof.industry?`<span style="color:var(--t4)">| ${prof.industry}</span>`:''}
+        ${sd.marketCap?.raw?`<span style="color:var(--t4)">| mcap ₹${fmtCr(sd.marketCap.raw)} Cr</span>`:''}
       </div>`;
+    }
+
+    let rows = '';
+    qs.slice(0,8).forEach((q,i)=>{
+      const dt   = q.endDate?.fmt||'—';
+      // Format date: "2024-09-30" → "Sep-24"
+      let ql = dt;
+      if(/\d{4}-\d{2}-\d{2}/.test(dt)){
+        const dd=new Date(dt);
+        ql=dd.toLocaleDateString('en-IN',{month:'short',year:'2-digit'}).replace(' ','-');
+      }
+      const pat  = q.netIncome?.raw;
+      const sal  = q.totalRevenue?.raw;
+      const opIn = q.operatingIncome?.raw;
+      const opm  = (opIn!=null&&sal) ? opIn/sal*100 : null;
+      const p4   = qs[i+4]; const pq = qs[i+1];
+      const isLat= i===0;
+      const bg   = isLat?'background:var(--bg4)':'';
+      const qs_  = isLat?'color:var(--y);font-weight:700':'color:var(--t2)';
+
+      rows+=`<tr style="border-bottom:1px solid var(--b1);${bg}">
+        <td style="padding:5px 8px;${qs_};font-family:'IBM Plex Mono',monospace;font-size:11px">${ql}</td>
+        <td style="padding:5px 8px;text-align:right;color:var(--t1);font-size:11px;font-family:'IBM Plex Mono',monospace">${fmtCr(pat)}</td>
+        <td style="padding:5px 8px;text-align:right;font-size:11px">${pct(pat,p4?.netIncome?.raw)}</td>
+        <td style="padding:5px 8px;text-align:right;font-size:11px">${pct(pat,pq?.netIncome?.raw)}</td>
+        <td style="padding:5px 8px;text-align:right;color:var(--t1);font-size:11px;font-family:'IBM Plex Mono',monospace">${fmtCr(sal)}</td>
+        <td style="padding:5px 8px;text-align:right;font-size:11px">${pct(sal,p4?.totalRevenue?.raw)}</td>
+        <td style="padding:5px 8px;text-align:right;font-size:11px">${pct(sal,pq?.totalRevenue?.raw)}</td>
+        <td style="padding:5px 8px;text-align:right;font-size:11.5px;font-weight:700;color:${opmCol(opm??0)}">${opm!=null?opm.toFixed(1)+'%':'—'}</td>
+      </tr>`;
+    });
+
+    el.innerHTML = `${infoHtml}
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:var(--t4);font-size:9.5px;text-transform:uppercase;background:var(--bg3)">
+          <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--b1)">FQ</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1)">PAT</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1);color:#4ADE80">YoY</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1);color:#818CF8">QoQ</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1)">Sales</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1);color:#4ADE80">YoY</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1);color:#818CF8">QoQ</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--b1);color:#F5C542">OPM%</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div style="font-size:10px;color:var(--t4);padding:4px 8px;text-align:right;border-top:1px solid var(--b1)">Cr · Yahoo Finance</div>`;
+
+  } catch(e){
+    el.innerHTML = `<div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11px;color:var(--t3)">Live data unavailable. Open directly:</div>
+      <a href="https://www.screener.in/company/${symbol}/consolidated/#quarters" target="_blank"
+         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--b);background:var(--bd);border:1px solid var(--b)">
+         📊 Screener.in ↗</a>
+      <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank"
+         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--y);background:var(--yd);border:1px solid rgba(245,197,66,.3)">
+         📈 Yahoo Finance ↗</a>
+    </div>`;
   }
 }
 
@@ -6576,9 +6309,12 @@ async function frsFetchEarnings(symbol, cardId){
   if(!earnEl) return;
 
   try{
-    const url  = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=calendarEvents`;
-    const raw  = await frsFetch(url);
-    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const url    = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=calendarEvents`;
+    const proxy  = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res    = await fetch(proxy, {signal:(()=>{const c=new AbortController();setTimeout(()=>c.abort(),10000);return c.signal;})()});
+    const d      = await res.json();
+    const raw    = d.contents;
+    const data   = typeof raw === 'string' ? JSON.parse(raw) : raw;
     const cal  = data?.quoteSummary?.result?.[0]?.calendarEvents;
     const dates= cal?.earnings?.earningsDate || [];
 
