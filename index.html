@@ -4131,8 +4131,7 @@ async function callGeminiAPI(prompt) {
       if(!lastErr.includes('quota') && !lastErr.includes('429')) throw new Error(lastErr);
     }catch(e){ lastErr = e.message; if(!lastErr.includes('quota')&&!lastErr.includes('429')) break; }
   }
-  throw new Error('Gemini quota exceeded on all models. Try again tomorrow or switch to Groq (free, 30 req/min).
-' + lastErr);
+  throw new Error('Gemini quota exceeded on all models. Try again tomorrow or switch to Groq (free, 30 req/min). ' + lastErr);
 }
 
 async function callGroqAPI(prompt) {
