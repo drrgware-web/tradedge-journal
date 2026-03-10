@@ -6167,12 +6167,33 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
   }
 
   try{
-    // Fetch 1D chart for meta (earnings timestamp etc)
-    const stockDay = await yhGet(symbol+'.NS','5d','1d');
+    // Fetch 1D chart for meta + v7/quote for earnings (parallel, v7 is more reliable for earnTs)
+    const [stockDay, v7Data] = await Promise.all([
+      yhGet(symbol+'.NS','5d','1d'),
+      (async()=>{
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}.NS&fields=earningsTimestamp,earningsTimestampStart,earningsTimestampEnd,earningsDate`;
+        const px  = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        try{
+          const res = await fetch(px,{signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),10000);return _c.signal;})()});
+          const d = await res.json();
+          return JSON.parse(d.contents);
+        }catch(e){ return null; }
+      })()
+    ]);
+
     const meta = stockDay?.meta || {};
 
-    // Try to set earnings badge from chart meta
-    frsSetEarnBadge(cid, meta);
+    // Merge earnings timestamps: v7 is more reliable than chart meta
+    const v7Result = v7Data?.quoteResponse?.result?.[0] || {};
+    const mergedMeta = {
+      ...meta,
+      earningsTimestamp:      v7Result.earningsTimestamp      || meta.earningsTimestamp,
+      earningsTimestampStart: v7Result.earningsTimestampStart || meta.earningsTimestampStart,
+      earningsTimestampEnd:   v7Result.earningsTimestampEnd   || meta.earningsTimestampEnd,
+    };
+
+    // Set earnings badge from best available data
+    frsSetEarnBadge(cid, mergedMeta);
 
     // Sequential period fetches to avoid Yahoo rate limiting
     const results = [];
@@ -6239,7 +6260,7 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
     });
 
     // Earnings row at bottom of RS table
-    const earnRow = frsEarnRow(meta);
+    const earnRow = frsEarnRow(mergedMeta);
 
     // Update RS header chip
     if(overallRsVal !== null){
@@ -6274,11 +6295,20 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
 
 // ─── Shared earnings helpers ──────────────────────────────────────────────────
 function frsParseEarnTs(meta){
-  // Yahoo returns earningsTimestampStart for scheduled, earningsTimestamp for confirmed
-  const ts = (meta.earningsTimestampStart && meta.earningsTimestampStart > 0 ? meta.earningsTimestampStart :
-               meta.earningsTimestamp      && meta.earningsTimestamp > 0      ? meta.earningsTimestamp      :
-               meta.earningsTimestampEnd   && meta.earningsTimestampEnd > 0   ? meta.earningsTimestampEnd   : 0);
-  return ts ? ts * 1000 : null;
+  if(!meta) return null;
+  // Try all fields, skip zeros and obviously wrong timestamps (before 2020)
+  const MIN_TS = 1577836800; // 2020-01-01
+  const candidates = [
+    meta.earningsTimestampStart,
+    meta.earningsTimestamp,
+    meta.earningsTimestampEnd,
+  ].filter(t => t && t > MIN_TS);
+  if(!candidates.length) return null;
+  // Pick the one closest to now (upcoming preferred, else most recent past)
+  const now = Date.now() / 1000;
+  const upcoming = candidates.filter(t => t > now);
+  if(upcoming.length) return Math.min(...upcoming) * 1000;
+  return Math.max(...candidates) * 1000; // most recent past
 }
 
 function frsSetEarnBadge(cid, meta){
@@ -6420,6 +6450,18 @@ async function frsLoadQuarterly(symbol, cid){
 
       </div>`;
   }
+
+  // Independently fetch earnings via v7 for badge (fires in parallel with quarterly)
+  (async()=>{
+    try{
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}.NS&fields=earningsTimestamp,earningsTimestampStart,earningsTimestampEnd`;
+      const px  = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(px,{signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),10000);return _c.signal;})()});
+      const d   = await res.json();
+      const r   = JSON.parse(d.contents)?.quoteResponse?.result?.[0] || {};
+      frsSetEarnBadge(cid, r);
+    }catch(e){}
+  })();
 
   try{
     // Strategy 1: Yahoo v10 — most complete quarterly data
