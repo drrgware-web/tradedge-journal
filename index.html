@@ -150,9 +150,10 @@ body{font-family:'Outfit',sans-serif;background:var(--bg0);color:var(--t1);displ
   height:var(--topbar);min-height:var(--topbar);
   background:var(--bg1);border-bottom:1px solid var(--b1);
   display:flex;align-items:center;padding:0 20px;gap:10px;
-  flex-shrink:0;
+  flex-shrink:0;position:relative;
 }
-.topbar-title{font-size:15px;font-weight:700;flex:1;color:var(--t1)}
+.topbar-title{font-size:15px;font-weight:700;color:var(--t1)}
+.topbar-tagline{position:absolute;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t4);white-space:nowrap;pointer-events:none;animation:taglinePulse 3s ease-in-out infinite;}
 .market-chip{
   font-family:'IBM Plex Mono',monospace;font-size:11px;
   padding:4px 10px;border-radius:20px;border:1px solid var(--b2);
@@ -600,6 +601,7 @@ select.fi{cursor:pointer}
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="topbar-title" id="page-title">Dashboard</div>
+    <span class="topbar-tagline">✦ &nbsp;Define Your Edge With TradEdge&nbsp; ✦</span>
     <div class="market-chip" id="mkt-chip">NSE • —</div>
     <button class="btn btn-ghost btn-sm" onclick="openImport()">
       <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -746,8 +748,7 @@ select.fi{cursor:pointer}
         <button class="btn btn-ghost btn-xs" onclick="nav('trades')">View All →</button>
       </div>
       <div class="tbl-wrap" id="open-tbl"></div>
-      <!-- Tagline -->
-      <div class="tagline-pulse">✦ &nbsp; Define Your Edge With TradEdge &nbsp; ✦</div>
+
     </div>
 
     <!-- ══ TRADES ══ -->
@@ -6190,6 +6191,37 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
       </tr>`;
     });
 
+    // Build earnings row for RS table
+    let earnRow = '';
+    {
+      const _earnTs = meta.earningsTimestamp || meta.earningsTimestampStart || meta.earningsTimestampEnd;
+      if(_earnTs){
+        const now=Date.now(), ts=_earnTs*1000;
+        const diff=Math.round((ts-now)/86400000);
+        const isPast=diff<0, isSoon=!isPast&&diff<=14, isToday=!isPast&&diff===0;
+        const fmt=new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}).replace(' ','-');
+        const label=isToday?'🔴 Earnings TODAY':isPast?`Last Earnings: ${fmt}`:diff<=7?`⚡ Earnings in ${diff}d · ${fmt}`:isSoon?`⏰ Earnings in ${diff}d · ${fmt}`:`Earnings: ${fmt}`;
+        const bg=isToday?'rgba(255,69,96,.1)':isSoon?'rgba(245,197,66,.08)':'transparent';
+        const col=isToday?'#FF6B8A':isSoon?'var(--y)':'var(--t4)';
+        earnRow=`<tr style="background:${bg};border-top:2px solid var(--b1)">
+          <td colspan="5" style="padding:7px 10px;font-size:11px;color:${col};display:flex;align-items:center;gap:6px">
+            <span class="earn-e ${(isSoon||isToday)?'earn-blink':''}">E</span>
+            <span style="font-weight:${isSoon||isToday?'700':'500'}">${label}</span>
+          </td>
+        </tr>`;
+
+        // Also update header badge
+        const earnEl2 = document.getElementById(`${cid}_earn`);
+        if(earnEl2 && earnEl2.style.display==='none'){
+          earnEl2.innerHTML=`<span class="earn-e ${isSoon?'earn-blink':''}">E</span>&nbsp;${isPast?`Last E: ${fmt}`:diff<=30?`E in ${diff}d`:fmt}`;
+          earnEl2.style.cssText='display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;border:1px solid';
+          earnEl2.style.color=isToday?'var(--r)':isSoon?'var(--y)':'var(--t3)';
+          earnEl2.style.borderColor=isToday?'rgba(255,69,96,.4)':isSoon?'rgba(245,197,66,.4)':'var(--b1)';
+          earnEl2.style.background=isToday?'var(--rd)':isSoon?'var(--yd)':'var(--bg3)';
+        }
+      }
+    }
+
     // Update RS header chip
     if(overallRsVal !== null){
       const rsChip = document.getElementById(`${cid}_sector`);
@@ -6210,7 +6242,7 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
           <th style="text-align:center;padding:6px 8px;border-bottom:2px solid var(--b1)">RS Position</th>
           <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--b1)">Market Interpretation</th>
         </tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows}${earnRow}</tbody>
       </table>
       <div style="font-size:10px;color:var(--t4);padding:4px 8px;text-align:right;border-top:1px solid var(--b1)">vs ${benchLabel} · Yahoo Finance</div>`;
 
@@ -6224,18 +6256,18 @@ async function frsLoadQuarterly(symbol, cid){
   const el = document.getElementById(`${cid}_fund`);
   if(!el) return;
 
-  async function yhGet(url){
+  async function tryGet(url){
     const proxies = [
       `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
       `https://corsproxy.io/?${encodeURIComponent(url)}`,
     ];
     for(const px of proxies){
       try{
-        const res = await fetch(px, {signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),14000);return _c.signal;})()});
+        const res = await fetch(px,{signal:(()=>{const _c=new AbortController();setTimeout(()=>_c.abort(),12000);return _c.signal;})()});
         if(!res.ok) continue;
         const d = await res.json();
-        const parsed = d.contents ? JSON.parse(d.contents) : d;
-        if(parsed && !parsed.error) return parsed;
+        const p = d.contents ? JSON.parse(d.contents) : d;
+        if(p && !p.error) return p;
       }catch(e){ continue; }
     }
     return null;
@@ -6258,13 +6290,12 @@ async function frsLoadQuarterly(symbol, cid){
   }
 
   function renderTable(quarters, source){
-    if(!quarters.length) throw new Error('empty');
     let rows='';
     quarters.forEach((q,i)=>{
       const p4=quarters[i+4]; const pq=quarters[i+1];
       const opm=(q.op!=null&&q.rev&&q.rev!==0)?q.op/q.rev*100:null;
       const isLat=i===0;
-      rows+=`<tr style="border-bottom:1px solid var(--b1);${isLat?'background:var(--bg4)':''}">
+      rows+=`<tr style="border-bottom:1px solid var(--b1);${isLat?'background:rgba(245,197,66,.05)':''}">
         <td style="padding:5px 8px;${isLat?'color:var(--y);font-weight:700':'color:var(--t2)'};font-family:'IBM Plex Mono',monospace;font-size:11px">${fmtQ(q.date)}</td>
         <td style="padding:5px 8px;text-align:right;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:11px">${fmtCr(q.pat)}</td>
         <td style="padding:5px 8px;text-align:right;font-size:11px">${pct(q.pat,p4?.pat)}</td>
@@ -6293,114 +6324,81 @@ async function frsLoadQuarterly(symbol, cid){
     </div>`;
   }
 
+  function showFallback(){
+    el.innerHTML=`
+      <div style="padding:10px 12px;border-bottom:1px solid var(--b1);font-size:10.5px;color:var(--t3)">
+        Open quarterly data in one click:
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:12px">
+        <a href="https://www.screener.in/company/${symbol}/consolidated/#quarters" target="_blank"
+           style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);transition:border-color .2s"
+           onmouseover="this.style.borderColor='var(--b)'" onmouseout="this.style.borderColor='var(--b1)'">
+          <span style="font-size:18px">📊</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--t1)">Screener.in</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:1px">${symbol} · Quarterly P&L, Balance Sheet, Cash Flow</div>
+          </div>
+          <span style="margin-left:auto;color:var(--t4);font-size:12px">↗</span>
+        </a>
+        <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank"
+           style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);color:var(--t1);transition:border-color .2s"
+           onmouseover="this.style.borderColor='rgba(245,197,66,.4)'" onmouseout="this.style.borderColor='var(--b1)'">
+          <span style="font-size:18px">📈</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--y)">Yahoo Finance</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:1px">${symbol}.NS · Income Statement, Revenue Growth</div>
+          </div>
+          <span style="margin-left:auto;color:var(--t4);font-size:12px">↗</span>
+        </a>
+        <a href="https://www.moneycontrol.com/stocks/company_info/stocks_news.php?sc_id=MC" target="_blank"
+           onclick="window.open('https://www.moneycontrol.com/india/stockpricequote/'+encodeURIComponent('${symbol}'.toLowerCase()),'_blank');return false;"
+           style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;text-decoration:none;background:var(--bg3);border:1px solid var(--b1);color:var(--t1)"
+           onmouseover="this.style.borderColor='#60A5FA'" onmouseout="this.style.borderColor='var(--b1)'">
+          <span style="font-size:18px">🔵</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#60A5FA">MoneyControl</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:1px">${symbol} · Financials, Results, News</div>
+          </div>
+          <span style="margin-left:auto;color:var(--t4);font-size:12px">↗</span>
+        </a>
+      </div>`;
+  }
+
   try{
-    // ── Strategy 1: Yahoo v8 chart with financials module ────────
-    // interval=3mo returns quarterly OHLC AND earnings data in result
-    const chart = await yhGet(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.NS?interval=3mo&range=4y`
-    );
-    const cr = chart?.chart?.result?.[0];
-
-    // Update sector chip from chart meta
-    const meta = cr?.meta || {};
-    const sEl  = document.getElementById(`${cid}_sector`);
-    if(sEl && sEl.textContent==='—' && meta.longName) sEl.textContent = meta.longName;
-
-    // Also update earnings badge from chart meta if not set yet
-    const earnEl = document.getElementById(`${cid}_earn`);
-    if(earnEl && earnEl.style.display==='none'){
-      const earnTs = meta.earningsTimestamp || meta.earningsTimestampStart;
-      if(earnTs){
-        const now=Date.now(), ts=earnTs*1000;
-        const diff=Math.round((ts-now)/86400000);
-        const isPast=diff<0, isSoon=!isPast&&diff<=14, isToday=!isPast&&diff===0;
-        const fmt=new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}).replace(' ','-');
-        const label=isToday?'Earnings TODAY':isPast?`Last E: ${fmt}`:diff<=30?`E in ${diff}d · ${fmt}`:`E: ${fmt}`;
-        earnEl.innerHTML=`<span class="earn-e ${isSoon?'earn-blink':''}">E</span>&nbsp;${label}`;
-        earnEl.style.cssText='display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;border:1px solid';
-        earnEl.style.color=isToday?'var(--r)':isSoon?'var(--y)':'var(--t3)';
-        earnEl.style.borderColor=isToday?'rgba(255,69,96,.4)':isSoon?'rgba(245,197,66,.4)':'var(--b1)';
-        earnEl.style.background=isToday?'var(--rd)':isSoon?'var(--yd)':'var(--bg3)';
-      }
-    }
-
-    // Extract quarterly revenue/earnings from chart result
-    // Yahoo returns quarterly closes = revenue proxy for some stocks
-    // More importantly: result has earningsHistory in the data
-    if(cr?.earnings){
-      const eh = cr.earnings;
-      // earningsHistory is array of {date, epsActual, epsEstimate, revenue}
-      const hist = (eh.financialsChart?.quarterly || []);
-      if(hist.length){
-        const quarters = hist.slice().reverse().slice(0,10).map(q=>({
-          date: q.date,
-          pat:  null,           // not directly available
-          rev:  q.revenue?.raw  || null,
-          op:   null
-        }));
-        // try to get PAT from earningsHistory
-        const earnHist = (eh.earningsHistory?.history || []);
-        earnHist.forEach(h=>{
-          const qMatch = quarters.find(q=>q.date===h.quarter?.fmt?.replace(' ',''));
-          if(qMatch && h.epsActual?.raw!=null && meta.sharesOutstanding){
-            qMatch.pat = h.epsActual.raw * meta.sharesOutstanding;
-          }
-        });
-        if(quarters.some(q=>q.rev||q.pat)){
-          renderTable(quarters, 'Yahoo Finance');
-          return;
-        }
-      }
-    }
-
-    // ── Strategy 2: Yahoo v7 quote (has some financial data) ────
-    const q7 = await yhGet(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}.NS&fields=earningsTimestamp,revenuePerShare,trailingEps,trailingPE,forwardPE,revenueGrowth,earningsGrowth`
-    );
-    const qResult = q7?.quoteResponse?.result?.[0];
-    if(qResult){
-      // Update earnings if not yet set
-      if(earnEl && earnEl.style.display==='none' && qResult.earningsTimestamp){
-        const ts=qResult.earningsTimestamp*1000, now=Date.now();
-        const diff=Math.round((ts-now)/86400000);
-        const isPast=diff<0, isSoon=!isPast&&diff<=14, isToday=!isPast&&diff===0;
-        const fmt=new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}).replace(' ','-');
-        const label=isToday?'Earnings TODAY':isPast?`Last E: ${fmt}`:diff<=30?`E in ${diff}d · ${fmt}`:`E: ${fmt}`;
-        earnEl.innerHTML=`<span class="earn-e ${isSoon?'earn-blink':''}">E</span>&nbsp;${label}`;
-        earnEl.style.cssText='display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;border:1px solid';
-        earnEl.style.color=isToday?'var(--r)':isSoon?'var(--y)':'var(--t3)';
-        earnEl.style.borderColor=isToday?'rgba(255,69,96,.4)':isSoon?'rgba(245,197,66,.4)':'var(--b1)';
-        earnEl.style.background=isToday?'var(--rd)':isSoon?'var(--yd)':'var(--bg3)';
-      }
-    }
-
-    // ── Strategy 3: v10 with smaller module set ──────────────────
-    const v10 = await yhGet(
+    // Try v10 with single module - smallest possible request
+    const v10 = await tryGet(
       `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=incomeStatementHistoryQuarterly`
     );
-    const qs = v10?.quoteSummary?.result?.[0]?.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
-    if(qs.length){
-      const quarters = qs.slice(0,10).map(q=>({
+    const hist = v10?.quoteSummary?.result?.[0]?.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
+    if(hist.length >= 2){
+      renderTable(hist.slice(0,10).map(q=>({
         date: q.endDate?.fmt,
         pat:  q.netIncome?.raw,
         rev:  q.totalRevenue?.raw,
-        op:   q.operatingIncome?.raw
-      }));
-      renderTable(quarters, 'Yahoo Finance');
+        op:   q.operatingIncome?.raw,
+      })), 'Yahoo Finance');
       return;
     }
 
-    throw new Error('all sources failed');
+    // Try fundamentals timeseries
+    const ts = await tryGet(
+      `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${symbol}.NS?type=quarterlyTotalRevenue,quarterlyNetIncome,quarterlyOperatingIncome&period1=1420070400&period2=${Math.floor(Date.now()/1000)}`
+    );
+    if(ts){
+      const arr = ts?.timeseries?.result || [];
+      const revA = arr.find(t=>t.meta?.type?.includes('TotalRevenue'))?.quarterlyTotalRevenue||[];
+      const patA = arr.find(t=>t.meta?.type?.includes('NetIncome'))?.quarterlyNetIncome||[];
+      const opA  = arr.find(t=>t.meta?.type?.includes('OperatingIncome'))?.quarterlyOperatingIncome||[];
+      const map={};
+      revA.forEach(d=>{if(d.reportedValue?.raw!=null){map[d.asOfDate]={...(map[d.asOfDate]||{}),rev:d.reportedValue.raw,date:d.asOfDate};}});
+      patA.forEach(d=>{if(d.reportedValue?.raw!=null){map[d.asOfDate]={...(map[d.asOfDate]||{}),pat:d.reportedValue.raw,date:d.asOfDate};}});
+      opA.forEach(d=> {if(d.reportedValue?.raw!=null){map[d.asOfDate]={...(map[d.asOfDate]||{}),op: d.reportedValue.raw, date:d.asOfDate};}});
+      const quarters=Object.values(map).filter(q=>q.date).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
+      if(quarters.length>=2){ renderTable(quarters,'Yahoo Finance'); return; }
+    }
 
-  }catch(e){
-    el.innerHTML=`<div style="padding:14px;display:flex;flex-direction:column;gap:8px">
-      <div style="font-size:11px;color:var(--t3)">Live data unavailable:</div>
-      <a href="https://www.screener.in/company/${symbol}/consolidated/#quarters" target="_blank"
-         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--b);background:var(--bd);border:1px solid var(--b)">📊 Screener.in ↗</a>
-      <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank"
-         style="padding:8px 12px;border-radius:7px;font-size:11px;font-weight:600;text-decoration:none;color:var(--y);background:var(--yd);border:1px solid rgba(245,197,66,.3)">📈 Yahoo Finance ↗</a>
-    </div>`;
-  }
+    showFallback();
+  }catch(e){ showFallback(); }
 }
 
 async function frsFetchEarnings(symbol, cardId){
