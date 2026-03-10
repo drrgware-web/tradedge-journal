@@ -70,6 +70,30 @@ body.light{
   border-radius:50%;animation:frsSpin .8s linear infinite;flex-shrink:0;
 }
 
+
+/* ── INFO TOOLTIP ── */
+.info-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:14px;height:14px;border-radius:50%;
+  background:rgba(139,160,184,.18);border:1px solid rgba(139,160,184,.3);
+  color:var(--t4);font-size:9px;font-weight:700;cursor:pointer;
+  margin-left:5px;vertical-align:middle;flex-shrink:0;
+  font-style:normal;line-height:1;transition:background .15s,color .15s;
+  position:relative;
+}
+.info-btn:hover{ background:rgba(59,139,255,.25);color:#3B8BFF;border-color:rgba(59,139,255,.5); }
+.info-tip{
+  position:fixed;z-index:99999;
+  background:#1a2030;border:1px solid rgba(59,139,255,.35);
+  border-radius:10px;padding:10px 13px;max-width:260px;
+  box-shadow:0 8px 32px rgba(0,0,0,.55);
+  pointer-events:none;opacity:0;transition:opacity .15s;
+}
+.info-tip.show{ opacity:1; }
+.info-tip-title{ font-size:12px;font-weight:700;color:#EDF2F7;margin-bottom:4px; }
+.info-tip-body{ font-size:11px;color:#8BA0B8;line-height:1.55; }
+.info-tip-good{ font-size:10px;color:#4ADE80;margin-top:5px;font-weight:600; }
+
 /* ── CHART IMAGE BOX ── */
 .chart-img-box{
   background:var(--bg3);border:1.5px dashed var(--b2);border-radius:8px;
@@ -2165,6 +2189,31 @@ const EXIT_COLORS  = ['#FF4560','#FF7A50','#FFAA50','#FFD050','#FFE580'];
 // ══════════════════════════════════════════════════
 // TRADE CALC
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════
+// KPI INFO MAP — tooltips for all metric panels
+// ══════════════════════════════════════════════════════════════════════════
+const kpiInfoMap = {
+  'Win Rate':        ['Win Rate', 'Percentage of closed trades that were profitable. Formula: Winners ÷ Total Trades × 100', '> 50% is good. 40%+ can be profitable with high payoff ratio.'],
+  'Profit Factor':   ['Profit Factor', 'Total gross profit ÷ total gross loss. Measures how much you earn per rupee lost across all trades.', '> 1.5 is good. > 2.0 is excellent. < 1.0 means losing system.'],
+  'Expectancy':      ['Expectancy (per trade)', 'Average ₹ gained or lost per trade. Formula: (Win Rate × Avg Win) + (Loss Rate × Avg Loss)', 'Positive expectancy = statistical edge in the market.'],
+  'Avg Win':         ['Average Win', 'Average profit per winning trade. Compare with Avg Loss to assess payoff ratio.', 'Should be significantly greater than Avg Loss.'],
+  'Avg Loss':        ['Average Loss', 'Average loss per losing trade. Keeping this controlled relative to Avg Win is key to profitability.', 'Ideally less than Avg Win. Larger avg loss = poor RR management.'],
+  'Avg R-Multiple':  ['Avg R-Multiple', 'Average return in units of initial risk (R). R=1.0 means you made exactly what you risked per trade.', '> 0.5R per trade indicates a positive-edge setup.'],
+  'Win Streak':      ['Win / Loss Streak', 'Maximum consecutive winning and losing trades in your history. Helps gauge consistency and psychological risk.', 'Large loss streaks (5+) indicate need for strategy review.'],
+  'Avg Hold Days':   ['Avg Holding Period', 'Average number of calendar days a trade was held before exit.', 'Shorter = more swing-oriented. Longer = positional style.'],
+  'Max Drawdown':    ['Max Drawdown', 'Largest peak-to-trough equity drop. Represents the worst-case loss you experienced from a high point.', 'Keep below 20% of capital. > 30% is high risk to capital.'],
+  'Sharpe Ratio':    ['Sharpe Ratio', 'Risk-adjusted return = avg return ÷ std deviation of returns. Annualised using √252 trading days factor.', '> 1.0 is good. > 2.0 is excellent. Negative = losing strategy.'],
+  'Calmar Ratio':    ['Calmar Ratio', 'Total P&L ÷ Max Drawdown. Measures your return relative to the worst drawdown you experienced.', '> 1.0 is strong. Higher = better return per unit of pain taken.'],
+  'Total Net P&L':   ['Total Net P&L', 'Sum of all realised P&L from closed trades only. Does not include open/unrealised positions.', 'Positive = profitable system overall on closed trades.'],
+  'Payoff Ratio':    ['Payoff Ratio', 'Avg Win ÷ Avg Loss (absolute values). Measures how much you win vs how much you lose per trade on average.', '> 1.5 preferred. Even 40% win rate is profitable above 2.0x payoff.'],
+  'Recovery Factor': ['Recovery Factor', 'Total net P&L ÷ Max Drawdown. Shows how many times your profits cover your worst drawdown.', '> 2.0 is strong. Shows the resilience of your trading strategy.'],
+  'Total Closed':    ['Total Closed Trades', 'Number of fully closed trades logged in your journal.', '> 30 trades gives statistically reliable win rate & expectancy data.'],
+  'Total P&L':       ['Total P&L', 'Combined realised P&L from closed trades + unrealised P&L from open positions at current market price.', 'Positive = your overall portfolio is currently profitable.'],
+  'Unrealised P&L':  ['Unrealised P&L', 'Mark-to-market value of all open positions. Changes with live price and is not locked in until you exit.', 'Refresh Live ₹ prices for accurate unrealised P&L figure.'],
+  'Capital':         ['Trading Capital', 'Your total allocated trading capital set in Settings. Used to calculate position sizes and risk per trade.', 'Set this in Settings for accurate risk % and position sizing.'],
+};
+
+
 function calc(t) {
   t = {...t};
   // Parse entries
@@ -2709,13 +2758,16 @@ function renderDash(){
     {l:'Avg R-Multiple',v:avgR.toFixed(2)+'R',c:avgR>=0?'col-g':'col-r',ac:'var(--c)',s:`${closed.length} closed trades`},
     {l:'Capital',v:fmtShort(cfg.cap||874000),c:'col-t',ac:'var(--t3)',s:`Risk/trade: ${cfg.risk||0.5}%`},
   ];
-  document.getElementById('kpi-row').innerHTML=kpis.map(k=>`
-    <div class="kpi">
+  document.getElementById('kpi-row').innerHTML=kpis.map(k=>{
+    const info = kpiInfoMap[k.l];
+    const ibtn = info ? `<i class="info-btn" onmouseenter="showInfoTip(this,'${info[0]}','${info[1]}','${info[2]}')" onmouseleave="hideInfoTip()">i</i>` : '';
+    return `<div class="kpi">
       <div class="kpi-accent" style="background:${k.ac}"></div>
-      <div class="kpi-label">${k.l}</div>
+      <div class="kpi-label">${k.l}${ibtn}</div>
       <div class="kpi-val ${k.c}">${k.v}</div>
       <div class="kpi-sub">${k.s}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   dChart('eqChart',eqCurve(closed));
   dChart('wlChart',wlDonut(wins.length,losses.length,open.length));
@@ -2923,12 +2975,15 @@ function renderAna(){
     {l:'Win Streak',v:maxWS,c:'col-g',s:`Max loss streak: ${maxLS}`},
     {l:'Avg Hold Days',v:avgHold.toFixed(1)+'d',c:'col-t',s:'closed trades'},
   ];
-  document.getElementById('ana-kpis').innerHTML=stats.map(k=>`
-    <div class="kpi" style="border-radius:10px">
-      <div class="kpi-label">${k.l}</div>
+  document.getElementById('ana-kpis').innerHTML=stats.map(k=>{
+    const info = kpiInfoMap[k.l];
+    const ibtn = info ? `<i class="info-btn" onmouseenter="showInfoTip(this,'${info[0]}','${info[1]}','${info[2]}')" onmouseleave="hideInfoTip()">i</i>` : '';
+    return `<div class="kpi" style="border-radius:10px">
+      <div class="kpi-label">${k.l}${ibtn}</div>
       <div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div>
       <div class="kpi-sub">${k.s}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Advanced KPIs
   const advStats=[
@@ -2939,12 +2994,15 @@ function renderAna(){
     {l:'Payoff Ratio',v:avgL?Math.abs(avgW/avgL).toFixed(2)+'x':'—',c:'col-t',s:'Avg win ÷ avg loss',info:'> 1.5 preferred'},
     {l:'Recovery Factor',v:recoveryFactor.toFixed(2),c:recoveryFactor>=2?'col-g':'col-y',s:'Net P&L ÷ Max DD',info:'> 2.0 is resilient'},
   ];
-  document.getElementById('ana-advanced-kpis').innerHTML=advStats.map(k=>`
-    <div class="kpi" style="border-radius:10px" title="${k.info||''}">
-      <div class="kpi-label">${k.l}</div>
+  document.getElementById('ana-advanced-kpis').innerHTML=advStats.map(k=>{
+    const info = kpiInfoMap[k.l];
+    const ibtn = info ? `<i class="info-btn" onmouseenter="showInfoTip(this,'${info[0]}','${info[1]}','${info[2]}')" onmouseleave="hideInfoTip()">i</i>` : '';
+    return `<div class="kpi" style="border-radius:10px">
+      <div class="kpi-label">${k.l}${ibtn}</div>
       <div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div>
       <div class="kpi-sub">${k.s}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Equity curve chart
   if (curve.length > 1) {
@@ -8059,6 +8117,39 @@ function renderChartsGallery(){
     </div>`;
   }).join('');
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INFO TOOLTIP SYSTEM
+// ══════════════════════════════════════════════════════════════════════════════
+(function(){
+  const tip = document.createElement('div');
+  tip.id = 'info-tip';
+  tip.className = 'info-tip';
+  tip.innerHTML = '<div class="info-tip-title" id="ititle"></div><div class="info-tip-body" id="ibody"></div><div class="info-tip-good" id="igood"></div>';
+  document.body.appendChild(tip);
+
+  window.showInfoTip = function(el, title, body, good){
+    document.getElementById('ititle').textContent = title;
+    document.getElementById('ibody').textContent  = body;
+    const g = document.getElementById('igood');
+    g.textContent = good || '';
+    g.style.display = good ? '' : 'none';
+    const r = el.getBoundingClientRect();
+    const tw = 260, th = 90;
+    let left = r.left + r.width/2 - tw/2;
+    let top  = r.top - th - 10;
+    if(top < 8)    top  = r.bottom + 8;
+    if(left < 8)   left = 8;
+    if(left+tw > window.innerWidth-8) left = window.innerWidth-tw-8;
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+    tip.style.width = tw  + 'px';
+    tip.classList.add('show');
+  };
+  window.hideInfoTip = function(){ tip.classList.remove('show'); };
+  document.addEventListener('scroll', window.hideInfoTip, true);
+  document.addEventListener('click',  window.hideInfoTip, true);
+})();
 
 </script>
 </body>
