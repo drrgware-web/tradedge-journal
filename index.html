@@ -5410,8 +5410,28 @@ function highlightMatch(sym, q) {
 function selectSym(sym) {
   document.getElementById('f-sym').value = sym;
   closeSymDrop();
-  // Auto-focus price field
-  setTimeout(() => document.getElementById('e-price-0')?.focus(), 50);
+  // Auto-fetch & populate entry price
+  const priceEl = document.getElementById('e-price-0');
+  if(priceEl && !priceEl.value){
+    priceEl.value = '';
+    priceEl.placeholder = 'Fetching…';
+    priceEl.style.color = 'var(--t3)';
+    fetchCMP(sym).then(price => {
+      if(price && priceEl){
+        priceEl.value = price.toFixed(2);
+        priceEl.style.color = 'var(--y)';
+        priceEl.title = 'Auto-fetched CMP — edit if needed';
+        // Trigger SL/target recalc if values present
+        slSyncOther(); tgtSyncOther();
+        toast(`📡 ${sym} CMP: ₹${price.toFixed(2)} auto-filled`, '✅');
+      } else {
+        priceEl.placeholder = '0.00';
+        priceEl.style.color = '';
+      }
+    }).catch(()=>{ priceEl.placeholder='0.00'; priceEl.style.color=''; });
+  } else {
+    setTimeout(() => priceEl?.focus(), 50);
+  }
 }
 
 function closeSymDrop() {
@@ -8261,18 +8281,19 @@ function renderChartsGallery(){
           </div>
           <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${t.status==='Open'?'var(--gd)':t.status==='Closed'?'var(--bg4)':'var(--yd)'};color:${statusC};font-weight:700">${t.status}</span>
         </div>
-        <div style="display:flex;align-items:center;gap:12px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${pnlC}">${pnlStr}</span>
           <button onclick="viewTradeCharts('${t.id}')" style="background:rgba(59,139,255,.18);border:1px solid rgba(59,139,255,.35);color:#3B8BFF;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700">🔍 Fullscreen</button>
+          <button onclick="deleteTradeChart('${t.id}','all')" style="background:rgba(255,107,138,.12);border:1px solid rgba(255,107,138,.3);color:#FF6B8A;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700" title="Delete all charts for this trade">🗑 Delete All</button>
         </div>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;padding:14px">
         ${t.entryImg?`<div>
-          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">📈 Entry Chart</div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between"><span>📈 Entry Chart</span><button onmousedown="event.stopPropagation();deleteTradeChart('${t.id}','entry')" style="background:rgba(255,107,138,.15);border:1px solid rgba(255,107,138,.3);color:#FF6B8A;border-radius:4px;padding:1px 7px;cursor:pointer;font-size:10px;font-weight:700">✕ Delete</button></div>
           <img src="${t.entryImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:200px;max-width:340px;border-radius:8px;border:1px solid var(--b1);object-fit:contain;background:var(--bg2);cursor:zoom-in;transition:transform .2s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform=''">
         </div>`:''}
         ${t.exitImg?`<div>
-          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">🚪 Exit Chart</div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between"><span>🚪 Exit Chart</span><button onmousedown="event.stopPropagation();deleteTradeChart('${t.id}','exit')" style="background:rgba(255,107,138,.15);border:1px solid rgba(255,107,138,.3);color:#FF6B8A;border-radius:4px;padding:1px 7px;cursor:pointer;font-size:10px;font-weight:700">✕ Delete</button></div>
           <img src="${t.exitImg}" onclick="viewTradeCharts('${t.id}')" style="max-height:200px;max-width:340px;border-radius:8px;border:1px solid var(--b1);object-fit:contain;background:var(--bg2);cursor:zoom-in;transition:transform .2s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform=''">
         </div>`:''}
         ${!t.entryImg&&!t.exitImg?'<div style="color:var(--t4);font-size:12px;padding:20px">No charts uploaded</div>':''}
@@ -8648,6 +8669,21 @@ function handleChartPaste(type, e){
     }
   }
   toast('No image found in clipboard', '⚠️');
+}
+
+// ── DELETE CHART FROM GALLERY ─────────────────────────────────────────────
+function deleteTradeChart(id, which){
+  const t = trades.find(x=>x.id===id);
+  if(!t) return;
+  const msg = which==='all' ? `Delete ALL charts for ${t.symbol}?`
+            : which==='entry' ? `Delete Entry chart for ${t.symbol}?`
+            : `Delete Exit chart for ${t.symbol}?`;
+  if(!confirm(msg)) return;
+  if(which==='entry' || which==='all') delete t.entryImg;
+  if(which==='exit'  || which==='all') delete t.exitImg;
+  save();
+  renderChartsGallery();
+  toast(`🗑 Chart deleted for ${t.symbol}`, '✅');
 }
 
 </script>
