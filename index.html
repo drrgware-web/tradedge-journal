@@ -6054,9 +6054,6 @@ function renderFundRS(){
               style="flex:1;padding:9px 0;font-size:11px;font-weight:600;border:none;background:transparent;color:var(--t3);cursor:pointer;text-transform:uppercase;letter-spacing:.05em">RS Line</button>
           </div>
           <div id="pane_${symbol}_price" style="flex:1;min-height:410px">
-            <div class="tradingview-widget-container frs-tv-wrap" style="width:100%;height:100%">
-              <div class="tradingview-widget-container__widget frs-tv-inner" style="height:100%"></div>
-            </div>
           </div>
           <div id="pane_${symbol}_rs" style="flex:1;min-height:410px;display:none;padding:12px;position:relative">
             <canvas id="frs_rs_${symbol}" style="width:100%;height:100%"></canvas>
@@ -6072,7 +6069,7 @@ function renderFundRS(){
             <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Quarterly Financials</span>
             <span style="font-size:10px;color:var(--t4)">PAT · Sales · OPM%</span>
           </div>
-          <div id="${cardId}_table" style="flex:1;overflow-y:auto">
+          <div id="${cardId}_table" style="flex:1;overflow-y:auto;min-height:400px">
             <div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--t3);font-size:12px;gap:8px">
               <div class="frs-spin"></div>Fetching…
             </div>
@@ -6081,21 +6078,19 @@ function renderFundRS(){
       </div>`;
     container.appendChild(card);
 
-    // Inject TradingView Advanced Chart widget
+    // Inject TradingView chart via direct iframe (no popup, works for all NSE symbols)
     (function(){
-      const wrap  = card.querySelector('.frs-tv-wrap');
-      const inner = card.querySelector('.frs-tv-inner');
-      wrap.style.height = '100%';
-      const s = document.createElement('script');
-      s.src   = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-      s.async = true;
-      s.innerHTML = JSON.stringify({
-        autosize:true, symbol:`NSE:${symbol}`, interval:'W',
-        timezone:'Asia/Kolkata', theme:tvTheme, style:'1', locale:'en',
-        hide_top_toolbar:false, hide_legend:false, save_image:false,
-        support_host:'https://www.tradingview.com'
-      });
-      wrap.appendChild(s);
+      const pane = card.querySelector('#pane_' + symbol + '_price');
+      const encodedSym = encodeURIComponent(`NSE:${symbol}`);
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://s.tradingview.com/widgetembed/?frameElementId=frs_tv_${symbol}&symbol=${encodedSym}&interval=W&hide_top_toolbar=0&hide_legend=0&save_image=0&theme=${tvTheme}&style=1&timezone=Asia%2FKolkata&withdateranges=1&hideideas=1&hide_side_toolbar=0&locale=en&utm_source=tradedge`;
+      iframe.style.cssText = 'width:100%;height:100%;min-height:410px;border:none;display:block';
+      iframe.setAttribute('allowtransparency','true');
+      iframe.setAttribute('scrolling','no');
+      iframe.id = `frs_tv_${symbol}`;
+      // Replace the whole pane content
+      pane.innerHTML = '';
+      pane.appendChild(iframe);
     })();
 
     // Load RS + fundamentals + earnings
@@ -6167,57 +6162,184 @@ async function frsLoadFundamentals(symbol, cardId){
   const mcapEl   = document.getElementById(`${cardId}_mcap`);
   const sectorEl = document.getElementById(`${cardId}_sector`);
   const ipoEl    = document.getElementById(`${cardId}_ipo`);
+  if(!tableEl) return;
+
+  // Show spinner
+  tableEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:200px;gap:8px;color:var(--t3);font-size:12px"><div class="frs-spin"></div>Loading fundamentals…</div>`;
 
   try{
-    // NSE India public API — company info + financials
-    const [quoteData, finData] = await Promise.allSettled([
-      frsFetchJSON(`https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(symbol)}`),
-      frsFetchJSON(`https://www.nseindia.com/api/financial-results?index=equities&from=01-01-2022&to=31-12-2024&symbol=${encodeURIComponent(symbol)}`)
+    // Tickertape has CORS headers - works from browser
+    // Step 1: resolve symbol to Tickertape SID
+    const searchRaw = await frsFetch(`https://api.tickertape.in/stocks/search?text=${encodeURIComponent(symbol)}&type=stock`);
+    const searchData = typeof searchRaw==='string' ? JSON.parse(searchRaw) : searchRaw;
+    const match = searchData?.data?.find(s => s.ticker === symbol || s.ticker === symbol.replace('NSE:',''));
+    const sid = match?.sid;
+    if(!sid) throw new Error('Symbol not found on Tickertape');
+
+    // Step 2: fetch financials (quarterly P&L)
+    const [finRaw, infoRaw] = await Promise.all([
+      frsFetch(`https://api.tickertape.in/stocks/${sid}/financials/income?period=quarterly&count=12`),
+      frsFetch(`https://api.tickertape.in/stocks/${sid}/info`)
     ]);
+    const finData  = typeof finRaw==='string'  ? JSON.parse(finRaw)  : finRaw;
+    const infoData = typeof infoRaw==='string' ? JSON.parse(infoRaw) : infoRaw;
 
-    // ── Header chips from NSE quote ──────────────────────
-    if(quoteData.status==='fulfilled'){
-      const q = quoteData.value;
-      const info = q?.industryInfo || q?.metadata || {};
-      const mcap = q?.marketDeptOrderBook?.tradeInfo?.totalTradedValue
-                || q?.priceInfo?.weekHighLow?.value || 0;
-      const sector   = info.sector   || info.basicIndustry || '—';
-      const industry = info.industry || info.subSector      || '';
-      const listed   = q?.metadata?.listingDate || q?.info?.listingDate || '';
-
-      if(mcapEl)   mcapEl.textContent   = '🏢 '+sector+(industry?` · ${industry}`:'');
-      if(sectorEl) sectorEl.textContent = sector || '—';
-      if(ipoEl)    ipoEl.textContent    = listed ? 'Listed '+listed.slice(0,4) : '—';
+    // Update header chips
+    const info = infoData?.data;
+    if(info){
+      if(mcapEl && info.mktCap)   mcapEl.textContent   = 'MCap \u20b9' + fmtCr(info.mktCap);
+      if(sectorEl && info.sector) sectorEl.textContent = info.sector + (info.industry ? ' · '+info.industry : '');
+      if(ipoEl && info.listingDate) ipoEl.textContent  = 'Listed ' + info.listingDate.slice(0,4);
     }
 
-    // ── Quarterly results from NSE ───────────────────────
-    if(finData.status==='fulfilled' && finData.value?.data?.length){
-      buildFrsTable(finData.value.data, tableEl, symbol, 'nse');
-      return;
-    }
+    const quarters = finData?.data?.income || finData?.data || [];
+    if(!quarters.length) throw new Error('No quarterly data');
 
-    // ── Fallback: Yahoo Finance summary for ratios ───────
-    const yhData = await frsFetchJSON(
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}.NS?modules=financialData,defaultKeyStatistics,incomeStatementHistoryQuarterly,summaryDetail`
-    );
-    const r = yhData?.quoteSummary?.result?.[0];
-    if(!r) throw new Error('No Yahoo data');
-    buildFrsTableFromYahoo(r, tableEl, symbol, mcapEl, ipoEl);
+    buildFrsNativeTable(quarters, tableEl, symbol, infoData?.data);
 
-  }catch(err){
-    if(tableEl) tableEl.innerHTML=`
-      <div style="padding:20px;color:var(--t3);font-size:12px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
-        <div style="color:var(--y);font-size:13px;font-weight:600">📋 Quarterly Data</div>
-        <div style="color:var(--t3)">Live fetch unavailable — NSE/Yahoo blocked by browser security (CORS).</div>
-        <div style="color:var(--t4);font-size:11px">View detailed financials directly:</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a href="https://www.screener.in/company/${symbol}/" target="_blank" style="color:var(--b);font-size:12px;text-decoration:none;background:var(--bd);border:1px solid var(--b);padding:5px 12px;border-radius:6px">📊 Screener.in</a>
-          <a href="https://www.nseindia.com/get-quotes/equity?symbol=${symbol}" target="_blank" style="color:var(--g);font-size:12px;text-decoration:none;background:var(--gd);border:1px solid var(--g);padding:5px 12px;border-radius:6px">🏛 NSE India</a>
-          <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank" style="color:var(--y);font-size:12px;text-decoration:none;background:var(--yd);border:1px solid var(--y);padding:5px 12px;border-radius:6px">📈 Yahoo Finance</a>
-        </div>
-        <div style="color:var(--t4);font-size:10px;margin-top:4px">RS chart on the left uses Yahoo Finance · Still working if prices load.</div>
-      </div>`;
+  } catch(e){
+    // Final fallback - clean styled links
+    frsShowFallback(symbol, tableEl);
   }
+}
+
+function fmtCr(v){
+  if(!v) return '—';
+  if(v >= 1e7)  return (v/1e7).toFixed(0) + ' Cr';
+  if(v >= 1e12) return (v/1e12).toFixed(1) + 'T';
+  return v.toFixed(0);
+}
+
+function buildFrsNativeTable(quarters, tableEl, symbol, info){
+  // quarters: array from Tickertape income API
+  // Each item typically has: period, revenue/sales, pat/netProfit, operatingProfit, opm
+
+  function val(q, ...keys){ for(const k of keys){ if(q[k]!=null) return +q[k]; } return null; }
+  function pctStr(cur, old){
+    if(cur==null||old==null||old===0) return '<span style="color:var(--t4)">—</span>';
+    const p = (cur - old) / Math.abs(old) * 100;
+    const col = p > 0 ? '#4ADE80' : p < 0 ? '#FF6B8A' : 'var(--t4)';
+    return `<span style="color:${col}">${p>0?'+':''}${p.toFixed(0)}%</span>`;
+  }
+  function opmCol(v){ return v==null?'var(--t4)':v>=30?'#F5C542':v>=20?'#4ADE80':v>=10?'#8BA0B8':'#FF6B8A'; }
+  function crStr(v){ return v==null ? '<span style="color:var(--t4)">—</span>' : (v/1e7).toFixed(1); }
+
+  const rows = quarters.slice(0, 10);
+
+  // Header info line
+  let headerLine = '';
+  if(info){
+    const parts = [];
+    if(info.name || symbol) parts.push(`<b style="color:var(--t1)">${info.name||symbol}</b>`);
+    if(info.mktCap)  parts.push(`mcap <b style="color:var(--t2)">\u20b9${fmtCr(info.mktCap)}</b>`);
+    if(info.ffMktCap||info.freeFloatMktCap) parts.push(`ff <b style="color:var(--t2)">\u20b9${fmtCr(info.ffMktCap||info.freeFloatMktCap)}</b>`);
+    headerLine = `<div style="padding:8px 12px;font-size:11px;color:var(--t3);border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      ${parts.join('<span style="color:var(--b1)"> | </span>')}
+    </div>`;
+
+    if(info.sector||info.industry||info.listingDate){
+      const p2 = [];
+      if(info.sector)   p2.push(`<span style="color:var(--t2)">${info.sector}</span>`);
+      if(info.industry) p2.push(`<span style="color:var(--t3)">${info.industry}</span>`);
+      if(info.listingDate) p2.push(`<span style="color:var(--t4)">listed ${info.listingDate.slice(0,4)}</span>`);
+      headerLine += `<div style="padding:6px 12px 8px;font-size:11px;color:var(--t3);border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ▶ ${p2.join('<span style="color:var(--b1)"> | </span>')}
+      </div>`;
+    }
+  }
+
+  let tableHTML = `
+  ${headerLine}
+  <div style="overflow-x:auto;padding:0">
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+      <thead>
+        <tr style="color:var(--t4);font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:var(--bg3)">
+          <th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--b1);font-weight:700">FQ</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700">PAT</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#4ADE80">YoY</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#818CF8">QoQ</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700">Sales</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#4ADE80">YoY</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#818CF8">QoQ</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700;color:#F5C542">OPM%</th>
+          <th style="text-align:right;padding:7px 8px;border-bottom:2px solid var(--b1);font-weight:700">P/E</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  rows.forEach((q, i) => {
+    const period = q.period || q.date || q.quarter || '—';
+    // Normalise quarter label: "2023-09-30" → "Sep-23"
+    let qLabel = period;
+    if(/^\d{4}-\d{2}-\d{2}/.test(period)){
+      const d = new Date(period);
+      qLabel = d.toLocaleDateString('en-IN',{month:'short',year:'2-digit'}).replace(' ','-');
+    }
+
+    const pat   = val(q, 'netProfit','pat','profit','netIncome');
+    const sales = val(q, 'revenue','sales','totalRevenue','income');
+    const opInc = val(q, 'operatingProfit','ebit','ebitda');
+    const opm   = opInc!=null && sales ? (opInc/sales*100) : val(q,'opm','operatingMargin');
+    const pe    = val(q, 'pe','priceToEarnings') || '—';
+
+    const prev4  = rows[i+4];  // same quarter last year
+    const prevQ  = rows[i+1];  // previous quarter
+
+    const patPrev4  = prev4 ? val(prev4,'netProfit','pat','profit','netIncome') : null;
+    const patPrevQ  = prevQ ? val(prevQ,'netProfit','pat','profit','netIncome') : null;
+    const salPrev4  = prev4 ? val(prev4,'revenue','sales','totalRevenue','income') : null;
+    const salPrevQ  = prevQ ? val(prevQ,'revenue','sales','totalRevenue','income') : null;
+
+    const isLatest = i === 0;
+    const rowBg    = isLatest ? 'background:var(--bg4)' : (i%2===0?'background:transparent':'background:rgba(255,255,255,.015)');
+    const qStyle   = isLatest ? 'color:var(--y);font-weight:700' : 'color:var(--t2)';
+
+    tableHTML += `
+        <tr style="border-bottom:1px solid var(--b1);${rowBg}">
+          <td style="padding:7px 10px;${qStyle}">${qLabel}</td>
+          <td style="padding:7px 8px;text-align:right;color:var(--t1)">${crStr(pat)}</td>
+          <td style="padding:7px 8px;text-align:right">${pctStr(pat,patPrev4)}</td>
+          <td style="padding:7px 8px;text-align:right">${pctStr(pat,patPrevQ)}</td>
+          <td style="padding:7px 8px;text-align:right;color:var(--t1)">${crStr(sales)}</td>
+          <td style="padding:7px 8px;text-align:right">${pctStr(sales,salPrev4)}</td>
+          <td style="padding:7px 8px;text-align:right">${pctStr(sales,salPrevQ)}</td>
+          <td style="padding:7px 8px;text-align:right;color:${opmCol(opm)};font-weight:700">${opm!=null?opm.toFixed(1)+'%':'<span style="color:var(--t4)">—</span>'}</td>
+          <td style="padding:7px 8px;text-align:right;color:var(--t4)">${pe}</td>
+        </tr>`;
+  });
+
+  tableHTML += `</tbody></table></div>
+  <div style="padding:6px 12px;font-size:10px;color:var(--t4);text-align:right;border-top:1px solid var(--b1)">
+    Values in Cr · Source: Tickertape
+  </div>`;
+
+  tableEl.innerHTML = tableHTML;
+}
+
+function frsShowFallback(symbol, tableEl){
+  if(!tableEl) return;
+  tableEl.innerHTML=`
+    <div style="padding:24px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+      <div style="font-size:13px;font-weight:700;color:var(--y)">📊 Quarterly Financials</div>
+      <div style="font-size:11px;color:var(--t3);line-height:1.7">
+        Data unavailable in-app. Open directly:
+      </div>
+      <a href="https://www.screener.in/company/${symbol}/consolidated/" target="_blank"
+        style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;width:100%;box-sizing:border-box;
+               text-decoration:none;font-size:12px;font-weight:600;background:var(--bd);color:var(--b);border:1px solid var(--b)">
+        📊 Screener.in — Full Quarterly Data ↗
+      </a>
+      <a href="https://finance.yahoo.com/quote/${symbol}.NS/financials/" target="_blank"
+        style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;width:100%;box-sizing:border-box;
+               text-decoration:none;font-size:12px;font-weight:600;background:var(--yd);color:var(--y);border:1px solid rgba(245,197,66,.4)">
+        📈 Yahoo Finance — Income Statement ↗
+      </a>
+      <a href="https://www.tickertape.in/stocks/${symbol}-NSE" target="_blank"
+        style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;width:100%;box-sizing:border-box;
+               text-decoration:none;font-size:12px;font-weight:600;background:var(--gd);color:var(--g);border:1px solid rgba(0,229,160,.3)">
+        🎯 Tickertape — Financials ↗
+      </a>
+    </div>`;
 }
 
 function buildFrsTableFromYahoo(r, tableEl, symbol, mcapEl, ipoEl){
