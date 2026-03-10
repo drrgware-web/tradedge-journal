@@ -754,10 +754,17 @@ select.fi{cursor:pointer}
 
     <!-- ══ PERFORMANCE vs BENCHMARK ══ -->
     <div id="perf-bm-section" style="margin-top:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">📊 My Performance vs Benchmark</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <select id="perf-bm-select" class="fi" style="width:140px;font-size:12px" onchange="renderPerfVsBm()">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <!-- Mode toggle -->
+          <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:6px;overflow:hidden;font-size:11px">
+            <button id="pbm-mode-open" onclick="setPbmMode('open')"
+              style="padding:4px 10px;border:none;cursor:pointer;font-weight:700;background:var(--y);color:#1a1a1a;font-size:11px">Open P&L</button>
+            <button id="pbm-mode-cum" onclick="setPbmMode('cum')"
+              style="padding:4px 10px;border:none;cursor:pointer;font-weight:700;background:var(--bg3);color:var(--t3);font-size:11px">Cumulative</button>
+          </div>
+          <select id="perf-bm-select" class="fi" style="width:130px;font-size:12px" onchange="renderPerfVsBm()">
             <option value="^NSEI">Nifty 50</option>
             <option value="^BSESN">Sensex</option>
             <option value="^NSEBANK">Bank Nifty</option>
@@ -770,11 +777,13 @@ select.fi{cursor:pointer}
             <option value="6mo">6 Months</option>
             <option value="1y">1 Year</option>
             <option value="ytd">This Year</option>
+            <option value="2y">2 Years</option>
           </select>
+          <button class="btn btn-ghost btn-xs" onclick="renderPerfVsBm()" title="Refresh">↻</button>
         </div>
       </div>
       <div id="perf-bm-content" class="card" style="padding:16px;min-height:80px;display:flex;align-items:center;justify-content:center">
-        <div style="color:var(--t4);font-size:12px">Select a period to compare your portfolio vs benchmark</div>
+        <div style="color:var(--t4);font-size:12px">Loading…</div>
       </div>
     </div>
 
@@ -6040,8 +6049,9 @@ renderTrades();
 
 // 2. Defer ALL network calls so UI is never blocked
 setTimeout(() => {
-  // Performance vs benchmark (Yahoo Finance)
-  renderPerfVsBm();
+  // Restore mode toggle state and render performance widget
+  const savedMode = localStorage.getItem('pbm_mode') || 'open';
+  setPbmMode(savedMode);
 }, 1200);
 
 setTimeout(() => {
@@ -7024,13 +7034,15 @@ async function renderPerfVsBm(){
   const el = document.getElementById('perf-bm-content');
   if(!el) return;
 
-  const bmTicker = document.getElementById('perf-bm-select')?.value || '^NSEI';
-  const bmLabel  = document.getElementById('perf-bm-select')?.selectedOptions[0]?.text || 'Nifty 50';
-  const range    = document.getElementById('perf-bm-period')?.value || '1mo';
-  const rangeLabel = document.getElementById('perf-bm-period')?.selectedOptions[0]?.text || '1 Month';
+  const mode      = localStorage.getItem('pbm_mode') || 'open';
+  const bmTicker  = document.getElementById('perf-bm-select')?.value || '^NSEI';
+  const bmLabel   = document.getElementById('perf-bm-select')?.selectedOptions[0]?.text || 'Nifty 50';
+  const range     = document.getElementById('perf-bm-period')?.value || '1mo';
+  const rangeLabel= document.getElementById('perf-bm-period')?.selectedOptions[0]?.text || '1 Month';
 
   el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:var(--t3);font-size:12px"><div class="frs-spin"></div>Fetching benchmark data…</div>';
 
+  // ── Fetch benchmark return via multi-proxy ──────────────────────────────
   async function getReturn(ticker){
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
     const proxies = [
@@ -7046,89 +7058,184 @@ async function renderPerfVsBm(){
         clearTimeout(tid);
         if(!res.ok) continue;
         const raw  = await res.text();
-        // allorigins wraps in {contents:...}, others return raw JSON
         let parsed;
         try{ const wrap=JSON.parse(raw); parsed = wrap.contents ? JSON.parse(wrap.contents) : wrap; }
         catch(e){ continue; }
         const closes = parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
-        if(closes?.length >= 2){
-          return (closes[closes.length-1] - closes[0]) / closes[0] * 100;
-        }
+        if(closes?.length >= 2) return (closes[closes.length-1] - closes[0]) / closes[0] * 100;
       }catch(e){ continue; }
     }
     return null;
   }
 
-  // Compute portfolio return for the period using trade entry prices vs current CMP
-  function getPortfolioReturn(){
-    const open = trades.filter(t=>t.status==='Open'||t.status==='Partial');
-    if(!open.length) return null;
-    let totalCost=0, totalValue=0;
-    open.forEach(t=>{
-      const ct = calc(t);
-      const entry = parseFloat(t.avgEntry||t.entry||0);
-      const qty   = parseFloat(t.openQty||t.qty||0);
-      const cmp   = parseFloat(t.cmp||entry);
-      const cost  = entry*qty;
-      const val   = cmp*qty;
-      totalCost  += cost;
-      totalValue += val;
-    });
-    if(!totalCost) return null;
-    return (totalValue-totalCost)/totalCost*100;
+  // ── Portfolio return helpers ─────────────────────────────────────────────
+  function getRangeStartDate(){
+    const now = new Date();
+    if(range==='1mo')  return new Date(now.getFullYear(), now.getMonth()-1, now.getDate());
+    if(range==='3mo')  return new Date(now.getFullYear(), now.getMonth()-3, now.getDate());
+    if(range==='6mo')  return new Date(now.getFullYear(), now.getMonth()-6, now.getDate());
+    if(range==='1y')   return new Date(now.getFullYear()-1, now.getMonth(), now.getDate());
+    if(range==='2y')   return new Date(now.getFullYear()-2, now.getMonth(), now.getDate());
+    if(range==='ytd')  return new Date(now.getFullYear(), 0, 1);
+    return new Date(now.getFullYear(), now.getMonth()-1, now.getDate());
   }
 
-  const [bmRet] = await Promise.all([getReturn(bmTicker)]);
-  const portRet = getPortfolioReturn();
+  // MODE 1: Open positions — unrealised P&L % on invested capital
+  function getOpenReturn(){
+    const open = trades.filter(t=>t.status==='Open'||t.status==='Partial');
+    if(!open.length) return {ret:null, label:'No open positions', detail:null};
+    let totalCost=0, totalUnreal=0, noCmp=0;
+    open.forEach(t=>{
+      const ct    = calc({...t});
+      const entry = ct.avgEntry || 0;
+      const qty   = ct.openQty  || ct.totalQty || 0;
+      const cmp   = parseFloat(t.cmp || 0);
+      const cost  = entry * qty;
+      if(cost > 0){
+        totalCost += cost;
+        if(cmp > 0){
+          totalUnreal += (cmp - entry) * qty;
+        } else {
+          noCmp++;
+        }
+      }
+    });
+    if(!totalCost) return {ret:null, label:'No cost data', detail:null};
+    const ret = totalUnreal / totalCost * 100;
+    const detail = noCmp > 0
+      ? `${open.length} open · ${noCmp} missing CMP (click Live ₹ to refresh)`
+      : `${open.length} open positions`;
+    return {ret, label:'Open Positions', detail};
+  }
+
+  // MODE 2: Cumulative — all closed trades P&L in range + open unrealised
+  function getCumulativeReturn(){
+    const cutoff  = getRangeStartDate();
+    const all     = trades.map(t=>calc({...t}));
+    let totalCost = 0, totalPL = 0, tradeCount = 0;
+
+    // Closed trades with exit in range
+    const closed = all.filter(t=>{
+      if(t.status!=='Closed') return false;
+      const exitDate = (t.exits||[]).map(e=>e.date).filter(Boolean).sort().pop();
+      return exitDate && new Date(exitDate) >= cutoff;
+    });
+    closed.forEach(t=>{
+      const cost = t.avgEntry * t.totalQty;
+      if(cost>0){ totalCost+=cost; totalPL+=t.realisedPL; tradeCount++; }
+    });
+
+    // Open trades entered in range — add unrealised P&L
+    const open = all.filter(t=>{
+      if(t.status==='Closed') return false;
+      const entryDate = (t.entries||[]).map(e=>e.date).filter(Boolean).sort()[0];
+      return entryDate && new Date(entryDate) >= cutoff;
+    });
+    let openCost=0, openUnreal=0, noCmp=0;
+    open.forEach(t=>{
+      const entry = t.avgEntry||0;
+      const qty   = t.openQty||t.totalQty||0;
+      const cmp   = parseFloat(trades.find(x=>x.id===t.id)?.cmp||0);
+      const cost  = entry*qty;
+      if(cost>0){
+        openCost   += cost;
+        totalCost  += cost;
+        tradeCount++;
+        if(cmp>0) openUnreal += (cmp-entry)*qty;
+        else noCmp++;
+      }
+    });
+    totalPL += openUnreal;
+
+    if(!totalCost || !tradeCount) return {ret:null, label:'No trades', detail:`No trades in ${rangeLabel}`};
+    const ret = totalPL / totalCost * 100;
+    const detail = `${closed.length} closed + ${open.length} open · ₹${totalPL>=0?'+':''}${Math.round(totalPL).toLocaleString('en-IN')} P&L` +
+      (noCmp>0?` · ${noCmp} missing CMP`:'');
+    return {ret, label:'Portfolio (Cumulative)', detail};
+  }
+
+  // ── Fetch benchmark + compute portfolio in parallel ──────────────────────
+  const [bmRet, portData] = await Promise.all([
+    getReturn(bmTicker),
+    Promise.resolve(mode==='open' ? getOpenReturn() : getCumulativeReturn()),
+  ]);
 
   if(bmRet===null){
     el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12px">
-      <span>⚠️ Benchmark data unavailable (proxy blocked)</span>
+      <span>⚠️ Benchmark data unavailable</span>
       <button class="btn btn-ghost btn-xs" onclick="renderPerfVsBm()">↻ Retry</button>
     </div>`;
     return;
   }
 
+  const portRet  = portData.ret;
   const alpha    = portRet!=null ? portRet - bmRet : null;
   const portCol  = portRet==null?'var(--t4)':portRet>=0?'var(--g)':'var(--r)';
   const bmCol    = bmRet>=0?'var(--g)':'var(--r)';
   const alphaCol = alpha==null?'var(--t4)':alpha>=0?'var(--g)':'var(--r)';
-  const sign = v => v>=0?'+':'';
+  const sign     = v => v>=0?'+':'';
+  const maxAbs   = Math.max(Math.abs(portRet??0), Math.abs(bmRet), 0.01);
 
-  // Bar chart visualization
-  const maxAbs = Math.max(Math.abs(portRet??0), Math.abs(bmRet), 0.01);
   function bar(val, col){
-    if(val==null) return '<div style="height:6px;background:var(--bg4);border-radius:3px;flex:1"></div>';
-    const w = Math.abs(val)/maxAbs*100;
-    const ml = val<0 ? `margin-left:auto` : '';
+    if(val==null) return '<div style="height:8px;background:var(--bg4);border-radius:4px;flex:1;opacity:.4"></div>';
+    const w = Math.min(Math.abs(val)/maxAbs*100, 100);
     return `<div style="flex:1;display:flex;align-items:center;${val<0?'justify-content:flex-end':''}">
-      <div style="height:6px;width:${w}%;background:${col};border-radius:3px;min-width:2px;transition:width .4s"></div>
+      <div style="height:8px;width:${w}%;background:${col};border-radius:4px;min-width:3px;
+        box-shadow:0 0 6px ${col}55;transition:width .5s ease"></div>
     </div>`;
   }
 
   el.innerHTML = `
     <div style="width:100%">
-      <div style="font-size:11px;color:var(--t3);margin-bottom:14px;font-weight:600">${rangeLabel} comparison · open positions vs ${bmLabel}</div>
-      <div style="display:grid;grid-template-columns:120px 1fr 80px;gap:10px;align-items:center;margin-bottom:12px">
-        <div style="font-size:12px;color:var(--t2);font-weight:600">My Portfolio</div>
+      <div style="font-size:11px;color:var(--t3);margin-bottom:16px;font-weight:600">
+        ${rangeLabel} · ${portData.label} vs ${bmLabel}
+        ${portData.detail ? `<span style="font-weight:400;color:var(--t4);margin-left:6px">· ${portData.detail}</span>` : ''}
+      </div>
+
+      <!-- Portfolio row -->
+      <div style="display:grid;grid-template-columns:140px 1fr 90px;gap:10px;align-items:center;margin-bottom:14px">
+        <div>
+          <div style="font-size:12px;color:var(--t2);font-weight:700">${portData.label}</div>
+        </div>
         ${bar(portRet, portRet===null?'var(--t4)':portRet>=0?'var(--g)':'var(--r)')}
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:800;color:${portCol};text-align:right">
-          ${portRet!=null?sign(portRet)+portRet.toFixed(2)+'%':'No CMP'}
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:800;color:${portCol};text-align:right">
+          ${portRet!=null ? sign(portRet)+portRet.toFixed(2)+'%' : '<span style="font-size:11px;color:var(--t4)">No CMP<br><span style="font-size:9px">click Live ₹</span></span>'}
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:120px 1fr 80px;gap:10px;align-items:center;margin-bottom:16px">
-        <div style="font-size:12px;color:var(--t2);font-weight:600">${bmLabel}</div>
+
+      <!-- Benchmark row -->
+      <div style="display:grid;grid-template-columns:140px 1fr 90px;gap:10px;align-items:center;margin-bottom:16px">
+        <div style="font-size:12px;color:var(--t2);font-weight:700">${bmLabel}</div>
         ${bar(bmRet, bmCol)}
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:800;color:${bmCol};text-align:right">${sign(bmRet)}${bmRet.toFixed(2)}%</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:800;color:${bmCol};text-align:right">
+          ${sign(bmRet)}${bmRet.toFixed(2)}%
+        </div>
       </div>
-      <div style="border-top:1px solid var(--b1);padding-top:12px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:11px;color:var(--t3)">Alpha (Portfolio – Benchmark)</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:900;color:${alphaCol}">
+
+      <!-- Alpha row -->
+      <div style="border-top:1px solid var(--b1);padding-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:11px;color:var(--t3)">Alpha (Portfolio – Benchmark)</div>
+          ${portRet==null?'<div style="font-size:10px;color:var(--t4);margin-top:2px">Refresh live prices to see alpha</div>':''}
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:900;color:${alphaCol}">
           ${alpha!=null ? sign(alpha)+alpha.toFixed(2)+'%' : '—'}
-          <span style="font-size:11px;font-weight:400;color:var(--t4);margin-left:4px">${alpha!=null?(alpha>=0?'outperforming 🚀':'underperforming 📉'):''}</span>
+          <span style="font-size:12px;font-weight:500;color:var(--t4);margin-left:6px">
+            ${alpha!=null?(alpha>=0?'🚀 outperforming':'📉 underperforming'):''}
+          </span>
         </div>
       </div>
     </div>`;
+}
+
+function setPbmMode(mode){
+  localStorage.setItem('pbm_mode', mode);
+  const isOpen = mode==='open';
+  const ob = document.getElementById('pbm-mode-open');
+  const cb = document.getElementById('pbm-mode-cum');
+  if(ob){ ob.style.background=isOpen?'var(--y)':'var(--bg3)'; ob.style.color=isOpen?'#1a1a1a':'var(--t3)'; }
+  if(cb){ cb.style.background=!isOpen?'var(--b)':'var(--bg3)'; cb.style.color=!isOpen?'#fff':'var(--t3)'; }
+  renderPerfVsBm();
 }
 
 
