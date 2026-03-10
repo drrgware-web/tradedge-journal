@@ -1475,6 +1475,50 @@ select.fi{cursor:pointer}
         </div>
       </div>
       <div id="frs-container"></div>
+
+      <!-- ══ RRG SECTION ══ -->
+      <div style="margin-top:28px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--t1)">🔄 Relative Rotation Graph (RRG)</div>
+            <div style="font-size:11px;color:var(--t3);margin-top:2px">JdK RS-Ratio vs RS-Momentum · open positions vs benchmark · tail = last 5 weeks</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:11px;color:var(--t4)">Benchmark:</label>
+            <select id="rrg-benchmark" class="fi" style="width:150px;font-size:12px" onchange="renderRRG()">
+              <optgroup label="── Broad Market ──">
+                <option value="^NSEI">Nifty 50</option>
+                <option value="NIFTY100.NS">Nifty 100</option>
+                <option value="NIFTY500.NS">Nifty 500</option>
+                <option value="^BSESN">Sensex</option>
+              </optgroup>
+              <optgroup label="── Cap-Based ──">
+                <option value="NIFTYMIDCAP100.NS">Midcap 100</option>
+                <option value="NIFTYSMALLCAP100.NS">Smallcap 100</option>
+              </optgroup>
+              <optgroup label="── Sectoral ──">
+                <option value="^NSEBANK">Bank Nifty</option>
+                <option value="CNXIT.NS">Nifty IT</option>
+                <option value="NIFTYPHARMA.NS">Nifty Pharma</option>
+                <option value="NIFTYAUTO.NS">Nifty Auto</option>
+              </optgroup>
+            </select>
+            <label style="font-size:11px;color:var(--t4)">Period:</label>
+            <select id="rrg-period" class="fi" style="width:100px;font-size:12px" onchange="renderRRG()">
+              <option value="3mo">3 Months</option>
+              <option value="6mo" selected>6 Months</option>
+              <option value="1y">1 Year</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="renderRRG()">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="rrg-container" class="card" style="padding:0;overflow:hidden;min-height:420px;display:flex;align-items:center;justify-content:center">
+          <div style="color:var(--t4);font-size:12px">Loading RRG…</div>
+        </div>
+        <!-- RRG description panel per stock -->
+        <div id="rrg-desc-panel" style="display:none;margin-top:12px"></div>
+      </div>
+
     </div>
 
     <!-- ══ SETTINGS ══ -->
@@ -2135,7 +2179,7 @@ function nav(p){
   if(p==='ledger')renderLedger();
   if(p==='possize')initPosSize();
   if(p==='mps')initMpsPage();
-  if(p==='fundrs')initFundRS();
+  if(p==='fundrs'){initFundRS();setTimeout(renderRRG,600);}
 }
 
 // ══════════════════════════════════════════════════
@@ -7236,6 +7280,334 @@ function setPbmMode(mode){
   if(ob){ ob.style.background=isOpen?'var(--y)':'var(--bg3)'; ob.style.color=isOpen?'#1a1a1a':'var(--t3)'; }
   if(cb){ cb.style.background=!isOpen?'var(--b)':'var(--bg3)'; cb.style.color=!isOpen?'#fff':'var(--t3)'; }
   renderPerfVsBm();
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RELATIVE ROTATION GRAPH (RRG)
+// JdK RS-Ratio & RS-Momentum computed from weekly closes vs benchmark
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function renderRRG(){
+  const container = document.getElementById('rrg-container');
+  if(!container) return;
+
+  const bmTicker  = document.getElementById('rrg-benchmark')?.value || '^NSEI';
+  const bmLabel   = document.getElementById('rrg-benchmark')?.selectedOptions[0]?.text || 'Nifty 50';
+  const period    = document.getElementById('rrg-period')?.value || '6mo';
+
+  // Get all open/partial symbols
+  const symbols = [...new Set(
+    trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol).filter(Boolean)
+  )];
+
+  if(!symbols.length){
+    container.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3)"><div style="font-size:32px;margin-bottom:8px">📊</div>No open positions to plot</div>';
+    return;
+  }
+
+  container.innerHTML='<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12px;padding:30px"><div class="frs-spin"></div>Computing RRG for '+symbols.length+' symbols…</div>';
+
+  // ── Fetch weekly closes via proxy ──────────────────────────────────────────
+  async function fetchWeekly(ticker){
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=${period}`;
+    const proxies = [
+      `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    ];
+    for(const px of proxies){
+      try{
+        const ctrl = new AbortController();
+        setTimeout(()=>ctrl.abort(), 10000);
+        const res = await fetch(px, {signal: ctrl.signal});
+        if(!res.ok) continue;
+        const raw = await res.text();
+        let parsed; try{ const w=JSON.parse(raw); parsed=w.contents?JSON.parse(w.contents):w; }catch(e){continue;}
+        const closes = parsed?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+        const ts     = parsed?.chart?.result?.[0]?.timestamp;
+        if(closes?.length >= 10) return {closes, ts};
+      }catch(e){ continue; }
+    }
+    return null;
+  }
+
+  // ── JdK RS-Ratio & RS-Momentum calculation ────────────────────────────────
+  // RS-Line    = stock_close / benchmark_close * 100
+  // RS-Ratio   = 10-period EMA of RS-Line, normalised to 100
+  // RS-Momentum= 10-period EMA of RS-Ratio momentum (ROC), normalised to 100
+  function ema(arr, period){
+    const k = 2/(period+1);
+    let e = arr[0];
+    return arr.map((v,i)=>{ if(i===0) return e; e=v*k+e*(1-k); return e; });
+  }
+
+  function computeJdK(stockCloses, bmCloses){
+    const len = Math.min(stockCloses.length, bmCloses.length);
+    const sc  = stockCloses.slice(-len);
+    const bc  = bmCloses.slice(-len);
+
+    // RS line
+    const rs = sc.map((v,i)=> bc[i]>0 ? (v/bc[i])*100 : null).filter(v=>v!==null);
+    if(rs.length < 12) return null;
+
+    // RS-Ratio = EMA(rs, 10), normalise to 100 mean
+    const rsEma   = ema(rs, 10);
+    const rsMean  = rsEma.reduce((a,b)=>a+b,0)/rsEma.length;
+    const rsRatio = rsEma.map(v=>(v/rsMean)*100);
+
+    // RS-Momentum = EMA of 1-period ROC of rsRatio, normalise to 100 mean
+    const roc     = rsRatio.map((v,i)=>i===0?0:((v-rsRatio[i-1])/rsRatio[i-1])*100+100);
+    const rocEma  = ema(roc.slice(1), 10);
+    const rocMean = rocEma.reduce((a,b)=>a+b,0)/rocEma.length;
+    const rsMom   = rocEma.map(v=>(v/rocMean)*100);
+
+    // Align tail: last N points
+    const TAIL = 5;
+    const n    = Math.min(rsRatio.length, rsMom.length, TAIL);
+    const tail = [];
+    for(let i=n;i>0;i--){
+      tail.push({
+        ratio: rsRatio[rsRatio.length-i],
+        mom:   rsMom[rsMom.length-i],
+      });
+    }
+    return tail; // array of {ratio, mom} — last point is current
+  }
+
+  // ── Quadrant classification ────────────────────────────────────────────────
+  function getQuadrant(ratio, mom){
+    if(ratio>=100 && mom>=100) return {name:'Leading',   color:'#22c55e', bg:'rgba(34,197,94,.08)'};
+    if(ratio>=100 && mom< 100) return {name:'Weakening', color:'#eab308', bg:'rgba(234,179,8,.08)'};
+    if(ratio< 100 && mom>=100) return {name:'Improving', color:'#60a5fa', bg:'rgba(96,165,250,.08)'};
+    return                            {name:'Lagging',   color:'#f87171', bg:'rgba(248,113,113,.08)'};
+  }
+
+  // ── Fetch benchmark + all stocks ──────────────────────────────────────────
+  const bmData = await fetchWeekly(bmTicker);
+  if(!bmData){ container.innerHTML='<div style="color:var(--t3);padding:20px;font-size:12px">⚠️ Benchmark data unavailable. <button class="btn btn-ghost btn-xs" onclick="renderRRG()">↻ Retry</button></div>'; return; }
+
+  const stockData = {};
+  for(const sym of symbols){
+    await new Promise(r=>setTimeout(r, 180)); // avoid rate limiting
+    stockData[sym] = await fetchWeekly(sym+'.NS');
+  }
+
+  // ── Compute JdK for each symbol ────────────────────────────────────────────
+  const rrgData = [];
+  for(const sym of symbols){
+    const sd = stockData[sym];
+    if(!sd) continue;
+    const tail = computeJdK(sd.closes, bmData.closes);
+    if(!tail || tail.length < 2) continue;
+    const cur  = tail[tail.length-1];
+    const quad = getQuadrant(cur.ratio, cur.mom);
+    rrgData.push({sym, tail, cur, quad});
+  }
+
+  if(!rrgData.length){
+    container.innerHTML='<div style="color:var(--t3);padding:20px;font-size:12px">⚠️ Could not compute RRG — insufficient data. Try a longer period.</div>';
+    return;
+  }
+
+  // ── Build SVG canvas ──────────────────────────────────────────────────────
+  // Find axis range
+  const allRatio = rrgData.flatMap(d=>d.tail.map(p=>p.ratio));
+  const allMom   = rrgData.flatMap(d=>d.tail.map(p=>p.mom));
+  const pad      = 1.5;
+  const rMin = Math.min(Math.min(...allRatio)-pad, 97);
+  const rMax = Math.max(Math.max(...allRatio)+pad, 103);
+  const mMin = Math.min(Math.min(...allMom)-pad, 97);
+  const mMax = Math.max(Math.max(...allMom)+pad, 103);
+
+  const W=780, H=480, ML=55, MR=20, MT=20, MB=40;
+  const PW=W-ML-MR, PH=H-MT-MB;
+
+  function px(ratio){ return ML + (ratio-rMin)/(rMax-rMin)*PW; }
+  function py(mom)  { return MT + PH - (mom-mMin)/(mMax-mMin)*PH; }
+
+  const cx = px(100), cy = py(100); // centre crosshair at 100,100
+
+  // Colour palette for symbols
+  const PALETTE = ['#00E5A0','#3B8BFF','#F5C542','#FF6B8A','#A78BFA','#22D3EE','#FB923C','#34D399','#F472B6','#FBBF24'];
+
+  let svgPaths = '';
+  let svgDots  = '';
+  let svgLabels= '';
+
+  rrgData.forEach((d, idx)=>{
+    const col = PALETTE[idx % PALETTE.length];
+    const pts = d.tail;
+
+    // Trail line (fading)
+    for(let i=1;i<pts.length;i++){
+      const op = 0.2 + (i/pts.length)*0.7;
+      const sw = 1 + (i/pts.length)*1.5;
+      svgPaths += `<line x1="${px(pts[i-1].ratio).toFixed(1)}" y1="${py(pts[i-1].mom).toFixed(1)}"
+        x2="${px(pts[i].ratio).toFixed(1)}" y2="${py(pts[i].mom).toFixed(1)}"
+        stroke="${col}" stroke-width="${sw.toFixed(1)}" stroke-opacity="${op.toFixed(2)}" stroke-linecap="round"/>`;
+    }
+
+    // Arrow head at current position
+    if(pts.length>=2){
+      const prev=pts[pts.length-2], curr=pts[pts.length-1];
+      const dx=px(curr.ratio)-px(prev.ratio), dy=py(curr.mom)-py(prev.mom);
+      const len=Math.sqrt(dx*dx+dy*dy)||1;
+      const ax=dx/len*8, ay=dy/len*8;
+      const ex=px(curr.ratio).toFixed(1), ey=py(curr.mom).toFixed(1);
+      svgPaths += `<polygon points="${ex},${ey} ${(+ex-ax-ay*0.4).toFixed(1)},${(+ey-ay+ax*0.4).toFixed(1)} ${(+ex-ax+ay*0.4).toFixed(1)},${(+ey-ay-ax*0.4).toFixed(1)}"
+        fill="${col}" opacity="0.9"/>`;
+    }
+
+    // Current dot
+    const cx2=px(d.cur.ratio).toFixed(1), cy2=py(d.cur.mom).toFixed(1);
+    svgDots += `<circle cx="${cx2}" cy="${cy2}" r="6" fill="${col}" stroke="#0f1118" stroke-width="1.5"
+      data-sym="${d.sym}" style="cursor:pointer" onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')"/>`;
+
+    // Label
+    svgLabels += `<text x="${(+cx2+8).toFixed(1)}" y="${(+cy2+4).toFixed(1)}"
+      font-size="10" fill="${col}" font-family="IBM Plex Mono,monospace" font-weight="700"
+      style="pointer-events:none">${d.sym}</text>`;
+  });
+
+  // Quadrant backgrounds
+  const qBG = `
+    <rect x="${ML}" y="${MT}" width="${(cx-ML).toFixed(0)}" height="${(cy-MT).toFixed(0)}" fill="rgba(96,165,250,.05)"/>
+    <rect x="${cx.toFixed(0)}" y="${MT}" width="${(ML+PW-cx).toFixed(0)}" height="${(cy-MT).toFixed(0)}" fill="rgba(34,197,94,.06)"/>
+    <rect x="${ML}" y="${cy.toFixed(0)}" width="${(cx-ML).toFixed(0)}" height="${(MT+PH-cy).toFixed(0)}" fill="rgba(248,113,113,.06)"/>
+    <rect x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" width="${(ML+PW-cx).toFixed(0)}" height="${(MT+PH-cy).toFixed(0)}" fill="rgba(234,179,8,.06)"/>`;
+
+  // Quadrant labels
+  const qLabels = `
+    <text x="${(ML+10).toFixed(0)}" y="${(MT+18).toFixed(0)}" font-size="11" fill="rgba(96,165,250,.5)" font-family="Outfit,sans-serif" font-weight="700">IMPROVING</text>
+    <text x="${(cx+10).toFixed(0)}" y="${(MT+18).toFixed(0)}" font-size="11" fill="rgba(34,197,94,.5)" font-family="Outfit,sans-serif" font-weight="700">LEADING</text>
+    <text x="${(ML+10).toFixed(0)}" y="${(MT+PH-8).toFixed(0)}" font-size="11" fill="rgba(248,113,113,.5)" font-family="Outfit,sans-serif" font-weight="700">LAGGING</text>
+    <text x="${(cx+10).toFixed(0)}" y="${(MT+PH-8).toFixed(0)}" font-size="11" fill="rgba(234,179,8,.5)" font-family="Outfit,sans-serif" font-weight="700">WEAKENING</text>`;
+
+  // Axis lines & ticks
+  let axisTicks = '';
+  for(let v=Math.ceil(rMin);v<=Math.floor(rMax);v++){
+    const x = px(v).toFixed(1);
+    axisTicks += `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT+PH}" stroke="rgba(139,160,184,.08)" stroke-width="1"/>
+      <text x="${x}" y="${MT+PH+14}" font-size="9" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace">${v}</text>`;
+  }
+  for(let v=Math.ceil(mMin);v<=Math.floor(mMax);v++){
+    const y = py(v).toFixed(1);
+    axisTicks += `<line x1="${ML}" y1="${y}" x2="${ML+PW}" y2="${y}" stroke="rgba(139,160,184,.08)" stroke-width="1"/>
+      <text x="${ML-6}" y="${(+y+3).toFixed(1)}" font-size="9" fill="#8BA0B8" text-anchor="end" font-family="IBM Plex Mono,monospace">${v}</text>`;
+  }
+
+  // Cross-hair at 100,100
+  const crosshair = `
+    <line x1="${ML}" y1="${cy.toFixed(1)}" x2="${ML+PW}" y2="${cy.toFixed(1)}" stroke="rgba(139,160,184,.35)" stroke-width="1" stroke-dasharray="4,3"/>
+    <line x1="${cx.toFixed(1)}" y1="${MT}" x2="${cx.toFixed(1)}" y2="${MT+PH}" stroke="rgba(139,160,184,.35)" stroke-width="1" stroke-dasharray="4,3"/>`;
+
+  // Axis labels
+  const axisLabels = `
+    <text x="${(ML+PW/2).toFixed(0)}" y="${H-4}" font-size="10" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace">JdK RS-RATIO</text>
+    <text x="12" y="${(MT+PH/2).toFixed(0)}" font-size="10" fill="#8BA0B8" text-anchor="middle" font-family="IBM Plex Mono,monospace" transform="rotate(-90,12,${(MT+PH/2).toFixed(0)})">RS-MOMENTUM</text>`;
+
+  // Benchmark label
+  const bmLbl = `<text x="${(ML+PW-4).toFixed(0)}" y="${(cy-6).toFixed(0)}" font-size="10" fill="rgba(139,160,184,.6)" text-anchor="end" font-family="Outfit,sans-serif">vs ${bmLabel}</text>`;
+
+  const svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="background:var(--bg2);display:block">
+    ${qBG}${axisTicks}${crosshair}${qLabels}${bmLbl}${axisLabels}
+    ${svgPaths}${svgDots}${svgLabels}
+  </svg>`;
+
+  // Legend
+  const legend = rrgData.map((d,i)=>{
+    const col = PALETTE[i%PALETTE.length];
+    return `<div style="display:flex;align-items:center;gap:5px;cursor:pointer" onclick="showRRGDesc('${d.sym}','${d.quad.name}','${d.cur.ratio.toFixed(2)}','${d.cur.mom.toFixed(2)}')">
+      <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
+      <span style="font-size:11px;font-weight:700;color:var(--t2)">${d.sym}</span>
+      <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${d.quad.color}22;color:${d.quad.color};font-weight:700">${d.quad.name}</span>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="padding:0">${svg}</div>
+    <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px;border-top:1px solid var(--b1)">
+      <span style="font-size:10px;color:var(--t4);align-self:center">Click a dot for details →</span>
+      ${legend}
+    </div>`;
+
+  // Store rrgData for desc lookup
+  window._rrgData = rrgData;
+  window._rrgBmLabel = bmLabel;
+
+  // Auto-update RS card descriptions
+  updateRSCardsWithRRG(rrgData);
+}
+
+function showRRGDesc(sym, quad, ratio, mom){
+  const panel = document.getElementById('rrg-desc-panel');
+  if(!panel) return;
+
+  const d = (window._rrgData||[]).find(x=>x.sym===sym);
+  const quadColors = {Leading:'#22c55e', Weakening:'#eab308', Improving:'#60a5fa', Lagging:'#f87171'};
+  const col = quadColors[quad]||'var(--t2)';
+
+  const quadDesc = {
+    Leading:   'Strong RS-Ratio (>100) with rising momentum. Stock is outperforming the benchmark and gaining strength. Ideal for holding or adding.',
+    Weakening: 'RS-Ratio above 100 but momentum declining. Stock still outperforms but may rotate into Lagging soon. Watch closely — consider tightening stops.',
+    Improving: 'RS-Ratio below 100 but momentum rising. Potential early-entry signal — stock is gaining strength vs benchmark. Confirm with price action.',
+    Lagging:   'Both RS-Ratio and momentum below 100. Underperforming the benchmark. Consider reducing or exiting the position.',
+  };
+
+  const tail = d?.tail || [];
+  const prev = tail.length>=2 ? tail[tail.length-2] : null;
+  const ratioDir = prev ? (parseFloat(ratio)>prev.ratio?'▲':'▼') : '';
+  const momDir   = prev ? (parseFloat(mom)>prev.mom?'▲':'▼') : '';
+
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div class="card" style="border-left:4px solid ${col}">
+      <div class="card-body">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-size:16px;font-weight:800;color:var(--t1)">${sym}</span>
+              <span style="padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;background:${col}22;color:${col}">${quad}</span>
+              <span style="font-size:11px;color:var(--t3)">vs ${window._rrgBmLabel||'Benchmark'}</span>
+            </div>
+            <div style="font-size:12px;color:var(--t2);max-width:480px;line-height:1.6">${quadDesc[quad]||''}</div>
+          </div>
+          <div style="display:flex;gap:20px">
+            <div style="text-align:center">
+              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:2px">RS-Ratio</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:800;color:${parseFloat(ratio)>=100?'var(--g)':'var(--r)'}">${ratio}</div>
+              <div style="font-size:11px;color:var(--t3)">${ratioDir} vs prev week</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:2px">RS-Momentum</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:800;color:${parseFloat(mom)>=100?'var(--g)':'var(--r)'}">${mom}</div>
+              <div style="font-size:11px;color:var(--t3)">${momDir} vs prev week</div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="document.getElementById('rrg-desc-panel').style.display='none'" style="margin-top:8px">✕ Close</button>
+      </div>
+    </div>`;
+}
+
+// Push RRG quadrant info into the existing RS cards on the page
+function updateRSCardsWithRRG(rrgData){
+  rrgData.forEach(d=>{
+    const cid = 'frs_'+d.sym.replace(/[^a-zA-Z0-9]/g,'_');
+    const chip = document.getElementById(`${cid}_rs_chip`);
+    if(chip && chip.dataset.rrgSet !== '1'){
+      chip.dataset.rrgSet = '1';
+      const quadColors={Leading:'#22c55e',Weakening:'#eab308',Improving:'#60a5fa',Lagging:'#f87171'};
+      const col = quadColors[d.quad.name]||'var(--t2)';
+      // Append RRG quadrant badge next to chip
+      const badge = document.createElement('span');
+      badge.style.cssText=`display:inline-flex;align-items:center;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;background:${col}22;color:${col};margin-left:4px;cursor:pointer`;
+      badge.textContent = 'RRG: '+d.quad.name;
+      badge.title = `RS-Ratio: ${d.cur.ratio.toFixed(2)} · RS-Momentum: ${d.cur.mom.toFixed(2)}`;
+      badge.onclick = ()=>showRRGDesc(d.sym, d.quad.name, d.cur.ratio.toFixed(2), d.cur.mom.toFixed(2));
+      chip.parentNode?.insertBefore(badge, chip.nextSibling);
+    }
+  });
 }
 
 
