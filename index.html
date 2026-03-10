@@ -899,12 +899,14 @@ select.fi{cursor:pointer}
 
     <!-- ══ AI TRADE REVIEW ══ -->
     <div class="page" id="page-ai">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
         <div>
           <div style="font-size:18px;font-weight:700;color:var(--t1)">🧠 AI Trade Review</div>
-          <div style="font-size:12px;color:var(--t3);margin-top:3px">Powered by Claude — get personalised analysis of your trading patterns and performance.</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">Analyse your trading patterns with Claude or Gemini — your data never leaves your browser.</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <select class="fi" id="ai-mode" style="width:auto;font-size:12px;padding:6px 10px">
             <option value="full">Full Journal Review</option>
             <option value="recent">Last 30 Days</option>
@@ -913,23 +915,49 @@ select.fi{cursor:pointer}
             <option value="risk">Risk Management Audit</option>
           </select>
           <button class="btn btn-y" onclick="runAIReview()" id="ai-run-btn">
-            <svg viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+            <svg viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
             Analyse My Trades
           </button>
         </div>
       </div>
 
-      <!-- API Key bar -->
-      <div id="ai-key-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:12px 14px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px">
-        <svg viewBox="0 0 24 24" style="width:16px;height:16px;flex-shrink:0;stroke:var(--y);fill:none;stroke-width:1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        <input class="fi" id="ai-api-key" type="password" placeholder="Paste your Anthropic API key (sk-ant-…)" style="flex:1;font-size:12px;font-family:'IBM Plex Mono',monospace;background:transparent;border:none;outline:none;color:var(--t1)" oninput="saveAIKey()">
-        <button class="btn btn-ghost btn-xs" onclick="toggleKeyVisibility()" id="ai-key-eye" title="Show/hide key" style="flex-shrink:0">👁</button>
+      <!-- Provider toggle -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+        <span style="font-size:11px;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;font-weight:700">AI Provider:</span>
+        <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
+          <button id="provider-claude" onclick="setAIProvider('claude')"
+            style="padding:6px 16px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:background .15s;background:var(--y);color:#1a1a1a">
+            ✦ Claude
+          </button>
+          <button id="provider-gemini" onclick="setAIProvider('gemini')"
+            style="padding:6px 16px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:background .15s;background:var(--bg3);color:var(--t3)">
+            ✦ Gemini
+          </button>
+        </div>
+      </div>
+
+      <!-- Claude key bar -->
+      <div id="ai-key-bar-claude" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:11px 14px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px">
+        <svg viewBox="0 0 24 24" style="width:15px;height:15px;flex-shrink:0;stroke:var(--y);fill:none;stroke-width:1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <span style="font-size:11px;color:var(--t4);font-weight:700;white-space:nowrap">Claude</span>
+        <input class="fi" id="ai-api-key" type="password" placeholder="Anthropic API key  (sk-ant-…)" style="flex:1;font-size:12px;font-family:'IBM Plex Mono',monospace;background:transparent;border:none;outline:none;color:var(--t1)" oninput="saveAIKey()">
+        <button class="btn btn-ghost btn-xs" onclick="toggleKeyVisibility('ai-api-key')" title="Show/hide">👁</button>
         <span id="ai-key-status" style="font-size:11px;color:var(--t3);white-space:nowrap;flex-shrink:0"></span>
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" style="font-size:11px;color:var(--b);white-space:nowrap;flex-shrink:0;text-decoration:none">Get key →</a>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" style="font-size:11px;color:var(--b);white-space:nowrap;text-decoration:none">Get key →</a>
+      </div>
+
+      <!-- Gemini key bar -->
+      <div id="ai-key-bar-gemini" style="display:none;align-items:center;gap:8px;margin-bottom:12px;padding:11px 14px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px">
+        <svg viewBox="0 0 24 24" style="width:15px;height:15px;flex-shrink:0;stroke:#60A5FA;fill:none;stroke-width:1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <span style="font-size:11px;color:#60A5FA;font-weight:700;white-space:nowrap">Gemini</span>
+        <input class="fi" id="gemini-api-key" type="password" placeholder="Google AI Studio key  (AIza…)" style="flex:1;font-size:12px;font-family:'IBM Plex Mono',monospace;background:transparent;border:none;outline:none;color:var(--t1)" oninput="saveGeminiKey()">
+        <button class="btn btn-ghost btn-xs" onclick="toggleKeyVisibility('gemini-api-key')" title="Show/hide">👁</button>
+        <span id="gemini-key-status" style="font-size:11px;color:var(--t3);white-space:nowrap;flex-shrink:0"></span>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:11px;color:#60A5FA;white-space:nowrap;text-decoration:none">Get key →</a>
       </div>
 
       <!-- Quick question bar -->
-      <div style="display:flex;gap:8px;margin-bottom:20px">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
         <input class="fi" id="ai-question" placeholder="Ask anything… e.g. 'Why do I lose on Fridays?' or 'Which setup is most profitable?'" style="flex:1">
         <button class="btn btn-ghost" onclick="runAIQuestion()" id="ai-ask-btn">Ask</button>
       </div>
@@ -942,12 +970,17 @@ select.fi{cursor:pointer}
         <button class="ai-chip" onclick="askChip('What setup type gives me the best risk-reward?')">Best setup</button>
         <button class="ai-chip" onclick="askChip('Am I overtrading? How many trades per week on average?')">Overtrading check</button>
         <button class="ai-chip" onclick="askChip('Which stocks should I stop trading based on my history?')">Problem stocks</button>
+        <button class="ai-chip" onclick="askChip('What is my average holding period and how does it correlate with profit?')">Holding period</button>
+        <button class="ai-chip" onclick="askChip('Analyse my risk management — am I risking too much per trade?')">Risk per trade</button>
       </div>
 
       <!-- AI Output -->
       <div class="card" id="ai-output-card" style="display:none">
         <div class="card-head" style="display:flex;align-items:center;justify-content:space-between">
-          <span class="card-title" id="ai-output-title">Analysis</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="card-title" id="ai-output-title">Analysis</span>
+            <span id="ai-output-provider" style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700"></span>
+          </div>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-xs" onclick="copyAIOutput()" title="Copy">📋</button>
             <button class="btn btn-ghost btn-xs" onclick="clearAIOutput()" title="Clear">✕</button>
@@ -960,7 +993,7 @@ select.fi{cursor:pointer}
 
       <!-- Loading state -->
       <div id="ai-loading" style="display:none;text-align:center;padding:40px">
-        <div style="font-size:32px;margin-bottom:12px;animation:spin 1s linear infinite;display:inline-block">🧠</div>
+        <div style="font-size:32px;margin-bottom:12px;animation:spin 1s linear infinite;display:inline-block" id="ai-loading-icon">🧠</div>
         <div style="color:var(--t2);font-size:14px" id="ai-loading-msg">Analysing your trades…</div>
       </div>
 
@@ -968,7 +1001,10 @@ select.fi{cursor:pointer}
       <div id="ai-empty" style="text-align:center;padding:60px 20px;color:var(--t3)">
         <div style="font-size:48px;margin-bottom:12px">🧠</div>
         <div style="font-size:15px;font-weight:600;color:var(--t2);margin-bottom:6px">AI Trade Coach</div>
-        <div style="font-size:13px;max-width:400px;margin:0 auto">Select a review type and click <b style="color:var(--y)">Analyse My Trades</b>, or type a custom question above. Your trade data never leaves your browser.</div>
+        <div style="font-size:13px;max-width:420px;margin:0 auto">
+          Choose <b style="color:var(--y)">Claude</b> or <b style="color:#60A5FA">Gemini</b>, paste your API key, then click <b style="color:var(--y)">Analyse My Trades</b>.<br>
+          <span style="color:var(--t4)">Your trade data never leaves your browser.</span>
+        </div>
       </div>
     </div>
 
@@ -3893,8 +3929,10 @@ async function runAIReview() {
 
   try {
     const prompt = buildPrompt(mode, null, context);
-    const result = await callClaudeAPI(prompt);
-    showAIResult(modeLabels[mode] || 'Analysis', result);
+    const provider = getAIProvider();
+    const icon = provider==='gemini'?'✦ Gemini':'✦ Claude';
+    const result = await callAI(prompt);
+    showAIResult(modeLabels[mode] || 'Analysis', result, provider);
   } catch(e) {
     hideAILoading();
     toast('AI review failed: ' + e.message, '❌');
@@ -3909,8 +3947,9 @@ async function runAIQuestion() {
   showAILoading('Thinking…');
   try {
     const prompt = buildPrompt('full', q, context);
-    const result = await callClaudeAPI(prompt);
-    showAIResult('Answer: ' + q.slice(0, 60) + (q.length > 60 ? '…' : ''), result);
+    const provider = getAIProvider();
+    const result = await callAI(prompt);
+    showAIResult('Answer: ' + q.slice(0, 60) + (q.length > 60 ? '…' : ''), result, provider);
     document.getElementById('ai-question').value = '';
   } catch(e) {
     hideAILoading();
@@ -3923,10 +3962,30 @@ function askChip(q) {
   runAIQuestion();
 }
 
+// ── AI Provider management ────────────────────────────────────────────────────
+function setAIProvider(provider){
+  localStorage.setItem('ai_provider', provider);
+  const isClaude = provider === 'claude';
+  document.getElementById('provider-claude').style.background = isClaude ? 'var(--y)' : 'var(--bg3)';
+  document.getElementById('provider-claude').style.color      = isClaude ? '#1a1a1a' : 'var(--t3)';
+  document.getElementById('provider-gemini').style.background = !isClaude ? '#60A5FA' : 'var(--bg3)';
+  document.getElementById('provider-gemini').style.color      = !isClaude ? '#0a0a1a' : 'var(--t3)';
+  document.getElementById('ai-key-bar-claude').style.display  = isClaude ? 'flex' : 'none';
+  document.getElementById('ai-key-bar-gemini').style.display  = !isClaude ? 'flex' : 'none';
+}
+
+function getAIProvider(){ return localStorage.getItem('ai_provider') || 'claude'; }
+
+async function callAI(prompt){
+  const provider = getAIProvider();
+  if(provider === 'gemini') return callGeminiAPI(prompt);
+  return callClaudeAPI(prompt);
+}
+
 async function callClaudeAPI(prompt) {
   const apiKey = localStorage.getItem('ai_api_key') || '';
   if (!apiKey || !apiKey.startsWith('sk-')) {
-    throw new Error('No API key set. Paste your Anthropic API key in the field above.');
+    throw new Error('No Claude API key set. Paste your Anthropic key (sk-ant-…) above.');
   }
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3938,16 +3997,38 @@ async function callClaudeAPI(prompt) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+      max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     })
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || 'API error ' + response.status);
+    throw new Error(err.error?.message || 'Claude API error ' + response.status);
   }
   const data = await response.json();
   return data.content?.map(b => b.text || '').join('') || 'No response received.';
+}
+
+async function callGeminiAPI(prompt) {
+  const apiKey = localStorage.getItem('gemini_api_key') || '';
+  if (!apiKey || !apiKey.startsWith('AIza')) {
+    throw new Error('No Gemini API key set. Paste your Google AI Studio key (AIza…) above.');
+  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 1500, temperature: 0.7 },
+    })
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Gemini API error ' + response.status);
+  }
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
 }
 
 function saveAIKey() {
@@ -3956,26 +4037,40 @@ function saveAIKey() {
   const status = document.getElementById('ai-key-status');
   if (status) {
     if (key.startsWith('sk-ant-') || key.startsWith('sk-')) {
-      status.textContent = '✅ Key saved';
-      status.style.color = 'var(--g)';
+      status.textContent = '✅ Saved'; status.style.color = 'var(--g)';
     } else if (key.length > 0) {
-      status.textContent = '⚠ Invalid format';
-      status.style.color = 'var(--y)';
-    } else {
-      status.textContent = '';
-    }
+      status.textContent = '⚠ Invalid'; status.style.color = 'var(--y)';
+    } else { status.textContent = ''; }
   }
 }
 
-function toggleKeyVisibility() {
-  const inp = document.getElementById('ai-api-key');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+function saveGeminiKey() {
+  const key = document.getElementById('gemini-api-key').value.trim();
+  localStorage.setItem('gemini_api_key', key);
+  const status = document.getElementById('gemini-key-status');
+  if (status) {
+    if (key.startsWith('AIza')) {
+      status.textContent = '✅ Saved'; status.style.color = 'var(--g)';
+    } else if (key.length > 0) {
+      status.textContent = '⚠ Invalid'; status.style.color = 'var(--y)';
+    } else { status.textContent = ''; }
+  }
+}
+
+function toggleKeyVisibility(inputId) {
+  const inp = document.getElementById(inputId || 'ai-api-key');
+  if(inp) inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
 function loadAIKey() {
   const key = localStorage.getItem('ai_api_key') || '';
   const inp = document.getElementById('ai-api-key');
   if (inp && key) { inp.value = key; saveAIKey(); }
+  const gKey = localStorage.getItem('gemini_api_key') || '';
+  const gInp = document.getElementById('gemini-api-key');
+  if (gInp && gKey) { gInp.value = gKey; saveGeminiKey(); }
+  // Restore provider toggle state
+  setAIProvider(getAIProvider());
 }
 
 function showAILoading(msg) {
@@ -3993,7 +4088,18 @@ function hideAILoading() {
   document.getElementById('ai-ask-btn').disabled = false;
 }
 
-function showAIResult(title, text) {
+function showAIResult(title, text, provider) {
+  const provEl = document.getElementById('ai-output-provider');
+  if(provEl){
+    if(provider==='gemini'){
+      provEl.textContent='✦ Gemini'; provEl.style.background='rgba(96,165,250,.15)'; provEl.style.color='#60A5FA';
+    } else {
+      provEl.textContent='✦ Claude'; provEl.style.background='rgba(245,197,66,.12)'; provEl.style.color='var(--y)';
+    }
+  }
+  // also update loading icon
+  const li = document.getElementById('ai-loading-icon');
+  if(li) li.textContent = provider==='gemini' ? '✦' : '🧠';
   hideAILoading();
   document.getElementById('ai-output-title').textContent = title;
   document.getElementById('ai-output').textContent = text;
@@ -4045,6 +4151,31 @@ function checkNotifPermission() {
 }
 
 // ── Sound effect ──────────────────────────────────
+// ── RS Underperformance warning beep (descending, ominous) ─────────────────
+function playRSWarningBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Descending two-tone warning: high→low = bad signal
+    const notes = [
+      {freq:880, t:0.00, dur:0.18},
+      {freq:659, t:0.20, dur:0.18},
+      {freq:440, t:0.40, dur:0.28},
+    ];
+    notes.forEach(({freq, t, dur}) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sawtooth'; // harsher tone = warning feel
+      const st = ctx.currentTime + t;
+      gain.gain.setValueAtTime(0, st);
+      gain.gain.linearRampToValueAtTime(0.25, st + 0.04);
+      gain.gain.linearRampToValueAtTime(0, st + dur);
+      osc.start(st); osc.stop(st + dur + 0.05);
+    });
+  } catch(e) {}
+}
+
 function playAlertSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -4236,6 +4367,102 @@ function updateAlertTypeHint() {
     : 'Alert will trigger when price <b style="color:var(--r)">falls below</b> the target.';
 }
 
+
+// ── RS Underperformance Auto-Alert ────────────────────────────────────────────
+// Called from frsComputeRS after 1W RS is computed
+function checkRSAlert(symbol, rsWeek, rsLabel, benchLabel) {
+  if(rsWeek == null) return;
+
+  const alertId  = `rs_underperf_${symbol}`;
+  const now      = Date.now();
+  const existing = customAlerts.find(a => a.id === alertId);
+
+  if(rsWeek < 0 && rsLabel === 'Laggard') {
+    // Stock is underperforming — create/update alert if not already active
+    if(!existing) {
+      customAlerts.push({
+        id:        alertId,
+        symbol:    symbol,
+        level:     rsWeek,
+        type:      'rs_weak',
+        label:     `RS Laggard 1W: ${rsWeek.toFixed(1)}% vs ${benchLabel}`,
+        color:     '#FF6B8A',
+        auto:      true,
+        rsAlert:   true,
+        triggered: true,  // already fired
+        createdAt: now,
+        updatedAt: now,
+      });
+      saveAlerts();
+      renderAlerts();
+
+      // Fire warning beep + banner
+      playRSWarningBeep();
+      showRSAlertBanner(symbol, rsWeek, benchLabel);
+      updateAlertBadge();
+
+    } else if(!existing.silenced) {
+      // Update RS value but don't re-beep unless it got worse by >2%
+      const prevRs = existing.level || 0;
+      if(rsWeek < prevRs - 2) {
+        existing.level  = rsWeek;
+        existing.label  = `RS Laggard 1W: ${rsWeek.toFixed(1)}% vs ${benchLabel}`;
+        existing.updatedAt = now;
+        saveAlerts();
+        renderAlerts();
+        playRSWarningBeep();
+        showRSAlertBanner(symbol, rsWeek, benchLabel);
+      }
+    }
+  } else {
+    // Stock recovered — remove the RS alert and notify
+    if(existing) {
+      customAlerts = customAlerts.filter(a => a.id !== alertId);
+      saveAlerts();
+      renderAlerts();
+      toast(`✅ ${symbol} RS recovered — alert cleared`, '📈');
+    }
+  }
+}
+
+function showRSAlertBanner(symbol, rsWeek, benchLabel) {
+  const id     = 'rs-alert-banner-' + Date.now();
+  const banner = document.createElement('div');
+  banner.id    = id;
+  banner.style.cssText = `
+    position:fixed;top:70px;right:20px;z-index:99999;
+    background:var(--bg3);border:1px solid #FF6B8A;border-left:4px solid #FF6B8A;
+    border-radius:10px;padding:13px 16px;min-width:280px;max-width:340px;
+    box-shadow:0 4px 24px rgba(255,107,138,.25);animation:slideInRight .3s ease;
+  `;
+  banner.innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#FF6B8A;margin-bottom:4px">
+          ⚠️ RS Underperformance Alert
+        </div>
+        <div style="font-size:12px;color:var(--t2);font-weight:600">${symbol}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:3px">
+          1W RS: <span style="color:#FF6B8A;font-weight:700;font-family:'IBM Plex Mono',monospace">${rsWeek.toFixed(1)}%</span>
+          vs ${benchLabel} · <b style="color:#FF6B8A">Laggard</b>
+        </div>
+        <div style="font-size:10px;color:var(--t4);margin-top:4px">Underperforming benchmark — review position</div>
+      </div>
+      <button onclick="document.getElementById('${id}').remove()"
+        style="background:none;border:none;color:var(--t4);cursor:pointer;font-size:16px;padding:0;flex-shrink:0">✕</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.remove(), 12000);
+
+  // Also browser notification
+  if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+    try{ new Notification(`⚠️ RS Alert: ${symbol}`, {
+      body: `1W underperforming ${benchLabel} by ${Math.abs(rsWeek).toFixed(1)}% — Laggard`,
+      icon: '/favicon.ico'
+    }); }catch(e){}
+  }
+}
+
 function saveCustomAlert() {
   const sym   = (document.getElementById('al-symbol').value || '').trim().toUpperCase();
   const price = +(document.getElementById('al-price').value || 0);
@@ -4253,6 +4480,16 @@ function saveCustomAlert() {
   closeM('m-add-alert');
   renderAlerts();
   toast(`Alert set: ${sym} ${type === 'above' ? '▲' : '▼'} ₹${price}`, '🔔');
+}
+
+
+function silenceRSAlert(id){
+  const a = customAlerts.find(x=>x.id===id);
+  if(!a) return;
+  a.silenced = !a.silenced;
+  saveAlerts();
+  renderAlerts();
+  toast(a.silenced ? `🔕 ${a.symbol} RS alert silenced` : `🔔 ${a.symbol} RS alert active`, a.silenced?'🔕':'🔔');
 }
 
 function deleteCustomAlert(id) {
@@ -4328,13 +4565,45 @@ function renderAlerts() {
     } else {
       if (noCustomEl) noCustomEl.style.display = 'none';
       customEl.innerHTML = customAlerts.map(a => {
-        const key = `${a.symbol}_${a.label}_${a.level}`;
+        const key  = `${a.symbol}_${a.label}_${a.level}`;
         const fired = triggeredSet.has(key);
+        const isRS  = !!a.rsAlert;
+
+        if(isRS){
+          // RS underperformance alert — special card
+          const silenced = !!a.silenced;
+          return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;
+              background:rgba(255,107,138,.06);border:1px solid rgba(255,107,138,.3);
+              border-left:4px solid #FF6B8A;border-radius:8px;${silenced?'opacity:.45':''}">
+            <span style="font-size:18px;flex-shrink:0">⚠️</span>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+                <span style="font-weight:800;color:var(--t1);font-size:13px">${a.symbol}</span>
+                <span style="font-size:10.5px;background:rgba(255,107,138,.15);color:#FF6B8A;
+                  padding:2px 8px;border-radius:20px;font-weight:700">RS Underperformance</span>
+                <span style="font-size:10px;color:var(--t4);font-family:'IBM Plex Mono',monospace">1W RS: ${(+a.level).toFixed(1)}%</span>
+              </div>
+              <div style="font-size:11px;color:var(--t3);margin-top:3px">${a.label}</div>
+              <div style="font-size:10px;color:var(--t4);margin-top:2px">
+                Auto-detected · ${new Date(a.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
+              </div>
+            </div>
+            <div style="display:flex;gap:5px;flex-shrink:0">
+              <button class="btn btn-ghost btn-xs" title="${silenced?'Un-silence':'Silence'}"
+                onclick="silenceRSAlert('${a.id}')" style="color:${silenced?'var(--y)':'var(--t3)'}">
+                ${silenced?'🔔':'🔕'}
+              </button>
+              <button class="btn btn-ghost btn-xs" onclick="deleteCustomAlert('${a.id}')" title="Dismiss" style="color:var(--r)">✕</button>
+            </div>
+          </div>`;
+        }
+
+        // Normal custom alert
         return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${a.color};border-radius:8px;${fired?'opacity:.5':''}">
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <span style="font-weight:700;color:var(--t1)">${a.symbol}</span>
-              <span style="font-size:11px;color:${a.color};padding:2px 7px;border-radius:20px;background:${a.color.replace('var(--','var(--').replace(')','')}1a">${a.label}</span>
+              <span style="font-size:11px;color:${a.color};padding:2px 7px;border-radius:20px;background:${a.color.replace('var(--','var(--').replace(')',')')}1a">${a.label}</span>
               <span style="font-size:11px;color:var(--t3)">${a.type==='above'?'▲ Above':'▼ Below'} ₹${a.level.toFixed(2)}</span>
             </div>
           </div>
@@ -6273,6 +6542,28 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
         rsChip.style.background = overallRsVal>=0?'var(--gd)':'var(--rd)';
         rsChip.style.borderColor = overallRsVal>=0?'rgba(0,229,160,.3)':'rgba(255,69,96,.3)';
       }
+    }
+
+    // ── Auto RS underperformance alert ─────────────────────────────────────
+    {
+      const [rs1wStk, rs1wBmk] = results[0];
+      const rs1w  = (rs1wStk!=null && rs1wBmk!=null) ? rs1wStk - rs1wBmk : null;
+      // Determine 1W RS label
+      let rs1wLabel = '—';
+      if(rs1w != null){
+        const pos1w = rs1w >= 0 ? 'Above Zero' : 'Below Zero';
+        let dir1w   = '—';
+        if(results[1]){
+          const [s2,b2] = results[1];
+          if(s2!=null&&b2!=null) dir1w = rs1w > (s2-b2) ? 'Rising' : 'Falling';
+        }
+        const match1w = [
+          ['Above Zero','Rising','Leader'],['Above Zero','Falling','Weakening'],
+          ['Below Zero','Rising','Improving'],['Below Zero','Falling','Laggard'],
+        ].find(r=>r[0]===pos1w&&r[1]===dir1w);
+        rs1wLabel = match1w ? match1w[2] : pos1w;
+      }
+      checkRSAlert(symbol, rs1w, rs1wLabel, benchLabel);
     }
 
     el.innerHTML = `
