@@ -1524,12 +1524,12 @@ select.fi{cursor:pointer}
           </div>
 
           <!-- Interpretation Table -->
-          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+          <div id="rrg-table-panel" class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column;align-self:stretch">
             <div style="padding:12px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:12px;font-weight:700;color:var(--t1)">📋 Interpretation</span>
               <span id="rrg-table-bm" style="font-size:10px;color:var(--t4)"></span>
             </div>
-            <div id="rrg-table-body" style="overflow-y:auto;max-height:480px">
+            <div id="rrg-table-body" style="overflow-y:auto;flex:1;min-height:0">
               <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">Loading…</div>
             </div>
           </div>
@@ -4582,7 +4582,7 @@ function startAlertTimer() {
     const h = ist.getHours(), mi = ist.getMinutes(), day = ist.getDay();
     const mktOpen = day>=1&&day<=5&&(h>9||(h===9&&mi>=15))&&(h<15||(h===15&&mi<=30));
     if (mktOpen) runAlertCheck();
-  }, 5 * 60 * 1000);
+  }, 15 * 60 * 1000);
 }
 
 // ── Add custom alert modal ────────────────────────
@@ -6134,7 +6134,7 @@ setTimeout(() => {
     try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); }catch(e){}
     const cached = cache[cacheKey];
     const age = cached ? Date.now() - cached.ts : Infinity;
-    if(age > 5*60*1000){
+    if(age > 15*60*1000){
       // Stale — silently prefetch into cache without touching UI
       frsBackgroundFetch(syms, benchmark);
     } else {
@@ -6160,7 +6160,7 @@ setInterval(() => {
   } else {
     frsBackgroundFetch(syms, benchmark);
   }
-}, 5 * 60 * 1000);
+}, 15 * 60 * 1000);
 
 setTimeout(() => {
   // Supabase cloud sync (only if enabled)
@@ -6574,8 +6574,9 @@ setTimeout(() => runAlertCheck(), 10000);
 // ══════════════════════════════════════════════════
 
 function saveFrsPrefs(){
-  // Bust cache when benchmark changes
+  // Bust localStorage cache + clear in-memory benchmark cache when benchmark changes
   try{ localStorage.removeItem('te_frs_cache'); }catch(e){}
+  window._bmDataCache = {}; // clear in-memory benchmark cache
   const b = document.getElementById('frs-benchmark')?.value || 'NIFTY50';
   localStorage.setItem('te_frs_prefs', JSON.stringify({benchmark:b}));
 }
@@ -6609,7 +6610,7 @@ function renderFundRS(forceRefresh=true){
   }
 
   const CACHE_KEY = 'te_frs_cache';
-  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
   const cacheKey  = benchmark + '_' + symbols.sort().join(',');
   let   cache     = {};
   try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); }catch(e){}
@@ -6748,7 +6749,7 @@ function frsUpdateStatusBar(fromCache, ageMs, benchmark){
   }
   const nextRefresh = fromCache ? Math.max(0, Math.round((5*60*1000 - ageMs)/1000)) : 0;
   const timeStr = fromCache && ageMs > 0
-    ? `cached ${Math.round(ageMs/1000)}s ago · next refresh in ${nextRefresh}s`
+    ? `cached ${Math.round(ageMs/1000)}s ago · next refresh in ${Math.floor(nextRefresh/60)}m ${nextRefresh%60}s`
     : 'fresh data';
   bar.innerHTML = `
     <div style="display:flex;align-items:center;gap:7px">
@@ -6757,12 +6758,16 @@ function frsUpdateStatusBar(fromCache, ageMs, benchmark){
       <span style="color:var(--t4)">· ${timeStr}</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="color:var(--t4)">Auto-refresh every 5 min</span>
+      <span style="color:var(--t4)">Auto-refresh every 15 min</span>
       <button class="btn btn-ghost btn-xs" onclick="renderFundRS(true);renderRRG();" style="font-size:10px">↻ Force refresh</button>
     </div>`;
 }
 
 // ─── RS computation using Yahoo Finance (same proxy as fetchCMP) ─────────────
+
+// In-memory benchmark data cache — avoids re-fetching same benchmark for every symbol
+// Key: bmTicker_range_interval → chart result object
+window._bmDataCache = window._bmDataCache || {};
 async function frsComputeRS(symbol, benchmark, benchLabel, cid){
   const el = document.getElementById(`${cid}_rs`);
   if(!el) return;
@@ -6840,13 +6845,17 @@ async function frsComputeRS(symbol, benchmark, benchLabel, cid){
     // Set earnings badge from best available data
     frsSetEarnBadge(cid, mergedMeta);
 
-    // Sequential period fetches to avoid Yahoo rate limiting
+    // Sequential period fetches — benchmark cached in-memory to avoid redundant calls
     const results = [];
     for(const p of periods){
-      const [sR, bR] = await Promise.all([
-        yhGet(symbol+'.NS', p.range, p.interval),
-        yhGet(bmTicker,     p.range, p.interval),
-      ]);
+      const bmCacheKey = `${bmTicker}_${p.range}_${p.interval}`;
+      // Fetch benchmark from cache or network
+      let bR = window._bmDataCache[bmCacheKey] || null;
+      if(!bR){
+        bR = await yhGet(bmTicker, p.range, p.interval);
+        if(bR) window._bmDataCache[bmCacheKey] = bR; // store for next symbol
+      }
+      const sR = await yhGet(symbol+'.NS', p.range, p.interval);
       const sClose = sR?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
       const bClose = bR?.indicators?.quote?.[0]?.close?.filter(v=>v!=null);
       const sRet = sClose?.length>=2 ? (sClose[sClose.length-1]-sClose[0])/sClose[0]*100 : null;
@@ -7826,6 +7835,8 @@ async function frsBackgroundFetch(symbols, benchmark){
     document.body.appendChild(ghost);
   }
 
+  // Fresh cycle — clear in-memory benchmark cache so data isn't stale
+  window._bmDataCache = {};
   let cache = {};
   try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); }catch(e){}
   const newData = cache[cacheKey]?.data ? {...cache[cacheKey].data} : {};
