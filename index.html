@@ -5103,8 +5103,7 @@ async function syncDefinedge() {
     });
     clearTimeout(timer);
     const raw = await res.json();
-    if(raw?.status==='error') throw new Error(raw.message || 'Definedge API error');
-    let data = Array.isArray(raw) ? raw : (raw?.data || raw?.tradebook || raw?.TradeBook || raw?.trades || []);
+    if(raw?.status==='error') throw new Error((raw.message||'Definedge API error') + (raw.debug ? ' | Debug: '+JSON.stringify(raw.debug).slice(0,200) : ''));    let data = Array.isArray(raw) ? raw : (raw?.data || raw?.tradebook || raw?.TradeBook || raw?.trades || []);
 
     if(!data.length){
       toast('No trades found in Definedge tradebook','ℹ️');
