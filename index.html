@@ -5837,6 +5837,93 @@ function loadSettings(){
 }
 
 
+
+// ══════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ══════════════════════════════════════════════════
+function toast(msg, icon='✅'){
+  const el=document.getElementById('toast');
+  if(!el) return;
+  document.getElementById('t-msg').textContent=msg;
+  document.getElementById('t-icon').textContent=icon;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+function fmt(v){
+  if(v===undefined||v===null||isNaN(v)) return '—';
+  const abs=Math.abs(v);
+  const str=abs>=10000000?'₹'+(abs/10000000).toFixed(2)+'Cr':
+             abs>=100000 ?'₹'+(abs/100000).toFixed(2)+'L':
+             abs>=1000   ?'₹'+(abs/1000).toFixed(1)+'K':
+             '₹'+abs.toFixed(2);
+  return (v<0?'-':v>0?'+':'')+str;
+}
+
+function setDot(id, state){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.className='sync-dot';
+  if(state==='ok')      el.style.background='var(--g)';
+  else if(state==='syncing') el.style.background='var(--y)';
+  else                  el.style.background='var(--t4)';
+}
+
+function fStatus(f, el){
+  curFilter=f;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  renderTrades();
+}
+
+function toggleExp(id){
+  const row=document.getElementById('exp-'+id);
+  const icon=document.getElementById('ei-'+id);
+  if(!row) return;
+  const open=row.style.display==='table-row';
+  row.style.display=open?'none':'table-row';
+  if(icon) icon.textContent=open?'▶':'▼';
+}
+
+function ed(id){ editTrade(id); }
+function del(id){ deleteTrade(id); }
+
+function openEdit(id){ editTrade(id); }
+
+function entrySummary(t){
+  if(!t.entries||!t.entries.length) return '—';
+  return t.entries.map(e=>`${e.date||''}${e.qty?(' ×'+e.qty):''}${e.price?(' @₹'+e.price):''}`.trim()).join('<br>');
+}
+
+function exitSummary(t){
+  if(!t.exits||!t.exits.length) return '—';
+  return t.exits.map(e=>`${e.date||''}${e.qty?(' ×'+e.qty):''}${e.price?(' @₹'+e.price):''}`.trim()).join('<br>');
+}
+
+function viewTradeCharts(id){
+  const t=trades.find(x=>x.id===id);
+  if(!t||(!t.entryImg&&!t.exitImg)) return;
+  const existing=document.getElementById('chart-img-lightbox');
+  if(existing) existing.remove();
+  const lb=document.createElement('div');
+  lb.id='chart-img-lightbox';
+  lb.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;overflow-y:auto';
+  lb.onclick=()=>lb.remove();
+  const imgs=[];
+  if(t.entryImg) imgs.push({src:t.entryImg,label:'📈 Entry Chart'});
+  if(t.exitImg)  imgs.push({src:t.exitImg, label:'🚪 Exit Chart'});
+  lb.innerHTML=`
+    <div style="position:absolute;top:16px;right:20px;font-size:24px;color:#fff;cursor:pointer;z-index:10" onclick="document.getElementById('chart-img-lightbox').remove()">✕</div>
+    <div style="font-size:14px;font-weight:700;color:var(--y);margin-bottom:4px">${t.symbol} — Chart Screenshots</div>
+    ${imgs.map(i=>`
+      <div onclick="event.stopPropagation()" style="max-width:90vw">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${i.label}</div>
+        <img src="${i.src}" style="max-width:90vw;max-height:70vh;border-radius:8px;border:1px solid var(--b1);object-fit:contain">
+      </div>`).join('')}`;
+  document.body.appendChild(lb);
+}
+
+
 </script>
 </body>
 </html>
