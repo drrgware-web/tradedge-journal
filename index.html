@@ -1780,11 +1780,11 @@ select.fi{cursor:pointer}
           </div>
           <div class="card-body">
             <div style="font-size:11.5px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 12px;margin-bottom:14px">
-              ℹ️ Definedge RZone API — Get your API Key from <b style="color:var(--y)">RZone → Settings → API Access</b>
+              ℹ️ Definedge Integrate API — Get your credentials from <b style="color:var(--y)">myaccount.definedgesecurities.com → Account → Show my API Secret</b>
             </div>
             <div class="fg2" style="margin-bottom:14px">
-              <div class="fg"><label class="fl">Client ID / User ID</label><input class="fi" id="s-de-id" placeholder="DE1234567"></div>
-              <div class="fg"><label class="fl">API Key / Token</label><input class="fi" id="s-de-tk" type="password" placeholder="Paste API key…"></div>
+              <div class="fg"><label class="fl">API Token</label><input class="fi" id="s-de-tk" type="password" placeholder="Your API Token…"></div>
+              <div class="fg"><label class="fl">API Secret</label><input class="fi" id="s-de-sec" type="password" placeholder="Your API Secret…"></div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               <button class="btn btn-green btn-sm" onclick="saveDefinedgeCreds()">Save Credentials</button>
@@ -3847,7 +3847,7 @@ function doImport(){
 // ══════════════════════════════════════════════════
 // SETTINGS
 // ══════════════════════════════════════════════════
-function loadSettings(){ loadZdWorkerUrl();
+function loadSettings(){ loadZdWorkerUrl(); loadDefinedgeCreds();
   document.getElementById('s-cap').value=cfg.cap||874000;
   document.getElementById('s-risk').value=cfg.risk||0.5;
   document.getElementById('s-dhan-id').value=localStorage.getItem('dhan_id')||'';
@@ -5087,6 +5087,8 @@ async function syncDefinedge() {
   try {
     const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
     if(!workerUrl) throw new Error('Cloudflare Worker URL not set — go to Settings → Zerodha → Step 3b');
+    const sec = localStorage.getItem('de_sec')||'';
+    if(!sec) throw new Error('API Secret missing — go to Settings → Definedge and enter your API Secret');
 
     const ctrl = new AbortController();
     const timer = setTimeout(()=>ctrl.abort(), 20000);
@@ -5094,21 +5096,20 @@ async function syncDefinedge() {
       method: 'GET',
       headers: {
         'X-Kite-Action': 'de-tradebook',
-        'Authorization': `Bearer ${tk}`,
-        'X-Client-ID': String(id),
-        'Accept': 'application/json'
+        'X-DE-Token':  tk,
+        'X-DE-Secret': sec,
       },
       signal: ctrl.signal
     });
     clearTimeout(timer);
     const raw = await res.json();
-    let data = Array.isArray(raw) ? raw : (raw?.data || raw?.trades || raw?.tradebook || raw?.TradeBook || []);
+    if(raw?.status==='error') throw new Error(raw.message || 'Definedge API error');
+    let data = Array.isArray(raw) ? raw : (raw?.data || raw?.tradebook || raw?.TradeBook || raw?.trades || []);
 
     if(!data.length){
-      const hint = (raw?.message||'').toLowerCase().includes('401') || (raw?.message||'').toLowerCase().includes('unauthorized')
-        ? 'Token expired — regenerate from RZone → Settings → API Access'
-        : 'No trades found or token expired. Regenerate token from RZone daily.';
-      throw new Error(hint);
+      toast('No trades found in Definedge tradebook','ℹ️');
+      setDot('de-sync-dot',''); setDot('de-dot','');
+      setLog('de-log','No trades found today.'); return;
     }
 
     // Broad filter — accept all instruments if segment unclear
@@ -5165,10 +5166,24 @@ function mergeDefinedgeOrders(orders) {
   return {added, skipped};
 }
 
+
+function loadDefinedgeCreds(){
+  const tk  = localStorage.getItem('de_tk') ||'';
+  const sec = localStorage.getItem('de_sec')||'';
+  const tkEl  = document.getElementById('s-de-tk');
+  const secEl = document.getElementById('s-de-sec');
+  if(tkEl)  tkEl.value  = tk;
+  if(secEl) secEl.value = sec;
+}
+
 function saveDefinedgeCreds() {
-  localStorage.setItem('de_id', document.getElementById('s-de-id').value.trim());
-  localStorage.setItem('de_tk', document.getElementById('s-de-tk').value.trim());
-  toast('Definedge credentials saved','✅');
+  const tk  = document.getElementById('s-de-tk')?.value.trim()||'';
+  const sec = document.getElementById('s-de-sec')?.value.trim()||'';
+  if(!tk)  { toast('Enter API Token first','⚠️'); return; }
+  if(!sec) { toast('Enter API Secret first','⚠️'); return; }
+  localStorage.setItem('de_tk',  tk);
+  localStorage.setItem('de_sec', sec);
+  toast('Definedge credentials saved ✅','✅');
   updateSyncStatuses();
 }
 
@@ -5607,6 +5622,7 @@ async function sbPush(){
     const workerUrl= localStorage.getItem('zd_worker_url')|| '';
     const zdKey    = localStorage.getItem('zd_key')       || '';
     const zdSec    = localStorage.getItem('zd_sec')       || '';
+    const deSec    = localStorage.getItem('de_sec')       || '';
     // trades array already contains entryImg/exitImg (base64 charts)
     const payload = {
       device_id:   'tradedge_main',
@@ -5615,7 +5631,7 @@ async function sbPush(){
       cfg_json:    cfg,
       fund_json:   fund,
       alerts_json: alerts,
-      prefs_json:  JSON.stringify({frsPrefs:JSON.parse(frsPrefs), mpsUrl, theme, workerUrl, zdKey, zdSec}),
+      prefs_json:  JSON.stringify({frsPrefs:JSON.parse(frsPrefs), mpsUrl, theme, workerUrl, zdKey, zdSec, deSec}),
       updated_at:  new Date().toISOString()
     };
     const sizeKB = Math.round(JSON.stringify(payload).length/1024);
@@ -5667,6 +5683,7 @@ async function sbPull(){
           if(prefs.workerUrl)localStorage.setItem('zd_worker_url',prefs.workerUrl);
           if(prefs.zdKey)    localStorage.setItem('zd_key',       prefs.zdKey);
           if(prefs.zdSec)    localStorage.setItem('zd_sec',       prefs.zdSec);
+          if(prefs.deSec)    localStorage.setItem('de_sec',       prefs.deSec);
         }catch(e2){}
       }
       localStorage.setItem('te_last_save', String(cloudTime));
