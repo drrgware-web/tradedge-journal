@@ -1854,6 +1854,9 @@ select.fi{cursor:pointer}
                 <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Pull from Cloud
               </button>
+              <button class="btn btn-sm" style="background:rgba(255,69,96,.15);border:1px solid rgba(255,69,96,.4);color:#FF4560" onclick="sbPull(true)" title="Force overwrite local data with cloud, even if local is newer">
+                ⚡ Force Pull
+              </button>
               <button class="btn btn-ghost btn-sm" onclick="sbTestConnection()" title="Test if Supabase is reachable">🔌 Test Connection</button>
               <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3)">
                 <input type="checkbox" id="sb-auto" onchange="toggleSbAuto(this.checked)" style="accent-color:var(--y)"> Auto-sync on every save
@@ -5639,7 +5642,9 @@ async function sbPull(){
     const cloudTime   = new Date(row.updated_at||0).getTime();
     const localTime   = +(localStorage.getItem('te_last_save')||0);
     if(cloudTrades.length===0 && trades.length>0){ setSbStatus('Cloud empty — keeping local',''); return; }
-    if(cloudTime >= localTime || trades.length===0){
+    // Always pull if cloud has more trades OR force flag set OR local is empty
+    const forcePull = arguments[0] === true;
+    if(forcePull || cloudTrades.length > trades.length || cloudTime >= localTime || trades.length===0){
       // Restore all data
       trades = cloudTrades;
       localStorage.setItem('te_trades',  JSON.stringify(trades));
@@ -5664,8 +5669,8 @@ async function sbPull(){
       setSbStatus(`Pulled ${cloudTrades.length} trades · ${lc} ledger · ${cc} charts ✅ · ${ts}`,'ok');
       toast(`☁️ Pulled ${cloudTrades.length} trades + ${lc} ledger + ${cc} charts`,'☁️');
     } else {
-      setSbStatus('Already up to date ✅','ok');
-      toast('Already up to date','ℹ️');
+      setSbStatus(`Local (${trades.length}) is newer than cloud (${cloudTrades.length}) — use Force Pull to override`,'');
+      toast(`Local has ${trades.length} trades, cloud has ${cloudTrades.length}. Use Force Pull if needed.`,'ℹ️');
     }
   }catch(e){
     setSbStatus('Pull failed: '+e.message,'');
