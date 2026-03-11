@@ -1691,7 +1691,7 @@ select.fi{cursor:pointer}
             <div style="font-size:11.5px;background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin-bottom:14px;line-height:1.9;color:var(--t2)">
               In <a href="https://developers.kite.trade/apps" target="_blank" style="color:var(--y)">Kite Developer Console</a> → click <b>TradEdge</b> app → Edit → set <b>Redirect URL</b> to:<br>
               <div style="margin-top:6px;padding:7px 10px;background:var(--bg0);border-radius:7px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-                <span id="zd-redirect-display" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--y);word-break:break-all">https://kite.trade/connect/login</span>
+                <span id="zd-redirect-display" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--y);word-break:break-all">https://drrgware-web.github.io/tradedge-journal/</span>
                 <button onclick="copyZdRedirect()" style="background:var(--bg4);border:1px solid var(--b2);border-radius:5px;color:var(--t2);padding:3px 8px;font-size:10px;cursor:pointer;white-space:nowrap;font-family:'Outfit',sans-serif">Copy</button>
               </div>
               <span style="font-size:10.5px;color:var(--t3)">Save the app, then come back here.</span>
@@ -1715,6 +1715,22 @@ select.fi{cursor:pointer}
             </div>
             <div id="zd-token-preview" style="display:none;margin-bottom:14px;padding:10px 14px;background:var(--gd);border:1px solid rgba(0,229,160,.3);border-radius:8px;font-size:12px">
               ✅ Request token found: <span id="zd-req-token" style="font-family:'IBM Plex Mono',monospace;color:var(--g);font-weight:700"></span>
+            </div>
+
+            <!-- Step 3b: Worker URL -->
+            <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+              <div style="font-size:12px;font-weight:700;color:var(--y);margin-bottom:6px">⚡ Optional: Cloudflare Worker for auto token exchange</div>
+              <div style="font-size:11px;color:var(--t3);margin-bottom:8px;line-height:1.7">
+                Deploy the free worker (takes 2 min) to auto-generate your access token.<br>
+                <b style="color:var(--t2)">1.</b> Go to <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--y)">workers.cloudflare.com</a> → Create Worker → paste the worker code → Deploy<br>
+                <b style="color:var(--t2)">2.</b> Copy your worker URL (e.g. <code style="color:var(--t3)">https://zd-proxy.yourname.workers.dev</code>) and paste below
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="fi" id="s-zd-worker" placeholder="https://your-worker.workers.dev" style="flex:1;font-size:11.5px" value="">
+                <button class="btn btn-ghost btn-sm" onclick="saveZdWorkerUrl()">💾 Save</button>
+                <button class="btn btn-ghost btn-sm" onclick="window.open('/mnt/user-data/outputs/zerodha-worker.js')" style="display:none" id="zd-worker-dl">⬇ Worker Code</button>
+              </div>
+              <div id="zd-worker-status" style="font-size:11px;color:var(--t3);margin-top:6px"></div>
             </div>
 
             <!-- Step 4: manual access token fallback -->
@@ -3864,7 +3880,7 @@ function doImport(){
 // ══════════════════════════════════════════════════
 // SETTINGS
 // ══════════════════════════════════════════════════
-function loadSettings(){
+function loadSettings(){ loadZdWorkerUrl();
   document.getElementById('s-cap').value=cfg.cap||874000;
   document.getElementById('s-risk').value=cfg.risk||0.5;
   document.getElementById('s-dhan-id').value=localStorage.getItem('dhan_id')||'';
@@ -3946,51 +3962,71 @@ function onZdUrlPaste(val){
   }
 }
 
-async function attemptTokenExchange(apiKey,requestToken,apiSecret){
-  setLog('zd-log','Generating checksum & preparing token exchange…');
-  try{
-    // Compute SHA-256 checksum: api_key + request_token + api_secret
-    const input=apiKey+requestToken+apiSecret;
-    const enc=new TextEncoder().encode(input);
-    const hashBuf=await crypto.subtle.digest('SHA-256',enc);
-    const checksum=Array.from(new Uint8Array(hashBuf)).map(b=>('0'+b.toString(16)).slice(-2)).join('');
+async function attemptTokenExchange(apiKey, requestToken, apiSecret){
+  setLog('zd-log', '⏳ Exchanging token…');
+  const preview = document.getElementById('zd-token-preview');
 
-    // NOTE: Public CORS proxies (corsproxy.io, allorigins) strip POST body fields,
-    // causing Zerodha to return "Missing api_key". Token exchange MUST be done
-    // server-side. We show the user a pre-filled curl command + manual paste fallback.
+  // Compute SHA-256 checksum
+  const input   = apiKey + requestToken + apiSecret;
+  const enc     = new TextEncoder().encode(input);
+  const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+  const checksum = Array.from(new Uint8Array(hashBuf))
+                    .map(b=>('0'+b.toString(16)).slice(-2)).join('');
 
-    const curlCmd = `curl -X POST https://api.kite.trade/session/token \\
-  -H "X-Kite-Version: 3" \\
-  -H "Content-Type: application/x-www-form-urlencoded" \\
-  -d "api_key=${apiKey}&request_token=${requestToken}&checksum=${checksum}"`;
+  const body = `api_key=${encodeURIComponent(apiKey)}&request_token=${encodeURIComponent(requestToken)}&checksum=${encodeURIComponent(checksum)}`;
 
-    const preview = document.getElementById('zd-token-preview');
-    if(preview){
-      preview.style.display='block';
-      preview.style.background='var(--bg3)';
-      preview.style.border='1px solid var(--y)';
-      preview.style.borderRadius='8px';
-      preview.style.padding='12px';
-      preview.innerHTML=`
-        <div style="color:var(--y);font-weight:700;margin-bottom:8px">⚡ Checksum Ready — 2 ways to get your Access Token:</div>
-        <div style="margin-bottom:10px">
-          <b style="color:var(--t2)">Option A — Run this in Terminal/CMD:</b>
-          <pre id="zd-curl-cmd" style="background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:8px;font-size:10px;color:var(--g);overflow-x:auto;margin-top:6px;white-space:pre-wrap;word-break:break-all">${curlCmd}</pre>
-          <button onclick="navigator.clipboard.writeText(document.getElementById('zd-curl-cmd').textContent).then(()=>toast('Copied!','📋'))" style="background:var(--bg2);border:1px solid var(--b1);color:var(--t2);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;margin-top:4px">📋 Copy curl command</button>
-        </div>
-        <div style="margin-bottom:10px">
-          <b style="color:var(--t2)">Option B — Use Zerodha Console:</b>
-          <span style="color:var(--t3);font-size:11px"> Go to <a href="https://developers.zerodha.com/apps" target="_blank" style="color:var(--y)">developers.zerodha.com/apps</a> → your app → API Sessions → generate token there</span>
-        </div>
-        <div style="color:var(--t3);font-size:11px;margin-bottom:6px">Then paste the <b style="color:var(--t1)">access_token</b> from the response into Step 4 below ↓</div>
-        <div style="font-size:10px;color:var(--t4);margin-top:8px;padding-top:8px;border-top:1px solid var(--b1)">
-          Checksum: <code style="color:var(--t3)">${checksum.slice(0,16)}…</code> &nbsp;|&nbsp; Request token: <code style="color:var(--t3)">${requestToken.slice(0,12)}…</code>
-        </div>`;
+  // Try worker URL saved in settings first, then fallback instructions
+  const workerUrl = (localStorage.getItem('zd_worker_url')||'').trim();
+
+  if(workerUrl){
+    try{
+      setLog('zd-log','⏳ Calling worker…');
+      const res  = await fetch(workerUrl, {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','X-Kite-Version':'3'},
+        body
+      });
+      const data = await res.json();
+      if(data?.data?.access_token){
+        const at = data.data.access_token;
+        localStorage.setItem('zd_tk', at);
+        const tkEl = document.getElementById('s-zd-tk');
+        if(tkEl) tkEl.value = at;
+        if(preview){
+          preview.style.cssText='display:block;padding:10px 14px;background:var(--gd);border:1px solid rgba(0,229,160,.3);border-radius:8px;font-size:12px';
+          preview.innerHTML='<span style="color:var(--g);font-weight:700">✅ Access token generated & saved! Click Sync Now.</span>';
+        }
+        setLog('zd-log','✅ Token exchanged via worker!');
+        setDot('zd-dot','ok'); setDot('zd-sync-dot','ok');
+        updateSyncStatuses();
+        setTimeout(syncZerodha, 600);
+        return;
+      } else {
+        setLog('zd-log','Worker error: '+(data?.message||JSON.stringify(data)));
+      }
+    }catch(e){
+      setLog('zd-log','Worker failed: '+e.message);
     }
-    setLog('zd-log','Checksum computed ✅ — use curl or Zerodha Console to get access token, then paste in Step 4.');
-  }catch(e){
-    setLog('zd-log','Checksum error: '+e.message);
   }
+
+  // No worker or worker failed — show manual fallback with checksum pre-computed
+  const curlCmd = `curl -X POST https://api.kite.trade/session/token -H "X-Kite-Version: 3" -H "Content-Type: application/x-www-form-urlencoded" -d "api_key=${apiKey}&request_token=${requestToken}&checksum=${checksum}"`;
+  if(preview){
+    preview.style.cssText='display:block;padding:12px 14px;background:var(--bg3);border:1px solid var(--y);border-radius:8px;font-size:12px';
+    preview.innerHTML=`
+      <div style="color:var(--y);font-weight:700;margin-bottom:8px">⚠️ Worker not set — 2 options to get your access token:</div>
+      <div style="margin-bottom:10px;font-size:11.5px">
+        <b style="color:var(--t2)">Option A — Deploy a free Cloudflare Worker</b>
+        <span style="color:var(--t3)"> (one-time 2 min setup) — see Settings → Zerodha → Worker URL</span>
+      </div>
+      <div style="margin-bottom:10px">
+        <b style="color:var(--t2);font-size:11.5px">Option B — Run in Terminal:</b>
+        <pre style="background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:8px;font-size:10px;color:var(--g);overflow-x:auto;margin:6px 0;white-space:pre-wrap;word-break:break-all">${curlCmd}</pre>
+        <button onclick="navigator.clipboard.writeText(\`${curlCmd}\`).then(()=>toast('Copied!','📋'))" style="background:var(--bg2);border:1px solid var(--b1);color:var(--t2);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px">📋 Copy</button>
+      </div>
+      <div style="color:var(--t3);font-size:11px">Copy the <b style="color:var(--t1)">access_token</b> from the response and paste it in Step 4 ↓</div>`;
+  }
+  setLog('zd-log', workerUrl ? 'Worker failed — use manual option' : 'Set Worker URL in Step 3b, or use curl to get token manually');
 }
 function updateSyncStatuses(){
   const dhanOk=!!(localStorage.getItem('dhan_id')&&localStorage.getItem('dhan_tk'));
@@ -8630,6 +8666,52 @@ function sbDiagRefresh(){
     }catch(e){ toast('Auto-fix failed: '+e.message,'❌'); }
   }
 }
+
+
+// ══════════════════════════════════════════════════
+// ZERODHA WORKER URL + AUTO REQUEST_TOKEN DETECT
+// ══════════════════════════════════════════════════
+function saveZdWorkerUrl(){
+  const url = (document.getElementById('s-zd-worker')?.value||'').trim();
+  localStorage.setItem('zd_worker_url', url);
+  const st = document.getElementById('zd-worker-status');
+  if(st) st.textContent = url ? '✅ Worker URL saved' : 'Cleared';
+  if(url) toast('Worker URL saved ✅ — token exchange will now work automatically','✅');
+}
+
+function loadZdWorkerUrl(){
+  const el = document.getElementById('s-zd-worker');
+  if(el) el.value = localStorage.getItem('zd_worker_url')||'';
+}
+
+// On page load — detect ?request_token= in URL (after Zerodha redirect)
+(function detectZdCallback(){
+  try{
+    const params = new URLSearchParams(window.location.search);
+    const rt = params.get('request_token');
+    const status = params.get('status');
+    if(rt && status === 'success'){
+      // Clean URL without reloading
+      window.history.replaceState({}, document.title, window.location.pathname);
+      const apiKey = localStorage.getItem('zd_key')||'';
+      const apiSec = localStorage.getItem('zd_sec')||'';
+      if(apiKey){
+        // Store request token, navigate to settings and trigger exchange
+        localStorage.setItem('zd_req_token', rt);
+        toast('🔑 Zerodha login detected — exchanging token…','🔑');
+        // Nav to settings after app loads
+        setTimeout(()=>{
+          nav('settings');
+          setTimeout(()=>{
+            const urlEl = document.getElementById('zd-redirect-url');
+            if(urlEl){ urlEl.value = window.location.href.split('?')[0]+'?request_token='+rt+'&status=success'; }
+            onZdUrlPaste('?request_token='+rt+'&status=success');
+          }, 400);
+        }, 800);
+      }
+    }
+  }catch(e){}
+})();
 
 </script>
 </body>
