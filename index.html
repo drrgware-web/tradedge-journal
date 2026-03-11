@@ -3436,28 +3436,24 @@ async function syncZerodha(){
   setDot('zd-sync-dot','syncing');setDot('zd-dot','syncing');
   setLog('zd-log','Syncing…');
   try{
-    const targetUrl='https://api.kite.trade/trades';
-    const authHeaders={'X-Kite-Version':'3','Authorization':`token ${key}:${tk}`};
-    const proxies=[
-      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-      `https://proxy.cors.sh/${targetUrl}`,
-    ];
-    let data=null, lastErr='';
-    for(const proxyUrl of proxies){
-      try{
-        const ctrl=new AbortController();
-        const timer=setTimeout(()=>ctrl.abort(),15000);
-        const res=await fetch(proxyUrl,{method:'GET',headers:authHeaders,signal:ctrl.signal});
-        clearTimeout(timer);
-        const raw=await res.json();
-        if(raw?.status==='error'){lastErr=raw?.message||'API error';continue;}
-        if(raw?.data!==undefined){data=raw;break;}
-        if(Array.isArray(raw)){data={data:raw};break;}
-        lastErr='Unexpected response';
-      }catch(e){lastErr=e.name==='AbortError'?'Timeout':e.message;}
-    }
-    if(!data){throw new Error(lastErr||'All proxies failed');}
+    const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
+    if(!workerUrl){ throw new Error('Cloudflare Worker URL not set — go to Settings → Zerodha → Step 3b'); }
+    const authHeader=`token ${key}:${tk}`;
+    // Fetch trades via worker
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),20000);
+    const res=await fetch(workerUrl,{
+      method:'GET',
+      headers:{'X-Kite-Version':'3','Authorization':authHeader,'X-Kite-Action':'trades'},
+      signal:ctrl.signal
+    });
+    clearTimeout(timer);
+    const raw=await res.json();
+    if(raw?.status==='error') throw new Error(raw.message||'Zerodha API error');
+    let data=null;
+    if(raw?.data!==undefined) data=raw;
+    else if(Array.isArray(raw)) data={data:raw};
+    if(!data) throw new Error('Unexpected response from Zerodha');
     const trds=(data?.data||[]).filter(t=>t.exchange==='NSE'||t.exchange==='BSE');
     if(!trds.length){toast('No trades found today','ℹ️');setDot('zd-sync-dot','');setDot('zd-dot','');setLog('zd-log','No equity trades today.');return;}
     const {added,skipped}=mergeApiOrders(trds,'zerodha');
