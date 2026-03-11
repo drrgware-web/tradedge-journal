@@ -1863,6 +1863,10 @@ select.fi{cursor:pointer}
               </div>
             </div>
             <div id="sb-log" style="font-size:11px;color:var(--t3);margin-top:4px;min-height:16px"></div>
+            <div id="sb-diag" style="font-size:11px;color:var(--t3);margin-top:6px;padding:6px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--b1)">
+              📦 localStorage: <b id="sb-ls-count">—</b> trades &nbsp;|&nbsp; 🧠 Memory: <b id="sb-mem-count">—</b> trades
+              &nbsp;<button onclick="sbDiagRefresh()" style="background:none;border:none;color:var(--y);cursor:pointer;font-size:11px;padding:0">🔄 Refresh</button>
+            </div>
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b1);font-size:10.5px;color:var(--t4);line-height:1.7">
               ⚠️ The <b style="color:var(--t3t3)">tradedge_trades</b> table — run this SQL once in Supabase → SQL Editor:
               <pre style="background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:10px;font-size:10px;color:var(--y);overflow-x:auto;margin-top:8px;line-height:1.7">-- ① Fresh install: create table
@@ -5594,6 +5598,15 @@ async function sbPush(){
   if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL','⚠️'); return; }
   setSbStatus('Pushing…', 'sync');
   try{
+    // Always re-read trades fresh from localStorage (memory var may be stale)
+    const rawTrades = localStorage.getItem('te_trades') || '[]';
+    let pushTrades;
+    try { pushTrades = JSON.parse(rawTrades); } catch(e) { pushTrades = trades; }
+    // Sync memory with localStorage
+    if(pushTrades.length !== trades.length) {
+      trades = pushTrades;
+      console.log('[sbPush] Reloaded trades from localStorage:', pushTrades.length);
+    }
     const ledger   = localStorage.getItem('te_ledger')    || '[]';
     const cfg      = localStorage.getItem('te_cfg')       || '{}';
     const fund     = localStorage.getItem('te_fund')      || '{}';
@@ -5604,7 +5617,7 @@ async function sbPush(){
     // trades array already contains entryImg/exitImg (base64 charts)
     const payload = {
       device_id:   'tradedge_main',
-      trades_json: JSON.stringify(trades),
+      trades_json: rawTrades,
       ledger_json: ledger,
       cfg_json:    cfg,
       fund_json:   fund,
@@ -5618,9 +5631,9 @@ async function sbPush(){
     localStorage.setItem('te_last_save', String(Date.now()));
     const ts = new Date().toLocaleTimeString('en-IN');
     const lc = JSON.parse(ledger).length;
-    const cc = trades.filter(t=>t.entryImg||t.exitImg).length;
-    setSbStatus(`Pushed ${trades.length} trades · ${lc} ledger · ${cc} charts · ${sizeKB}KB ✅ · ${ts}`, 'ok');
-    toast(`☁️ ${trades.length} trades + ${lc} ledger + ${cc} charts pushed (${sizeKB}KB)`, '☁️');
+    const cc = pushTrades.filter(t=>t.entryImg||t.exitImg).length;
+    setSbStatus(`Pushed ${pushTrades.length} trades · ${lc} ledger · ${cc} charts · ${sizeKB}KB ✅ · ${ts}`, 'ok');
+    toast(`☁️ ${pushTrades.length} trades + ${lc} ledger + ${cc} charts pushed (${sizeKB}KB)`, '☁️');
   }catch(e){
     const hint = e.message.includes('Network') ? ' — use HTTPS not file://' : '';
     setSbStatus('Push failed: '+e.message+hint, '');
@@ -8566,7 +8579,7 @@ function handleChartDrop(type, e){
 }
 
 
-function loadSbCreds(){
+function loadSbCreds(){ setTimeout(sbDiagRefresh, 100);
   const urlEl=document.getElementById('s-sb-url');
   const keyEl=document.getElementById('s-sb-key');
   if(urlEl) urlEl.value=localStorage.getItem('sb_url')||'';
@@ -8577,6 +8590,34 @@ function loadSbCreds(){
   setSbStatus(url?'Credentials loaded':'Not configured',url?'ok':'');
   const warn=document.getElementById('file-proto-warn');
   if(warn) warn.style.display=location.protocol==='file:'?'block':'none';
+}
+
+
+function sbDiagRefresh(){
+  try{
+    const raw = localStorage.getItem('te_trades') || '[]';
+    const lsCount = JSON.parse(raw).length;
+    const memCount = trades.length;
+    const lsEl  = document.getElementById('sb-ls-count');
+    const memEl = document.getElementById('sb-mem-count');
+    if(lsEl)  lsEl.textContent  = lsCount;
+    if(memEl) memEl.textContent = memCount;
+    if(lsEl && lsCount !== memCount){
+      lsEl.style.color  = 'var(--r)';
+      memEl.style.color = 'var(--r)';
+      // Auto-fix: sync memory with localStorage
+      if(lsCount > memCount){
+        trades = JSON.parse(raw);
+        renderDash(); renderTrades();
+        if(lsEl) lsEl.style.color = 'var(--g)';
+        if(memEl){ memEl.textContent = trades.length; memEl.style.color = 'var(--g)'; }
+        toast('Fixed: reloaded ' + trades.length + ' trades from localStorage ✅', '✅');
+      }
+    } else {
+      if(lsEl)  lsEl.style.color  = 'var(--g)';
+      if(memEl) memEl.style.color = 'var(--g)';
+    }
+  }catch(e){ console.error('[sbDiagRefresh]',e); }
 }
 
 </script>
