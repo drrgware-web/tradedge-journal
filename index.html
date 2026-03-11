@@ -3342,57 +3342,28 @@ async function syncDhan(){
   setDot('dhan-sync-dot','syncing');setDot('dhan-dot','syncing');
   setLog('dhan-log','Syncing…');
 
-  // Helper: try a fetch with timeout
-  async function tryFetch(url, opts={}, timeoutMs=15000){
-    const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
-    try{
-      const r=await fetch(url,{...opts,signal:ctrl.signal});
-      clearTimeout(timer);
-      return r;
-    }catch(e){ clearTimeout(timer); throw e; }
-  }
-
-  // Try multiple CORS proxies in order
-  async function fetchWithProxies(targetUrl, opts={}){
-    const proxies=[
-      url=>`https://corsproxy.io/?${encodeURIComponent(url)}`,
-      url=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      url=>`https://proxy.cors.sh/${url}`,
-      url=>`https://cors-anywhere.herokuapp.com/${url}`,
-    ];
-    let lastErr='';
-    for(const makeProxy of proxies){
-      try{
-        const proxyUrl=makeProxy(targetUrl);
-        const res=await tryFetch(proxyUrl,opts,12000);
-        if(res.ok||res.status===200) return res;
-        lastErr=`HTTP ${res.status}`;
-      }catch(e){ lastErr=e.message||'fetch failed'; }
-    }
-    throw new Error('All proxies failed: '+lastErr);
-  }
-
   try{
+    const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
+    if(!workerUrl) throw new Error('Cloudflare Worker URL not set — go to Settings → Zerodha → Step 3b');
     const today=new Date().toISOString().slice(0,10);
     const from=new Date(Date.now()-90*86400000).toISOString().slice(0,10);
 
-    // Try tradebook first (POST)
+    // Try tradebook first via worker
     let data=null;
     try{
-      const res=await fetchWithProxies('https://api.dhan.co/v2/tradebook',{
+      const res=await fetch(workerUrl,{
         method:'POST',
-        headers:{'Content-Type':'application/json','access-token':tk,'client-id':String(id)},
-        body:JSON.stringify({'dhanClientId':String(id),'access-token':tk,'fromDate':from,'toDate':today})
+        headers:{'Content-Type':'application/json','X-Kite-Action':'dhan-tradebook','X-Dhan-Token':tk,'X-Dhan-ID':String(id)},
+        body:JSON.stringify({'dhanClientId':String(id),'fromDate':from,'toDate':today})
       });
       data=await res.json();
     }catch(e){ setLog('dhan-log','Tradebook failed, trying orders… '+e.message); }
 
-    // Fallback: orders endpoint (GET)
+    // Fallback: orders endpoint
     if(!data||(Array.isArray(data)&&!data.length)){
-      const res2=await fetchWithProxies('https://api.dhan.co/v2/orders',{
+      const res2=await fetch(workerUrl,{
         method:'GET',
-        headers:{'Content-Type':'application/json','access-token':tk,'client-id':String(id)}
+        headers:{'X-Kite-Action':'dhan-orders','X-Dhan-Token':tk,'X-Dhan-ID':String(id)}
       });
       data=await res2.json();
     }
@@ -5114,51 +5085,30 @@ async function syncDefinedge() {
   setLog('de-log','Syncing from Definedge RZone…');
 
   try {
-    // corsproxy.io forwards Authorization headers correctly unlike allorigins
-    // Try multiple known Definedge RZone endpoints
-    const endpoints = [
-      'https://connect.definedge.com/trade/tradebook',
-      'https://connect.definedge.com/orders/tradebook',
-      'https://api.definedge.com/v1/tradebook',
-    ];
+    const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
+    if(!workerUrl) throw new Error('Cloudflare Worker URL not set — go to Settings → Zerodha → Step 3b');
 
-    let data = null;
-    let lastErr = '';
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 20000);
+    const res = await fetch(workerUrl, {
+      method: 'GET',
+      headers: {
+        'X-Kite-Action': 'de-tradebook',
+        'Authorization': `Bearer ${tk}`,
+        'X-Client-ID': String(id),
+        'Accept': 'application/json'
+      },
+      signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    const raw = await res.json();
+    let data = Array.isArray(raw) ? raw : (raw?.data || raw?.trades || raw?.tradebook || raw?.TradeBook || []);
 
-    for(const endpoint of endpoints){
-      try{
-        // Use corsproxy.io — it forwards custom headers
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(endpoint)}`;
-        const ctrl = new AbortController();
-        const timer = setTimeout(()=>ctrl.abort(), 12000);
-        const res = await fetch(proxyUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${tk}`,
-            'X-Client-ID': String(id),
-            'Accept': 'application/json'
-          },
-          signal: ctrl.signal
-        });
-        clearTimeout(timer);
-        const raw = await res.json();
-        const arr = Array.isArray(raw) ? raw : (raw?.data || raw?.trades || raw?.tradebook || raw?.TradeBook || []);
-        if(arr.length > 0){ data = arr; break; }
-        lastErr = raw?.message || raw?.error || raw?.Message || `No data from ${endpoint}`;
-      }catch(e){
-        if(e.name==='AbortError') lastErr='Timeout';
-        else lastErr = e.message;
-      }
-    }
-
-    if(!data || !data.length){
-      // Provide specific guidance based on the error
-      const hint = lastErr.toLowerCase().includes('401') || lastErr.toLowerCase().includes('unauthorized')
+    if(!data.length){
+      const hint = (raw?.message||'').toLowerCase().includes('401') || (raw?.message||'').toLowerCase().includes('unauthorized')
         ? 'Token expired — regenerate from RZone → Settings → API Access'
-        : lastErr.toLowerCase().includes('timeout')
-        ? 'Connection timed out — check your internet'
         : 'No trades found or token expired. Regenerate token from RZone daily.';
-      throw new Error(hint + (lastErr ? ` (${lastErr})` : ''));
+      throw new Error(hint);
     }
 
     // Broad filter — accept all instruments if segment unclear
@@ -5654,6 +5604,9 @@ async function sbPush(){
     const frsPrefs = localStorage.getItem('te_frs_prefs') || '{}';
     const mpsUrl   = localStorage.getItem('te_mps_url')   || '';
     const theme    = localStorage.getItem('te_theme')     || 'dark';
+    const workerUrl= localStorage.getItem('zd_worker_url')|| '';
+    const zdKey    = localStorage.getItem('zd_key')       || '';
+    const zdSec    = localStorage.getItem('zd_sec')       || '';
     // trades array already contains entryImg/exitImg (base64 charts)
     const payload = {
       device_id:   'tradedge_main',
@@ -5662,7 +5615,7 @@ async function sbPush(){
       cfg_json:    cfg,
       fund_json:   fund,
       alerts_json: alerts,
-      prefs_json:  JSON.stringify({frsPrefs:JSON.parse(frsPrefs), mpsUrl, theme}),
+      prefs_json:  JSON.stringify({frsPrefs:JSON.parse(frsPrefs), mpsUrl, theme, workerUrl, zdKey, zdSec}),
       updated_at:  new Date().toISOString()
     };
     const sizeKB = Math.round(JSON.stringify(payload).length/1024);
@@ -5711,6 +5664,9 @@ async function sbPull(){
           if(prefs.frsPrefs) localStorage.setItem('te_frs_prefs', JSON.stringify(prefs.frsPrefs));
           if(prefs.mpsUrl)   localStorage.setItem('te_mps_url',   prefs.mpsUrl);
           if(prefs.theme)    localStorage.setItem('te_theme',     prefs.theme);
+          if(prefs.workerUrl)localStorage.setItem('zd_worker_url',prefs.workerUrl);
+          if(prefs.zdKey)    localStorage.setItem('zd_key',       prefs.zdKey);
+          if(prefs.zdSec)    localStorage.setItem('zd_sec',       prefs.zdSec);
         }catch(e2){}
       }
       localStorage.setItem('te_last_save', String(cloudTime));
