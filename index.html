@@ -5924,6 +5924,413 @@ function viewTradeCharts(id){
 }
 
 
+
+// ══════════════════════════════════════════════════
+// FORMAT HELPERS
+// ══════════════════════════════════════════════════
+function fmtShort(v){
+  if(v===undefined||v===null||isNaN(v)) return '—';
+  const abs=Math.abs(v);
+  const s=abs>=1e7?'₹'+(abs/1e7).toFixed(1)+'Cr':abs>=1e5?'₹'+(abs/1e5).toFixed(1)+'L':abs>=1e3?'₹'+(abs/1e3).toFixed(1)+'K':'₹'+abs.toFixed(0);
+  return (v<0?'-':v>0?'+':'')+s;
+}
+function fmtNum(v,dec=2){ return (v===undefined||v===null||isNaN(v))?'—':Number(v).toFixed(dec); }
+function fmtK(v){ if(!v||isNaN(v)) return '—'; const a=Math.abs(v); return (v<0?'-':'')+(a>=1e7?(a/1e7).toFixed(1)+'Cr':a>=1e5?(a/1e5).toFixed(1)+'L':a>=1e3?(a/1e3).toFixed(1)+'K':a.toFixed(0)); }
+function fmtDate(d){
+  if(!d) return '—';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)){
+    const dd=new Date(d+'T00:00:00');
+    return dd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+  }
+  return d;
+}
+function fmtCr(v){ if(!v||isNaN(v)) return '—'; if(Math.abs(v)>=1e7) return (v/1e7).toFixed(1)+' Cr'; if(Math.abs(v)>=1e5) return (v/1e5).toFixed(1)+' L'; return v.toFixed(0); }
+function pctStr(cur,old){ if(cur==null||old==null||old===0) return '<span style="color:var(--t4)">—</span>'; const p=(cur-old)/Math.abs(old)*100; const col=p>0?'#4CAF50':p<0?'#FF4560':'var(--t3)'; return `<span style="color:${col}">${p>0?'+':''}${p.toFixed(1)}%</span>`; }
+function crStr(v){ return v==null?'<span style="color:var(--t4)">—</span>':(v/1e7).toFixed(1); }
+
+// ══════════════════════════════════════════════════
+// PAGE RENDERERS (stubs for pages that render their own HTML)
+// ══════════════════════════════════════════════════
+function renderCal(){
+  const el=document.getElementById('page-calendar');
+  if(!el) return;
+  // Calendar heat-map by month
+  const closed=trades.filter(t=>t.status==='Closed');
+  if(!closed.length){ el.querySelector('#cal-body,#hmap') && (el.querySelector('#hmap').innerHTML='<div style="color:var(--t3);padding:20px;text-align:center">No closed trades yet</div>'); return; }
+  const byDate={};
+  closed.forEach(t=>{
+    const d=t.exits?.[0]?.date||t.date||'';
+    if(d){ byDate[d]=(byDate[d]||0)+(t.realisedPL??0); }
+  });
+  const hmap=document.getElementById('hmap');
+  if(!hmap) return;
+  const dates=Object.keys(byDate).sort();
+  hmap.innerHTML=dates.map(d=>{
+    const v=byDate[d]; const col=v>0?'var(--g)':v<0?'var(--r)':'var(--t4)';
+    return `<div title="${d}: ${fmt(v)}" style="background:${col};opacity:.7;width:14px;height:14px;border-radius:2px;display:inline-block;margin:1px" onclick=""></div>`;
+  }).join('');
+}
+
+function renderFund(){
+  const el=document.getElementById('fund-body')||document.getElementById('page-fund');
+  if(!el) return;
+  // Fund page renders from cfg data
+  try{
+    const capEl=document.getElementById('fund-cap');
+    const riskEl=document.getElementById('fund-risk');
+    if(capEl) capEl.textContent='₹'+Number(cfg.cap||0).toLocaleString('en-IN');
+    if(riskEl) riskEl.textContent=(cfg.risk||0.5)+'%';
+  }catch(e){}
+}
+
+function renderLedger(){
+  const container=document.getElementById('ledger-tbody')||document.getElementById('page-ledger');
+  if(!container) return;
+  try{
+    const all=getLedger();
+    const data=typeof ledgerBrokerFilter!=='undefined'&&ledgerBrokerFilter!=='all'?all.filter(e=>e.broker===ledgerBrokerFilter):all;
+    const sorted=[...data].sort((a,b)=>b.date?.localeCompare(a.date||'')||0);
+    const tbody=document.getElementById('ledger-tbody');
+    if(tbody) tbody.innerHTML=sorted.map(e=>`<tr>
+      <td>${e.date||'—'}</td>
+      <td>${e.broker||'—'}</td>
+      <td>${e.type||'—'}</td>
+      <td class="mono ${(e.amount||0)>0?'col-g':'col-r'}">${fmt(e.amount||0)}</td>
+      <td class="mono">${fmt(e.balance||0)}</td>
+      <td style="color:var(--t3);font-size:11px">${e.note||''}</td>
+    </tr>`).join('');
+  }catch(e){ console.error('[renderLedger]',e); }
+}
+
+function renderAlerts(){
+  const container=document.getElementById('alerts-list');
+  if(!container) return;
+  try{
+    const alerts=JSON.parse(localStorage.getItem('te_alerts')||'[]');
+    if(!alerts.length){ container.innerHTML='<div style="color:var(--t3);padding:20px;text-align:center">No alerts set</div>'; return; }
+    container.innerHTML=alerts.map((a,i)=>`<div class="card" style="margin-bottom:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+      <div><span style="font-weight:700;color:var(--t1)">${a.sym||'—'}</span> <span style="color:var(--t3);font-size:11px">${a.type||'Price'} ${a.dir||'≥'} ₹${a.price||0}</span></div>
+      <button onclick="deleteAlert(${i})" style="background:rgba(255,107,138,.15);border:1px solid rgba(255,107,138,.3);color:#FF6B8A;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">✕</button>
+    </div>`).join('');
+  }catch(e){ console.error('[renderAlerts]',e); }
+}
+
+function renderPossize(){
+  // Position sizer renders on input change - just trigger recalc
+  if(typeof calcPositionSize==='function') calcPositionSize();
+}
+
+function renderAna(){
+  // Analytics page - renders charts and stats
+  const el=document.getElementById('page-analytics');
+  if(!el) return;
+  try{
+    if(typeof renderAnalyticsKPIs==='function') renderAnalyticsKPIs();
+  }catch(e){}
+}
+
+function renderMPS(){
+  const el=document.getElementById('mps-container')||document.getElementById('page-mps');
+  if(el && typeof renderMPSContent==='function') renderMPSContent();
+}
+
+// ══════════════════════════════════════════════════
+// DATA LOADERS
+// ══════════════════════════════════════════════════
+function getLedger(){
+  try{ return JSON.parse(localStorage.getItem('te_ledger')||'[]'); }catch{ return []; }
+}
+let ledgerBrokerFilter='all';
+
+function loadFund(){
+  try{
+    const capEl=document.getElementById('s-cap'); if(capEl) capEl.value=cfg.cap||874000;
+    const riskEl=document.getElementById('s-risk'); if(riskEl) riskEl.value=cfg.risk||0.5;
+  }catch(e){}
+}
+
+function loadAlerts(){
+  renderAlerts();
+  // Populate alert symbol/price from settings if needed
+  const sym=localStorage.getItem('al_last_sym')||'';
+  const symEl=document.getElementById('al-sym'); if(symEl&&sym) symEl.value=sym;
+}
+
+// ══════════════════════════════════════════════════
+// AI PAGE
+// ══════════════════════════════════════════════════
+function initAI(){
+  const provEl=document.getElementById('ai-provider-select');
+  if(provEl) provEl.value=getAIProvider();
+}
+
+function clearAIOutput(){
+  const out=document.getElementById('ai-output');
+  if(out) out.innerHTML='';
+  const inp=document.getElementById('ai-question');
+  if(inp) inp.value='';
+}
+
+function buildTradeContext(mode){
+  const closed=trades.filter(t=>t.status==='Closed').map(t=>calc({...t}));
+  const wins=closed.filter(t=>t.realisedPL>0);
+  const losses=closed.filter(t=>t.realisedPL<0);
+  const totalPL=closed.reduce((s,t)=>s+(t.realisedPL||0),0);
+  return {
+    summary:{ total:closed.length, wins:wins.length, losses:losses.length, totalPL, winRate:closed.length?wins.length/closed.length*100:0 },
+    trades: mode==='full' ? closed.slice(-30) : closed.slice(-10)
+  };
+}
+
+function buildPrompt(mode, question, context){
+  const s=context.summary;
+  return `You are a trading coach analysing a trader's journal.
+Stats: ${s.total} closed trades, ${s.wins} wins, ${s.losses} losses, win rate ${s.winRate.toFixed(1)}%, total P&L ₹${s.totalPL.toFixed(0)}.
+Recent trades (last ${context.trades.length}): ${JSON.stringify(context.trades.map(t=>({sym:t.symbol,side:t.side,pnl:t.realisedPL?.toFixed(0),rr:t.rr?.toFixed(2),setup:t.setup})))}.
+Question: ${question}
+Answer concisely in 2-3 sentences with actionable insight.`;
+}
+
+// ══════════════════════════════════════════════════
+// ALERTS HELPERS
+// ══════════════════════════════════════════════════
+function deleteAlert(i){
+  try{
+    const alerts=JSON.parse(localStorage.getItem('te_alerts')||'[]');
+    alerts.splice(i,1);
+    localStorage.setItem('te_alerts',JSON.stringify(alerts));
+    renderAlerts();
+    toast('Alert deleted');
+  }catch(e){}
+}
+
+function clearAlertLog(){
+  const log=document.getElementById('alert-log');
+  if(log) log.innerHTML='';
+}
+
+async function alFetchPrice(sym){
+  if(!sym) return;
+  const statusEl=document.getElementById('al-price-status');
+  if(statusEl) statusEl.textContent='⏳ Fetching CMP…';
+  const ticker=sym.includes('.')?sym:sym+'.NS';
+  try{
+    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`;
+    const r=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    const d=await r.json();
+    const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    if(price){
+      const priceEl=document.getElementById('al-cmp');
+      if(priceEl) priceEl.value=price;
+      if(statusEl) statusEl.textContent='✅ CMP: ₹'+price;
+    } else {
+      if(statusEl) statusEl.textContent='—';
+    }
+  }catch(e){
+    if(statusEl) statusEl.textContent='Failed';
+  }
+}
+
+// ══════════════════════════════════════════════════
+// CLEAR ALL TRADES
+// ══════════════════════════════════════════════════
+function clearAll(){
+  const existing=document.getElementById('del-confirm-bar');
+  if(existing) existing.remove();
+  const bar=document.createElement('div');
+  bar.id='del-confirm-bar';
+  bar.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;background:#1C2A3A;border:1.5px solid #FF4560;border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 24px rgba(0,0,0,.5)';
+  bar.innerHTML=`<span style="color:#fff;font-size:13px">⚠️ Delete <b>all ${trades.length} trades</b>? This cannot be undone.</span>
+    <button onclick="confirmClearAll()" style="background:#FF4560;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:700">Delete All</button>
+    <button onclick="document.getElementById('del-confirm-bar').remove()" style="background:var(--bg3);color:var(--t2);border:1px solid var(--b1);border-radius:8px;padding:7px 16px;cursor:pointer">Cancel</button>`;
+  document.body.appendChild(bar);
+}
+
+function confirmClearAll(){
+  trades=[];
+  save();
+  renderDash(); renderTrades();
+  const bar=document.getElementById('del-confirm-bar');
+  if(bar) bar.remove();
+  toast('All trades deleted','🗑');
+}
+
+
+
+// ══════════════════════════════════════════════════
+// CHART.JS DEFAULTS & CHART HELPERS
+// ══════════════════════════════════════════════════
+const CO = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 300 },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1C2B3A',
+      titleColor: '#E2EAF4',
+      bodyColor: '#8BA0B8',
+      borderColor: '#2A3F55',
+      borderWidth: 1,
+      padding: 10,
+      titleFont: { family: 'Outfit', size: 12 },
+      bodyFont:  { family: 'Outfit', size: 11 }
+    }
+  },
+  scales: {
+    x: {
+      grid: { color: 'rgba(139,160,184,0.07)' },
+      ticks: { color: '#8BA0B8', font: { family: 'Outfit', size: 10 } }
+    },
+    y: {
+      grid: { color: 'rgba(139,160,184,0.07)' },
+      ticks: { color: '#8BA0B8', font: { family: 'Outfit', size: 10 } }
+    }
+  }
+};
+
+function dChart(id, cfg){
+  if(charts[id]){ charts[id].destroy(); delete charts[id]; }
+  const canvas = document.getElementById(id);
+  if(!canvas) return;
+  charts[id] = new Chart(canvas, cfg);
+}
+
+function eqCurve(closed){
+  const s = [...closed].sort((a,b)=>(a.entries?.[0]?.date||'').localeCompare(b.entries?.[0]?.date||''));
+  let cum = 0, cap = cfg.cap || 874000;
+  const data   = s.map(t=>{ cum += t.realisedPL; return eqMode==='pct' ? +(cum/cap*100).toFixed(2) : +cum.toFixed(0); });
+  const labels = s.map(t=>t.entries?.[0]?.date||'');
+  const col = (!data.length || data[data.length-1] >= 0) ? '#00E5A0' : '#FF4560';
+  return {
+    type: 'line',
+    data: { labels, datasets:[{ data, borderColor:col, backgroundColor:col+'18', borderWidth:2, fill:true, tension:.4, pointRadius:2, pointHoverRadius:5 }] },
+    options: { ...CO, scales: { ...CO.scales, y: { ...CO.scales.y, ticks: { ...CO.scales.y.ticks, callback: v => eqMode==='pct' ? v.toFixed(1)+'%' : '₹'+Math.round(v/1000)+'k' } } } }
+  };
+}
+
+function wlDonut(w, l, o){
+  return {
+    type: 'doughnut',
+    data: { labels:['Wins','Losses','Open'], datasets:[{ data:[w,l,o], backgroundColor:['#00E5A022','#FF456022','#3B8BFF22'], borderColor:['#00E5A0','#FF4560','#3B8BFF'], borderWidth:2 }] },
+    options: { responsive:true, maintainAspectRatio:false, animation:{duration:300},
+      plugins: { legend:{ display:true, position:'bottom', labels:{ color:'#8BA0B8', font:{family:'Outfit',size:11}, padding:10 } }, tooltip: CO.plugins.tooltip } }
+  };
+}
+
+function monthBars(closed){
+  const m = {};
+  closed.forEach(t=>{ const d=t.entries?.[0]?.date; if(!d) return; const[y,mo]=d.split('-'); const k=`${y}-${mo}`; m[k]=(m[k]||0)+t.realisedPL; });
+  const s = Object.entries(m).sort((a,b)=>a[0].localeCompare(b[0])).slice(-12);
+  return {
+    type: 'bar',
+    data: {
+      labels: s.map(([k])=>{ const[y,mo]=k.split('-'); return new Date(+y,+mo-1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'}); }),
+      datasets:[{ data:s.map(([,v])=>v), backgroundColor:s.map(([,v])=>v>=0?'#00E5A033':'#FF456033'), borderColor:s.map(([,v])=>v>=0?'#00E5A0':'#FF4560'), borderWidth:1, borderRadius:4 }]
+    },
+    options: { ...CO, scales: { ...CO.scales, y: { ...CO.scales.y, ticks: { ...CO.scales.y.ticks, callback: v=>'₹'+Math.round(v/1000)+'k' } } } }
+  };
+}
+
+function rBars(closed){
+  const b = {'<-2R':0, '-2→-1R':0, '-1→0R':0, '0→1R':0, '1→2R':0, '>2R':0};
+  closed.forEach(t=>{ const r=t.rr; if(r<-2) b['<-2R']++; else if(r<-1) b['-2→-1R']++; else if(r<0) b['-1→0R']++; else if(r<1) b['0→1R']++; else if(r<2) b['1→2R']++; else b['>2R']++; });
+  const cols = ['#FF4560','#FF7090','#FF9AB0','#60A5FA','#34D399','#00E5A0'];
+  return { type:'bar', data:{ labels:Object.keys(b), datasets:[{ data:Object.values(b), backgroundColor:cols.map(c=>c+'33'), borderColor:cols, borderWidth:1, borderRadius:4 }] }, options:CO };
+}
+
+// ══════════════════════════════════════════════════
+// INFO TOOLTIPS
+// ══════════════════════════════════════════════════
+function showInfoTip(btn, title, body, good){
+  let tip = document.getElementById('_info_tip');
+  if(!tip){ tip=document.createElement('div'); tip.id='_info_tip'; tip.className='info-tip'; document.body.appendChild(tip); }
+  tip.innerHTML = `<div class="info-tip-title">${title}</div><div class="info-tip-body">${body}</div>${good?`<div class="info-tip-good">${good}</div>`:''}`;
+  const r = btn.getBoundingClientRect();
+  tip.style.left = Math.min(r.left, window.innerWidth-220)+'px';
+  tip.style.top  = (r.bottom+6)+'px';
+  tip.classList.add('show');
+}
+function hideInfoTip(){
+  const tip=document.getElementById('_info_tip');
+  if(tip) tip.classList.remove('show');
+}
+
+// ══════════════════════════════════════════════════
+// ANALYTICS PAGE RENDERER
+// ══════════════════════════════════════════════════
+function renderAna(){
+  const closed = trades.map(t=>calc({...t})).filter(t=>t.status==='Closed');
+  const open   = trades.map(t=>calc({...t})).filter(t=>t.status!=='Closed');
+
+  // ── KPI Row ─────────────────────────────────────
+  const wins=closed.filter(t=>t.realisedPL>0), losses=closed.filter(t=>t.realisedPL<0);
+  const wr=closed.length?wins.length/closed.length*100:0;
+  const totalPL=closed.reduce((s,t)=>s+t.realisedPL,0);
+  const avgW=wins.length?wins.reduce((s,t)=>s+t.realisedPL,0)/wins.length:0;
+  const avgL=losses.length?Math.abs(losses.reduce((s,t)=>s+t.realisedPL,0)/losses.length):0;
+  const pf = avgL ? Math.abs(wins.reduce((s,t)=>s+t.realisedPL,0)) / Math.abs(losses.reduce((s,t)=>s+t.realisedPL,0)) : 0;
+  const avgR = closed.length ? closed.reduce((s,t)=>s+(t.rr||0),0)/closed.length : 0;
+  const avgHold = closed.length ? closed.reduce((s,t)=>s+(t.holdDays||0),0)/closed.length : 0;
+  const maxDD = (()=>{ let peak=0,dd=0,cum=0; [...closed].sort((a,b)=>(a.entries?.[0]?.date||'').localeCompare(b.entries?.[0]?.date||'')).forEach(t=>{ cum+=t.realisedPL; if(cum>peak)peak=cum; if(peak-cum>dd)dd=peak-cum; }); return dd; })();
+
+  const kpiEl = document.getElementById('ana-kpis');
+  if(kpiEl) kpiEl.innerHTML = [
+    {l:'Closed Trades', v:closed.length, s:''},
+    {l:'Win Rate',      v:wr.toFixed(1)+'%', c:wr>=50?'col-g':'col-r', s:`${wins.length}W / ${losses.length}L`},
+    {l:'Profit Factor', v:pf.toFixed(2)+'x', c:pf>=1?'col-g':'col-r', s:'Gross W / Gross L'},
+    {l:'Total Realised',v:fmt(totalPL), c:totalPL>=0?'col-g':'col-r', s:'Closed trades only'},
+    {l:'Avg R-Multiple',v:avgR.toFixed(2)+'R', c:avgR>=0?'col-g':'col-r', s:'Per closed trade'},
+    {l:'Avg Win',       v:fmt(avgW), c:'col-g', s:'Per winning trade'},
+    {l:'Avg Loss',      v:fmt(-avgL), c:'col-r', s:'Per losing trade'},
+    {l:'Avg Hold Days', v:avgHold.toFixed(1)+'d', s:'Closed trades'},
+    {l:'Max Drawdown',  v:fmt(maxDD), c:'col-r', s:'Peak-to-trough'},
+  ].map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c||''}">${k.v}</div><div class="kpi-sub">${k.s||''}</div></div>`).join('');
+
+  // ── Charts ───────────────────────────────────────
+  dChart('equityChart', eqCurve(closed));
+  dChart('monthlyChart', monthBars(closed));
+
+  // Setup breakdown
+  const setups={};
+  closed.forEach(t=>{ const s=t.setup||'Unknown'; setups[s]=(setups[s]||{wins:0,losses:0,pl:0}); if(t.realisedPL>0)setups[s].wins++; else setups[s].losses++; setups[s].pl+=t.realisedPL; });
+  const sEntries=Object.entries(setups).sort((a,b)=>b[1].pl-a[1].pl);
+  dChart('setupChart', {
+    type:'bar',
+    data:{ labels:sEntries.map(([k])=>k), datasets:[{ data:sEntries.map(([,v])=>v.pl), backgroundColor:sEntries.map(([,v])=>v.pl>=0?'#00E5A033':'#FF456033'), borderColor:sEntries.map(([,v])=>v.pl>=0?'#00E5A0':'#FF4560'), borderWidth:1, borderRadius:4 }] },
+    options:{ ...CO, scales:{ ...CO.scales, y:{ ...CO.scales.y, ticks:{ ...CO.scales.y.ticks, callback:v=>'₹'+Math.round(v/1000)+'k' } } } }
+  });
+
+  // Holding days distribution
+  const holdBuckets={'1d':0,'2-3d':0,'4-7d':0,'1-2w':0,'2-4w':0,'>4w':0};
+  closed.forEach(t=>{ const d=t.holdDays||0; if(d<=1)holdBuckets['1d']++; else if(d<=3)holdBuckets['2-3d']++; else if(d<=7)holdBuckets['4-7d']++; else if(d<=14)holdBuckets['1-2w']++; else if(d<=28)holdBuckets['2-4w']++; else holdBuckets['>4w']++; });
+  dChart('holdChart', {
+    type:'bar',
+    data:{ labels:Object.keys(holdBuckets), datasets:[{ data:Object.values(holdBuckets), backgroundColor:'#3B8BFF33', borderColor:'#3B8BFF', borderWidth:1, borderRadius:4 }] },
+    options:CO
+  });
+
+  // Advanced KPIs
+  const advEl = document.getElementById('ana-advanced-kpis');
+  if(advEl){
+    const expRet = closed.reduce((s,t)=>s+(t.rr||0),0);
+    const sqlt = closed.length ? Math.sqrt(closed.length) : 1;
+    const stdRR = closed.length>1 ? Math.sqrt(closed.reduce((s,t)=>s+Math.pow((t.rr||0)-avgR,2),0)/(closed.length-1)) : 0;
+    const sqi = stdRR ? (avgR / stdRR) * sqlt : 0;
+    advEl.innerHTML = [
+      {l:'Expectancy (R)', v:closed.length?(expRet/closed.length).toFixed(3)+'R':'—'},
+      {l:'SQN Score',      v:sqi.toFixed(2), c:sqi>=2?'col-g':sqi>=1?'col-y':'col-r'},
+      {l:'Std Dev (R)',    v:stdRR.toFixed(3)+'R'},
+      {l:'Best Trade',     v:fmt(Math.max(...closed.map(t=>t.realisedPL),0)), c:'col-g'},
+      {l:'Worst Trade',    v:fmt(Math.min(...closed.map(t=>t.realisedPL),0)), c:'col-r'},
+      {l:'Consec. Wins',   v:(()=>{ let mx=0,cur=0; [...closed].sort((a,b)=>(a.entries?.[0]?.date||'').localeCompare(b.entries?.[0]?.date||'')).forEach(t=>{ if(t.realisedPL>0){cur++;mx=Math.max(mx,cur);}else cur=0;}); return mx; })()},
+    ].map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c||''}">${k.v}</div></div>`).join('');
+  }
+
+  setTimeout(renderChartsGallery, 100);
+}
+
+
 </script>
 </body>
 </html>
