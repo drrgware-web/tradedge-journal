@@ -3947,46 +3947,49 @@ function onZdUrlPaste(val){
 }
 
 async function attemptTokenExchange(apiKey,requestToken,apiSecret){
-  setLog('zd-log','Attempting token exchange…');
+  setLog('zd-log','Generating checksum & preparing token exchange…');
   try{
+    // Compute SHA-256 checksum: api_key + request_token + api_secret
     const input=apiKey+requestToken+apiSecret;
     const enc=new TextEncoder().encode(input);
     const hashBuf=await crypto.subtle.digest('SHA-256',enc);
     const checksum=Array.from(new Uint8Array(hashBuf)).map(b=>('0'+b.toString(16)).slice(-2)).join('');
-    const body=`api_key=${apiKey}&request_token=${requestToken}&checksum=${checksum}`;
-    const headers={'X-Kite-Version':'3','Content-Type':'application/x-www-form-urlencoded'};
-    const targetUrl='https://api.kite.trade/session/token';
-    const proxies=[
-      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-    ];
-    for(const proxy of proxies){
-      try{
-        const ctrl=new AbortController();
-        const t=setTimeout(()=>ctrl.abort(),12000);
-        const res=await fetch(proxy,{method:'POST',headers,body,signal:ctrl.signal});
-        clearTimeout(t);
-        const data=await res.json();
-        if(data?.data?.access_token){
-          const at=data.data.access_token;
-          localStorage.setItem('zd_tk',at);
-          document.getElementById('s-zd-tk').value=at;
-          document.getElementById('zd-token-preview').innerHTML='<span style="color:var(--g);font-weight:700">✅ Access token generated & saved! Click Sync Now.</span>';
-          setLog('zd-log','✅ Token generated automatically!');
-          setDot('zd-dot','connected');
-          updateSyncStatuses();
-          setTimeout(syncZerodha,600);
-          return;
-        }
-      }catch(e){}
+
+    // NOTE: Public CORS proxies (corsproxy.io, allorigins) strip POST body fields,
+    // causing Zerodha to return "Missing api_key". Token exchange MUST be done
+    // server-side. We show the user a pre-filled curl command + manual paste fallback.
+
+    const curlCmd = `curl -X POST https://api.kite.trade/session/token \\
+  -H "X-Kite-Version: 3" \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "api_key=${apiKey}&request_token=${requestToken}&checksum=${checksum}"`;
+
+    const preview = document.getElementById('zd-token-preview');
+    if(preview){
+      preview.style.display='block';
+      preview.style.background='var(--bg3)';
+      preview.style.border='1px solid var(--y)';
+      preview.style.borderRadius='8px';
+      preview.style.padding='12px';
+      preview.innerHTML=`
+        <div style="color:var(--y);font-weight:700;margin-bottom:8px">⚡ Checksum Ready — 2 ways to get your Access Token:</div>
+        <div style="margin-bottom:10px">
+          <b style="color:var(--t2)">Option A — Run this in Terminal/CMD:</b>
+          <pre id="zd-curl-cmd" style="background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:8px;font-size:10px;color:var(--g);overflow-x:auto;margin-top:6px;white-space:pre-wrap;word-break:break-all">${curlCmd}</pre>
+          <button onclick="navigator.clipboard.writeText(document.getElementById('zd-curl-cmd').textContent).then(()=>toast('Copied!','📋'))" style="background:var(--bg2);border:1px solid var(--b1);color:var(--t2);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;margin-top:4px">📋 Copy curl command</button>
+        </div>
+        <div style="margin-bottom:10px">
+          <b style="color:var(--t2)">Option B — Use Zerodha Console:</b>
+          <span style="color:var(--t3);font-size:11px"> Go to <a href="https://developers.zerodha.com/apps" target="_blank" style="color:var(--y)">developers.zerodha.com/apps</a> → your app → API Sessions → generate token there</span>
+        </div>
+        <div style="color:var(--t3);font-size:11px;margin-bottom:6px">Then paste the <b style="color:var(--t1)">access_token</b> from the response into Step 4 below ↓</div>
+        <div style="font-size:10px;color:var(--t4);margin-top:8px;padding-top:8px;border-top:1px solid var(--b1)">
+          Checksum: <code style="color:var(--t3)">${checksum.slice(0,16)}…</code> &nbsp;|&nbsp; Request token: <code style="color:var(--t3)">${requestToken.slice(0,12)}…</code>
+        </div>`;
     }
-    // Exchange failed — ask user to paste token manually
-    setLog('zd-log','Auto-exchange failed. Please paste your access token manually in Step 4.');
-    document.getElementById('zd-token-preview').innerHTML='⚠️ Auto-exchange failed. Go to <a href="https://kite.trade/connect/login?api_key='+apiKey+'&v=3" target="_blank" style="color:var(--y)">Kite login</a>, after redirect copy the access_token from network tab or paste it in Step 4.';
-    document.getElementById('zd-token-preview').style.background='var(--yd)';
-    document.getElementById('zd-token-preview').style.display='block';
+    setLog('zd-log','Checksum computed ✅ — use curl or Zerodha Console to get access token, then paste in Step 4.');
   }catch(e){
-    setLog('zd-log','Token exchange error: '+e.message);
+    setLog('zd-log','Checksum error: '+e.message);
   }
 }
 function updateSyncStatuses(){
