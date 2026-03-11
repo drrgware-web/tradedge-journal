@@ -1499,22 +1499,12 @@ select.fi{cursor:pointer}
     </div>
 
     <!-- ══ CHARTS GALLERY ══ -->
+
+
 <div id="charts-gallery-section" style="margin-top:28px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
     <div>
-      <div style="font-size:15px;font-weight:700;color:var(--t1)">📸 Chart Screenshots Gallery</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:2px">All uploaded entry & exit charts from your trades</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <select id="gallery-filter" class="fi" style="width:120px;font-size:12px" onchange="renderChartsGallery()">
-        <option value="all">All Trades</option>
-        <option value="open">Open</option>
-        <option value="closed">Closed</option>
-      </select>
-    </div>
-  </div>
-  <div id="charts-gallery-container"></div>
-</div>
+      <div style="font-size:15px;font-weight:700;color:var(--t1)">📸 Chart Screenshots Gallery
 
 <!-- ══ CALENDAR ══ -->
     <div class="page" id="page-calendar">
@@ -5708,6 +5698,142 @@ function renderChartsGallery(){
       </div>
     </div>`;
   }).join('');
+}
+
+
+
+// ══════════════════════════════════════════════════
+// MODAL HELPERS
+// ══════════════════════════════════════════════════
+function openM(id){ const el=document.getElementById(id); if(el) el.classList.add('open'); }
+function closeM(id){ const el=document.getElementById(id); if(el) el.classList.remove('open'); }
+function openSync(){ openM('m-sync'); loadSbCreds(); }
+
+// ══════════════════════════════════════════════════
+// SUPABASE CLOUD SYNC
+// ══════════════════════════════════════════════════
+let sbAutoEnabled = !!localStorage.getItem('sb_auto');
+
+function getSbCreds(){
+  return { url: localStorage.getItem('sb_url')||'', key: localStorage.getItem('sb_key')||'' };
+}
+
+function setSbStatus(msg, type){
+  const txt = document.getElementById('sb-status-txt');
+  const dot = document.getElementById('sb-dot');
+  if(txt) txt.textContent = msg;
+  if(dot){ dot.className='sync-dot'; dot.style.background = type==='ok'?'var(--g)':type==='sync'?'var(--y)':'var(--t4)'; }
+  const log = document.getElementById('sb-log');
+  if(log) log.textContent = msg;
+}
+
+async function sbApi(method, path, body){
+  const {url, key} = getSbCreds();
+  const res = await fetch(`${url}/rest/v1/${path}`, {
+    method,
+    headers: { 'apikey':key, 'Authorization':`Bearer ${key}`, 'Content-Type':'application/json', 'Prefer': method==='POST'?'resolution=merge-duplicates':'' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if(!res.ok){ const e=await res.text().catch(()=>''); throw new Error(`HTTP ${res.status}: ${e.slice(0,120)}`); }
+  return method==='GET' ? res.json() : null;
+}
+
+async function sbPush(){
+  const {url, key} = getSbCreds();
+  if(!url||!key){ toast('Configure Supabase in Settings → Cloud Sync','⚠️'); nav('settings'); return; }
+  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL','⚠️'); return; }
+  setSbStatus('Pushing…','sync');
+  try{
+    await sbApi('POST','tradedge_trades?on_conflict=device_id',{
+      device_id:'tradedge_main', trades_json:JSON.stringify(trades),
+      ledger_json:localStorage.getItem('te_ledger')||'[]', cfg_json:JSON.stringify(cfg),
+      alerts_json:localStorage.getItem('te_alerts')||'[]',
+      prefs_json:JSON.stringify({theme:localStorage.getItem('te_theme')||'dark'}),
+      updated_at:new Date().toISOString()
+    });
+    localStorage.setItem('te_last_save',String(Date.now()));
+    const ts=new Date().toLocaleTimeString('en-IN');
+    setSbStatus('Pushed '+trades.length+' trades ✅ · '+ts,'ok');
+    toast('☁️ Pushed '+trades.length+' trades to cloud','☁️');
+  }catch(e){
+    const hint=e.message.includes('Network')?' — ensure app is on HTTPS':'';
+    setSbStatus('Push failed: '+e.message+hint,'');
+    toast('Push failed: '+e.message,'❌');
+    console.error('[sbPush]',e);
+  }
+}
+
+async function sbPull(){
+  const {url, key} = getSbCreds();
+  if(!url||!key){ toast('Configure Supabase in Settings → Cloud Sync','⚠️'); nav('settings'); return; }
+  if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL','⚠️'); return; }
+  setSbStatus('Pulling…','sync');
+  try{
+    const rows=await sbApi('GET','tradedge_trades?device_id=eq.tradedge_main&select=trades_json,ledger_json,cfg_json,alerts_json,updated_at&limit=1');
+    if(!rows||!rows.length){ setSbStatus('No cloud data yet — push first',''); toast('No cloud data found','⚠️'); return; }
+    const row=rows[0];
+    if(row.trades_json){ trades=JSON.parse(row.trades_json); localStorage.setItem('te_trades',row.trades_json); }
+    if(row.ledger_json) localStorage.setItem('te_ledger',row.ledger_json);
+    if(row.cfg_json){ cfg=JSON.parse(row.cfg_json); localStorage.setItem('te_cfg',row.cfg_json); }
+    if(row.alerts_json) localStorage.setItem('te_alerts',row.alerts_json);
+    renderDash(); renderTrades();
+    const ts=new Date(row.updated_at).toLocaleString('en-IN');
+    setSbStatus('Pulled '+trades.length+' trades ✅ · saved '+ts,'ok');
+    toast('☁️ Pulled '+trades.length+' trades from cloud','☁️');
+  }catch(e){
+    setSbStatus('Pull failed: '+e.message,'');
+    toast('Pull failed: '+e.message,'❌');
+    console.error('[sbPull]',e);
+  }
+}
+
+async function sbTestConnection(){
+  const {url,key}=getSbCreds();
+  if(!url||!key){ toast('Enter URL and Key first','⚠️'); return; }
+  setSbStatus('Testing…','sync');
+  try{ await sbApi('GET','tradedge_trades?limit=1'); setSbStatus('Connected ✅','ok'); toast('Supabase connected ✅','✅'); }
+  catch(e){ setSbStatus('Failed: '+e.message,''); toast('Connection failed: '+e.message,'❌'); }
+}
+
+function saveSbCreds(){
+  const url=(document.getElementById('s-sb-url')?.value||'').trim();
+  const key=(document.getElementById('s-sb-key')?.value||'').trim();
+  localStorage.setItem('sb_url',url); localStorage.setItem('sb_key',key);
+  setSbStatus(url?'Credentials saved ✅':'Cleared',url?'ok':'');
+  toast('Cloud sync credentials saved ✅','✅');
+}
+
+function loadSbCreds(){
+  const urlEl=document.getElementById('s-sb-url');
+  const keyEl=document.getElementById('s-sb-key');
+  if(urlEl) urlEl.value=localStorage.getItem('sb_url')||'';
+  if(keyEl) keyEl.value=localStorage.getItem('sb_key')||'';
+  const autoEl=document.getElementById('sb-auto');
+  if(autoEl) autoEl.checked=!!localStorage.getItem('sb_auto');
+  const {url}=getSbCreds();
+  setSbStatus(url?'Credentials loaded':'Not configured',url?'ok':'');
+  const warn=document.getElementById('file-proto-warn');
+  if(warn) warn.style.display=location.protocol==='file:'?'block':'none';
+}
+
+function toggleSbAuto(checked){
+  if(checked){ localStorage.setItem('sb_auto','1'); sbAutoEnabled=true; toast('Auto-sync enabled ✅','✅'); }
+  else { localStorage.removeItem('sb_auto'); sbAutoEnabled=false; toast('Auto-sync disabled',''); }
+}
+
+// ══════════════════════════════════════════════════
+// SETTINGS LOADER
+// ══════════════════════════════════════════════════
+function loadSettings(){
+  try{
+    const capEl=document.getElementById('s-cap'); if(capEl) capEl.value=cfg.cap||874000;
+    const riskEl=document.getElementById('s-risk'); if(riskEl) riskEl.value=cfg.risk||0.5;
+    ['dhan_id','zd_key','zd_tk','de_id','de_tk'].forEach(k=>{
+      const el=document.getElementById('s-'+k.replace('_','-')); if(el) el.value=localStorage.getItem(k)||'';
+    });
+    const aiEl=document.getElementById('ai-key-input'); if(aiEl) aiEl.value=localStorage.getItem('te_ai_key')||'';
+    loadSbCreds();
+  }catch(e){ console.error('[loadSettings]',e); }
 }
 
 
