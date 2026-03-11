@@ -1782,16 +1782,18 @@ select.fi{cursor:pointer}
             </div>
             <button class="btn btn-green btn-sm" onclick="saveDefinedgeCreds()" style="margin-bottom:14px">💾 Save Credentials</button>
             <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin-bottom:14px">
-              <div style="font-size:12px;font-weight:700;color:var(--y);margin-bottom:8px">🔐 Daily Login (OTP required)</div>
-              <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.7">Definedge requires an OTP each day. Click <b style="color:var(--t2)">Send OTP</b> → enter OTP received on mobile/email → <b style="color:var(--t2)">Verify & Get Session</b></div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-                <button class="btn btn-y btn-sm" id="de-otp-btn" onclick="deStep1()">📱 Send OTP</button>
-                <span id="de-otp-status" style="font-size:11px;color:var(--t3);align-self:center"></span>
+              <div style="font-size:12px;font-weight:700;color:var(--y);margin-bottom:8px">🔐 Daily Session Key (required every day)</div>
+              <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.8">
+                <b style="color:var(--t2)">Step 1:</b> Open login link in <b style="color:var(--t1)">Incognito window</b> → enter your credentials + OTP<br>
+                <b style="color:var(--t2)">Step 2:</b> After login, click <b style="color:var(--t1)">"Regenerate Token"</b> — you'll see your <code style="color:var(--g)">api_session_key</code><br>
+                <b style="color:var(--t2)">Step 3:</b> Copy and paste that key below → click <b style="color:var(--t1)">Save & Sync</b>
               </div>
-              <div id="de-otp-box" style="display:none;margin-top:8px">
-                <div class="fg" style="margin-bottom:8px"><label class="fl">OTP received on mobile/email</label><input class="fi" id="s-de-otp" placeholder="123456" maxlength="10" style="letter-spacing:4px;font-size:16px;font-weight:700"></div>
-                <button class="btn btn-green btn-sm" onclick="deStep2()">✅ Verify & Get Session Key</button>
+              <button class="btn btn-y btn-sm" onclick="window.open('https://myaccount.definedgesecurities.com','_blank')" style="margin-bottom:12px">🔗 Open Definedge Login</button>
+              <div class="fg" style="margin-bottom:8px">
+                <label class="fl">Paste api_session_key here (renew daily)</label>
+                <input class="fi" id="s-de-session" placeholder="Paste your api_session_key…">
               </div>
+              <button class="btn btn-green btn-sm" onclick="deManualSession()">💾 Save & Sync</button>
             </div>
             <div id="de-session-box" style="display:none;background:var(--gd);border:1px solid rgba(0,229,160,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">✅ Session key active — <span id="de-session-time" style="color:var(--t3)"></span></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -8513,6 +8515,8 @@ function loadZdWorkerUrl(){
   if(el) el.value=localStorage.getItem('zd_worker_url')||'';
 }
 function loadDefinedgeCreds(){
+  const sesEl=document.getElementById('s-de-session');
+  if(sesEl&&localStorage.getItem('de_session')) sesEl.value=localStorage.getItem('de_session');
   const tkEl=document.getElementById('s-de-tk');
   const secEl=document.getElementById('s-de-sec');
   if(tkEl)  tkEl.value=localStorage.getItem('de_tk')||'';
@@ -8607,6 +8611,21 @@ async function deStep2(){
       toast('OTP failed: '+msg,'❌'); setLog('de-log','OTP failed: '+msg);
     }
   }catch(e){ toast('Error: '+e.message,'❌'); setLog('de-log','Error: '+e.message); }
+}
+
+
+function deManualSession(){
+  const sk = (document.getElementById('s-de-session')?.value||'').trim();
+  if(!sk){ toast('Paste your api_session_key first','⚠️'); return; }
+  localStorage.setItem('de_session', sk);
+  localStorage.setItem('de_session_time', new Date().toLocaleTimeString('en-IN'));
+  const box = document.getElementById('de-session-box');
+  const tm  = document.getElementById('de-session-time');
+  if(box) box.style.display='block';
+  if(tm)  tm.textContent = 'Generated at '+new Date().toLocaleTimeString('en-IN');
+  setDot('de-dot','connected');
+  toast('✅ Session key saved — syncing now…','✅');
+  setTimeout(syncDefinedge, 400);
 }
 
 </script>
