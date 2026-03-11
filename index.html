@@ -1863,9 +1863,13 @@ select.fi{cursor:pointer}
               </div>
             </div>
             <div id="sb-log" style="font-size:11px;color:var(--t3);margin-top:4px;min-height:16px"></div>
-            <div id="sb-diag" style="font-size:11px;color:var(--t3);margin-top:6px;padding:6px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--b1)">
-              📦 localStorage: <b id="sb-ls-count">—</b> trades &nbsp;|&nbsp; 🧠 Memory: <b id="sb-mem-count">—</b> trades
-              &nbsp;<button onclick="sbDiagRefresh()" style="background:none;border:none;color:var(--y);cursor:pointer;font-size:11px;padding:0">🔄 Refresh</button>
+            <div id="sb-diag" style="font-size:11px;color:var(--t3);margin-top:6px;padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--b1);line-height:2">
+              <span>📦 localStorage: <b id="sb-ls-count" style="color:var(--y)">—</b> trades</span>
+              &nbsp;|&nbsp;
+              <span>🧠 Memory: <b id="sb-mem-count" style="color:var(--y)">—</b> trades</span>
+              &nbsp;
+              <button onclick="sbDiagRefresh()" style="background:none;border:none;color:var(--y);cursor:pointer;font-size:11px;padding:0">🔄 Refresh</button>
+              <div id="sb-diag-warn" style="display:none;margin-top:4px;color:var(--r);font-weight:600"></div>
             </div>
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b1);font-size:10.5px;color:var(--t4);line-height:1.7">
               ⚠️ The <b style="color:var(--t3t3)">tradedge_trades</b> table — run this SQL once in Supabase → SQL Editor:
@@ -4096,6 +4100,7 @@ async function refreshLivePrices(showToast=false) {
   // Re-render to show updated CMPs + P&L
   renderDash();
   renderTrades();
+  sbDiagRefresh();
   if (showToast) toast(`Live prices: ${updated}/${symbols.length} updated`, '📡');
 }
 
@@ -8594,32 +8599,32 @@ function loadSbCreds(){ setTimeout(sbDiagRefresh, 100);
 
 
 function sbDiagRefresh(){
+  const lsEl  = document.getElementById('sb-ls-count');
+  const memEl = document.getElementById('sb-mem-count');
+  let lsCount = 0, lsError = null;
   try{
-    const raw = localStorage.getItem('te_trades') || '[]';
-    const lsCount = JSON.parse(raw).length;
-    const memCount = trades.length;
-    const lsEl  = document.getElementById('sb-ls-count');
-    const memEl = document.getElementById('sb-mem-count');
-    if(lsEl)  lsEl.textContent  = lsCount;
-    if(memEl) memEl.textContent = memCount;
-    if(lsEl && lsCount !== memCount){
-      lsEl.style.color  = 'var(--r)';
-      memEl.style.color = 'var(--r)';
-      // Auto-fix: sync memory with localStorage
-      if(lsCount > memCount){
-        trades = JSON.parse(raw);
-        renderDash(); renderTrades();
-        if(lsEl) lsEl.style.color = 'var(--g)';
-        if(memEl){ memEl.textContent = trades.length; memEl.style.color = 'var(--g)'; }
-        toast('Fixed: reloaded ' + trades.length + ' trades from localStorage ✅', '✅');
-      }
-    } else {
-      if(lsEl)  lsEl.style.color  = 'var(--g)';
-      if(memEl) memEl.style.color = 'var(--g)';
-    }
-  }catch(e){ console.error('[sbDiagRefresh]',e); }
+    const raw = localStorage.getItem('te_trades');
+    if(raw === null){ lsCount = 0; lsError = 'no data in browser'; }
+    else { lsCount = JSON.parse(raw).length; }
+  }catch(e){ lsError = e.message; }
+  let memCount = 0;
+  try{ memCount = Array.isArray(trades) ? trades.length : 0; }catch(e){}
+  if(lsEl){
+    lsEl.textContent = lsError ? ('ERR: '+lsError) : lsCount;
+    lsEl.style.color = lsError ? '#FF4560' : (lsCount===memCount?'#00E5A0':'#F5C542');
+  }
+  if(memEl){
+    memEl.textContent = memCount;
+    memEl.style.color = lsCount===memCount ? '#00E5A0' : '#F5C542';
+  }
+  if(!lsError && lsCount > memCount){
+    try{
+      trades = JSON.parse(localStorage.getItem('te_trades'));
+      renderDash(); renderTrades();
+      if(lsEl){ lsEl.style.color='#00E5A0'; }
+      if(memEl){ memEl.textContent=trades.length; memEl.style.color='#00E5A0'; }
+      toast('Auto-fixed: loaded '+trades.length+' trades from localStorage ✅','✅');
+    }catch(e){ toast('Auto-fix failed: '+e.message,'❌'); }
+  }
 }
 
-</script>
-</body>
-</html>
