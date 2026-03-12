@@ -9227,6 +9227,132 @@ let _newsBeepEnabled = false;
 let _newsAutoInterval = null;
 let _newsAudioCtx = null;
 
+// ══════════════════════════════════════════════════
+// NEWS SCORING ENGINE (noise filter + sentiment + category + time decay)
+// ══════════════════════════════════════════════════
+const NEWS_NOISE_KW = [
+  'agm','xbrl','filing','shareholding','board meeting','compliance','disclosure',
+  'intimation','outcome of board','change in director','appointment of','resignation of',
+  'record date','book closure','postal ballot','voting result','annual general',
+  'extraordinary general','rights issue price','issue of securities','credit rating',
+  'loss of share certificate','transmission of shares','pledge','encumbrance',
+  'insider trading window','trading window closure','esop','esos','stock split announcement',
+  'sub-division','buyback record','financial results date','investor presentation schedule',
+  'con call','concall schedule','nclt','nse circular','bse circular','listing of securities',
+  'allotment','forfeiture','scheme of arrangement'
+];
+const NEWS_BULL_KW = [
+  'profit','revenue surge','record high','all-time high','strong growth','beats estimate',
+  'upgrade','buy rating','target raised','outperform','order win','order book','new contract',
+  'major order','expansion','capacity addition','new plant','acquisition benefit','merger benefit',
+  'debt-free','zero debt','cash rich','dividend','buyback','promoter buying','fii buying',
+  'dii buying','stake increase','block deal buy','product launch','market share gain',
+  'margin expansion','ebitda growth','pat growth','net profit','fy guidance raised',
+  'export growth','new market','partnership','fda approval','drug approval','clinical success',
+  'pli benefit','government order','record revenue','highest ever','strong demand'
+];
+const NEWS_BEAR_KW = [
+  'loss','net loss','revenue decline','profit fall','miss estimate','downgrade','sell rating',
+  'target cut','underperform','order cancellation','project delay','debt concern','debt increase',
+  'pledged shares','stake sale','promoter selling','fii selling','block deal sell',
+  'margin contraction','ebitda decline','write-off','impairment','npa','bad loan','fraud',
+  'scam','probe','investigation','sebi notice','show cause','penalty','fine','litigation',
+  'regulatory action','factory fire','plant shutdown','strike','lockout','supply disruption',
+  'recall','ban','import duty','price cut','market share loss','client loss','contract termination',
+  'insolvency','rating downgrade','default','restructuring','ed raid','cbi raid','income tax search',
+  'tax demand','nclat','credit watch'
+];
+const NEWS_CAT_SCORE = {
+  earnings:10, guidance:9, fda:9, order_win:8, major_deal:8, acquisition:7,
+  regulatory:7, debt:7, insider:6, management:5, macro:4, routine:2, noise:0
+};
+
+function scoreNewsItem(item){
+  const t = (item.title||'').toLowerCase();
+  const isNoise = NEWS_NOISE_KW.some(k=>t.includes(k));
+  if(isNoise) return{...item,sentiment:'NOISE',score:0,strength:null,action:'IGNORE',category:'noise'};
+
+  const bullHits = NEWS_BULL_KW.filter(k=>t.includes(k));
+  const bearHits = NEWS_BEAR_KW.filter(k=>t.includes(k));
+  let sentiment = 'NEUTRAL';
+  if(bullHits.length > bearHits.length) sentiment='BULLISH';
+  else if(bearHits.length > bullHits.length) sentiment='BEARISH';
+  else if(bullHits.length>0) sentiment='BULLISH';
+  else if(bearHits.length>0) sentiment='BEARISH';
+
+  let category='routine';
+  if(/q[1-4]|quarter|earnings|profit|revenue|pat|ebitda|results/.test(t)) category='earnings';
+  else if(/guidance|fy\d{2}|outlook|forecast/.test(t)) category='guidance';
+  else if(/order|contract|win|bag|secure/.test(t)) category='order_win';
+  else if(/acqui|merger|deal|take.*over/.test(t)) category='acquisition';
+  else if(/fda|drug|approv|trial|clinical/.test(t)) category='fda';
+  else if(/debt|npa|rating|downgrade|upgrade/.test(t)) category='debt';
+  else if(/fraud|probe|raid|notice|penalty|sebi/.test(t)) category='regulatory';
+  else if(/director|ceo|md|chairman|appoint|resign/.test(t)) category='management';
+  else if(/rbi|fed|budget|policy|interest rate|macro/.test(t)) category='macro';
+
+  const catScore = NEWS_CAT_SCORE[category]||2;
+  const ageH = item.time ? (Date.now()-new Date(item.time).getTime())/3600000 : 24;
+  const tw = ageH<2?1.0:ageH<6?0.85:ageH<24?0.7:ageH<48?0.5:0.3;
+  const hits = Math.max(bullHits.length, bearHits.length);
+  const rawScore = Math.min(10, catScore * tw * (1 + hits*0.3));
+
+  let strength = null;
+  if(rawScore>=7) strength='STRONG';
+  else if(rawScore>=4) strength='MODERATE';
+  else if(rawScore>=1) strength='WEAK';
+
+  let action='IGNORE';
+  if(sentiment==='BEARISH'&&strength==='STRONG') action='REVIEW IMMEDIATELY';
+  else if(sentiment==='BEARISH'&&strength==='MODERATE') action='MONITOR CLOSELY';
+  else if(sentiment==='BEARISH') action='WATCH';
+  else if(sentiment==='BULLISH'&&strength==='STRONG') action='HOLD / ADD';
+  else if(sentiment==='BULLISH') action='HOLD';
+
+  return{...item, sentiment, score:+rawScore.toFixed(1), strength, action, category};
+}
+
+function scoreSymbolNews(items){
+  return items.map(n=>scoreNewsItem(n)).filter(n=>n.sentiment!=='NOISE').sort((a,b)=>b.score-a.score);
+}
+
+// ── multi-proxy RSS fetch ──────────────────────────
+const RSS_PROXIES = [
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+
+async function fetchRSSWithProxy(rssUrl){
+  let lastErr = null;
+  for(const proxy of RSS_PROXIES){
+    try{
+      const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),10000);
+      const r=await fetch(proxy(rssUrl),{signal:ctrl.signal}); clearTimeout(t);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return await r.text();
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr || new Error('All proxies failed');
+}
+
+// ── try worker /news endpoint first ───────────────
+async function fetchSymbolNewsViaWorker(sym){
+  try{
+    const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
+    if(!workerUrl) return null;
+    const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch(workerUrl,{
+      method:'GET', signal:ctrl.signal,
+      headers:{'X-Kite-Action':'news','X-News-Symbol':sym}
+    }); clearTimeout(t);
+    if(!r.ok) return null;
+    const data=await r.json();
+    if(Array.isArray(data)&&data.length>0) return data;
+    return null;
+  }catch(e){ return null; }
+}
+
 function initNewsPage(){
   const beepEl = document.getElementById('news-beep-toggle');
   if(beepEl) beepEl.checked = _newsBeepEnabled;
@@ -9273,66 +9399,144 @@ async function newsRefreshAll(silent){
 }
 
 async function fetchSymbolNews(sym){
+  // 1. Try Cloudflare Worker /news endpoint first
+  const workerNews = await fetchSymbolNewsViaWorker(sym);
+  if(workerNews && workerNews.length>0){
+    return workerNews.map(n=>({
+      title:(n.title||n.headline||'').replace(/<[^>]*>/g,'').trim(),
+      url:n.url||n.link||'#',
+      time:n.time||n.pubDate?new Date(n.time||n.pubDate):new Date(),
+      source:n.source||'Worker',
+      sentiment:null, summary:null, sym
+    })).filter(n=>n.title);
+  }
+
+  // 2. Fallback: Google News RSS via multi-proxy
   try{
     const query = encodeURIComponent(sym+' NSE India stock');
-    const url = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://news.google.com/rss/search?q='+query+'&hl=en-IN&gl=IN&ceid=IN:en')}`;
-    const res = await fetch(url); const text = await res.text();
+    const rssUrl = 'https://news.google.com/rss/search?q='+query+'&hl=en-IN&gl=IN&ceid=IN:en';
+    const text = await fetchRSSWithProxy(rssUrl);
     const parser = new DOMParser(); const xml = parser.parseFromString(text, 'text/xml');
     const items = xml.querySelectorAll('item'); const news = [];
     items.forEach((item,i)=>{
-      if(i>=6) return;
+      if(i>=8) return;
       const title = item.querySelector('title')?.textContent||'';
       const link = item.querySelector('link')?.textContent||'';
       const pubDate = item.querySelector('pubDate')?.textContent||'';
       const source = item.querySelector('source')?.textContent||'';
-      news.push({ title:title.replace(/<[^>]*>/g,'').trim(), url:link, time:pubDate?new Date(pubDate):new Date(), source:source||'Google News', sentiment:null, summary:null, sym });
+      if(title) news.push({ title:title.replace(/<[^>]*>/g,'').trim(), url:link, time:pubDate?new Date(pubDate):new Date(), source:source||'Google News', sentiment:null, summary:null, sym });
     });
     return news;
   }catch(e){ return []; }
 }
 
 async function analyzeNewsSentiment(){
-  const allNews = Object.values(_newsData).flat().filter(n=>!n.sentiment);
+  // Apply local scoring engine first (instant, no API needed)
+  Object.keys(_newsData).forEach(sym=>{
+    _newsData[sym] = _newsData[sym].map(n=>{
+      if(n.sentiment) return n;
+      const scored = scoreNewsItem(n);
+      return{
+        ...n,
+        sentiment: scored.sentiment==='NOISE'?'NEUTRAL':scored.sentiment,
+        summary: scored.action!=='IGNORE'?scored.action:
+                 scored.sentiment==='BULLISH'?'Positive signal':
+                 scored.sentiment==='BEARISH'?'Monitor closely':'Routine news',
+        score: scored.score,
+        strength: scored.strength,
+        action: scored.action,
+        category: scored.category
+      };
+    }).filter(n=>n.sentiment!=='NOISE');
+  });
+
+  // Then try AI enhancement via callAI for deeper context
+  const allNews = Object.values(_newsData).flat().filter(n=>n.sentiment==='NEUTRAL'&&n.score>0);
   if(!allNews.length) return;
-  const headlineBlock = allNews.map((n,i)=>`[${i}] ${n.sym}: "${n.title}"`).join('\n');
-  const prompt = `You are a stock market news analyst. Classify each headline's sentiment for the specific stock as BULLISH, BEARISH, or NEUTRAL. Also provide a 1-line trading implication.\n\nHeadlines:\n${headlineBlock}\n\nReply ONLY in JSON array format, no markdown:\n[{"i":0,"s":"BULLISH","m":"Strong earnings beat suggests continued uptrend"}]`;
+  const headlineBlock = allNews.slice(0,12).map((n,i)=>`[${i}] ${n.sym}: "${n.title}"`).join('\n');
+  const prompt = `You are a stock market news analyst for NSE India. Classify each headline as BULLISH, BEARISH, or NEUTRAL with a 1-line trading implication.\n\nHeadlines:\n${headlineBlock}\n\nReply ONLY JSON array, no markdown:\n[{"i":0,"s":"BULLISH","m":"Strong earnings beat suggests continued uptrend"}]`;
   try{
     const raw = await callAI(prompt);
     const cleaned = raw.replace(/```json|```/g,'').trim();
     const match = cleaned.match(/\[[\s\S]*\]/);
-    if(match){ const parsed=JSON.parse(match[0]); parsed.forEach(r=>{ if(r.i>=0&&r.i<allNews.length){ allNews[r.i].sentiment=(r.s||'NEUTRAL').toUpperCase(); allNews[r.i].summary=r.m||''; } }); }
-  }catch(e){
-    allNews.forEach(n=>{
-      const t=n.title.toLowerCase();
-      if(/profit|surge|rise|jump|bull|upgrade|beat|rally|strong|high|record|growth/.test(t)) n.sentiment='BULLISH';
-      else if(/loss|fall|drop|bear|downgrade|miss|decline|crash|weak|low|concern|risk|probe|fraud/.test(t)) n.sentiment='BEARISH';
-      else n.sentiment='NEUTRAL';
-      n.summary=n.sentiment==='BULLISH'?'Positive signal':n.sentiment==='BEARISH'?'Monitor — negative signal':'Routine news';
-    });
-  }
+    if(match){ const parsed=JSON.parse(match[0]); parsed.forEach(r=>{ if(r.i>=0&&r.i<allNews.length){ allNews[r.i].sentiment=(r.s||'NEUTRAL').toUpperCase(); allNews[r.i].summary=r.m||allNews[r.i].summary||''; } }); }
+  }catch(e){ /* local scoring already applied above */ }
 }
 
 function renderNewsFeed(){
   const container = document.getElementById('news-feed-container');
   const symbols = Object.keys(_newsData);
   if(!symbols.length){ container.innerHTML='<div style="padding:40px;text-align:center;color:var(--t4)">No news loaded</div>'; return; }
-  let bullCount=0,bearCount=0,neutCount=0;
-  Object.values(_newsData).flat().forEach(n=>{ if(n.sentiment==='BULLISH')bullCount++; else if(n.sentiment==='BEARISH')bearCount++; else neutCount++; });
+  let bullCount=0,bearCount=0,neutCount=0,reviewCount=0;
+  Object.values(_newsData).flat().forEach(n=>{
+    if(n.sentiment==='BULLISH')bullCount++;
+    else if(n.sentiment==='BEARISH'){bearCount++; if(n.action==='REVIEW IMMEDIATELY')reviewCount++;}
+    else neutCount++;
+  });
   document.getElementById('news-bull-count').textContent=bullCount;
   document.getElementById('news-bear-count').textContent=bearCount;
   document.getElementById('news-neut-count').textContent=neutCount;
+
+  // Sort symbols: BEARISH with STRONG first
+  const sortedSyms = symbols.slice().sort((a,b)=>{
+    const aScore = Math.max(...(_newsData[a].map(n=>n.score||0)), 0);
+    const bScore = Math.max(...(_newsData[b].map(n=>n.score||0)), 0);
+    const aBear = _newsData[a].filter(n=>n.sentiment==='BEARISH').length;
+    const bBear = _newsData[b].filter(n=>n.sentiment==='BEARISH').length;
+    if(bBear!==aBear) return bBear-aBear;
+    return bScore-aScore;
+  });
+
+  const catEmoji = {earnings:'📊',guidance:'🎯',order_win:'📦',acquisition:'🤝',fda:'💊',regulatory:'⚖️',debt:'🏦',management:'👔',macro:'🌐',routine:'📰'};
+  const actionColor = {'REVIEW IMMEDIATELY':'var(--r)','MONITOR CLOSELY':'#FF8C00','WATCH':'var(--y)','HOLD / ADD':'var(--g)','HOLD':'var(--g2)','IGNORE':'var(--t4)'};
+  const strengthBg = {'STRONG':'rgba(255,69,96,.18)','MODERATE':'rgba(245,197,66,.15)','WEAK':'rgba(139,160,184,.1)'};
+  const strengthCol = {'STRONG':'var(--r)','MODERATE':'var(--y)','WEAK':'var(--t3)'};
+
   let html='';
-  symbols.forEach(sym=>{
+  sortedSyms.forEach(sym=>{
     const items=_newsData[sym]; if(!items.length) return;
-    const overall=items.filter(n=>n.sentiment==='BEARISH').length>items.filter(n=>n.sentiment==='BULLISH').length?'BEARISH':items.filter(n=>n.sentiment==='BULLISH').length>0?'BULLISH':'NEUTRAL';
+    const bearItems = items.filter(n=>n.sentiment==='BEARISH');
+    const bullItems = items.filter(n=>n.sentiment==='BULLISH');
+    const topScore = Math.max(...items.map(n=>n.score||0),0);
+    const overall = bearItems.length>bullItems.length?'BEARISH':bullItems.length>0?'BULLISH':'NEUTRAL';
     const sentIcon=overall==='BULLISH'?'📈':overall==='BEARISH'?'📉':'📊';
-    html+=`<div class="card" style="margin-bottom:12px;${overall==='BEARISH'?'border-color:rgba(255,69,96,.35);':''}">
-      <div class="card-head" style="padding:10px 14px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">${sentIcon}</span><span style="font-size:14px;font-weight:800;color:var(--t1)">${sym}</span><span class="rbdg ${overall==='BULLISH'?'pos':overall==='BEARISH'?'neg':'neu'}" style="font-size:10px">${overall}</span></div><span style="font-size:10px;color:var(--t4)">${items.length} articles</span></div>
+    const hasCritical = bearItems.some(n=>n.action==='REVIEW IMMEDIATELY');
+
+    html+=`<div class="card" style="margin-bottom:12px;${hasCritical?'border-color:rgba(255,69,96,.5);box-shadow:0 0 16px rgba(255,69,96,.12);':''}">
+      <div class="card-head" style="padding:10px 14px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:16px">${sentIcon}</span>
+          <span style="font-size:14px;font-weight:800;color:var(--t1)">${sym}</span>
+          <span class="rbdg ${overall==='BULLISH'?'pos':overall==='BEARISH'?'neg':'neu'}" style="font-size:10px">${overall}</span>
+          ${topScore>0?`<span style="font-size:10px;font-weight:700;color:var(--y);font-family:'IBM Plex Mono',monospace;background:var(--yd);padding:2px 7px;border-radius:10px">Score ${topScore}</span>`:''}
+          ${hasCritical?`<span style="font-size:10px;font-weight:800;color:var(--r);background:var(--rd);padding:2px 8px;border-radius:10px;animation:earnBlink 1s infinite">🚨 REVIEW</span>`:''}
+        </div>
+        <span style="font-size:10px;color:var(--t4)">${items.length} articles</span>
+      </div>
       <div class="card-body" style="padding:0">`;
+
     items.forEach(n=>{
       const sDot=n.sentiment==='BULLISH'?'🟢':n.sentiment==='BEARISH'?'🔴':'⚪';
       const sCol=n.sentiment==='BULLISH'?'var(--g)':n.sentiment==='BEARISH'?'var(--r)':'var(--t3)';
-      html+=`<div style="padding:10px 14px;border-bottom:1px solid var(--b1);${n.sentiment==='BEARISH'?'background:rgba(255,69,96,.04);':''}"><div style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:12px;flex-shrink:0;margin-top:2px">${sDot}</span><div style="flex:1;min-width:0"><a href="${n.url||'#'}" target="_blank" style="font-size:12.5px;font-weight:600;color:var(--t1);text-decoration:none;line-height:1.4;display:block">${n.title}</a>${n.summary?`<div style="font-size:11px;color:${sCol};margin-top:4px;font-weight:600">→ ${n.summary}</div>`:''}<div style="font-size:10px;color:var(--t4);margin-top:3px">${n.source} · ${newsTimeAgo(n.time)}</div></div></div></div>`;
+      const catE = catEmoji[n.category]||'📰';
+      const actionC = actionColor[n.action]||'var(--t4)';
+      const strengthStyle = n.strength?`background:${strengthBg[n.strength]||''};border-radius:4px;padding:1px 6px;font-size:9.5px;font-weight:700;color:${strengthCol[n.strength]||'var(--t3)'};font-family:'IBM Plex Mono',monospace`:'display:none';
+      html+=`<div style="padding:10px 14px;border-bottom:1px solid var(--b1);${n.sentiment==='BEARISH'&&n.strength==='STRONG'?'background:rgba(255,69,96,.05);':''}">
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="font-size:12px;flex-shrink:0;margin-top:2px">${sDot}</span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+              <span style="font-size:10px">${catE}</span>
+              ${n.strength?`<span style="${strengthStyle}">${n.strength}</span>`:''}
+              ${n.action&&n.action!=='IGNORE'?`<span style="font-size:10px;font-weight:700;color:${actionC}">→ ${n.action}</span>`:''}
+              ${n.score>0?`<span style="font-size:9px;color:var(--t4);font-family:'IBM Plex Mono',monospace">${n.score}/10</span>`:''}
+            </div>
+            <a href="${n.url||'#'}" target="_blank" style="font-size:12.5px;font-weight:600;color:var(--t1);text-decoration:none;line-height:1.4;display:block">${n.title}</a>
+            ${n.summary&&n.action!=='IGNORE'?`<div style="font-size:11px;color:${sCol};margin-top:4px;font-weight:600">${n.summary}</div>`:''}
+            <div style="font-size:10px;color:var(--t4);margin-top:3px">${n.source} · ${newsTimeAgo(n.time)}</div>
+          </div>
+        </div>
+      </div>`;
     });
     html+=`</div></div>`;
   });
