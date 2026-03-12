@@ -623,6 +623,10 @@ select.fi{cursor:pointer}
   <div class="sb-item" id="nav-ai" data-tip="AI Trade Review" onclick="nav('ai')">
     <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M8 12h.01M12 12h.01M16 12h.01" stroke-width="2.5"/></svg>
   </div>
+  <div class="sb-item" id="nav-news" data-tip="News Intelligence" onclick="nav('news')" style="position:relative">
+    <svg viewBox="0 0 24 24"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2"/><line x1="9" y1="9" x2="13" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/></svg>
+    <span id="news-alert-badge" style="display:none;position:absolute;top:6px;right:6px;width:8px;height:8px;background:var(--r);border-radius:50%;border:1.5px solid var(--bg1)"></span>
+  </div>
   <div class="sb-item" id="nav-alerts" data-tip="Price Alerts" onclick="nav('alerts')" style="position:relative">
     <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
     <span id="alert-badge" style="display:none;position:absolute;top:6px;right:6px;width:8px;height:8px;background:var(--r);border-radius:50%;border:1.5px solid var(--bg1)"></span>
@@ -632,6 +636,9 @@ select.fi{cursor:pointer}
   </div>
   <div class="sb-item" id="nav-possize" data-tip="Position Sizing" onclick="nav('possize')">
     <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+  </div>
+  <div class="sb-item" id="nav-execute" data-tip="Trade Execution" onclick="nav('execute')">
+    <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
   </div>
   <div class="sb-item" id="nav-mps" data-tip="MPS Dashboard" onclick="nav('mps')" style="position:relative">
     <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -800,41 +807,21 @@ select.fi{cursor:pointer}
       </div>
       <div class="tbl-wrap" id="open-tbl"></div>
 
-    </div>
-
-    <!-- ══ PERFORMANCE vs BENCHMARK ══ -->
-    <div id="perf-bm-section" style="margin-top:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">📊 My Performance vs Benchmark</div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <!-- Mode toggle -->
-          <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:6px;overflow:hidden;font-size:11px">
-            <button id="pbm-mode-open" onclick="setPbmMode('open')"
-              style="padding:4px 10px;border:none;cursor:pointer;font-weight:700;background:var(--y);color:#1a1a1a;font-size:11px">Open P&L</button>
-            <button id="pbm-mode-cum" onclick="setPbmMode('cum')"
-              style="padding:4px 10px;border:none;cursor:pointer;font-weight:700;background:var(--bg3);color:var(--t3);font-size:11px">Cumulative</button>
+      <!-- Dashboard News Ticker -->
+      <div id="dash-news-ticker" style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">📰 News — Open Positions</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span id="dash-news-time" style="font-size:10px;color:var(--t4)"></span>
+            <button class="btn btn-ghost btn-xs" onclick="newsRefreshAll()" style="font-size:10px">↻</button>
+            <button class="btn btn-ghost btn-xs" onclick="nav('news')" style="font-size:10px">View All →</button>
           </div>
-          <select id="perf-bm-select" class="fi" style="width:130px;font-size:12px" onchange="renderPerfVsBm()">
-            <option value="^NSEI">Nifty 50</option>
-            <option value="^BSESN">Sensex</option>
-            <option value="^NSEBANK">Bank Nifty</option>
-            <option value="NIFTYMIDCAP100.NS">Midcap 100</option>
-            <option value="NIFTYSMALLCAP100.NS">Smallcap 100</option>
-          </select>
-          <select id="perf-bm-period" class="fi" style="width:100px;font-size:12px" onchange="renderPerfVsBm()">
-            <option value="1mo">1 Month</option>
-            <option value="3mo">3 Months</option>
-            <option value="6mo">6 Months</option>
-            <option value="1y">1 Year</option>
-            <option value="ytd">This Year</option>
-            <option value="2y">2 Years</option>
-          </select>
-          <button class="btn btn-ghost btn-xs" onclick="renderPerfVsBm()" title="Refresh">↻</button>
+        </div>
+        <div id="dash-news-feed" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto">
+          <div style="padding:16px;text-align:center;color:var(--t4);font-size:12px;border:1px dashed var(--b2);border-radius:10px">News loads when you click Refresh</div>
         </div>
       </div>
-      <div id="perf-bm-content" class="card" style="padding:16px;min-height:80px;display:flex;align-items:center;justify-content:center">
-        <div style="color:var(--t4);font-size:12px">Loading…</div>
-      </div>
+
     </div>
 
     <!-- ══ TRADES ══ -->
@@ -905,25 +892,60 @@ select.fi{cursor:pointer}
         <div class="card-head"><span class="card-title">Daily P&L Heatmap</span></div>
         <div class="card-body"><div id="hmap"></div></div>
       </div>
+
+    <!-- ══ PERFORMANCE vs BENCHMARK (Analytics only) ══ -->
+    <div id="perf-bm-section" style="margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">📊 My Performance vs Benchmark</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:6px;overflow:hidden;font-size:11px">
+            <button id="pbm-mode-open" onclick="setPbmMode('open')"
+              style="padding:4px 10px;border:none;cursor:pointer;font-weight:700;background:var(--y);color:#1a1a1a;font-size:11px">Open P&L</button>
+            <button id="pbm-mode-cum" onclick="setPbmMode('cum')"
+              style="padding:4px 10px;border:none;cursor:pointer;font-weight:700;background:var(--bg3);color:var(--t3);font-size:11px">Cumulative</button>
+          </div>
+          <select id="perf-bm-select" class="fi" style="width:130px;font-size:12px" onchange="renderPerfVsBm()">
+            <option value="^NSEI">Nifty 50</option>
+            <option value="^BSESN">Sensex</option>
+            <option value="^NSEBANK">Bank Nifty</option>
+            <option value="NIFTYMIDCAP100.NS">Midcap 100</option>
+            <option value="NIFTYSMALLCAP100.NS">Smallcap 100</option>
+          </select>
+          <select id="perf-bm-period" class="fi" style="width:100px;font-size:12px" onchange="renderPerfVsBm()">
+            <option value="1mo">1 Month</option>
+            <option value="3mo">3 Months</option>
+            <option value="6mo">6 Months</option>
+            <option value="1y">1 Year</option>
+            <option value="ytd">This Year</option>
+            <option value="2y">2 Years</option>
+          </select>
+          <button class="btn btn-ghost btn-xs" onclick="renderPerfVsBm()" title="Refresh">↻</button>
+        </div>
+      </div>
+      <div id="perf-bm-content" class="card" style="padding:16px;min-height:80px;display:flex;align-items:center;justify-content:center">
+        <div style="color:var(--t4);font-size:12px">Loading…</div>
+      </div>
     </div>
 
-    <!-- ══ CHARTS GALLERY ══ -->
-<div id="charts-gallery-section" style="margin-top:28px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div>
-      <div style="font-size:15px;font-weight:700;color:var(--t1)">📸 Chart Screenshots Gallery</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:2px">All uploaded entry & exit charts from your trades</div>
+    <!-- ══ CHARTS GALLERY (Analytics only) ══ -->
+    <div id="charts-gallery-section" style="margin-top:28px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--t1)">📸 Chart Screenshots Gallery</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">All uploaded entry & exit charts from your trades</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="gallery-filter" class="fi" style="width:120px;font-size:12px" onchange="renderChartsGallery()">
+            <option value="all">All Trades</option>
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+      </div>
+      <div id="charts-gallery-container"></div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <select id="gallery-filter" class="fi" style="width:120px;font-size:12px" onchange="renderChartsGallery()">
-        <option value="all">All Trades</option>
-        <option value="open">Open</option>
-        <option value="closed">Closed</option>
-      </select>
+
     </div>
-  </div>
-  <div id="charts-gallery-container"></div>
-</div>
 
 <!-- ══ CALENDAR ══ -->
     <div class="page" id="page-calendar">
@@ -1129,6 +1151,80 @@ select.fi{cursor:pointer}
         <div style="font-size:13px;max-width:420px;margin:0 auto">
           Choose <b style="color:var(--y)">Claude</b>, <b style="color:#60A5FA">Gemini</b> or <b style="color:#A78BFA">⚡ Groq</b> (free, 30 req/min), paste your API key, then click <b style="color:var(--y)">Analyse My Trades</b>.<br>
           <span style="color:var(--t4)">Your trade data never leaves your browser.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ NEWS INTELLIGENCE ══ -->
+    <div class="page" id="page-news">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--t1)">📰 News Intelligence</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">Real-time news for your open positions with AI-driven sentiment analysis</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="news-beep-toggle" onchange="toggleNewsBeep(this.checked)" style="accent-color:var(--r)">
+            <label for="news-beep-toggle" style="font-size:11px;color:var(--t3);cursor:pointer">🔊 Bearish Beep</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="news-auto-toggle" onchange="toggleNewsAuto(this.checked)" style="accent-color:var(--y)">
+            <label for="news-auto-toggle" style="font-size:11px;color:var(--t3);cursor:pointer">Auto-refresh 5 min</label>
+          </div>
+          <button class="btn btn-y btn-sm" onclick="newsRefreshAll()">
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Refresh News
+          </button>
+        </div>
+      </div>
+
+      <!-- Sentiment Overview -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px" id="news-sentiment-row">
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-accent" style="background:var(--g)"></div>
+          <div class="kpi-label">Bullish</div>
+          <div class="kpi-val col-g" id="news-bull-count">0</div>
+          <div class="kpi-sub">positive signals</div>
+        </div>
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-accent" style="background:var(--r)"></div>
+          <div class="kpi-label">Bearish</div>
+          <div class="kpi-val col-r" id="news-bear-count">0</div>
+          <div class="kpi-sub">negative signals</div>
+        </div>
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-accent" style="background:var(--t3)"></div>
+          <div class="kpi-label">Neutral</div>
+          <div class="kpi-val col-t" id="news-neut-count">0</div>
+          <div class="kpi-sub">routine news</div>
+        </div>
+        <div class="kpi" style="text-align:center">
+          <div class="kpi-accent" style="background:var(--y)"></div>
+          <div class="kpi-label">Positions</div>
+          <div class="kpi-val col-y" id="news-pos-count">0</div>
+          <div class="kpi-sub">tracked symbols</div>
+        </div>
+      </div>
+
+      <!-- Bearish Alerts Banner -->
+      <div id="news-bearish-banner" style="display:none;background:var(--rd);border:1px solid rgba(255,69,96,.3);border-radius:12px;padding:14px 18px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:18px">🚨</span>
+          <span style="font-size:13px;font-weight:700;color:var(--r)">Bearish Alert — Action Required</span>
+          <button class="btn btn-ghost btn-xs" onclick="document.getElementById('news-bearish-banner').style.display='none'" style="margin-left:auto">✕</button>
+        </div>
+        <div id="news-bearish-list" style="font-size:12px;color:var(--t2);line-height:1.7"></div>
+      </div>
+
+      <!-- News Feed by Symbol -->
+      <div id="news-feed-container">
+        <div style="text-align:center;padding:60px 20px;color:var(--t3)">
+          <div style="font-size:48px;margin-bottom:12px">📰</div>
+          <div style="font-size:15px;font-weight:600;color:var(--t2);margin-bottom:6px">News Intelligence Hub</div>
+          <div style="font-size:13px;max-width:420px;margin:0 auto">
+            Click <b style="color:var(--y)">Refresh News</b> to fetch latest headlines for all your open positions.<br>
+            <span style="color:var(--t4)">Headlines are analysed by AI for sentiment (Bullish/Bearish/Neutral). Enable <b style="color:var(--r)">Bearish Beep</b> for audio alerts.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1364,12 +1460,26 @@ select.fi{cursor:pointer}
               <input type="number" class="fi" id="ps-entry" placeholder="0.00" step="0.01" oninput="calcPositionSize()">
             </div>
             <div class="fg">
-              <label class="fl">Stop Loss Price (₹)</label>
-              <input type="number" class="fi" id="ps-sl" placeholder="0.00" step="0.01" oninput="calcPositionSize()">
+              <label class="fl">Stop Loss
+                <span id="ps-sl-mode-label" style="font-size:9px;color:var(--y);margin-left:4px">₹ price</span>
+              </label>
+              <div class="sl-wrap">
+                <input type="number" class="fi" id="ps-sl" placeholder="e.g. 245.50" step="0.01" oninput="psSLSync()">
+                <button type="button" class="sl-mode-btn active" id="ps-sl-btn-inr" onclick="psSLSetMode('inr')">₹</button>
+                <button type="button" class="sl-mode-btn" id="ps-sl-btn-pct" onclick="psSLSetMode('pct')">%</button>
+              </div>
+              <div id="ps-sl-other" style="font-size:10px;color:var(--t4);margin-top:3px;min-height:14px"></div>
             </div>
             <div class="fg">
-              <label class="fl">Target Price (₹) <span style="color:var(--t4);font-size:10px">(optional)</span></label>
-              <input type="number" class="fi" id="ps-target" placeholder="0.00" step="0.01" oninput="calcPositionSize()">
+              <label class="fl">Target
+                <span id="ps-tgt-mode-label" style="font-size:9px;color:var(--g);margin-left:4px">₹ price</span>
+              </label>
+              <div class="sl-wrap">
+                <input type="number" class="fi" id="ps-target" placeholder="e.g. 280.00" step="0.01" oninput="psTgtSync()">
+                <button type="button" class="sl-mode-btn active" id="ps-tgt-btn-inr" onclick="psTgtSetMode('inr')" style="color:var(--g)">₹</button>
+                <button type="button" class="sl-mode-btn" id="ps-tgt-btn-pct" onclick="psTgtSetMode('pct')" style="color:var(--g)">%</button>
+              </div>
+              <div id="ps-tgt-other" style="font-size:10px;color:var(--t4);margin-top:3px;min-height:14px"></div>
             </div>
             <div class="fg">
               <label class="fl">Brokerage Model</label>
@@ -1481,8 +1591,304 @@ select.fi{cursor:pointer}
                 <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add to Trade Log
               </button>
+              <button class="btn btn-green" style="width:100%;justify-content:center;margin-top:6px" onclick="execFromPosSize()">
+                <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Execute Trade via Broker
+              </button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TRADE EXECUTION & MANAGEMENT ══ -->
+    <div class="page" id="page-execute">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--t1)">⚡ Trade Execution & Management</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">Place orders, manage open positions, modify SL/Target, trail stops, pyramid entries</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div id="exec-broker-status" style="font-size:11px;color:var(--t3)"></div>
+          <button class="btn btn-ghost btn-sm" onclick="execRefreshPositions()">
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Broker Selector -->
+      <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:16px">
+        <button id="exec-br-zd" class="sl-mode-btn active" onclick="setExecBroker('zerodha')" style="flex:1;padding:8px;font-size:12px;font-weight:700;background:var(--yd);color:var(--y)">🟢 Zerodha</button>
+        <button id="exec-br-dhan" class="sl-mode-btn" onclick="setExecBroker('dhan')" style="flex:1;padding:8px;font-size:12px;font-weight:700">🔵 Dhan</button>
+        <button id="exec-br-de" class="sl-mode-btn" onclick="setExecBroker('definedge')" style="flex:1;padding:8px;font-size:12px;font-weight:700">🟣 Definedge</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start">
+
+        <!-- ── LEFT: Place New Order ── -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">📤 Place Order</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+            <div class="fg">
+              <label class="fl">Symbol</label>
+              <div class="sym-wrap" style="position:relative">
+                <input class="fi" id="exec-sym" placeholder="Type symbol e.g. RELIANCE, INFY…"
+                  autocomplete="off" style="text-transform:uppercase"
+                  oninput="onExecSymInput(this.value)"
+                  onkeydown="onExecSymKey(event)"
+                  onfocus="onExecSymInput(this.value)"
+                  onblur="setTimeout(closeExecSymDrop,200)">
+                <div class="sym-dropdown" id="exec-sym-drop"></div>
+              </div>
+              <div id="exec-price-status" style="font-size:10px;color:var(--t3);margin-top:4px;min-height:14px"></div>
+            </div>
+
+            <div class="fg2">
+              <div class="fg">
+                <label class="fl">Side</label>
+                <select class="fi" id="exec-side">
+                  <option value="BUY">BUY</option>
+                  <option value="SELL">SELL</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="fl">Order Type</label>
+                <select class="fi" id="exec-otype" onchange="execOtypeChange()">
+                  <option value="MARKET">Market</option>
+                  <option value="LIMIT">Limit</option>
+                  <option value="SL">SL (Stop Loss)</option>
+                  <option value="SL-M">SL-M (SL Market)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="fg2">
+              <div class="fg">
+                <label class="fl">Quantity</label>
+                <input type="number" class="fi" id="exec-qty" placeholder="1" min="1" value="">
+              </div>
+              <div class="fg" id="exec-limit-wrap">
+                <label class="fl">Price (₹)</label>
+                <input type="number" class="fi" id="exec-price" placeholder="0.00" step="0.05">
+              </div>
+            </div>
+
+            <div class="fg" id="exec-trigger-wrap" style="display:none">
+              <label class="fl">Trigger Price (₹)</label>
+              <input type="number" class="fi" id="exec-trigger" placeholder="0.00" step="0.05">
+            </div>
+
+            <div class="fg2">
+              <div class="fg">
+                <label class="fl">Product</label>
+                <select class="fi" id="exec-product">
+                  <option value="CNC">CNC (Delivery)</option>
+                  <option value="MIS">MIS (Intraday)</option>
+                  <option value="NRML">NRML</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="fl">Validity</label>
+                <select class="fi" id="exec-validity">
+                  <option value="DAY">Day</option>
+                  <option value="IOC">IOC</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Bracket/Cover extras -->
+            <div style="border-top:1px solid var(--b1);padding-top:12px">
+              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">SL & Target (optional — creates separate orders)</div>
+              <div class="fg2">
+                <div class="fg">
+                  <label class="fl">Stop Loss ₹</label>
+                  <input type="number" class="fi" id="exec-sl" placeholder="Optional" step="0.05">
+                </div>
+                <div class="fg">
+                  <label class="fl">Target ₹</label>
+                  <input type="number" class="fi" id="exec-tgt" placeholder="Optional" step="0.05">
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-y" style="width:100%;justify-content:center;padding:10px;font-size:13px" onclick="execPlaceOrder()" id="exec-place-btn">
+              <svg viewBox="0 0 24 24" style="width:14px;height:14px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Place Order
+            </button>
+            <div id="exec-order-status" style="font-size:11px;color:var(--t3);min-height:16px;text-align:center"></div>
+
+            <!-- Quick from journal -->
+            <div style="border-top:1px solid var(--b1);padding-top:10px;margin-top:4px">
+              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">Quick Fill from Journal</div>
+              <select class="fi" id="exec-from-journal" onchange="execFillFromJournal()" style="font-size:12px">
+                <option value="">— Select open trade —</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── RIGHT: Live Positions & Management ── -->
+        <div style="display:flex;flex-direction:column;gap:12px">
+
+          <!-- Open Positions from broker -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">📊 Broker Positions</span>
+              <span id="exec-pos-count" style="font-size:11px;color:var(--t3)">0 positions</span>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div id="exec-positions-tbl" style="overflow-x:auto">
+                <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Select a broker and click Refresh to load positions</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Position Management Panel (shown when position selected) -->
+          <div class="card" id="exec-manage-card" style="display:none;border:1px solid var(--yd)">
+            <div class="card-head" style="background:rgba(245,197,66,.06)">
+              <span class="card-title" style="color:var(--y)">🎯 Manage: <span id="exec-manage-sym">—</span></span>
+              <button class="btn btn-ghost btn-xs" onclick="document.getElementById('exec-manage-card').style.display='none'">✕</button>
+            </div>
+            <div class="card-body">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
+                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">Qty</div>
+                  <div id="exec-m-qty" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--t1);font-weight:700">–</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
+                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">Avg Price</div>
+                  <div id="exec-m-avg" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--t1);font-weight:700">–</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
+                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">P&L</div>
+                  <div id="exec-m-pnl" style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700">–</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
+                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">CMP</div>
+                  <div id="exec-m-cmp" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--c);font-weight:700">–</div>
+                </div>
+              </div>
+
+              <!-- Action tabs -->
+              <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:14px">
+                <button class="sl-mode-btn active" id="exec-act-sl" onclick="setExecAction('sl')" style="flex:1;padding:6px;font-size:11px;font-weight:700;background:var(--yd);color:var(--y)">Modify SL/Tgt</button>
+                <button class="sl-mode-btn" id="exec-act-trail" onclick="setExecAction('trail')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Trail SL</button>
+                <button class="sl-mode-btn" id="exec-act-partial" onclick="setExecAction('partial')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Partial Exit</button>
+                <button class="sl-mode-btn" id="exec-act-pyramid" onclick="setExecAction('pyramid')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Pyramid</button>
+                <button class="sl-mode-btn" id="exec-act-close" onclick="setExecAction('close')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Close All</button>
+              </div>
+
+              <!-- Modify SL/Target -->
+              <div id="exec-panel-sl">
+                <div class="fg2" style="margin-bottom:10px">
+                  <div class="fg">
+                    <label class="fl">New Stop Loss ₹</label>
+                    <input type="number" class="fi" id="exec-new-sl" placeholder="0.00" step="0.05">
+                  </div>
+                  <div class="fg">
+                    <label class="fl">New Target ₹</label>
+                    <input type="number" class="fi" id="exec-new-tgt" placeholder="0.00" step="0.05">
+                  </div>
+                </div>
+                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execModifySLTgt()">Update SL & Target</button>
+              </div>
+
+              <!-- Trail SL -->
+              <div id="exec-panel-trail" style="display:none">
+                <div class="fg2" style="margin-bottom:10px">
+                  <div class="fg">
+                    <label class="fl">Trail Method</label>
+                    <select class="fi" id="exec-trail-method">
+                      <option value="fixed">Fixed points (₹)</option>
+                      <option value="pct">Percentage (%)</option>
+                      <option value="cost">Move SL to cost</option>
+                    </select>
+                  </div>
+                  <div class="fg">
+                    <label class="fl">Trail Value</label>
+                    <input type="number" class="fi" id="exec-trail-val" placeholder="e.g. 5.00" step="0.5">
+                  </div>
+                </div>
+                <div style="font-size:11px;color:var(--t3);margin-bottom:10px" id="exec-trail-preview">New SL will be: –</div>
+                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execTrailSL()">Trail Stop Loss</button>
+              </div>
+
+              <!-- Partial Exit -->
+              <div id="exec-panel-partial" style="display:none">
+                <div class="fg2" style="margin-bottom:10px">
+                  <div class="fg">
+                    <label class="fl">Exit Quantity</label>
+                    <input type="number" class="fi" id="exec-partial-qty" placeholder="e.g. 50" min="1">
+                  </div>
+                  <div class="fg">
+                    <label class="fl">Order Type</label>
+                    <select class="fi" id="exec-partial-type">
+                      <option value="MARKET">Market</option>
+                      <option value="LIMIT">Limit</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="fg" id="exec-partial-price-wrap" style="display:none;margin-bottom:10px">
+                  <label class="fl">Limit Price ₹</label>
+                  <input type="number" class="fi" id="exec-partial-price" placeholder="0.00" step="0.05">
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+                  <button class="btn btn-ghost btn-xs" onclick="setPartialPct(25)">25%</button>
+                  <button class="btn btn-ghost btn-xs" onclick="setPartialPct(50)">50%</button>
+                  <button class="btn btn-ghost btn-xs" onclick="setPartialPct(75)">75%</button>
+                </div>
+                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execPartialExit()">Execute Partial Exit</button>
+              </div>
+
+              <!-- Pyramid -->
+              <div id="exec-panel-pyramid" style="display:none">
+                <div class="fg2" style="margin-bottom:10px">
+                  <div class="fg">
+                    <label class="fl">Add Quantity</label>
+                    <input type="number" class="fi" id="exec-pyr-qty" placeholder="e.g. 50" min="1">
+                  </div>
+                  <div class="fg">
+                    <label class="fl">Order Type</label>
+                    <select class="fi" id="exec-pyr-type">
+                      <option value="MARKET">Market</option>
+                      <option value="LIMIT">Limit</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="fg" id="exec-pyr-price-wrap" style="display:none;margin-bottom:10px">
+                  <label class="fl">Limit Price ₹</label>
+                  <input type="number" class="fi" id="exec-pyr-price" placeholder="0.00" step="0.05">
+                </div>
+                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execPyramidAdd()">Add Pyramid Entry</button>
+              </div>
+
+              <!-- Close All -->
+              <div id="exec-panel-close" style="display:none">
+                <div style="background:var(--rd);border:1px solid rgba(255,69,96,.3);border-radius:10px;padding:14px;text-align:center">
+                  <div style="font-size:13px;font-weight:700;color:var(--r);margin-bottom:6px">⚠ Close Entire Position</div>
+                  <div style="font-size:11px;color:var(--t2);margin-bottom:12px">This will place a market order to square off all <span id="exec-close-qty">—</span> shares</div>
+                  <button class="btn btn-red" style="width:100%;justify-content:center" onclick="execCloseAll()">Close Position at Market</button>
+                </div>
+              </div>
+
+              <div id="exec-manage-status" style="font-size:11px;color:var(--t3);min-height:16px;text-align:center;margin-top:8px"></div>
+            </div>
+          </div>
+
+          <!-- Order History -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">📋 Today's Orders</span>
+              <button class="btn btn-ghost btn-xs" onclick="execRefreshOrders()">↻</button>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div id="exec-orders-tbl" style="overflow-x:auto">
+                <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">No orders loaded</div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -1573,10 +1979,10 @@ select.fi{cursor:pointer}
             </select>
             <label style="font-size:11px;color:var(--t4)">Period:</label>
             <select id="rrg-period" class="fi" style="width:110px;font-size:12px" onchange="renderRRG()">
-              <option value="1wk">1 Week</option>
+              <option value="1wk" selected>1 Week</option>
               <option value="1mo">1 Month</option>
               <option value="3mo">3 Months</option>
-              <option value="6mo" selected>6 Months</option>
+              <option value="6mo">6 Months</option>
               <option value="1y">1 Year</option>
             </select>
             <button class="btn btn-ghost btn-sm" onclick="renderRRG()">↻ Refresh</button>
@@ -1914,6 +2320,18 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
         </div>
 
         <div class="card">
+          <div class="card-head"><span class="card-title">NSE Symbol Database</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:12px;color:var(--t2)">Update stock symbols from NSE's official listing (~2200+ symbols). Auto-updates whenever you click refresh.</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-y btn-sm" onclick="fetchNSESymbolList()">↻ Refresh NSE Symbols</button>
+              <span id="nse-db-status" style="font-size:11px;color:var(--t3)"></span>
+            </div>
+            <div style="font-size:10px;color:var(--t4)">Source: <a href="https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv" target="_blank" style="color:var(--b)">nsearchives.nseindia.com/content/equities/EQUITY_L.csv</a></div>
+          </div>
+        </div>
+
+        <div class="card">
           <div class="card-head"><span class="card-title">Data</span></div>
           <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
@@ -1941,7 +2359,7 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
         <div class="fsec-title">🎯 Trade Info</div>
         <div class="fg2">
           <div class="fg">
-            <label class="fl">Symbol *</label>
+            <label class="fl">Symbol * <span style="color:var(--t4);font-size:10px">(auto-fetches price)</span></label>
             <div class="sym-wrap">
               <input class="fi" id="f-sym" placeholder="Type symbol e.g. RELI, INFY, TCS…"
                 autocomplete="off"
@@ -1951,6 +2369,7 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
                 onblur="setTimeout(closeSymDrop,200)">
               <div class="sym-dropdown" id="sym-drop"></div>
             </div>
+            <div id="f-sym-price-status" style="font-size:10px;color:var(--t3);margin-top:4px;min-height:14px"></div>
           </div>
           <div class="fg"><label class="fl">Setup</label>
             <div class="ac-wrap" id="setup-ac-wrap">
@@ -2366,7 +2785,7 @@ function save(){
 // ══════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════
-const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',alerts:'Price Alerts',ai:'AI Trade Review',settings:'Settings & Sync',ledger:'Broker Ledger',possize:'Position Sizing',mps:'MPS — Market Pulse Score',fundrs:'Fundamentals & RS'};
+const PAGE_NAMES={dashboard:'Dashboard',trades:'Trade Log',analytics:'Analytics',calendar:'Calendar',fund:'Fund Management',alerts:'Price Alerts',ai:'AI Trade Review',news:'News Intelligence',settings:'Settings & Sync',ledger:'Broker Ledger',possize:'Position Sizing',execute:'Trade Execution',mps:'MPS — Market Pulse Score',fundrs:'Fundamentals & RS'};
 function nav(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.sb-item[id^=nav-]').forEach(x=>x.classList.remove('active'));
@@ -2380,9 +2799,11 @@ function nav(p){
   if(p==='settings')loadSettings();
   if(p==='fund')renderFund();
   if(p==='alerts')renderAlerts();
+  if(p==='news')initNewsPage();
   if(p==='ai')renderAIPage();
   if(p==='ledger')renderLedger();
   if(p==='possize')initPosSize();
+  if(p==='execute')initExecPage();
   if(p==='mps')initMpsPage();
   if(p==='fundrs'){initFundRS();setTimeout(()=>renderRRG(false),400);}
 }
@@ -5276,6 +5697,60 @@ const NSE_SYMBOLS = [
   ["DICIND","DIC India","Chemical"],["THANGAMAYL","Thangamayil Jewellery","Jewellery"],
 ];
 
+// ── Dynamic NSE Symbol Database Update ──
+// Fetches ~2200+ symbols from NSE EQUITY_L.csv and merges with built-in list
+let NSE_EXTENDED_SYMBOLS = null; // will hold fetched symbols
+
+function getSymbolDB(){
+  return NSE_EXTENDED_SYMBOLS || NSE_SYMBOLS;
+}
+
+async function fetchNSESymbolList(){
+  try{
+    const statusEl = document.getElementById('nse-db-status');
+    if(statusEl) statusEl.textContent = '⏳ Fetching NSE symbols…';
+    const url = 'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv';
+    const r = await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url));
+    const text = await r.text();
+    const lines = text.trim().split('\n');
+    const parsed = [];
+    for(let i=1;i<lines.length;i++){
+      const parts = lines[i].split(',');
+      if(parts.length>=2){
+        const sym = parts[0].trim();
+        const name = parts[1].trim();
+        if(sym && name) parsed.push([sym, name, '']);
+      }
+    }
+    if(parsed.length > 100){
+      // Merge: keep sector info from built-in where available
+      const sectorMap = {};
+      NSE_SYMBOLS.forEach(([s,n,sec])=> sectorMap[s]=sec);
+      NSE_EXTENDED_SYMBOLS = parsed.map(([s,n,sec])=> [s, n, sectorMap[s]||sec||'']);
+      localStorage.setItem('te_nse_ext', JSON.stringify(NSE_EXTENDED_SYMBOLS));
+      localStorage.setItem('te_nse_ext_ts', new Date().toISOString());
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--g)">✅ ${parsed.length} symbols loaded</span> (${new Date().toLocaleString('en-IN')})`;
+      toast(`NSE database updated: ${parsed.length} symbols`,'✅');
+    } else {
+      throw new Error('Too few symbols parsed');
+    }
+  } catch(e){
+    const statusEl = document.getElementById('nse-db-status');
+    if(statusEl) statusEl.innerHTML = `<span style="color:var(--r)">❌ Failed: ${e.message}</span>`;
+    toast('NSE fetch failed — using built-in database','⚠️');
+  }
+}
+
+// Auto-load cached NSE extended symbols on startup
+(function loadCachedNSE(){
+  try{
+    const cached = localStorage.getItem('te_nse_ext');
+    if(cached){
+      NSE_EXTENDED_SYMBOLS = JSON.parse(cached);
+    }
+  }catch(e){}
+})();
+
 let symFocusIdx = -1;
 
 function onSymInput(val) {
@@ -5298,7 +5773,7 @@ function onSymInput(val) {
     return -1;
   }
 
-  const scored = NSE_SYMBOLS.map(([sym, name, sector]) => ({
+  const scored = getSymbolDB().map(([sym, name, sector]) => ({
     sym, name, sector, score: scoreMatch(sym, name.toUpperCase(), q)
   })).filter(x => x.score >= 0).sort((a,b) => b.score - a.score).slice(0, 10);
 
@@ -5355,8 +5830,32 @@ function highlightMatch(sym, q) {
 function selectSym(sym) {
   document.getElementById('f-sym').value = sym;
   closeSymDrop();
+  // Auto-fetch price for entry
+  tradeSymFetchPrice(sym);
   // Auto-focus price field
   setTimeout(() => document.getElementById('e-price-0')?.focus(), 50);
+}
+
+async function tradeSymFetchPrice(sym){
+  if(!sym) return;
+  const statusEl = document.getElementById('f-sym-price-status');
+  if(statusEl) statusEl.textContent = '⏳ Fetching price…';
+  const ticker = sym.includes('.') ? sym : sym+'.NS';
+  try{
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`;
+    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    const d = await r.json();
+    const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice || d?.chart?.result?.[0]?.meta?.previousClose;
+    if(price){
+      const entryEl = document.getElementById('e-price-0');
+      if(entryEl && !entryEl.value){ entryEl.value = price.toFixed(2); }
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--g)">✓ CMP: ₹${price.toFixed(2)}</span> — Entry auto-filled`;
+    } else {
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--y)">⚠ Price unavailable — enter manually</span>`;
+    }
+  } catch(err){
+    if(statusEl) statusEl.innerHTML = `<span style="color:var(--t3)">Price fetch failed — enter manually</span>`;
+  }
 }
 
 function closeSymDrop() {
@@ -6177,6 +6676,98 @@ function psLoadFromSettings(){
   calcPositionSize();
   toast('Loaded from Settings','✅');
 }
+// ── Position Size SL/Target ₹/% mode toggle ──
+let _psSLMode = 'inr';
+let _psTgtMode = 'inr';
+
+function psSLSetMode(mode){
+  _psSLMode = mode;
+  const btnInr = document.getElementById('ps-sl-btn-inr');
+  const btnPct = document.getElementById('ps-sl-btn-pct');
+  if(mode==='inr'){ btnInr.classList.add('active'); btnPct.classList.remove('active'); }
+  else { btnPct.classList.add('active'); btnInr.classList.remove('active'); }
+  const lbl = document.getElementById('ps-sl-mode-label');
+  if(lbl) lbl.textContent = mode==='inr' ? '₹ price' : '% from entry';
+  document.getElementById('ps-sl').placeholder = mode==='inr' ? 'e.g. 245.50' : 'e.g. 2.5';
+  document.getElementById('ps-sl').value = '';
+  document.getElementById('ps-sl-other').textContent = '';
+  calcPositionSize();
+}
+
+function psSLSync(){
+  const val = parseFloat(document.getElementById('ps-sl').value);
+  const other = document.getElementById('ps-sl-other');
+  const entry = +document.getElementById('ps-entry').value || 0;
+  if(!val||isNaN(val)){ other.textContent=''; calcPositionSize(); return; }
+  if(_psSLMode==='inr'){
+    if(entry>0){
+      const pct = Math.abs((entry - val)/entry*100);
+      other.textContent = `= ${pct.toFixed(2)}% from entry ₹${entry}`;
+      other.style.color = 'var(--r)';
+    } else { other.textContent = 'Enter entry price to see %'; other.style.color = 'var(--t4)'; }
+  } else {
+    if(entry>0){
+      const slPrice = entry * (1 - val/100);
+      other.textContent = `= ₹${slPrice.toFixed(2)} (entry: ₹${entry})`;
+      other.style.color = 'var(--r)';
+    } else { other.textContent = 'Enter entry price to auto-calculate'; other.style.color = 'var(--t4)'; }
+  }
+  calcPositionSize();
+}
+
+function getPsSLPrice(){
+  const raw = parseFloat(document.getElementById('ps-sl').value);
+  if(!raw||isNaN(raw)) return 0;
+  if(_psSLMode==='inr') return raw;
+  const entry = +document.getElementById('ps-entry').value || 0;
+  if(!entry) return 0;
+  return entry * (1 - raw/100);
+}
+
+function psTgtSetMode(mode){
+  _psTgtMode = mode;
+  const btnInr = document.getElementById('ps-tgt-btn-inr');
+  const btnPct = document.getElementById('ps-tgt-btn-pct');
+  if(mode==='inr'){ btnInr.classList.add('active'); btnPct.classList.remove('active'); }
+  else { btnPct.classList.add('active'); btnInr.classList.remove('active'); }
+  const lbl = document.getElementById('ps-tgt-mode-label');
+  if(lbl) lbl.textContent = mode==='inr' ? '₹ price' : '% from entry';
+  document.getElementById('ps-target').placeholder = mode==='inr' ? 'e.g. 280.00' : 'e.g. 5.0';
+  document.getElementById('ps-target').value = '';
+  document.getElementById('ps-tgt-other').textContent = '';
+  calcPositionSize();
+}
+
+function psTgtSync(){
+  const val = parseFloat(document.getElementById('ps-target').value);
+  const other = document.getElementById('ps-tgt-other');
+  const entry = +document.getElementById('ps-entry').value || 0;
+  if(!val||isNaN(val)){ other.textContent=''; calcPositionSize(); return; }
+  if(_psTgtMode==='inr'){
+    if(entry>0){
+      const pct = Math.abs((val - entry)/entry*100);
+      other.textContent = `= +${pct.toFixed(2)}% from entry ₹${entry}`;
+      other.style.color = 'var(--g)';
+    } else { other.textContent = 'Enter entry price to see %'; other.style.color = 'var(--t4)'; }
+  } else {
+    if(entry>0){
+      const tgtPrice = entry * (1 + val/100);
+      other.textContent = `= ₹${tgtPrice.toFixed(2)} (entry: ₹${entry})`;
+      other.style.color = 'var(--g)';
+    } else { other.textContent = 'Enter entry price to auto-calculate'; other.style.color = 'var(--t4)'; }
+  }
+  calcPositionSize();
+}
+
+function getPsTgtPrice(){
+  const raw = parseFloat(document.getElementById('ps-target').value);
+  if(!raw||isNaN(raw)) return 0;
+  if(_psTgtMode==='inr') return raw;
+  const entry = +document.getElementById('ps-entry').value || 0;
+  if(!entry) return 0;
+  return entry * (1 + raw/100);
+}
+
 function calcPositionSize(){
   const brok = document.getElementById('ps-brokerage').value;
   document.getElementById('ps-custom-charges').style.display = brok==='custom'?'':'none';
@@ -6184,8 +6775,8 @@ function calcPositionSize(){
   const capital = +document.getElementById('ps-capital').value || 0;
   const riskPct = +document.getElementById('ps-risk').value || 0.5;
   const entry   = +document.getElementById('ps-entry').value || 0;
-  const sl      = +document.getElementById('ps-sl').value || 0;
-  const target  = +document.getElementById('ps-target').value || 0;
+  const sl      = getPsSLPrice();
+  const target  = getPsTgtPrice();
 
   const qEl = document.getElementById('ps-qty');
   const noteEl = document.getElementById('ps-qty-note');
@@ -6501,7 +7092,7 @@ function onPsSymInput(val){
     let si=0; for(let ci=0;ci<q.length&&si<sym.length;ci++){if(sym[si]===q[ci])si++;} if(si>=q.length)return 20;
     return -1;
   }
-  const scored = NSE_SYMBOLS.map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  const scored = getSymbolDB().map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
   const matches = scored.map(x=>[x.sym,x.name,x.sector]);
   psFocusIdx = -1;
 
@@ -6571,8 +7162,8 @@ async function psFetchPrice(sym){
 function psAddToTradeLog(){
   const sym    = (document.getElementById('ps-symbol').value||'').trim().toUpperCase();
   const entry  = +document.getElementById('ps-entry').value||0;
-  const sl     = +document.getElementById('ps-sl').value||0;
-  const target = +document.getElementById('ps-target').value||0;
+  const sl     = getPsSLPrice();
+  const target = getPsTgtPrice();
   const side   = document.getElementById('ps-side').value||'Buy';
   const etype  = document.getElementById('ps-etype').value||'Swing';
   const qtyEl  = document.getElementById('ps-qty');
@@ -6620,7 +7211,7 @@ function onAlSymInput(val){
     if(sym.includes(q))return 70; if(name.toUpperCase().includes(q))return 50;
     let si=0;for(let ci=0;ci<q.length&&si<sym.length;ci++){if(sym[si]===q[ci])si++;}if(si>=q.length)return 20; return -1;
   }
-  const scored = NSE_SYMBOLS.map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  const scored = getSymbolDB().map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
   const matches = scored.map(x=>[x.sym,x.name,x.sector]);
   alFocusIdx=-1;
 
@@ -8626,6 +9217,445 @@ function deManualSession(){
   setDot('de-dot','connected');
   toast('✅ Session key saved — syncing now…','✅');
   setTimeout(syncDefinedge, 400);
+}
+
+// ══════════════════════════════════════════════════
+// NEWS INTELLIGENCE ENGINE — Real-time news + AI sentiment
+// ══════════════════════════════════════════════════
+let _newsData = {};
+let _newsBeepEnabled = false;
+let _newsAutoInterval = null;
+let _newsAudioCtx = null;
+
+function initNewsPage(){
+  const beepEl = document.getElementById('news-beep-toggle');
+  if(beepEl) beepEl.checked = _newsBeepEnabled;
+  const autoEl = document.getElementById('news-auto-toggle');
+  if(autoEl) autoEl.checked = !!_newsAutoInterval;
+  if(Object.keys(_newsData).length) renderNewsFeed();
+}
+
+function toggleNewsBeep(on){
+  _newsBeepEnabled = on;
+  if(on && !_newsAudioCtx) _newsAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(on) toast('Bearish Beep enabled','🔊');
+}
+
+function toggleNewsAuto(on){
+  if(_newsAutoInterval){ clearInterval(_newsAutoInterval); _newsAutoInterval=null; }
+  if(on){ _newsAutoInterval = setInterval(()=>newsRefreshAll(true), 5*60*1000); toast('Auto-refresh 5 min','⏱'); }
+}
+
+function playBearishBeep(){
+  if(!_newsBeepEnabled || !_newsAudioCtx) return;
+  try{
+    const now = _newsAudioCtx.currentTime;
+    [600,450,300].forEach((freq,i)=>{
+      const osc = _newsAudioCtx.createOscillator(); const gain = _newsAudioCtx.createGain();
+      osc.type='square'; osc.frequency.value=freq;
+      gain.gain.setValueAtTime(0.15,now+i*0.2); gain.gain.exponentialRampToValueAtTime(0.01,now+i*0.2+0.18);
+      osc.connect(gain); gain.connect(_newsAudioCtx.destination); osc.start(now+i*0.2); osc.stop(now+i*0.2+0.2);
+    });
+  }catch(e){}
+}
+
+async function newsRefreshAll(silent){
+  const openSymbols = [...new Set(trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol).filter(Boolean))];
+  if(!openSymbols.length){ if(!silent) toast('No open positions','ℹ️'); return; }
+  document.getElementById('news-pos-count').textContent = openSymbols.length;
+  const container = document.getElementById('news-feed-container');
+  if(!silent) container.innerHTML = '<div style="padding:40px;text-align:center"><div style="font-size:28px;margin-bottom:8px;animation:spin 1s linear infinite;display:inline-block">📰</div><div style="color:var(--t2)">Fetching news for '+openSymbols.length+' positions…</div></div>';
+  const results = await Promise.all(openSymbols.map(sym => fetchSymbolNews(sym)));
+  _newsData = {}; openSymbols.forEach((sym,i) => { _newsData[sym] = results[i]; });
+  await analyzeNewsSentiment();
+  renderNewsFeed(); renderDashNewsTicker(); checkBearishAlerts();
+  const tEl=document.getElementById('dash-news-time'); if(tEl) tEl.textContent='Updated '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function fetchSymbolNews(sym){
+  try{
+    const query = encodeURIComponent(sym+' NSE India stock');
+    const url = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://news.google.com/rss/search?q='+query+'&hl=en-IN&gl=IN&ceid=IN:en')}`;
+    const res = await fetch(url); const text = await res.text();
+    const parser = new DOMParser(); const xml = parser.parseFromString(text, 'text/xml');
+    const items = xml.querySelectorAll('item'); const news = [];
+    items.forEach((item,i)=>{
+      if(i>=6) return;
+      const title = item.querySelector('title')?.textContent||'';
+      const link = item.querySelector('link')?.textContent||'';
+      const pubDate = item.querySelector('pubDate')?.textContent||'';
+      const source = item.querySelector('source')?.textContent||'';
+      news.push({ title:title.replace(/<[^>]*>/g,'').trim(), url:link, time:pubDate?new Date(pubDate):new Date(), source:source||'Google News', sentiment:null, summary:null, sym });
+    });
+    return news;
+  }catch(e){ return []; }
+}
+
+async function analyzeNewsSentiment(){
+  const allNews = Object.values(_newsData).flat().filter(n=>!n.sentiment);
+  if(!allNews.length) return;
+  const headlineBlock = allNews.map((n,i)=>`[${i}] ${n.sym}: "${n.title}"`).join('\n');
+  const prompt = `You are a stock market news analyst. Classify each headline's sentiment for the specific stock as BULLISH, BEARISH, or NEUTRAL. Also provide a 1-line trading implication.\n\nHeadlines:\n${headlineBlock}\n\nReply ONLY in JSON array format, no markdown:\n[{"i":0,"s":"BULLISH","m":"Strong earnings beat suggests continued uptrend"}]`;
+  try{
+    const raw = await callAI(prompt);
+    const cleaned = raw.replace(/```json|```/g,'').trim();
+    const match = cleaned.match(/\[[\s\S]*\]/);
+    if(match){ const parsed=JSON.parse(match[0]); parsed.forEach(r=>{ if(r.i>=0&&r.i<allNews.length){ allNews[r.i].sentiment=(r.s||'NEUTRAL').toUpperCase(); allNews[r.i].summary=r.m||''; } }); }
+  }catch(e){
+    allNews.forEach(n=>{
+      const t=n.title.toLowerCase();
+      if(/profit|surge|rise|jump|bull|upgrade|beat|rally|strong|high|record|growth/.test(t)) n.sentiment='BULLISH';
+      else if(/loss|fall|drop|bear|downgrade|miss|decline|crash|weak|low|concern|risk|probe|fraud/.test(t)) n.sentiment='BEARISH';
+      else n.sentiment='NEUTRAL';
+      n.summary=n.sentiment==='BULLISH'?'Positive signal':n.sentiment==='BEARISH'?'Monitor — negative signal':'Routine news';
+    });
+  }
+}
+
+function renderNewsFeed(){
+  const container = document.getElementById('news-feed-container');
+  const symbols = Object.keys(_newsData);
+  if(!symbols.length){ container.innerHTML='<div style="padding:40px;text-align:center;color:var(--t4)">No news loaded</div>'; return; }
+  let bullCount=0,bearCount=0,neutCount=0;
+  Object.values(_newsData).flat().forEach(n=>{ if(n.sentiment==='BULLISH')bullCount++; else if(n.sentiment==='BEARISH')bearCount++; else neutCount++; });
+  document.getElementById('news-bull-count').textContent=bullCount;
+  document.getElementById('news-bear-count').textContent=bearCount;
+  document.getElementById('news-neut-count').textContent=neutCount;
+  let html='';
+  symbols.forEach(sym=>{
+    const items=_newsData[sym]; if(!items.length) return;
+    const overall=items.filter(n=>n.sentiment==='BEARISH').length>items.filter(n=>n.sentiment==='BULLISH').length?'BEARISH':items.filter(n=>n.sentiment==='BULLISH').length>0?'BULLISH':'NEUTRAL';
+    const sentIcon=overall==='BULLISH'?'📈':overall==='BEARISH'?'📉':'📊';
+    html+=`<div class="card" style="margin-bottom:12px;${overall==='BEARISH'?'border-color:rgba(255,69,96,.35);':''}">
+      <div class="card-head" style="padding:10px 14px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">${sentIcon}</span><span style="font-size:14px;font-weight:800;color:var(--t1)">${sym}</span><span class="rbdg ${overall==='BULLISH'?'pos':overall==='BEARISH'?'neg':'neu'}" style="font-size:10px">${overall}</span></div><span style="font-size:10px;color:var(--t4)">${items.length} articles</span></div>
+      <div class="card-body" style="padding:0">`;
+    items.forEach(n=>{
+      const sDot=n.sentiment==='BULLISH'?'🟢':n.sentiment==='BEARISH'?'🔴':'⚪';
+      const sCol=n.sentiment==='BULLISH'?'var(--g)':n.sentiment==='BEARISH'?'var(--r)':'var(--t3)';
+      html+=`<div style="padding:10px 14px;border-bottom:1px solid var(--b1);${n.sentiment==='BEARISH'?'background:rgba(255,69,96,.04);':''}"><div style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:12px;flex-shrink:0;margin-top:2px">${sDot}</span><div style="flex:1;min-width:0"><a href="${n.url||'#'}" target="_blank" style="font-size:12.5px;font-weight:600;color:var(--t1);text-decoration:none;line-height:1.4;display:block">${n.title}</a>${n.summary?`<div style="font-size:11px;color:${sCol};margin-top:4px;font-weight:600">→ ${n.summary}</div>`:''}<div style="font-size:10px;color:var(--t4);margin-top:3px">${n.source} · ${newsTimeAgo(n.time)}</div></div></div></div>`;
+    });
+    html+=`</div></div>`;
+  });
+  container.innerHTML=html;
+}
+
+function renderDashNewsTicker(){
+  const feed=document.getElementById('dash-news-feed'); if(!feed)return;
+  const allNews=Object.values(_newsData).flat().sort((a,b)=>b.time-a.time).slice(0,10);
+  if(!allNews.length){feed.innerHTML='<div style="padding:12px;text-align:center;color:var(--t4);font-size:12px">No news yet</div>';return;}
+  let html='';
+  allNews.forEach(n=>{
+    const sDot=n.sentiment==='BULLISH'?'🟢':n.sentiment==='BEARISH'?'🔴':'⚪';
+    const bg=n.sentiment==='BEARISH'?'background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.2);':'background:var(--bg2);border:1px solid var(--b1);';
+    html+=`<div style="${bg}border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;flex-shrink:0">${sDot}</span><span class="rbdg ${n.sentiment==='BULLISH'?'pos':n.sentiment==='BEARISH'?'neg':'neu'}" style="font-size:9px;flex-shrink:0">${n.sym}</span><a href="${n.url||'#'}" target="_blank" style="font-size:11.5px;color:var(--t2);text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.title}</a><span style="font-size:10px;color:var(--t4);flex-shrink:0">${newsTimeAgo(n.time)}</span></div>`;
+  });
+  feed.innerHTML=html;
+}
+
+function checkBearishAlerts(){
+  const bearishItems=Object.values(_newsData).flat().filter(n=>n.sentiment==='BEARISH');
+  const banner=document.getElementById('news-bearish-banner'); const badge=document.getElementById('news-alert-badge');
+  if(bearishItems.length>0){
+    if(banner){ banner.style.display=''; document.getElementById('news-bearish-list').innerHTML=bearishItems.map(n=>`<div style="margin-bottom:4px">• <b style="color:var(--r)">${n.sym}</b>: ${n.title} <span style="color:var(--t4);font-size:10px">— ${n.summary||''}</span></div>`).join(''); }
+    if(badge) badge.style.display='';
+    playBearishBeep();
+  } else { if(banner) banner.style.display='none'; if(badge) badge.style.display='none'; }
+}
+
+function newsTimeAgo(date){
+  if(!date)return''; const d=date instanceof Date?date:new Date(date); const diff=(Date.now()-d.getTime())/1000;
+  if(diff<60)return'just now'; if(diff<3600)return Math.floor(diff/60)+'m ago'; if(diff<86400)return Math.floor(diff/3600)+'h ago'; return Math.floor(diff/86400)+'d ago';
+}
+
+// ══════════════════════════════════════════════════
+// TRADE EXECUTION & MANAGEMENT ENGINE
+// ══════════════════════════════════════════════════
+let _execBroker = 'zerodha';
+let _execPositions = [];
+let _execOrders = [];
+let _execManageSym = null;
+let _execManagePos = null;
+let execSymFocusIdx = -1;
+
+function initExecPage(){
+  execPopulateJournalDropdown();
+  execCheckBrokerStatus();
+}
+
+function setExecBroker(b){
+  _execBroker = b;
+  ['zd','dhan','de'].forEach(k=>{
+    const btn = document.getElementById('exec-br-'+k);
+    if(!btn) return;
+    const isActive = (k==='zd'&&b==='zerodha') || (k==='dhan'&&b==='dhan') || (k==='de'&&b==='definedge');
+    btn.style.background = isActive ? 'var(--yd)' : 'var(--bg3)';
+    btn.style.color = isActive ? 'var(--y)' : 'var(--t3)';
+  });
+  execCheckBrokerStatus();
+}
+
+function execCheckBrokerStatus(){
+  const st = document.getElementById('exec-broker-status');
+  if(!st) return;
+  let connected = false;
+  if(_execBroker==='zerodha'){
+    const tk = localStorage.getItem('zd_access_token') || localStorage.getItem('zd_tk');
+    connected = !!tk;
+  } else if(_execBroker==='dhan'){
+    connected = !!localStorage.getItem('dhan_tk');
+  } else if(_execBroker==='definedge'){
+    connected = !!localStorage.getItem('de_session');
+  }
+  const workerUrl = (localStorage.getItem('zd_worker_url')||'').trim();
+  if(!workerUrl){ st.innerHTML = '<span style="color:var(--r)">⚠ Set Worker URL in Settings first</span>'; return; }
+  st.innerHTML = connected ? '<span style="color:var(--g)">● Connected</span>' : '<span style="color:var(--r)">● Not authenticated — configure in Settings</span>';
+}
+
+function getExecWorkerUrl(){ return (localStorage.getItem('zd_worker_url')||'').trim(); }
+
+function getExecHeaders(){
+  const h = {'Content-Type':'application/json'};
+  if(_execBroker==='zerodha'){ h['Authorization']=`token ${localStorage.getItem('zd_key')||''}:${localStorage.getItem('zd_access_token')||localStorage.getItem('zd_tk')||''}`; }
+  else if(_execBroker==='dhan'){ h['X-Dhan-Token']=localStorage.getItem('dhan_tk')||''; h['X-Dhan-ID']=localStorage.getItem('dhan_id')||''; }
+  else if(_execBroker==='definedge'){ h['X-DE-Session']=localStorage.getItem('de_session')||''; }
+  return h;
+}
+
+function onExecSymInput(val){
+  const q=val.trim().toUpperCase(); const drop=document.getElementById('exec-sym-drop');
+  if(!q||q.length<1){drop.classList.remove('open');return;}
+  const scored=getSymbolDB().map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  if(!scored.length){drop.classList.remove('open');return;}
+  execSymFocusIdx=-1;
+  let html='<div class="sym-dropdown-header">NSE Stocks</div>';
+  scored.forEach(s=>{ html+=`<div class="sym-opt" data-sym="${s.sym}" onclick="selectExecSym('${s.sym}')"><div class="sym-opt-icon">${s.sym.slice(0,2)}</div><div class="sym-opt-info"><div class="sym-opt-sym">${s.sym}</div><div class="sym-opt-name">${s.name}</div></div>${s.sector?`<div class="sym-opt-sector">${s.sector}</div>`:''}</div>`; });
+  drop.innerHTML=html;drop.classList.add('open');
+}
+function closeExecSymDrop(){const d=document.getElementById('exec-sym-drop');if(d)d.classList.remove('open');}
+function selectExecSym(sym){ document.getElementById('exec-sym').value=sym; closeExecSymDrop(); execFetchPrice(sym); }
+function onExecSymKey(e){
+  const drop=document.getElementById('exec-sym-drop'); const opts=drop?.querySelectorAll('.sym-opt'); if(!opts?.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();execSymFocusIdx=Math.min(execSymFocusIdx+1,opts.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();execSymFocusIdx=Math.max(execSymFocusIdx-1,0);}
+  else if(e.key==='Enter'&&execSymFocusIdx>=0){e.preventDefault();const s=opts[execSymFocusIdx]?.dataset?.sym;if(s)selectExecSym(s);return;}
+  else if(e.key==='Escape'){closeExecSymDrop();return;}
+  opts.forEach((o,i)=>o.classList.toggle('focused',i===execSymFocusIdx));
+}
+
+async function execFetchPrice(sym){
+  if(!sym)return; const st=document.getElementById('exec-price-status'); if(st) st.textContent='⏳ Fetching CMP…';
+  try{ const ticker=sym.includes('.')?sym:sym+'.NS'; const r=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`)}`); const d=await r.json(); const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice||d?.chart?.result?.[0]?.meta?.previousClose;
+    if(price){ document.getElementById('exec-price').value=price.toFixed(2); if(st) st.innerHTML=`<span style="color:var(--g)">✓ CMP: ₹${price.toFixed(2)}</span>`; }
+    else { if(st) st.innerHTML=`<span style="color:var(--y)">⚠ Price unavailable</span>`; }
+  }catch(e){ if(st) st.innerHTML=`<span style="color:var(--t3)">Fetch failed</span>`; }
+}
+
+function execOtypeChange(){ const otype=document.getElementById('exec-otype').value; document.getElementById('exec-trigger-wrap').style.display=(otype==='SL'||otype==='SL-M')?'':'none'; }
+
+async function execPlaceOrder(){
+  const workerUrl=getExecWorkerUrl(); if(!workerUrl){toast('Set Worker URL in Settings','⚠️');return;}
+  const sym=(document.getElementById('exec-sym').value||'').trim().toUpperCase();
+  const side=document.getElementById('exec-side').value; const otype=document.getElementById('exec-otype').value;
+  const qty=+document.getElementById('exec-qty').value||0; const price=+document.getElementById('exec-price').value||0;
+  const trigger=+document.getElementById('exec-trigger').value||0; const product=document.getElementById('exec-product').value;
+  const validity=document.getElementById('exec-validity').value;
+  const sl=+document.getElementById('exec-sl').value||0; const tgt=+document.getElementById('exec-tgt').value||0;
+  if(!sym){toast('Enter symbol','⚠️');return;} if(!qty||qty<=0){toast('Enter quantity','⚠️');return;}
+  const statusEl=document.getElementById('exec-order-status'); const btn=document.getElementById('exec-place-btn');
+  btn.disabled=true; statusEl.innerHTML='<span style="color:var(--y)">⏳ Placing order…</span>';
+  try{
+    const headers=getExecHeaders(); let action='',body={};
+    if(_execBroker==='zerodha'){action='zd-place-order';body={tradingsymbol:sym,exchange:'NSE',transaction_type:side,order_type:otype,quantity:qty,product,validity,price:price||0,trigger_price:trigger||0};}
+    else if(_execBroker==='dhan'){action='dhan-place-order';body={symbol:sym,side,order_type:otype,qty,price:price||0,trigger:trigger||0,product,validity};}
+    else{action='de-place-order';body={symbol:sym,side,order_type:otype,qty,price:price||0,trigger:trigger||0,product,validity};}
+    headers['X-Kite-Action']=action;
+    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)}); const data=await res.json();
+    if(data?.order_id||data?.orderId||data?.data?.order_id){
+      const oid=data.order_id||data.orderId||data.data?.order_id;
+      statusEl.innerHTML=`<span style="color:var(--g)">✅ Order placed — ID: ${oid}</span>`; toast(`Order placed: ${side} ${qty} ${sym}`,'✅');
+      if(sl>0) await execPlaceSLTgtOrder(sym,side==='BUY'?'SELL':'BUY',qty,sl,product,'SL-M','trigger');
+      if(tgt>0) await execPlaceSLTgtOrder(sym,side==='BUY'?'SELL':'BUY',qty,tgt,product,'LIMIT','price');
+    } else { statusEl.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||data?.error||JSON.stringify(data).slice(0,200)}</span>`; }
+  }catch(e){ statusEl.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
+  btn.disabled=false;
+}
+
+async function execPlaceSLTgtOrder(sym,side,qty,val,product,otype,field){
+  try{ const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
+    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
+    const body=_execBroker==='zerodha'
+      ?{tradingsymbol:sym,exchange:'NSE',transaction_type:side,order_type:otype,quantity:qty,product,validity:'DAY',[field==='trigger'?'trigger_price':'price']:val}
+      :{symbol:sym,side,order_type:otype,qty,[field]:val,product,validity:'DAY'};
+    await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)});
+  }catch(e){console.error('SL/Target order error:',e);}
+}
+
+async function execRefreshPositions(){
+  const workerUrl=getExecWorkerUrl(); if(!workerUrl){toast('Set Worker URL','⚠️');return;}
+  const tbl=document.getElementById('exec-positions-tbl'); tbl.innerHTML='<div style="padding:20px;text-align:center;color:var(--t4)">⏳ Loading…</div>';
+  try{
+    const headers=getExecHeaders();
+    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-positions':_execBroker==='dhan'?'dhan-positions':'de-positions';
+    const res=await fetch(workerUrl,{method:'GET',headers}); const data=await res.json();
+    let positions=(_execBroker==='zerodha'?(data?.data?.net||data?.net||[]):(data?.data||data||[])).filter(p=>(p.quantity||p.netQty||0)!==0);
+    _execPositions=positions; document.getElementById('exec-pos-count').textContent=positions.length+' positions';
+    if(!positions.length){tbl.innerHTML='<div style="padding:30px;text-align:center;color:var(--t4)">No open positions</div>';return;}
+    let html='<table style="width:100%;font-size:12px"><thead><tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&L</th><th></th></tr></thead><tbody>';
+    positions.forEach((p,i)=>{
+      const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||''; const qty=p.quantity||p.netQty||0;
+      const avg=p.average_price||p.averagePrice||p.buyAvg||0; const ltp=p.last_price||p.lastPrice||p.ltp||0;
+      const pnl=p.pnl||((ltp-avg)*qty)||0; const col=pnl>=0?'var(--g)':'var(--r)';
+      html+=`<tr><td style="font-weight:700;color:var(--t1)">${sym}</td><td class="mono">${qty}</td><td class="mono">₹${(+avg).toFixed(2)}</td><td class="mono" style="color:var(--c)">₹${(+ltp).toFixed(2)}</td><td class="mono" style="color:${col};font-weight:700">₹${(+pnl).toFixed(2)}</td><td><button class="btn btn-ghost btn-xs" onclick="execManagePosition(${i})">Manage</button></td></tr>`;
+    });
+    tbl.innerHTML=html+'</tbody></table>';
+  }catch(e){ tbl.innerHTML=`<div style="padding:20px;text-align:center;color:var(--r)">❌ ${e.message}</div>`; }
+  execRefreshOrders();
+}
+
+function execManagePosition(idx){
+  const p=_execPositions[idx]; if(!p)return; _execManagePos=p;
+  const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||''; _execManageSym=sym;
+  const qty=p.quantity||p.netQty||0; const avg=p.average_price||p.averagePrice||p.buyAvg||0;
+  const ltp=p.last_price||p.lastPrice||p.ltp||0; const pnl=p.pnl||((ltp-avg)*qty)||0;
+  document.getElementById('exec-manage-sym').textContent=sym; document.getElementById('exec-m-qty').textContent=qty;
+  document.getElementById('exec-m-avg').textContent='₹'+(+avg).toFixed(2); document.getElementById('exec-m-cmp').textContent='₹'+(+ltp).toFixed(2);
+  const pe=document.getElementById('exec-m-pnl'); pe.textContent='₹'+(+pnl).toFixed(2); pe.style.color=pnl>=0?'var(--g)':'var(--r)';
+  document.getElementById('exec-close-qty').textContent=Math.abs(qty);
+  document.getElementById('exec-manage-card').style.display=''; setExecAction('sl');
+}
+
+function setExecAction(act){
+  ['sl','trail','partial','pyramid','close'].forEach(a=>{
+    const btn=document.getElementById('exec-act-'+a); const panel=document.getElementById('exec-panel-'+a);
+    if(btn){btn.style.background=a===act?'var(--yd)':'var(--bg3)';btn.style.color=a===act?'var(--y)':'var(--t3)';}
+    if(panel)panel.style.display=a===act?'':'none';
+  });
+}
+
+function setPartialPct(pct){ const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0)); document.getElementById('exec-partial-qty').value=Math.floor(qty*pct/100); }
+
+async function execModifySLTgt(){
+  const newSL=+document.getElementById('exec-new-sl').value||0; const newTgt=+document.getElementById('exec-new-tgt').value||0;
+  if(!newSL&&!newTgt){toast('Enter SL or Target','⚠️');return;}
+  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Updating…</span>';
+  const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0));
+  const side=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0?'SELL':'BUY'; const product=_execManagePos?.product||'CNC';
+  try{
+    if(newSL>0) await execPlaceSLTgtOrder(_execManageSym,side,qty,newSL,product,'SL-M','trigger');
+    if(newTgt>0) await execPlaceSLTgtOrder(_execManageSym,side,qty,newTgt,product,'LIMIT','price');
+    st.innerHTML=`<span style="color:var(--g)">✅ Orders updated</span>`;
+  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
+}
+
+async function execTrailSL(){
+  const method=document.getElementById('exec-trail-method').value; const val=+document.getElementById('exec-trail-val').value||0;
+  const avg=+(_execManagePos?.average_price||_execManagePos?.averagePrice||0); const ltp=+(_execManagePos?.last_price||_execManagePos?.lastPrice||0);
+  const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0)); const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0;
+  let newSL=0;
+  if(method==='cost')newSL=avg; else if(method==='fixed')newSL=isLong?(ltp-val):(ltp+val); else if(method==='pct')newSL=isLong?(ltp*(1-val/100)):(ltp*(1+val/100));
+  if(newSL<=0){toast('Invalid trail value','⚠️');return;}
+  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Trailing…</span>';
+  try{ await execPlaceSLTgtOrder(_execManageSym,isLong?'SELL':'BUY',qty,+newSL.toFixed(2),_execManagePos?.product||'CNC','SL-M','trigger');
+    st.innerHTML=`<span style="color:var(--g)">✅ SL trailed to ₹${newSL.toFixed(2)}</span>`;
+  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
+}
+
+async function execPartialExit(){
+  const qty=+document.getElementById('exec-partial-qty').value||0; const otype=document.getElementById('exec-partial-type').value;
+  const price=+document.getElementById('exec-partial-price').value||0;
+  if(!qty){toast('Enter exit quantity','⚠️');return;}
+  const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0; const side=isLong?'SELL':'BUY';
+  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Partial exit…</span>';
+  try{ const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
+    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
+    const body=_execBroker==='zerodha'?{tradingsymbol:_execManageSym,exchange:'NSE',transaction_type:side,order_type:otype,quantity:qty,product:_execManagePos?.product||'CNC',validity:'DAY',price:otype==='LIMIT'?price:0}:{symbol:_execManageSym,side,order_type:otype,qty,price:otype==='LIMIT'?price:0,product:_execManagePos?.product||'CNC',validity:'DAY'};
+    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)}); const data=await res.json();
+    if(data?.order_id||data?.orderId||data?.data?.order_id){ st.innerHTML=`<span style="color:var(--g)">✅ Partial exit: ${qty} shares</span>`; toast(`Partial exit: ${qty} ${_execManageSym}`,'✅'); }
+    else { st.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||JSON.stringify(data).slice(0,150)}</span>`; }
+  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
+}
+
+async function execPyramidAdd(){
+  const qty=+document.getElementById('exec-pyr-qty').value||0; const otype=document.getElementById('exec-pyr-type').value;
+  const price=+document.getElementById('exec-pyr-price').value||0;
+  if(!qty){toast('Enter pyramid quantity','⚠️');return;}
+  const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0; const side=isLong?'BUY':'SELL';
+  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Adding pyramid…</span>';
+  try{ const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
+    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
+    const body=_execBroker==='zerodha'?{tradingsymbol:_execManageSym,exchange:'NSE',transaction_type:side,order_type:otype,quantity:qty,product:_execManagePos?.product||'CNC',validity:'DAY',price:otype==='LIMIT'?price:0}:{symbol:_execManageSym,side,order_type:otype,qty,price:otype==='LIMIT'?price:0,product:_execManagePos?.product||'CNC',validity:'DAY'};
+    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)}); const data=await res.json();
+    if(data?.order_id||data?.orderId||data?.data?.order_id){ st.innerHTML=`<span style="color:var(--g)">✅ Pyramid: +${qty} shares</span>`; toast(`Pyramid: +${qty} ${_execManageSym}`,'✅'); }
+    else { st.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||JSON.stringify(data).slice(0,150)}</span>`; }
+  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
+}
+
+async function execCloseAll(){
+  const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0)); if(!qty){toast('No qty','⚠️');return;}
+  const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0; const side=isLong?'SELL':'BUY';
+  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Closing…</span>';
+  try{ const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
+    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
+    const body=_execBroker==='zerodha'?{tradingsymbol:_execManageSym,exchange:'NSE',transaction_type:side,order_type:'MARKET',quantity:qty,product:_execManagePos?.product||'CNC',validity:'DAY'}:{symbol:_execManageSym,side,order_type:'MARKET',qty,product:_execManagePos?.product||'CNC',validity:'DAY'};
+    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)}); const data=await res.json();
+    if(data?.order_id||data?.orderId||data?.data?.order_id){ st.innerHTML=`<span style="color:var(--g)">✅ Position closed</span>`; toast(`Closed ${_execManageSym}`,'✅'); document.getElementById('exec-manage-card').style.display='none'; setTimeout(execRefreshPositions,2000); }
+    else { st.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||JSON.stringify(data).slice(0,150)}</span>`; }
+  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
+}
+
+async function execRefreshOrders(){
+  const workerUrl=getExecWorkerUrl(); if(!workerUrl)return; const tbl=document.getElementById('exec-orders-tbl');
+  try{ const headers=getExecHeaders(); headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-orders':_execBroker==='dhan'?'dhan-orders':'de-orders';
+    const res=await fetch(workerUrl,{method:'GET',headers}); const data=await res.json(); const orders=data?.data||data||[];
+    if(!orders.length||!Array.isArray(orders)){tbl.innerHTML='<div style="padding:16px;text-align:center;color:var(--t4);font-size:12px">No orders today</div>';return;}
+    let html='<table style="width:100%;font-size:11.5px"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Status</th></tr></thead><tbody>';
+    orders.slice(0,20).forEach(o=>{
+      const sym=o.tradingsymbol||o.tradingSymbol||o.symbol||''; const side=o.transaction_type||o.transactionType||o.side||'';
+      const qty=o.quantity||o.qty||0; const price=o.average_price||o.price||0; const status=o.status||o.orderStatus||'';
+      const time=o.order_timestamp||o.exchange_timestamp||'';
+      html+=`<tr><td style="font-size:10px;color:var(--t3)">${time?new Date(time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-'}</td><td style="font-weight:700;color:var(--t1)">${sym}</td><td style="color:${side.includes('BUY')?'var(--g)':'var(--r)'};font-weight:700">${side}</td><td class="mono">${qty}</td><td class="mono">₹${(+price).toFixed(2)}</td><td style="color:${status==='COMPLETE'||status==='TRADED'?'var(--g)':status==='REJECTED'?'var(--r)':'var(--y)'};font-weight:600;font-size:10.5px">${status}</td></tr>`;
+    });
+    tbl.innerHTML=html+'</tbody></table>';
+  }catch(e){ tbl.innerHTML=`<div style="padding:16px;color:var(--r);font-size:12px;text-align:center">❌ ${e.message}</div>`; }
+}
+
+function execPopulateJournalDropdown(){
+  const sel=document.getElementById('exec-from-journal'); if(!sel)return;
+  sel.innerHTML='<option value="">— Select open trade —</option>';
+  trades.filter(t=>t.status==='Open'||t.status==='Partial').forEach(t=>{
+    const avgE=t.entries&&t.entries.length?t.entries.reduce((s,e)=>s+e.price*e.qty,0)/t.entries.reduce((s,e)=>s+e.qty,0):0;
+    sel.innerHTML+=`<option value="${t.id}">${t.symbol} · ${t.side} · Avg ₹${avgE.toFixed(2)}</option>`;
+  });
+}
+
+function execFillFromJournal(){
+  const id=document.getElementById('exec-from-journal').value; if(!id)return;
+  const t=trades.find(x=>x.id===id); if(!t)return;
+  document.getElementById('exec-sym').value=t.symbol||'';
+  document.getElementById('exec-side').value=(t.side||'Buy')==='Buy'?'BUY':'SELL';
+  const avgE=t.entries&&t.entries.length?t.entries.reduce((s,e)=>s+e.price*e.qty,0)/t.entries.reduce((s,e)=>s+e.qty,0):0;
+  document.getElementById('exec-price').value=avgE.toFixed(2);
+  const tQty=t.entries?t.entries.reduce((s,e)=>s+e.qty,0):0; const eQty=t.exits?t.exits.reduce((s,e)=>s+e.qty,0):0;
+  document.getElementById('exec-qty').value=tQty-eQty;
+  if(t.sl) document.getElementById('exec-sl').value=(+t.sl).toFixed(2);
+  if(t.target) document.getElementById('exec-tgt').value=(+t.target).toFixed(2);
+  execFetchPrice(t.symbol);
+}
+
+function execFromPosSize(){
+  const sym=(document.getElementById('ps-symbol').value||'').trim().toUpperCase();
+  const entry=+document.getElementById('ps-entry').value||0; const sl=getPsSLPrice(); const target=getPsTgtPrice();
+  const qty=parseInt(document.getElementById('ps-qty')?.textContent)||0;
+  const side=document.getElementById('ps-side')?.value||'Buy';
+  if(!sym||!qty){toast('Calculate position size first','⚠️');return;}
+  nav('execute');
+  setTimeout(()=>{
+    document.getElementById('exec-sym').value=sym; document.getElementById('exec-side').value=side==='Buy'?'BUY':'SELL';
+    document.getElementById('exec-qty').value=qty; document.getElementById('exec-price').value=entry.toFixed(2);
+    if(sl>0)document.getElementById('exec-sl').value=sl.toFixed(2);
+    if(target>0)document.getElementById('exec-tgt').value=target.toFixed(2);
+    execFetchPrice(sym);
+  },200);
 }
 
 </script>
