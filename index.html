@@ -5706,39 +5706,90 @@ function getSymbolDB(){
 }
 
 async function fetchNSESymbolList(){
-  try{
-    const statusEl = document.getElementById('nse-db-status');
-    if(statusEl) statusEl.textContent = '⏳ Fetching NSE symbols…';
-    const url = 'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv';
-    const r = await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url));
-    const text = await r.text();
-    const lines = text.trim().split('\n');
-    const parsed = [];
+  const statusEl = document.getElementById('nse-db-status');
+  if(statusEl) statusEl.innerHTML = '⏳ Fetching NSE symbols…';
+  const NSE_CSV = 'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv';
+  const PROXIES = [
+    u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+    u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+  ];
+  function parseCSV(text){
+    const lines=text.trim().split('\n'); const parsed=[];
     for(let i=1;i<lines.length;i++){
-      const parts = lines[i].split(',');
+      const parts=lines[i].split(',');
       if(parts.length>=2){
-        const sym = parts[0].trim();
-        const name = parts[1].trim();
-        if(sym && name) parsed.push([sym, name, '']);
+        const sym=parts[0].trim().replace(/^"|"$/g,'');
+        const name=parts[1].trim().replace(/^"|"$/g,'');
+        if(sym&&name&&/^[A-Z0-9&\-\.]+$/.test(sym)) parsed.push([sym,name,'']);
       }
     }
-    if(parsed.length > 100){
-      // Merge: keep sector info from built-in where available
-      const sectorMap = {};
-      NSE_SYMBOLS.forEach(([s,n,sec])=> sectorMap[s]=sec);
-      NSE_EXTENDED_SYMBOLS = parsed.map(([s,n,sec])=> [s, n, sectorMap[s]||sec||'']);
-      localStorage.setItem('te_nse_ext', JSON.stringify(NSE_EXTENDED_SYMBOLS));
-      localStorage.setItem('te_nse_ext_ts', new Date().toISOString());
-      if(statusEl) statusEl.innerHTML = `<span style="color:var(--g)">✅ ${parsed.length} symbols loaded</span> (${new Date().toLocaleString('en-IN')})`;
-      toast(`NSE database updated: ${parsed.length} symbols`,'✅');
-    } else {
-      throw new Error('Too few symbols parsed');
-    }
-  } catch(e){
-    const statusEl = document.getElementById('nse-db-status');
-    if(statusEl) statusEl.innerHTML = `<span style="color:var(--r)">❌ Failed: ${e.message}</span>`;
-    toast('NSE fetch failed — using built-in database','⚠️');
+    return parsed;
   }
+  let lastErr=null;
+  for(let i=0;i<PROXIES.length;i++){
+    try{
+      if(statusEl) statusEl.innerHTML=`⏳ Trying proxy ${i+1}/${PROXIES.length}…`;
+      const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),12000);
+      const r=await fetch(PROXIES[i](NSE_CSV),{signal:ctrl.signal}); clearTimeout(t);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const parsed=parseCSV(await r.text());
+      if(parsed.length>100){
+        const sectorMap={};
+        NSE_SYMBOLS.forEach(([s,n,sec])=>sectorMap[s]=sec);
+        NSE_EXTENDED_SYMBOLS=parsed.map(([s,n])=>[s,n,sectorMap[s]||'']);
+        localStorage.setItem('te_nse_ext',JSON.stringify(NSE_EXTENDED_SYMBOLS));
+        localStorage.setItem('te_nse_ext_ts',new Date().toISOString());
+        if(statusEl) statusEl.innerHTML=`<span style="color:var(--g)">✅ ${parsed.length} symbols loaded</span> (${new Date().toLocaleString('en-IN')})`;
+        toast(`NSE database updated: ${parsed.length} symbols`,'✅');
+        return;
+      } else { throw new Error('Too few symbols ('+parsed.length+')'); }
+    }catch(e){ lastErr=e.name==='AbortError'?new Error('Timeout'):e; }
+  }
+  // All proxies failed — show manual upload fallback
+  if(statusEl) statusEl.innerHTML=`
+    <span style="color:var(--r)">❌ Auto-fetch failed. </span>
+    <label style="cursor:pointer;color:var(--y);text-decoration:underline;font-size:11px">
+      📂 Upload EQUITY_L.csv manually
+      <input type="file" accept=".csv" style="display:none" onchange="loadNSEFromFile(this)">
+    </label>
+    <span style="color:var(--t4);font-size:10px;display:block;margin-top:4px">
+      Download CSV from <a href="https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv" target="_blank" style="color:var(--b)">NSE Archives</a>, then upload here.
+    </span>`;
+  toast('NSE fetch failed — use manual CSV upload','⚠️');
+}
+
+function loadNSEFromFile(input){
+  const file=input.files[0]; if(!file)return;
+  const statusEl=document.getElementById('nse-db-status');
+  if(statusEl) statusEl.innerHTML='⏳ Reading file…';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const lines=e.target.result.trim().split('\n'); const parsed=[];
+      for(let i=1;i<lines.length;i++){
+        const parts=lines[i].split(',');
+        if(parts.length>=2){
+          const sym=parts[0].trim().replace(/^"|"$/g,'');
+          const name=parts[1].trim().replace(/^"|"$/g,'');
+          if(sym&&name&&/^[A-Z0-9&\-\.]+$/.test(sym)) parsed.push([sym,name,'']);
+        }
+      }
+      if(parsed.length>100){
+        const sectorMap={};
+        NSE_SYMBOLS.forEach(([s,n,sec])=>sectorMap[s]=sec);
+        NSE_EXTENDED_SYMBOLS=parsed.map(([s,n])=>[s,n,sectorMap[s]||'']);
+        localStorage.setItem('te_nse_ext',JSON.stringify(NSE_EXTENDED_SYMBOLS));
+        localStorage.setItem('te_nse_ext_ts',new Date().toISOString());
+        if(statusEl) statusEl.innerHTML=`<span style="color:var(--g)">✅ ${parsed.length} symbols loaded from file</span>`;
+        toast(`NSE database: ${parsed.length} symbols from file`,'✅');
+      } else { throw new Error('Invalid CSV — only '+parsed.length+' symbols'); }
+    }catch(err){
+      if(statusEl) statusEl.innerHTML=`<span style="color:var(--r)">❌ ${err.message}</span>`;
+    }
+  };
+  reader.readAsText(file);
 }
 
 // Auto-load cached NSE extended symbols on startup
