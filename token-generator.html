@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradEdge Token Generator</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            padding: 16px;
+            color: #fff;
+        }
+        .container { max-width: 440px; margin: 0 auto; }
+        
+        h1 { 
+            text-align: center; 
+            margin-bottom: 6px; 
+            color: #fff; 
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .subtitle { 
+            text-align: center; 
+            color: #64748b; 
+            margin-bottom: 20px; 
+            font-size: 13px; 
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .tab {
+            flex: 1;
+            padding: 14px;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            background: #1e293b;
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .tab:hover { border-color: #475569; }
+        .tab.active-zerodha { 
+            border-color: #ef4444; 
+            background: linear-gradient(135deg, #7f1d1d 0%, #1e293b 100%);
+            color: #fff;
+        }
+        .tab.active-definedge { 
+            border-color: #22c55e; 
+            background: linear-gradient(135deg, #14532d 0%, #1e293b 100%);
+            color: #fff;
+        }
+        .tab-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+        /* Cards */
+        .card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            border: 1px solid #334155;
+        }
+        .card h2 { 
+            color: #e2e8f0; 
+            margin-bottom: 14px; 
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .step-num {
+            background: #3b82f6;
+            color: #fff;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        /* Forms */
+        .form-group { margin-bottom: 12px; }
+        .form-row { display: flex; gap: 10px; }
+        .form-row .form-group { flex: 1; }
+        label { 
+            display: block; 
+            margin-bottom: 5px; 
+            color: #94a3b8; 
+            font-size: 12px;
+            font-weight: 500;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            background: #0f172a;
+            color: #fff;
+            font-size: 13px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        input:focus, textarea:focus { 
+            outline: none; 
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        input::placeholder { color: #475569; }
+        textarea { resize: none; height: 70px; }
+
+        /* Buttons */
+        button {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-zerodha { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
+        .btn-zerodha:hover:not(:disabled) { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+        .btn-definedge { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
+        .btn-definedge:hover:not(:disabled) { background: linear-gradient(135deg, #16a34a, #15803d); }
+        .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; }
+        .btn-blue:hover:not(:disabled) { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+
+        /* Status */
+        .status {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .status.success { background: #052e16; border: 1px solid #22c55e; color: #4ade80; }
+        .status.error { background: #450a0a; border: 1px solid #ef4444; color: #fca5a5; }
+        .status.info { background: #172554; border: 1px solid #3b82f6; color: #93c5fd; }
+
+        /* Result */
+        .result-box {
+            background: #0f172a;
+            border: 2px solid #22c55e;
+            border-radius: 10px;
+            padding: 14px;
+            margin-top: 12px;
+        }
+        .result-box label { color: #4ade80; font-weight: 600; margin-bottom: 8px; }
+        .result-box input { 
+            font-size: 12px; 
+            background: #1e293b;
+            border-color: #22c55e;
+        }
+
+        /* Utilities */
+        .hidden { display: none !important; }
+        .small { font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4; }
+        .saved-badge {
+            background: #052e16;
+            border: 1px solid #22c55e;
+            color: #4ade80;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+        .divider {
+            height: 1px;
+            background: #334155;
+            margin: 16px 0;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #334155;
+            color: #475569;
+            font-size: 11px;
+        }
+        .footer a { color: #3b82f6; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔑 TradEdge Token Generator</h1>
+        <p class="subtitle">Generate daily access tokens for your brokers</p>
+
+        <!-- Broker Tabs -->
+        <div class="tabs">
+            <div class="tab active-zerodha" id="tabZerodha" onclick="showBroker('zerodha')">
+                <span class="tab-icon">🔴</span>
+                Zerodha
+            </div>
+            <div class="tab" id="tabDefinedge" onclick="showBroker('definedge')">
+                <span class="tab-icon">🟢</span>
+                Definedge
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- ZERODHA SECTION -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div id="zerodhaSection">
+            <!-- Step 1: Credentials -->
+            <div class="card">
+                <h2><span class="step-num">1</span> API Credentials</h2>
+                <div id="zdSavedBadge" class="saved-badge hidden">✓ Saved</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="text" id="zdApiKey" placeholder="Your API Key">
+                    </div>
+                    <div class="form-group">
+                        <label>API Secret</label>
+                        <input type="password" id="zdApiSecret" placeholder="Your API Secret">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Login -->
+            <div class="card">
+                <h2><span class="step-num">2</span> Login & Get Token</h2>
+                <button class="btn-zerodha" onclick="zdOpenLogin()">🔐 Open Zerodha Login</button>
+                <p class="small">After login, copy the full URL from "This site can't be reached" page</p>
+            </div>
+
+            <!-- Step 3: Paste URL -->
+            <div class="card">
+                <h2><span class="step-num">3</span> Paste Redirect URL</h2>
+                <div class="form-group">
+                    <textarea id="zdRedirectUrl" placeholder="http://127.0.0.1/?request_token=..."></textarea>
+                </div>
+                <button class="btn-blue" onclick="zdGetToken()">⚡ Get Access Token</button>
+                <div id="zdStatus"></div>
+            </div>
+
+            <!-- Result -->
+            <div class="card hidden" id="zdResultCard">
+                <h2>✅ Success!</h2>
+                <div class="result-box">
+                    <label>Access Token:</label>
+                    <input type="text" id="zdAccessToken" readonly>
+                    <button class="btn-blue" onclick="copyText('zdAccessToken')" style="margin-top:10px">📋 Copy Token</button>
+                </div>
+                <div id="zdCopyStatus"></div>
+                <p class="small">Paste this in TradEdge → Zerodha → ACCESS TOKEN</p>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- DEFINEDGE SECTION -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div id="definedgeSection" class="hidden">
+            <!-- Step 1: Credentials -->
+            <div class="card">
+                <h2><span class="step-num">1</span> API Credentials</h2>
+                <div id="deSavedBadge" class="saved-badge hidden">✓ Saved</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>API Token</label>
+                        <input type="text" id="deApiToken" placeholder="Your API Token">
+                    </div>
+                    <div class="form-group">
+                        <label>API Secret</label>
+                        <input type="password" id="deApiSecret" placeholder="Your API Secret">
+                    </div>
+                </div>
+                <button class="btn-definedge" onclick="deRequestOTP()">📱 Request OTP</button>
+                <div id="deStep1Status"></div>
+            </div>
+
+            <!-- Step 2: Enter OTP -->
+            <div class="card hidden" id="deStep2Card">
+                <h2><span class="step-num">2</span> Enter OTP</h2>
+                <div class="form-group">
+                    <label>OTP from your mobile</label>
+                    <input type="text" id="deOtpInput" placeholder="Enter 6-digit OTP" maxlength="6">
+                </div>
+                <button class="btn-definedge" onclick="deGetSessionKey()">🔑 Get Session Key</button>
+                <div id="deStep2Status"></div>
+            </div>
+
+            <!-- Result -->
+            <div class="card hidden" id="deResultCard">
+                <h2>✅ Success!</h2>
+                <div class="result-box">
+                    <label>Session Key:</label>
+                    <input type="text" id="deSessionKey" readonly>
+                    <button class="btn-blue" onclick="copyText('deSessionKey')" style="margin-top:10px">📋 Copy Key</button>
+                </div>
+                <div id="deCopyStatus"></div>
+                <p class="small">Paste this in TradEdge → Definedge → API_SESSION_KEY</p>
+            </div>
+        </div>
+
+        <!-- Worker URL (shared) -->
+        <div class="card">
+            <details>
+                <summary style="cursor:pointer; color:#64748b; font-size:12px;">⚙️ Advanced Settings</summary>
+                <div class="form-group" style="margin-top:12px">
+                    <label>Cloudflare Worker URL</label>
+                    <input type="text" id="workerUrl" value="https://spring-fire-41a0.drrgware.workers.dev">
+                </div>
+            </details>
+        </div>
+
+        <div class="footer">
+            Made for <a href="https://drrgware-web.github.io/tradedge-journal/" target="_blank">TradEdge Journal</a>
+        </div>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════
+        let deOtpToken = '';
+
+        window.onload = function() {
+            // Load Zerodha credentials
+            const zdKey = localStorage.getItem('zd_api_key');
+            const zdSecret = localStorage.getItem('zd_api_secret');
+            if (zdKey) { document.getElementById('zdApiKey').value = zdKey; }
+            if (zdSecret) { document.getElementById('zdApiSecret').value = zdSecret; }
+            if (zdKey && zdSecret) { document.getElementById('zdSavedBadge').classList.remove('hidden'); }
+
+            // Load Definedge credentials
+            const deToken = localStorage.getItem('de_api_token');
+            const deSecret = localStorage.getItem('de_api_secret');
+            if (deToken) { document.getElementById('deApiToken').value = deToken; }
+            if (deSecret) { document.getElementById('deApiSecret').value = deSecret; }
+            if (deToken && deSecret) { document.getElementById('deSavedBadge').classList.remove('hidden'); }
+
+            // Load worker URL
+            const workerUrl = localStorage.getItem('worker_url');
+            if (workerUrl) { document.getElementById('workerUrl').value = workerUrl; }
+
+            // Check URL params for broker selection
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('broker') === 'definedge') {
+                showBroker('definedge');
+            }
+        };
+
+        function showBroker(broker) {
+            const zdSection = document.getElementById('zerodhaSection');
+            const deSection = document.getElementById('definedgeSection');
+            const zdTab = document.getElementById('tabZerodha');
+            const deTab = document.getElementById('tabDefinedge');
+
+            if (broker === 'zerodha') {
+                zdSection.classList.remove('hidden');
+                deSection.classList.add('hidden');
+                zdTab.classList.add('active-zerodha');
+                deTab.classList.remove('active-definedge');
+            } else {
+                zdSection.classList.add('hidden');
+                deSection.classList.remove('hidden');
+                zdTab.classList.remove('active-zerodha');
+                deTab.classList.add('active-definedge');
+            }
+        }
+
+        function saveCredentials(broker) {
+            if (broker === 'zerodha') {
+                localStorage.setItem('zd_api_key', document.getElementById('zdApiKey').value);
+                localStorage.setItem('zd_api_secret', document.getElementById('zdApiSecret').value);
+                document.getElementById('zdSavedBadge').classList.remove('hidden');
+            } else {
+                localStorage.setItem('de_api_token', document.getElementById('deApiToken').value);
+                localStorage.setItem('de_api_secret', document.getElementById('deApiSecret').value);
+                document.getElementById('deSavedBadge').classList.remove('hidden');
+            }
+            localStorage.setItem('worker_url', document.getElementById('workerUrl').value);
+        }
+
+        function copyText(elementId) {
+            const el = document.getElementById(elementId);
+            el.select();
+            document.execCommand('copy');
+            
+            const statusId = elementId === 'zdAccessToken' ? 'zdCopyStatus' : 'deCopyStatus';
+            document.getElementById(statusId).innerHTML = '<div class="status success" style="margin-top:8px">✓ Copied to clipboard!</div>';
+            setTimeout(() => { document.getElementById(statusId).innerHTML = ''; }, 2000);
+        }
+
+        // ═══════════════════════════════════════════
+        // ZERODHA FUNCTIONS
+        // ═══════════════════════════════════════════
+        function zdOpenLogin() {
+            const apiKey = document.getElementById('zdApiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your API Key first');
+                return;
+            }
+            saveCredentials('zerodha');
+            const loginUrl = `https://kite.zerodha.com/connect/login?v=3&api_key=${apiKey}`;
+            window.open(loginUrl, '_blank');
+        }
+
+        async function zdGetToken() {
+            const apiKey = document.getElementById('zdApiKey').value.trim();
+            const apiSecret = document.getElementById('zdApiSecret').value.trim();
+            const redirectUrl = document.getElementById('zdRedirectUrl').value.trim();
+            const workerUrl = document.getElementById('workerUrl').value.trim();
+            const statusDiv = document.getElementById('zdStatus');
+
+            if (!apiKey || !apiSecret) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please enter API Key and Secret</div>';
+                return;
+            }
+
+            // Extract request_token
+            const match = redirectUrl.match(/request_token=([^&]+)/);
+            if (!match) {
+                statusDiv.innerHTML = '<div class="status error">❌ Could not find request_token in URL</div>';
+                return;
+            }
+            const requestToken = match[1];
+            saveCredentials('zerodha');
+
+            statusDiv.innerHTML = '<div class="status info">⏳ Getting access token...</div>';
+
+            try {
+                // Generate SHA256 checksum
+                const combined = apiKey + requestToken + apiSecret;
+                const encoder = new TextEncoder();
+                const data = encoder.encode(combined);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const checksum = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+                // Call worker
+                const response = await fetch(workerUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Kite-Action': 'zd-session'
+                    },
+                    body: JSON.stringify({
+                        api_key: apiKey,
+                        request_token: requestToken,
+                        checksum: checksum
+                    })
+                });
+
+                const result = await response.json();
+                const accessToken = result.data?.access_token || result.access_token;
+
+                if (accessToken) {
+                    document.getElementById('zdAccessToken').value = accessToken;
+                    document.getElementById('zdResultCard').classList.remove('hidden');
+                    statusDiv.innerHTML = '<div class="status success">✅ Token generated!</div>';
+                } else {
+                    statusDiv.innerHTML = `<div class="status error">❌ ${result.message || result.error || JSON.stringify(result)}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // ═══════════════════════════════════════════
+        // DEFINEDGE FUNCTIONS
+        // ═══════════════════════════════════════════
+        async function deRequestOTP() {
+            const apiToken = document.getElementById('deApiToken').value.trim();
+            const apiSecret = document.getElementById('deApiSecret').value.trim();
+            const workerUrl = document.getElementById('workerUrl').value.trim();
+            const statusDiv = document.getElementById('deStep1Status');
+
+            if (!apiToken || !apiSecret) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please enter API Token and Secret</div>';
+                return;
+            }
+
+            saveCredentials('definedge');
+            statusDiv.innerHTML = '<div class="status info">⏳ Requesting OTP...</div>';
+
+            try {
+                const response = await fetch(workerUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Kite-Action': 'de-step1',
+                        'X-DE-Token': apiToken,
+                        'X-DE-Secret': apiSecret
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (data.otp_token) {
+                    deOtpToken = data.otp_token;
+                    statusDiv.innerHTML = `<div class="status success">✅ OTP sent! ${data.message || ''}</div>`;
+                    document.getElementById('deStep2Card').classList.remove('hidden');
+                    document.getElementById('deOtpInput').focus();
+                } else if (data.error || data.message) {
+                    statusDiv.innerHTML = `<div class="status error">❌ ${data.error || data.message}</div>`;
+                } else {
+                    statusDiv.innerHTML = `<div class="status error">❌ Unexpected response</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function deGetSessionKey() {
+            const otp = document.getElementById('deOtpInput').value.trim();
+            const workerUrl = document.getElementById('workerUrl').value.trim();
+            const statusDiv = document.getElementById('deStep2Status');
+
+            if (!otp) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please enter OTP</div>';
+                return;
+            }
+
+            if (!deOtpToken) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please request OTP first</div>';
+                return;
+            }
+
+            statusDiv.innerHTML = '<div class="status info">⏳ Getting session key...</div>';
+
+            try {
+                const response = await fetch(workerUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Kite-Action': 'de-step2'
+                    },
+                    body: JSON.stringify({
+                        otp_token: deOtpToken,
+                        otp: otp
+                    })
+                });
+
+                const data = await response.json();
+                const sessionKey = data.api_session_key || data.access_token;
+
+                if (sessionKey) {
+                    document.getElementById('deSessionKey').value = sessionKey;
+                    document.getElementById('deResultCard').classList.remove('hidden');
+                    statusDiv.innerHTML = '<div class="status success">✅ Session key generated!</div>';
+                } else if (data.error || data.message) {
+                    statusDiv.innerHTML = `<div class="status error">❌ ${data.error || data.message}</div>`;
+                } else {
+                    statusDiv.innerHTML = `<div class="status error">❌ Unexpected response</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // Enter key support
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const activeSection = document.getElementById('zerodhaSection').classList.contains('hidden') ? 'definedge' : 'zerodha';
+                if (activeSection === 'definedge') {
+                    if (document.getElementById('deStep2Card').classList.contains('hidden')) {
+                        deRequestOTP();
+                    } else {
+                        deGetSessionKey();
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
