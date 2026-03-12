@@ -8503,25 +8503,53 @@ async function renderRRG(){
 
   // ── Fetch all data ────────────────────────────────────────────────────────
   // ── Fetch benchmark + all stocks in parallel ──────────────────────────────
-  const bmCloses=await fetchPrices(bmTicker);
-  if(!bmCloses){ loadMsg('⚠️ Benchmark unavailable — <button class="btn btn-ghost btn-xs" onclick="renderRRG()">↻ Retry</button>'); return; }
+  let bmCloses=await fetchPrices(bmTicker);
+  let usingDemoData=false;
 
-  const stockCloses={};
-  // Fetch all stocks in parallel (no 220ms delay)
-  await Promise.all(symbols.map(async sym=>{
-    stockCloses[sym]=await fetchPrices(sym+'.NS');
-  }));
+  // ── Demo-data fallback when API is unreachable ──────────────────────────
+  function generateDemoRRG(syms){
+    // Seed from symbol name for deterministic but varied placement
+    function hashSeed(s){let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}return h;}
+    const tailLen=period==='1wk'?5:period==='1mo'?10:6;
+    return syms.map(sym=>{
+      const seed=hashSeed(sym);
+      // Place symbols across all 4 quadrants based on hash
+      const baseR=96+((seed&0xFF)/255)*8;       // 96–104
+      const baseM=96+(((seed>>8)&0xFF)/255)*8;   // 96–104
+      const tail=[];
+      for(let i=0;i<tailLen;i++){
+        const t=i/tailLen;
+        const drift=Math.sin(seed+i*0.7)*1.5;
+        tail.push({ratio:baseR+t*drift, mom:baseM+t*drift*0.8+Math.cos(seed+i)*0.6});
+      }
+      const cur=tail[tail.length-1];
+      return {sym, tail, cur, quad:getQuadrant(cur.ratio,cur.mom)};
+    });
+  }
+
+  let rrgData=[];
+
+  if(!bmCloses){
+    // API unreachable — use demo data so chart still renders
+    usingDemoData=true;
+    rrgData=generateDemoRRG(symbols);
+  } else {
+    const stockCloses={};
+    // Fetch all stocks in parallel (no 220ms delay)
+    await Promise.all(symbols.map(async sym=>{
+      stockCloses[sym]=await fetchPrices(sym+'.NS');
+    }));
+
+    for(const sym of symbols){
+      const sc=stockCloses[sym]; if(!sc) continue;
+      const tail=computeJdK(sc,bmCloses);
+      if(!tail||tail.length<2) continue;
+      const cur=tail[tail.length-1];
+      rrgData.push({sym, tail, cur, quad:getQuadrant(cur.ratio,cur.mom)});
+    }
+  }
 
   const PALETTE=['#00E5A0','#3B8BFF','#F5C542','#FF6B8A','#A78BFA','#22D3EE','#FB923C','#34D399','#F472B6','#FBBF24','#C084FC','#4ADE80'];
-
-  const rrgData=[];
-  for(const sym of symbols){
-    const sc=stockCloses[sym]; if(!sc) continue;
-    const tail=computeJdK(sc,bmCloses);
-    if(!tail||tail.length<2) continue;
-    const cur=tail[tail.length-1];
-    rrgData.push({sym, tail, cur, quad:getQuadrant(cur.ratio,cur.mom)});
-  }
 
   if(!rrgData.length){ loadMsg('⚠️ Insufficient data. Try a longer period.'); return; }
 
@@ -8604,12 +8632,13 @@ async function renderRRG(){
   });
   svg+=dots+labels;
 
-  container.innerHTML=`<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;background:var(--bg2)">${svg}</svg>`;
+  container.innerHTML=`${usingDemoData?'<div style="background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:6px 12px;margin:8px;font-size:11px;color:#eab308;display:flex;align-items:center;gap:6px"><span>⚠️</span><span>API unreachable — showing <strong>demo data</strong> for layout preview. Connect to internet for live RRG. <button class="btn btn-ghost btn-xs" onclick="renderRRG()" style="margin-left:6px;color:#eab308;border-color:#eab308">↻ Retry Live</button></span></div>':''}
+<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;background:var(--bg2)">${svg}</svg>`;
 
   // ════════════════════════════════════════════════════════════════════════════
   // INTERPRETATION TABLE (right panel)
   // ════════════════════════════════════════════════════════════════════════════
-  if(tableBmLbl) tableBmLbl.textContent=`vs ${bmLabel} · ${periodLabel}`;
+  if(tableBmLbl) tableBmLbl.textContent=`vs ${bmLabel} · ${periodLabel}${usingDemoData?' (Demo)':''}`;
 
   if(tableBody){
     const quadOrder={Leading:0,Improving:1,Weakening:2,Lagging:3};
