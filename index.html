@@ -3946,30 +3946,44 @@ async function syncZerodha(){
 }
 
 function mergeApiOrders(orders,source){
-  const existing=new Set(trades.map(t=>`${t.entries?.[0]?.date}_${t.symbol}_${t.entries?.[0]?.price}`));
-  let added=0,skipped=0;
+  // ── Step 1: Group fills by date + symbol + side ──
+  const groups={};
   orders.forEach(o=>{
-    let sym,rawDate,side,price,qty;
+    let sym,rawDate,side,price,qty,orderId;
     if(source==='dhan'){
-      // handles both /orders and /tradebook response shapes
       sym=(o.tradingSymbol||o.customSymbol||o.scrip||'').replace(/-EQ$|-BE$/,'').toUpperCase().trim();
       rawDate=o.exchangeTime||o.createTime||o.tradingDate||o.orderDate||'';
       side=(o.transactionType||o.orderType||'').toUpperCase().includes('BUY')?'Buy':'Sell';
       price=+(o.tradedPrice||o.averageTradedPrice||o.price||o.tradePrice||0);
       qty=+(o.tradedQuantity||o.filledQty||o.quantity||0);
+      orderId=o.orderId||o.tradeId||'';
     }else{
       sym=(o.tradingsymbol||'').replace(/-EQ$|-BE$/,'').toUpperCase().trim();
       rawDate=o.fill_timestamp||o.order_timestamp||'';
       side=o.transaction_type==='BUY'?'Buy':'Sell';
       price=+(o.average_price||o.price||0);
       qty=+(o.quantity||o.filled_quantity||0);
+      orderId=o.order_id||'';
     }
     const date=rawDate?new Date(rawDate).toISOString().slice(0,10):new Date().toISOString().slice(0,10);
-    if(!sym||!price||!qty)return;
-    const key=`${date}_${sym}_${price}`;
+    if(!sym||!price||!qty) return;
+    const groupKey=`${date}_${sym}_${side}`;
+    if(!groups[groupKey]) groups[groupKey]={sym,date,side,fills:[],orderIds:[],source};
+    groups[groupKey].fills.push({price,qty});
+    if(orderId) groups[groupKey].orderIds.push(orderId);
+  });
+
+  // ── Step 2: Calculate weighted avg price per group & merge ──
+  const existing=new Set(trades.map(t=>`${t.entries?.[0]?.date}_${t.symbol}_${t.side}`));
+  let added=0,skipped=0;
+  Object.values(groups).forEach(g=>{
+    const key=`${g.date}_${g.sym}_${g.side}`;
     if(existing.has(key)){skipped++;return;}
     existing.add(key);
-    trades.push({id:Date.now()+''+Math.random(),symbol:sym,setup:'',side,status:'Open',sl:0,plan:'',exitTrigger:'',growth:'',notes:source==='dhan'?(o.orderId||o.tradeId||''):(o.order_id||''),source,entries:[{date,price,qty}],exits:[],cmp:0});
+    const totalQty=g.fills.reduce((s,f)=>s+f.qty,0);
+    const totalVal=g.fills.reduce((s,f)=>s+f.price*f.qty,0);
+    const avgPrice=+(totalVal/totalQty).toFixed(2);
+    trades.push({id:Date.now()+''+Math.random(),symbol:g.sym,setup:'',side:g.side,status:'Open',sl:0,plan:'',exitTrigger:'',growth:'',notes:g.fills.length+' fills avg | '+g.orderIds.slice(0,3).join(', '),source:g.source,entries:[{date:g.date,price:avgPrice,qty:totalQty}],exits:[],cmp:0});
     added++;
   });
   return{added,skipped};
@@ -7537,7 +7551,7 @@ function renderFundRS(forceRefresh=true){
   }
 
   const CACHE_KEY = 'te_frs_cache';
-  const CACHE_TTL = 60 * 60 * 1000; // 60 minutes (was 15)
+  const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours — reduces Yahoo Finance API load
   const cacheKey  = benchmark + '_' + symbols.sort().join(',');
   let   cache     = {};
   try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); }catch(e){}
@@ -9682,6 +9696,16 @@ function renderNewsFeed(){
   const container = document.getElementById('news-feed-container');
   const symbols = Object.keys(_newsData);
   if(!symbols.length){ container.innerHTML='<div style="padding:40px;text-align:center;color:var(--t4)">No news loaded</div>'; return; }
+  // ── Filter stale news (older than 5 days) ──
+  const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  Object.keys(_newsData).forEach(sym=>{
+    _newsData[sym] = _newsData[sym].filter(n=>{
+      const t = n.time instanceof Date ? n.time.getTime() : new Date(n.time).getTime();
+      return !isNaN(t) && (now - t) < FIVE_DAYS;
+    });
+  });
+
   let bullCount=0,bearCount=0,neutCount=0,reviewCount=0;
   Object.values(_newsData).flat().forEach(n=>{
     if(n.sentiment==='BULLISH')bullCount++;
