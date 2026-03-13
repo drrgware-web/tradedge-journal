@@ -3888,7 +3888,7 @@ async function syncDhan(){
       setLog('dhan-log','No trades found — try after market hours or check if trades exist.');
       return;
     }
-    const {added,skipped}=mergeApiOrders(orders,'dhan');
+    const {added,skipped,matched}=mergeApiOrders(orders,'dhan');
     save();renderDash();renderTrades();
     const msg=`✓ ${added} added · ${skipped} skipped`;
     toast('Dhan synced! '+msg,'✅');
@@ -3932,9 +3932,9 @@ async function syncZerodha(){
     if(!data) throw new Error('Unexpected response from Zerodha');
     const trds=(data?.data||[]).filter(t=>t.exchange==='NSE'||t.exchange==='BSE');
     if(!trds.length){toast('No trades found today','ℹ️');setDot('zd-sync-dot','');setDot('zd-dot','');setLog('zd-log','No equity trades today.');return;}
-    const {added,skipped}=mergeApiOrders(trds,'zerodha');
+    const {added,skipped,matched}=mergeApiOrders(trds,'zerodha');
     save();renderDash();renderTrades();
-    const msg=`✓ ${added} added · ${skipped} skipped`;
+    const msg=`✓ ${added} new · ${matched||0} exits matched · ${skipped} skipped`;
     toast('Zerodha synced! '+msg,'✅');setDot('zd-sync-dot','connected');setDot('zd-dot','connected');
     setLog('zd-log',msg+' · '+new Date().toLocaleTimeString('en-IN'));
     const s=document.getElementById('zd-sync-status');if(s)s.textContent='Last sync: '+new Date().toLocaleTimeString('en-IN');
@@ -3973,20 +3973,56 @@ function mergeApiOrders(orders,source){
     if(orderId) groups[groupKey].orderIds.push(orderId);
   });
 
-  // ── Step 2: Calculate weighted avg price per group & merge ──
-  const existing=new Set(trades.map(t=>`${t.entries?.[0]?.date}_${t.symbol}_${t.side}`));
-  let added=0,skipped=0;
+  // ── Step 2: Smart merge — match exits to open positions, or create new ──
+  let added=0,skipped=0,matched=0;
   Object.values(groups).forEach(g=>{
-    const key=`${g.date}_${g.sym}_${g.side}`;
-    if(existing.has(key)){skipped++;return;}
-    existing.add(key);
     const totalQty=g.fills.reduce((s,f)=>s+f.qty,0);
     const totalVal=g.fills.reduce((s,f)=>s+f.price*f.qty,0);
     const avgPrice=+(totalVal/totalQty).toFixed(2);
-    trades.push({id:Date.now()+''+Math.random(),symbol:g.sym,setup:'',side:g.side,status:'Open',sl:0,plan:'',exitTrigger:'',growth:'',notes:g.fills.length+' fills avg | '+g.orderIds.slice(0,3).join(', '),source:g.source,entries:[{date:g.date,price:avgPrice,qty:totalQty}],exits:[],cmp:0});
+    const oppositeSide = g.side==='Sell'?'Buy':'Sell';
+
+    // ── Check if this is an EXIT for an existing open/partial position ──
+    // e.g., Sell synced → look for an Open/Partial Buy of same symbol
+    const openTrade = trades.find(t=>
+      t.symbol===g.sym &&
+      t.side===oppositeSide &&
+      (t.status==='Open'||t.status==='Partial')
+    );
+
+    if(openTrade){
+      // Check if this exact exit was already recorded (prevent duplicates)
+      const alreadyExited = (openTrade.exits||[]).some(e=>
+        e.date===g.date && Math.abs(e.price-avgPrice)<0.5 && e.qty===totalQty
+      );
+      if(alreadyExited){skipped++;return;}
+
+      // Add as exit to the existing position
+      if(!openTrade.exits) openTrade.exits=[];
+      openTrade.exits.push({date:g.date, price:avgPrice, qty:totalQty});
+
+      // Auto-recalculate status
+      const entryQty = (openTrade.entries||[]).reduce((s,e)=>s+(+e.qty||0),0);
+      const exitQty = openTrade.exits.reduce((s,e)=>s+(+e.qty||0),0);
+      if(exitQty >= entryQty) openTrade.status='Closed';
+      else if(exitQty > 0) openTrade.status='Partial';
+      matched++;
+      return;
+    }
+
+    // ── No matching open position — check if already added as new trade ──
+    const alreadyExists = trades.some(t=>
+      t.symbol===g.sym &&
+      t.side===g.side &&
+      t.entries?.[0]?.date===g.date &&
+      Math.abs((t.entries?.[0]?.price||0)-avgPrice)<0.5
+    );
+    if(alreadyExists){skipped++;return;}
+
+    // ── Create new trade entry ──
+    trades.push({id:Date.now()+''+Math.random(),symbol:g.sym,setup:'',side:g.side,status:'Open',sl:0,plan:'',exitTrigger:'',growth:'',notes:g.fills.length>1?(g.fills.length+' fills avg'):'',source:g.source,entries:[{date:g.date,price:avgPrice,qty:totalQty}],exits:[],cmp:0});
     added++;
   });
-  return{added,skipped};
+  return{added,skipped,matched};
 }
 
 // ══════════════════════════════════════════════════
@@ -5628,8 +5664,8 @@ async function syncDefinedge() {
 }
 
 function mergeDefinedgeOrders(orders) {
-  const existing = new Set(trades.map(t => `${t.entries?.[0]?.date}_${t.symbol}_${t.entries?.[0]?.price}`));
-  let added=0, skipped=0;
+  // ── Step 1: Group fills by date + symbol + side ──
+  const groups={};
   orders.forEach(o => {
     const sym = (o.tradingSymbol || o.symbol || o.scrip || '').replace(/-EQ$|-BE$/,'').toUpperCase().trim();
     const rawDate = o.tradeDate || o.orderDate || o.date || '';
@@ -5638,17 +5674,56 @@ function mergeDefinedgeOrders(orders) {
     const price = +(o.averagePrice || o.tradePrice || o.price || 0);
     const qty   = +(o.tradedQty || o.quantity || o.qty || 0);
     if (!sym || !price || !qty) return;
-    const key = `${date}_${sym}_${price}`;
-    if (existing.has(key)) { skipped++; return; }
-    existing.add(key);
+    const groupKey=`${date}_${sym}_${side}`;
+    if(!groups[groupKey]) groups[groupKey]={sym,date,side,fills:[],orderIds:[]};
+    groups[groupKey].fills.push({price,qty});
+    const oid=o.orderId||o.tradeId||'';
+    if(oid) groups[groupKey].orderIds.push(oid);
+  });
+
+  // ── Step 2: Smart merge — match exits to open positions, or create new ──
+  let added=0, skipped=0, matched=0;
+  Object.values(groups).forEach(g=>{
+    const totalQty=g.fills.reduce((s,f)=>s+f.qty,0);
+    const totalVal=g.fills.reduce((s,f)=>s+f.price*f.qty,0);
+    const avgPrice=+(totalVal/totalQty).toFixed(2);
+    const oppositeSide = g.side==='Sell'?'Buy':'Sell';
+
+    // Check if this is an EXIT for an existing open position
+    const openTrade = trades.find(t=>
+      t.symbol===g.sym && t.side===oppositeSide && (t.status==='Open'||t.status==='Partial')
+    );
+
+    if(openTrade){
+      const alreadyExited = (openTrade.exits||[]).some(e=>
+        e.date===g.date && Math.abs(e.price-avgPrice)<0.5 && e.qty===totalQty
+      );
+      if(alreadyExited){skipped++;return;}
+      if(!openTrade.exits) openTrade.exits=[];
+      openTrade.exits.push({date:g.date, price:avgPrice, qty:totalQty});
+      const entryQty = (openTrade.entries||[]).reduce((s,e)=>s+(+e.qty||0),0);
+      const exitQty = openTrade.exits.reduce((s,e)=>s+(+e.qty||0),0);
+      if(exitQty >= entryQty) openTrade.status='Closed';
+      else if(exitQty > 0) openTrade.status='Partial';
+      matched++;
+      return;
+    }
+
+    // No matching position — check duplicate
+    const alreadyExists = trades.some(t=>
+      t.symbol===g.sym && t.side===g.side && t.entries?.[0]?.date===g.date &&
+      Math.abs((t.entries?.[0]?.price||0)-avgPrice)<0.5
+    );
+    if(alreadyExists){skipped++;return;}
+
     trades.push({
-      id: Date.now()+''+ Math.random(), symbol: sym, setup:'', side, status:'Open',
-      sl:0, plan:'', exitTrigger:'', growth:'', notes: o.orderId||o.tradeId||'',
-      source:'definedge', entries:[{date, price, qty}], exits:[], cmp:0
+      id: Date.now()+''+ Math.random(), symbol: g.sym, setup:'', side: g.side, status:'Open',
+      sl:0, plan:'', exitTrigger:'', growth:'', notes: g.fills.length>1?(g.fills.length+' fills avg'):'',
+      source:'definedge', entries:[{date:g.date, price:avgPrice, qty:totalQty}], exits:[], cmp:0
     });
     added++;
   });
-  return {added, skipped};
+  return {added, skipped, matched};
 }
 
 function saveDefinedgeCreds(){
