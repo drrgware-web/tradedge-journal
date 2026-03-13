@@ -1,0 +1,151 @@
+# =============================================================================
+# MPS Daily Auto-Update — GitHub Action
+# =============================================================================
+# Runs every trading day at 4:15 PM IST (10:45 AM UTC)
+# Fetches data from Chartink + NSE, calculates MPS v2, commits JSON
+#
+# Setup:
+# 1. Place this file in your repo: .github/workflows/mps-daily.yml
+# 2. Place mps_engine_v2.py and mps_fetcher.py in the repo root (or /scripts/)
+# 3. The action will create/update data/mps_latest.json and data/mps_history.json
+# 4. Your dashboard reads from these JSON files
+# =============================================================================
+
+name: MPS Daily Update
+
+on:
+  schedule:
+    # 10:45 UTC = 4:15 PM IST (after market close at 3:30 PM)
+    # Runs Mon-Fri only (but we also check in the script)
+    - cron: '45 10 * * 1-5'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+# Prevent concurrent runs
+concurrency:
+  group: mps-update
+  cancel-in-progress: false
+
+jobs:
+  update-mps:
+    runs-on: ubuntu-latest
+
+    # Skip on market holidays (basic check — you can enhance this)
+    # For now, we run Mon-Fri and let the script handle holiday skipping
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Run MPS Fetcher
+        id: mps
+        run: |
+          cd scripts
+          python mps_fetcher.py \
+            --output ../data/mps_latest.json \
+            --state-file ../data/mps_state.json
+        continue-on-error: true
+
+      - name: Check if fetch succeeded
+        if: steps.mps.outcome == 'failure'
+        run: |
+          echo "::warning::MPS fetch failed. This could be due to:"
+          echo "  - Market holiday (no data available)"
+          echo "  - Chartink/NSE website changes"
+          echo "  - Network issues"
+          echo "Skipping commit."
+          exit 0
+
+      - name: Update history file
+        if: steps.mps.outcome == 'success'
+        run: |
+          # Extract history from latest and append to dedicated history file
+          python3 -c "
+          import json
+          
+          # Read latest
+          with open('data/mps_latest.json') as f:
+              latest = json.load(f)
+          
+          # Read or create history
+          history_file = 'data/mps_history.json'
+          try:
+              with open(history_file) as f:
+                  history = json.load(f)
+          except FileNotFoundError:
+              history = []
+          
+          # Append today's data (avoid duplicates)
+          today = latest['current']['date']
+          history = [h for h in history if h.get('date') != today]
+          history.append({
+              'date': today,
+              'final_score': latest['current']['final_score'],
+              'zone': latest['current']['zone'],
+              'base_score': latest['current']['base_score'],
+              'total_modifier': latest['current']['total_modifier'],
+              'pillars': {p['name']: p['raw_score'] for p in latest['current']['pillar_scores']},
+          })
+          
+          # Keep last 365 days
+          history = history[-365:]
+          
+          with open(history_file, 'w') as f:
+              json.dump(history, f, indent=2)
+          
+          print(f'History updated: {len(history)} records')
+          "
+
+      - name: Commit and push
+        if: steps.mps.outcome == 'success'
+        run: |
+          git config user.name "MPS Bot"
+          git config user.email "mps-bot@tradedge.local"
+          
+          git add data/mps_latest.json data/mps_history.json data/mps_state.json
+          
+          # Get the zone for the commit message
+          ZONE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['zone'])")
+          SCORE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['final_score'])")
+          DATE=$(date +%Y-%m-%d)
+          
+          git commit -m "📊 MPS ${DATE}: ${SCORE} — ${ZONE}" || echo "No changes to commit"
+          git push
+
+      - name: Summary
+        if: steps.mps.outcome == 'success'
+        run: |
+          python3 -c "
+          import json
+          with open('data/mps_latest.json') as f:
+              d = json.load(f)
+          c = d['current']
+          print('## MPS Daily Summary')
+          print(f'**Score:** {c[\"final_score\"]}')
+          print(f'**Zone:** {c[\"zone\"]} {c[\"zone_emoji\"]}')
+          print(f'**Risk:** {c[\"risk_per_trade\"]}')
+          print()
+          print('### Pillars')
+          for p in c['pillar_scores']:
+              print(f'- {p[\"name\"]}: {p[\"raw_score\"]:.1f}/100 ({p[\"description\"]})')
+          print()
+          print('### Modifiers')
+          for m in c['modifiers']:
+              status = '✅' if m['triggered'] else '⬜'
+              print(f'- {status} {m[\"name\"]}: {m[\"adjustment\"]:+.1f} — {m[\"reason\"]}')
+          " >> $GITHUB_STEP_SUMMARY
