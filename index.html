@@ -133,6 +133,40 @@ body.light{
 @keyframes taglinePulse {
   0%,100%{opacity:.55} 50%{opacity:1}
 }
+/* ── TRADEDGE BRAND ANIMATION ── */
+@keyframes tradedgeGlow {
+  0%   { text-shadow:0 0 4px rgba(0,229,160,.3), 0 0 8px rgba(0,229,160,.15); }
+  25%  { text-shadow:0 0 8px rgba(0,229,160,.6), 0 0 20px rgba(0,229,160,.3), 0 0 40px rgba(0,229,160,.1); }
+  50%  { text-shadow:0 0 12px rgba(0,229,160,.8), 0 0 30px rgba(0,229,160,.45), 0 0 60px rgba(0,229,160,.15); }
+  75%  { text-shadow:0 0 8px rgba(0,229,160,.6), 0 0 20px rgba(0,229,160,.3), 0 0 40px rgba(0,229,160,.1); }
+  100% { text-shadow:0 0 4px rgba(0,229,160,.3), 0 0 8px rgba(0,229,160,.15); }
+}
+@keyframes tradedgeShimmer {
+  0%   { background-position:200% center; }
+  100% { background-position:-200% center; }
+}
+.tradedge-brand {
+  color:#00E5A0;
+  font-weight:900;
+  letter-spacing:.15em;
+  background: linear-gradient(90deg, #00E5A0 0%, #00FFD1 25%, #FFFFFF 50%, #00FFD1 75%, #00E5A0 100%);
+  background-size:200% auto;
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation: tradedgeShimmer 3s linear infinite, tradedgeGlow 2.5s ease-in-out infinite;
+  /* glow needs a real text-shadow, so we use a pseudo-element */
+  position:relative;
+  display:inline-block;
+}
+.tradedge-brand::after {
+  content:'TradEdge';
+  position:absolute;
+  left:0;top:0;
+  color:transparent;
+  z-index:-1;
+  animation: tradedgeGlow 2.5s ease-in-out infinite;
+}
 .tagline-pulse{
   animation:taglinePulse 3s ease-in-out infinite;
   font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
@@ -719,7 +753,7 @@ select.fi{cursor:pointer}
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="topbar-title" id="page-title">Dashboard</div>
-    <span class="topbar-tagline">✦ &nbsp;Define Your Edge With TradEdge&nbsp; ✦</span>
+    <span class="topbar-tagline">✦ &nbsp;Define Your Edge With <span class="tradedge-brand">TradEdge</span>&nbsp; ✦</span>
     <div style="flex:1"></div>
     <div class="market-chip" id="mkt-chip">NSE • —</div>
     <button class="btn btn-ghost btn-sm" onclick="openImport()">
@@ -3934,7 +3968,7 @@ async function syncZerodha(){
     if(!trds.length){toast('No trades found today','ℹ️');setDot('zd-sync-dot','');setDot('zd-dot','');setLog('zd-log','No equity trades today.');return;}
     const {added,skipped,matched}=mergeApiOrders(trds,'zerodha');
     save();renderDash();renderTrades();
-    const msg=`✓ ${added} new · ${matched||0} exits matched · ${skipped} skipped`;
+    const msg=`✓ ${added} new · ${matched||0} exits · ${pyramided||0} pyramids · ${skipped} skipped`;
     toast('Zerodha synced! '+msg,'✅');setDot('zd-sync-dot','connected');setDot('zd-dot','connected');
     setLog('zd-log',msg+' · '+new Date().toLocaleTimeString('en-IN'));
     const s=document.getElementById('zd-sync-status');if(s)s.textContent='Last sync: '+new Date().toLocaleTimeString('en-IN');
@@ -3973,43 +4007,64 @@ function mergeApiOrders(orders,source){
     if(orderId) groups[groupKey].orderIds.push(orderId);
   });
 
-  // ── Step 2: Smart merge — match exits to open positions, or create new ──
-  let added=0,skipped=0,matched=0;
+  // ── Step 2: Smart merge — match exits, pyramiding, or create new ──
+  let added=0,skipped=0,matched=0,pyramided=0;
   Object.values(groups).forEach(g=>{
     const totalQty=g.fills.reduce((s,f)=>s+f.qty,0);
     const totalVal=g.fills.reduce((s,f)=>s+f.price*f.qty,0);
     const avgPrice=+(totalVal/totalQty).toFixed(2);
     const oppositeSide = g.side==='Sell'?'Buy':'Sell';
 
-    // ── Check if this is an EXIT for an existing open/partial position ──
+    // ── A) Check if this is an EXIT for an existing open/partial position ──
     // e.g., Sell synced → look for an Open/Partial Buy of same symbol
-    const openTrade = trades.find(t=>
+    const openOpposite = trades.find(t=>
       t.symbol===g.sym &&
       t.side===oppositeSide &&
       (t.status==='Open'||t.status==='Partial')
     );
 
-    if(openTrade){
+    if(openOpposite){
       // Check if this exact exit was already recorded (prevent duplicates)
-      const alreadyExited = (openTrade.exits||[]).some(e=>
+      const alreadyExited = (openOpposite.exits||[]).some(e=>
         e.date===g.date && Math.abs(e.price-avgPrice)<0.5 && e.qty===totalQty
       );
       if(alreadyExited){skipped++;return;}
 
       // Add as exit to the existing position
-      if(!openTrade.exits) openTrade.exits=[];
-      openTrade.exits.push({date:g.date, price:avgPrice, qty:totalQty});
+      if(!openOpposite.exits) openOpposite.exits=[];
+      openOpposite.exits.push({date:g.date, price:avgPrice, qty:totalQty});
 
       // Auto-recalculate status
-      const entryQty = (openTrade.entries||[]).reduce((s,e)=>s+(+e.qty||0),0);
-      const exitQty = openTrade.exits.reduce((s,e)=>s+(+e.qty||0),0);
-      if(exitQty >= entryQty) openTrade.status='Closed';
-      else if(exitQty > 0) openTrade.status='Partial';
+      const entryQty = (openOpposite.entries||[]).reduce((s,e)=>s+(+e.qty||0),0);
+      const exitQty = openOpposite.exits.reduce((s,e)=>s+(+e.qty||0),0);
+      if(exitQty >= entryQty) openOpposite.status='Closed';
+      else if(exitQty > 0) openOpposite.status='Partial';
       matched++;
       return;
     }
 
-    // ── No matching open position — check if already added as new trade ──
+    // ── B) Check if this is PYRAMIDING into an existing same-side position ──
+    // e.g., Buy synced → already have an Open Buy for same symbol → add to entries
+    const openSame = trades.find(t=>
+      t.symbol===g.sym &&
+      t.side===g.side &&
+      (t.status==='Open'||t.status==='Partial')
+    );
+
+    if(openSame){
+      // Check if this exact entry was already recorded (prevent duplicates)
+      const alreadyEntered = (openSame.entries||[]).some(e=>
+        e.date===g.date && Math.abs(e.price-avgPrice)<0.5 && e.qty===totalQty
+      );
+      if(alreadyEntered){skipped++;return;}
+
+      // Add as additional entry (pyramid)
+      openSame.entries.push({date:g.date, price:avgPrice, qty:totalQty});
+      pyramided++;
+      return;
+    }
+
+    // ── C) No matching position — check if already added as new trade ──
     const alreadyExists = trades.some(t=>
       t.symbol===g.sym &&
       t.side===g.side &&
@@ -4018,11 +4073,11 @@ function mergeApiOrders(orders,source){
     );
     if(alreadyExists){skipped++;return;}
 
-    // ── Create new trade entry ──
+    // ── D) Create brand new trade entry ──
     trades.push({id:Date.now()+''+Math.random(),symbol:g.sym,setup:'',side:g.side,status:'Open',sl:0,plan:'',exitTrigger:'',growth:'',notes:g.fills.length>1?(g.fills.length+' fills avg'):'',source:g.source,entries:[{date:g.date,price:avgPrice,qty:totalQty}],exits:[],cmp:0});
     added++;
   });
-  return{added,skipped,matched};
+  return{added,skipped,matched,pyramided};
 }
 
 // ══════════════════════════════════════════════════
@@ -5681,41 +5736,57 @@ function mergeDefinedgeOrders(orders) {
     if(oid) groups[groupKey].orderIds.push(oid);
   });
 
-  // ── Step 2: Smart merge — match exits to open positions, or create new ──
-  let added=0, skipped=0, matched=0;
+  // ── Step 2: Smart merge — match exits, pyramiding, or create new ──
+  let added=0, skipped=0, matched=0, pyramided=0;
   Object.values(groups).forEach(g=>{
     const totalQty=g.fills.reduce((s,f)=>s+f.qty,0);
     const totalVal=g.fills.reduce((s,f)=>s+f.price*f.qty,0);
     const avgPrice=+(totalVal/totalQty).toFixed(2);
     const oppositeSide = g.side==='Sell'?'Buy':'Sell';
 
-    // Check if this is an EXIT for an existing open position
-    const openTrade = trades.find(t=>
+    // A) Check if this is an EXIT for an existing open position
+    const openOpposite = trades.find(t=>
       t.symbol===g.sym && t.side===oppositeSide && (t.status==='Open'||t.status==='Partial')
     );
 
-    if(openTrade){
-      const alreadyExited = (openTrade.exits||[]).some(e=>
+    if(openOpposite){
+      const alreadyExited = (openOpposite.exits||[]).some(e=>
         e.date===g.date && Math.abs(e.price-avgPrice)<0.5 && e.qty===totalQty
       );
       if(alreadyExited){skipped++;return;}
-      if(!openTrade.exits) openTrade.exits=[];
-      openTrade.exits.push({date:g.date, price:avgPrice, qty:totalQty});
-      const entryQty = (openTrade.entries||[]).reduce((s,e)=>s+(+e.qty||0),0);
-      const exitQty = openTrade.exits.reduce((s,e)=>s+(+e.qty||0),0);
-      if(exitQty >= entryQty) openTrade.status='Closed';
-      else if(exitQty > 0) openTrade.status='Partial';
+      if(!openOpposite.exits) openOpposite.exits=[];
+      openOpposite.exits.push({date:g.date, price:avgPrice, qty:totalQty});
+      const entryQty = (openOpposite.entries||[]).reduce((s,e)=>s+(+e.qty||0),0);
+      const exitQty = openOpposite.exits.reduce((s,e)=>s+(+e.qty||0),0);
+      if(exitQty >= entryQty) openOpposite.status='Closed';
+      else if(exitQty > 0) openOpposite.status='Partial';
       matched++;
       return;
     }
 
-    // No matching position — check duplicate
+    // B) Check if this is PYRAMIDING into an existing same-side position
+    const openSame = trades.find(t=>
+      t.symbol===g.sym && t.side===g.side && (t.status==='Open'||t.status==='Partial')
+    );
+
+    if(openSame){
+      const alreadyEntered = (openSame.entries||[]).some(e=>
+        e.date===g.date && Math.abs(e.price-avgPrice)<0.5 && e.qty===totalQty
+      );
+      if(alreadyEntered){skipped++;return;}
+      openSame.entries.push({date:g.date, price:avgPrice, qty:totalQty});
+      pyramided++;
+      return;
+    }
+
+    // C) No matching position — check duplicate
     const alreadyExists = trades.some(t=>
       t.symbol===g.sym && t.side===g.side && t.entries?.[0]?.date===g.date &&
       Math.abs((t.entries?.[0]?.price||0)-avgPrice)<0.5
     );
     if(alreadyExists){skipped++;return;}
 
+    // D) Create new trade
     trades.push({
       id: Date.now()+''+ Math.random(), symbol: g.sym, setup:'', side: g.side, status:'Open',
       sl:0, plan:'', exitTrigger:'', growth:'', notes: g.fills.length>1?(g.fills.length+' fills avg'):'',
@@ -5723,7 +5794,7 @@ function mergeDefinedgeOrders(orders) {
     });
     added++;
   });
-  return {added, skipped, matched};
+  return {added, skipped, matched, pyramided};
 }
 
 function saveDefinedgeCreds(){
