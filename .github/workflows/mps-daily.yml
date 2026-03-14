@@ -1,14 +1,21 @@
 # =============================================================================
-# MPS Daily Auto-Update — GitHub Action
+# MPS v3 Daily Auto-Update — GitHub Action
 # =============================================================================
 # Runs every trading day at 4:15 PM IST (10:45 AM UTC)
-# Fetches data from Chartink + NSE, calculates MPS v2, commits JSON
+# Fetches data from Chartink (7 scanners) + NSE, calculates MPS v3, commits JSON
+#
+# v3 Changes from v2:
+#   - Calls mps_fetcher_v3.py (imports mps_engine_v3.py)
+#   - 7 Chartink scanners (was 4): + rsi_above_50, burst_4_5pct, atr_pct_above_4
+#   - 18 daily data inputs (was 14)
+#   - JSON output includes: 7 pillars, 6 modifiers, daily state, burst/ATR fields
+#   - History includes pillar breakdown + state
 #
 # Setup:
-# 1. Place this file in your repo: .github/workflows/mps-daily.yml
-# 2. Place mps_engine_v2.py and mps_fetcher.py in the repo root (or /scripts/)
-# 3. The action will create/update data/mps_latest.json and data/mps_history.json
-# 4. Your dashboard reads from these JSON files
+#   1. Place this file in: .github/workflows/mps-daily.yml
+#   2. Place mps_engine_v3.py and mps_fetcher_v3.py in /scripts/
+#   3. Action creates/updates data/mps_latest.json, data/mps_history.json, data/mps_state.json
+#   4. Dashboard reads from these JSON files via GitHub Pages
 # =============================================================================
 
 name: MPS Daily Update
@@ -31,9 +38,6 @@ jobs:
   update-mps:
     runs-on: ubuntu-latest
 
-    # Skip on market holidays (basic check — you can enhance this)
-    # For now, we run Mon-Fri and let the script handle holiday skipping
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,11 +56,11 @@ jobs:
       - name: Create data directory
         run: mkdir -p data
 
-      - name: Run MPS Fetcher
+      - name: Run MPS v3 Fetcher
         id: mps
         run: |
           cd scripts
-          python mps_fetcher.py \
+          python mps_fetcher_v3.py \
             --output ../data/mps_latest.json \
             --state-file ../data/mps_state.json
         continue-on-error: true
@@ -74,7 +78,6 @@ jobs:
       - name: Update history file
         if: steps.mps.outcome == 'success'
         run: |
-          # Extract history from latest and append to dedicated history file
           python3 -c "
           import json
           
@@ -93,14 +96,24 @@ jobs:
           # Append today's data (avoid duplicates)
           today = latest['current']['date']
           history = [h for h in history if h.get('date') != today]
-          history.append({
+          
+          # v3 history record — includes all pillar scores + state
+          record = {
               'date': today,
               'final_score': latest['current']['final_score'],
-              'zone': latest['current']['zone'],
               'base_score': latest['current']['base_score'],
               'total_modifier': latest['current']['total_modifier'],
+              'zone': latest['current']['zone'],
+              'state': latest['current']['state'],
+              'burst_ratio': latest['current'].get('burst_ratio', 0),
+              'burst_label': latest['current'].get('burst_label', ''),
+              'rsi_breadth_pct': latest['current'].get('rsi_breadth_pct', 0),
+              'atr_breadth_pct': latest['current'].get('atr_breadth_pct', 0),
+              'atr_regime': latest['current'].get('atr_regime', ''),
               'pillars': {p['name']: p['raw_score'] for p in latest['current']['pillar_scores']},
-          })
+              'modifiers_active': [m['name'] for m in latest['current']['modifiers'] if m['triggered']],
+          }
+          history.append(record)
           
           # Keep last 365 days
           history = history[-365:]
@@ -119,12 +132,13 @@ jobs:
           
           git add data/mps_latest.json data/mps_history.json data/mps_state.json
           
-          # Get the zone for the commit message
+          # Get zone, score, and state for commit message
           ZONE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['zone'])")
           SCORE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['final_score'])")
+          STATE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['state'])")
           DATE=$(date +%Y-%m-%d)
           
-          git commit -m "📊 MPS ${DATE}: ${SCORE} — ${ZONE}" || echo "No changes to commit"
+          git commit -m "📊 MPS v3 ${DATE}: ${SCORE} — ${ZONE} [${STATE}]" || echo "No changes to commit"
           git push
 
       - name: Summary
@@ -135,17 +149,26 @@ jobs:
           with open('data/mps_latest.json') as f:
               d = json.load(f)
           c = d['current']
-          print('## MPS Daily Summary')
+          print('## MPS v3 Daily Summary')
           print(f'**Score:** {c[\"final_score\"]}')
           print(f'**Zone:** {c[\"zone\"]} {c[\"zone_emoji\"]}')
+          print(f'**State:** {c[\"state\"]} — {c[\"state_message\"]}')
           print(f'**Risk:** {c[\"risk_per_trade\"]}')
+          print(f'**Burst:** {c.get(\"burst_ratio\", 0):.0f} [{c.get(\"burst_label\", \"\")}]')
+          print(f'**RSI Breadth:** {c.get(\"rsi_breadth_pct\", 0):.1f}%')
+          print(f'**ATR Breadth:** {c.get(\"atr_breadth_pct\", 0):.1f}% [{c.get(\"atr_regime\", \"\")}]')
           print()
-          print('### Pillars')
+          print('### Pillars (7)')
           for p in c['pillar_scores']:
               print(f'- {p[\"name\"]}: {p[\"raw_score\"]:.1f}/100 ({p[\"description\"]})')
           print()
-          print('### Modifiers')
+          print('### Modifiers (6)')
           for m in c['modifiers']:
               status = '✅' if m['triggered'] else '⬜'
               print(f'- {status} {m[\"name\"]}: {m[\"adjustment\"]:+.1f} — {m[\"reason\"]}')
+          print()
+          print('### Data Sources')
+          print(f'- Chartink scanners: 7')
+          print(f'- NSE endpoints: 6')
+          print(f'- Total daily inputs: {d[\"metadata\"].get(\"daily_inputs\", 18)}')
           " >> $GITHUB_STEP_SUMMARY
