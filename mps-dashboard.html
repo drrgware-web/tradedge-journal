@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MPS v3 — Market Pulse Score | TradEdge Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   CSS RESET & VARIABLES
+   ═══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-void: #06080d;
+  --bg-panel: #0c1018;
+  --bg-card: #111827;
+  --bg-card-hover: #1a2235;
+  --border-dim: #1e293b;
+  --border-glow: #334155;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-dim: #475569;
+
+  /* Zone colors */
+  --easy-money: #22c55e;
+  --easy-money-bg: rgba(34,197,94,0.08);
+  --smart-money: #3b82f6;
+  --smart-money-bg: rgba(59,130,246,0.08);
+  --hard-money: #eab308;
+  --hard-money-bg: rgba(234,179,8,0.08);
+  --no-money: #ef4444;
+  --no-money-bg: rgba(239,68,68,0.08);
+
+  /* Pillar colors */
+  --c-structural: #3b82f6;
+  --c-breadth: #8b5cf6;
+  --c-spark: #f59e0b;
+  --c-quality: #10b981;
+  --c-sentiment: #ef4444;
+  --c-momentum: #06b6d4;
+  --c-volatility: #ec4899;
+
+  /* Neon accents */
+  --neon-cyan: #22d3ee;
+  --neon-pink: #f472b6;
+  --neon-green: #4ade80;
+
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Exo 2', sans-serif;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scanline overlay */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════════════ */
+.header {
+  text-align: center;
+  padding: 28px 0 20px;
+  position: relative;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 300px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+}
+
+.header-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  margin-bottom: 4px;
+}
+
+.header-subtitle {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+}
+
+.header-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-meta span { opacity: 0.7; }
+.data-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border-dim);
+  background: var(--bg-card);
+}
+.data-source-badge .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  animation: pulse-dot 2s infinite;
+}
+.data-source-badge.offline .dot { background: var(--no-money); animation: none; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HERO — Score + Zone + State
+   ═══════════════════════════════════════════════════════════════ */
+.hero {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 24px;
+  margin-bottom: 20px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan) 30%, var(--neon-pink) 70%, transparent);
+}
+
+.hero-left { text-align: center; }
+.hero-center { text-align: center; }
+.hero-right { text-align: center; }
+
+/* Score ring */
+.score-ring-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto;
+}
+.score-ring-container svg { width: 100%; height: 100%; }
+.score-number {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -55%);
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: -1px;
+}
+.score-label {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, 30px);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+/* Zone badge */
+.zone-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border: 1.5px solid;
+  margin-bottom: 10px;
+}
+
+/* State badge */
+.state-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  border: 1px solid;
+}
+
+/* Quick stats */
+.quick-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.quick-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-dim);
+  min-width: 200px;
+}
+.quick-stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.quick-stat-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Action banner */
+.action-banner {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-dim);
+  background: var(--bg-card);
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.action-banner strong {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PILLAR CARDS
+   ═══════════════════════════════════════════════════════════════ */
+.section-title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+.pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.pillar-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius);
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s, background 0.3s;
+}
+.pillar-card:hover {
+  border-color: var(--border-glow);
+  background: var(--bg-card-hover);
+}
+
+.pillar-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+}
+
+.pillar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.pillar-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.pillar-weight {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.pillar-score-big {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+.pillar-weighted {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+/* Score bar */
+.pillar-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-void);
+  border-radius: 3px;
+  margin: 10px 0 6px;
+  overflow: hidden;
+}
+.pillar-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pillar-description {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODIFIERS
+   ═══════════════════════════════════════════════════════════════ */
+.modifiers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.modifier-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.3s;
+}
+.modifier-row:hover { border-color: var(--border-glow); }
+.modifier-row.active { border-color: rgba(34,197,94,0.3); }
+.modifier-row.active.negative { border-color: rgba(239,68,68,0.3); }
+
+.modifier-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.modifier-icon.inactive { background: var(--bg-void); color: var(--text-dim); }
+.modifier-icon.positive { background: rgba(34,197,94,0.15); color: var(--neon-green); }
+.modifier-icon.negative { background: rgba(239,68,68,0.15); color: var(--no-money); }
+
+.modifier-info { flex: 1; min-width: 0; }
+.modifier-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.modifier-reason {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modifier-adj {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HISTORY CHART
+   ═══════════════════════════════════════════════════════════════ */
+.history-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 24px;
+}
+
+.history-chart {
+  width: 100%;
+  height: 160px;
+  position: relative;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SCORE BREAKDOWN BAR
+   ═══════════════════════════════════════════════════════════════ */
+.breakdown-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.breakdown-bar {
+  display: flex;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.breakdown-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.breakdown-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.legend-name { color: var(--text-muted); }
+.legend-value { font-weight: 700; }
+
+/* ═══════════════════════════════════════════════════════════════
+   ZONE THRESHOLDS
+   ═══════════════════════════════════════════════════════════════ */
+.zones-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+.zone-block {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  text-align: center;
+  transition: transform 0.2s;
+}
+.zone-block:hover { transform: translateY(-2px); }
+.zone-block-name {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.zone-block-range {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.zone-block-risk {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.zone-block.current {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RAW DATA
+   ═══════════════════════════════════════════════════════════════ */
+.raw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.raw-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.raw-section-title {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.raw-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  border-bottom: 1px solid rgba(30,41,59,0.5);
+}
+.raw-row:last-child { border-bottom: none; }
+.raw-key { color: var(--text-muted); }
+.raw-val { color: var(--text-primary); font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════════ */
+.footer {
+  text-align: center;
+  padding: 20px 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  border-top: 1px solid var(--border-dim);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOADING STATE
+   ═══════════════════════════════════════════════════════════════ */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 16px;
+}
+.loading-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border-dim);
+  border-top-color: var(--neon-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+  .quick-stat { min-width: auto; }
+  .zones-bar { flex-wrap: wrap; }
+  .zone-block { min-width: 48%; }
+  .modifiers-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="dashboard" id="app">
+  <div class="loading-screen" id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">FETCHING MARKET PULSE...</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// FALLBACK SAMPLE DATA (used when JSON not available)
+// ═══════════════════════════════════════════════════════════════
+const SAMPLE_DATA = {
+  "current": {
+    "date": "2026-03-14", "version": "3.0",
+    "pillar_scores": [
+      {"name":"Structural","raw_value":62.4,"raw_score":65.5,"weight":0.18,"weighted_score":11.79,"description":"62.4% of Nifty 500 above 200 SMA","sub_components":{}},
+      {"name":"Breadth","raw_value":57,"raw_score":70.33,"weight":0.18,"weighted_score":12.66,"description":"Composite: 57.0% > 50 SMA + A/D 1.78","sub_components":{"positional_pct":57,"positional_score":61.7,"ad_ratio":1.78,"ad_score":83.3,"advances":1280,"declines":720}},
+      {"name":"Spark","raw_value":18,"raw_score":68.5,"weight":0.13,"weighted_score":8.91,"description":"Stockbee 4%+: 18 + Burst 733 [Super Trend]","sub_components":{"stockbee_count":18,"stockbee_score":47.5,"burst_gainers":22,"burst_losers":3,"burst_ratio":733.3,"burst_label":"Super Trend","burst_score":100}},
+      {"name":"Quality","raw_value":34,"raw_score":72,"weight":0.13,"weighted_score":9.36,"description":"Net New Highs: 34 (42H - 8L)","sub_components":{}},
+      {"name":"Sentiment","raw_value":13.2,"raw_score":86.5,"weight":0.13,"weighted_score":11.25,"description":"VIX: 13.20, PCR: 1.18","sub_components":{"vix_score":91,"pcr_score":82}},
+      {"name":"Momentum","raw_value":68.4,"raw_score":68.4,"weight":0.13,"weighted_score":8.89,"description":"68.4% of Nifty 500 with RSI(14) > 50","sub_components":{}},
+      {"name":"Volatility","raw_value":13,"raw_score":75,"weight":0.12,"weighted_score":9,"description":"ATR Breadth: 13.0% — [Healthy]","sub_components":{}}
+    ],
+    "base_score":71.85,
+    "modifiers":[
+      {"name":"Exhaustion Penalty","triggered":false,"adjustment":0,"reason":"9.0% stocks with RSI>70 — within normal range"},
+      {"name":"Persistence Boost","triggered":true,"adjustment":3,"reason":"35 days of structural bull — stability bonus active"},
+      {"name":"Divergence Warning","triggered":false,"adjustment":0,"reason":"No divergence detected"},
+      {"name":"FII Flow Warning","triggered":false,"adjustment":0,"reason":"FII sell streak: 0 days — below threshold"},
+      {"name":"Warning Day","triggered":false,"adjustment":0,"reason":"0 pillars weak — below threshold (need 3+)"},
+      {"name":"Volatility Regime","triggered":true,"adjustment":5,"reason":"ATR Breadth 13.0% — calm market, high confidence"}
+    ],
+    "total_modifier":8,"final_score":79.85,
+    "zone":"Easy Money Zone","zone_emoji":"🟢",
+    "zone_action":"Full position sizing. Breakouts have high success rate. Be aggressive on quality setups.",
+    "risk_per_trade":"1.5–2% risk per trade",
+    "state":"NORMAL","state_message":"Trend is healthy — trade your plan.",
+    "burst_ratio":733.3,"burst_label":"Super Trend",
+    "rsi_breadth_pct":68.4,"atr_breadth_pct":13,"atr_regime":"Healthy"
+  },
+  "history":[
+    {"date":"2026-03-10","mps":72.5,"zone":"Smart Money Zone"},
+    {"date":"2026-03-11","mps":68.2,"zone":"Smart Money Zone"},
+    {"date":"2026-03-12","mps":75.8,"zone":"Easy Money Zone"},
+    {"date":"2026-03-13","mps":80.1,"zone":"Easy Money Zone"},
+    {"date":"2026-03-14","mps":79.85,"zone":"Easy Money Zone"}
+  ],
+  "raw_inputs":{
+    "chartink":{"above_200sma":312,"above_50sma":285,"spark_4pct":18,"rsi_above_70":45,"rsi_above_50":342,"burst_4_5pct_gainers":22,"burst_4_5pct_losers":3,"atr_pct_above_4":65},
+    "nse":{"advances":1280,"declines":720,"new_52w_highs":42,"new_52w_lows":8,"india_vix":13.2,"pcr":1.18,"fii_net":2100,"nifty_52w_high":false}
+  },
+  "state":{"structural_bull_streak":35,"fii_consecutive_sell_days":0,"fii_5day_net":5200},
+  "metadata":{"version":"3.0","generated_at":"2026-03-14T16:15:00","universe":"Nifty 500","pillars":7,"modifiers":6,"daily_inputs":18}
+};
+
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+const PILLAR_COLORS = {
+  'Structural': 'var(--c-structural)',
+  'Breadth': 'var(--c-breadth)',
+  'Spark': 'var(--c-spark)',
+  'Quality': 'var(--c-quality)',
+  'Sentiment': 'var(--c-sentiment)',
+  'Momentum': 'var(--c-momentum)',
+  'Volatility': 'var(--c-volatility)',
+};
+const PILLAR_COLORS_RAW = {
+  'Structural': '#3b82f6',
+  'Breadth': '#8b5cf6',
+  'Spark': '#f59e0b',
+  'Quality': '#10b981',
+  'Sentiment': '#ef4444',
+  'Momentum': '#06b6d4',
+  'Volatility': '#ec4899',
+};
+
+function getZoneStyle(zone) {
+  if (zone.includes('Easy')) return { color: 'var(--easy-money)', bg: 'var(--easy-money-bg)', border: 'rgba(34,197,94,0.4)' };
+  if (zone.includes('Smart')) return { color: 'var(--smart-money)', bg: 'var(--smart-money-bg)', border: 'rgba(59,130,246,0.4)' };
+  if (zone.includes('Hard')) return { color: 'var(--hard-money)', bg: 'var(--hard-money-bg)', border: 'rgba(234,179,8,0.4)' };
+  return { color: 'var(--no-money)', bg: 'var(--no-money-bg)', border: 'rgba(239,68,68,0.4)' };
+}
+
+function getScoreColor(score) {
+  if (score >= 75) return '#22c55e';
+  if (score >= 60) return '#3b82f6';
+  if (score >= 40) return '#eab308';
+  return '#ef4444';
+}
+
+function getStateStyle(state) {
+  switch (state) {
+    case 'NORMAL': return { color: '#22c55e', bg: 'rgba(34,197,94,0.1)', icon: '✦' };
+    case 'WARNING': return { color: '#eab308', bg: 'rgba(234,179,8,0.1)', icon: '⚠️' };
+    case 'OVEREXTENDED': return { color: '#f97316', bg: 'rgba(249,115,22,0.1)', icon: '🔥' };
+    case 'EXHAUSTED': return { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', icon: '💀' };
+    default: return { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', icon: '?' };
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SVG BUILDERS
+// ═══════════════════════════════════════════════════════════════
+function buildScoreRing(score) {
+  const r = 72, cx = 90, cy = 90, sw = 10;
+  const startA = -225, endA = 45;
+  const totalArc = endA - startA;
+  const scoreA = startA + (score / 100) * totalArc;
+  const color = getScoreColor(score);
+
+  function arc(a1, a2, radius) {
+    const s = { x: cx + radius * Math.cos(a1 * Math.PI / 180), y: cy + radius * Math.sin(a1 * Math.PI / 180) };
+    const e = { x: cx + radius * Math.cos(a2 * Math.PI / 180), y: cy + radius * Math.sin(a2 * Math.PI / 180) };
+    const large = (a2 - a1) > 180 ? 1 : 0;
+    return `M ${s.x} ${s.y} A ${radius} ${radius} 0 ${large} 1 ${e.x} ${e.y}`;
+  }
+
+  return `<svg viewBox="0 0 180 180" width="180" height="180">
+    <defs>
+      <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <path d="${arc(startA, endA, r)}" fill="none" stroke="#1e293b" stroke-width="${sw}" stroke-linecap="round"/>
+    ${score > 0 ? `<path d="${arc(startA, scoreA, r)}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" filter="url(#glow)"/>` : ''}
+    <!-- tick marks -->
+    ${[0, 25, 50, 75, 100].map(v => {
+      const a = startA + (v / 100) * totalArc;
+      const inner = r - sw/2 - 3, outer = r - sw/2 - 8;
+      const x1 = cx + inner * Math.cos(a * Math.PI / 180), y1 = cy + inner * Math.sin(a * Math.PI / 180);
+      const x2 = cx + outer * Math.cos(a * Math.PI / 180), y2 = cy + outer * Math.sin(a * Math.PI / 180);
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#334155" stroke-width="1"/>`;
+    }).join('')}
+  </svg>`;
+}
+
+function buildHistoryChart(history) {
+  if (!history || history.length < 2) return '<div style="text-align:center;color:var(--text-dim);font-size:11px;padding:40px 0">Awaiting history data...</div>';
+
+  const w = 800, h = 140, padL = 40, padR = 16, padT = 10, padB = 24;
+  const iw = w - padL - padR, ih = h - padT - padB;
+
+  const scores = history.map(d => d.mps || d.final_score || 0);
+  const minS = Math.min(...scores, 30);
+  const maxS = Math.max(...scores, 90);
+  const range = maxS - minS || 1;
+
+  const toX = (i) => padL + (i / (history.length - 1)) * iw;
+  const toY = (v) => padT + ih - ((v - minS) / range) * ih;
+
+  // Zone bands
+  const zones = [
+    { y0: 0, y1: 40, fill: 'rgba(239,68,68,0.06)' },
+    { y0: 40, y1: 60, fill: 'rgba(234,179,8,0.06)' },
+    { y0: 60, y1: 75, fill: 'rgba(59,130,246,0.06)' },
+    { y0: 75, y1: 100, fill: 'rgba(34,197,94,0.06)' },
+  ];
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:100%">`;
+
+  // Zone bands
+  zones.forEach(z => {
+    const y1c = Math.max(minS, z.y0), y2c = Math.min(maxS, z.y1);
+    if (y2c > y1c) {
+      svg += `<rect x="${padL}" y="${toY(y2c)}" width="${iw}" height="${toY(y1c) - toY(y2c)}" fill="${z.fill}"/>`;
+    }
+  });
+
+  // Grid lines
+  [40, 60, 75].forEach(v => {
+    if (v >= minS && v <= maxS) {
+      svg += `<line x1="${padL}" y1="${toY(v)}" x2="${w - padR}" y2="${toY(v)}" stroke="#1e293b" stroke-width="0.5" stroke-dasharray="4,4"/>`;
+      svg += `<text x="${padL - 6}" y="${toY(v) + 3}" text-anchor="end" font-size="8" fill="#475569" font-family="JetBrains Mono">${v}</text>`;
+    }
+  });
+
+  // Area gradient
+  const areaId = 'histGrad';
+  const lastColor = getScoreColor(scores[scores.length - 1]);
+  svg += `<defs><linearGradient id="${areaId}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="${lastColor}" stop-opacity="0.2"/>
+    <stop offset="100%" stop-color="${lastColor}" stop-opacity="0"/>
+  </linearGradient></defs>`;
+
+  // Area path
+  let areaD = `M ${toX(0)} ${toY(scores[0])}`;
+  for (let i = 1; i < scores.length; i++) areaD += ` L ${toX(i)} ${toY(scores[i])}`;
+  areaD += ` L ${toX(scores.length - 1)} ${padT + ih} L ${toX(0)} ${padT + ih} Z`;
+  svg += `<path d="${areaD}" fill="url(#${areaId})"/>`;
+
+  // Line path
+  let lineD = `M ${toX(0)} ${toY(scores[0])}`;
+  for (let i = 1; i < scores.length; i++) lineD += ` L ${toX(i)} ${toY(scores[i])}`;
+  svg += `<path d="${lineD}" fill="none" stroke="${lastColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  // Dots + labels
+  history.forEach((d, i) => {
+    const x = toX(i), y = toY(scores[i]);
+    const c = getScoreColor(scores[i]);
+    svg += `<circle cx="${x}" cy="${y}" r="4" fill="${c}" stroke="#0c1018" stroke-width="2"/>`;
+    // Date label
+    const dateStr = d.date.slice(5); // MM-DD
+    svg += `<text x="${x}" y="${h - 4}" text-anchor="middle" font-size="8" fill="#475569" font-family="JetBrains Mono">${dateStr}</text>`;
+    // Score label on last point
+    if (i === history.length - 1) {
+      svg += `<text x="${x}" y="${y - 10}" text-anchor="middle" font-size="10" font-weight="700" fill="${c}" font-family="JetBrains Mono">${scores[i].toFixed(1)}</text>`;
+    }
+  });
+
+  svg += '</svg>';
+  return svg;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function render(data, isLive) {
+  const c = data.current;
+  const zs = getZoneStyle(c.zone);
+  const ss = getStateStyle(c.state);
+  const scoreColor = getScoreColor(c.final_score);
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <!-- HEADER -->
+    <div class="header">
+      <div class="header-title">TradEdge Command Center</div>
+      <div class="header-subtitle">MPS v${c.version} — MARKET PULSE SCORE</div>
+      <div class="header-meta">
+        <span>${c.date}</span>
+        <span>Universe: ${data.metadata?.universe || 'Nifty 500'}</span>
+        <span>${data.metadata?.pillars || 7} Pillars · ${data.metadata?.modifiers || 6} Modifiers</span>
+        <span class="data-source-badge ${isLive ? '' : 'offline'}">
+          <span class="dot"></span>
+          ${isLive ? 'LIVE DATA' : 'SAMPLE DATA'}
+        </span>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-left">
+        <div class="zone-badge" style="color:${zs.color};background:${zs.bg};border-color:${zs.border}">
+          ${c.zone_emoji} ${c.zone}
+        </div>
+        <div style="margin-top:8px">
+          <div class="state-badge" style="color:${ss.color};background:${ss.bg};border-color:${ss.color}44">
+            ${ss.icon} ${c.state}
+          </div>
+        </div>
+        <div class="action-banner" style="margin-top:12px;border-color:${zs.border}">
+          <strong style="color:${zs.color}">ACTION:</strong><br>
+          ${c.zone_action}
+        </div>
+      </div>
+
+      <div class="hero-center">
+        <div class="score-ring-container">
+          ${buildScoreRing(c.final_score)}
+          <div class="score-number" style="color:${scoreColor}">${c.final_score.toFixed(1)}</div>
+          <div class="score-label">MPS SCORE</div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:4px">
+          Base ${c.base_score.toFixed(1)} ${c.total_modifier >= 0 ? '+' : ''}${c.total_modifier.toFixed(1)} mod
+        </div>
+      </div>
+
+      <div class="hero-right">
+        <div class="quick-stats">
+          <div class="quick-stat">
+            <span class="quick-stat-label">Risk</span>
+            <span class="quick-stat-value" style="color:${zs.color}">${c.risk_per_trade}</span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">Burst</span>
+            <span class="quick-stat-value" style="color:var(--c-spark)">${(c.burst_ratio||0).toFixed(0)} <span style="font-size:9px;color:var(--text-muted)">[${c.burst_label||'—'}]</span></span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">RSI Breadth</span>
+            <span class="quick-stat-value" style="color:var(--c-momentum)">${(c.rsi_breadth_pct||0).toFixed(1)}%</span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">ATR Regime</span>
+            <span class="quick-stat-value" style="color:var(--c-volatility)">${(c.atr_breadth_pct||0).toFixed(1)}% <span style="font-size:9px;color:var(--text-muted)">[${c.atr_regime||'—'}]</span></span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">State</span>
+            <span class="quick-stat-value" style="color:${ss.color};font-size:10px">${c.state_message}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY CHART -->
+    <div class="section-title">MPS HISTORY</div>
+    <div class="history-panel">
+      <div class="history-chart">${buildHistoryChart(data.history)}</div>
+    </div>
+
+    <!-- PILLAR CARDS -->
+    <div class="section-title">7 PILLARS</div>
+    <div class="pillars-grid">
+      ${c.pillar_scores.map(p => {
+        const color = PILLAR_COLORS[p.name] || 'var(--text-primary)';
+        const colorRaw = PILLAR_COLORS_RAW[p.name] || '#94a3b8';
+        return `
+        <div class="pillar-card" style="--pc:${color}">
+          <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:${color};border-radius:3px 0 0 3px"></div>
+          <div class="pillar-header">
+            <div>
+              <div class="pillar-name" style="color:${color}">${p.name}</div>
+              <div class="pillar-weight">${(p.weight * 100).toFixed(0)}% weight</div>
+            </div>
+            <div>
+              <div class="pillar-score-big" style="color:${color}">${p.raw_score.toFixed(1)}</div>
+              <div class="pillar-weighted">wt: ${p.weighted_score.toFixed(2)}</div>
+            </div>
+          </div>
+          <div class="pillar-bar-track">
+            <div class="pillar-bar-fill" style="width:${p.raw_score}%;background:${color}"></div>
+          </div>
+          <div class="pillar-description">${p.description}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- SCORE BREAKDOWN BAR -->
+    <div class="section-title">WEIGHTED CONTRIBUTION</div>
+    <div class="breakdown-panel">
+      <div class="breakdown-bar">
+        ${c.pillar_scores.map(p => {
+          const pct = (p.weighted_score / Math.max(c.base_score, 0.01)) * 100;
+          const color = PILLAR_COLORS_RAW[p.name] || '#94a3b8';
+          return `<div class="breakdown-segment" style="width:${Math.max(pct, 2)}%;background:${color}">${pct > 8 ? p.name.slice(0,4) + ' ' + p.weighted_score.toFixed(1) : ''}</div>`;
+        }).join('')}
+      </div>
+      <div class="breakdown-legend">
+        ${c.pillar_scores.map(p => {
+          const color = PILLAR_COLORS_RAW[p.name] || '#94a3b8';
+          return `<div class="legend-item">
+            <div class="legend-dot" style="background:${color}"></div>
+            <span class="legend-name">${p.name}</span>
+            <span class="legend-value" style="color:${color}">${p.weighted_score.toFixed(2)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- MODIFIERS -->
+    <div class="section-title">6 SMART MODIFIERS</div>
+    <div class="modifiers-grid">
+      ${c.modifiers.map(m => {
+        const active = m.triggered;
+        const positive = m.adjustment > 0;
+        const iconClass = !active ? 'inactive' : (positive ? 'positive' : 'negative');
+        const adjColor = !active ? 'var(--text-dim)' : (positive ? 'var(--neon-green)' : 'var(--no-money)');
+        const adjStr = active ? (positive ? '+' : '') + m.adjustment.toFixed(1) : '0.0';
+        return `
+        <div class="modifier-row ${active ? 'active' : ''} ${active && !positive ? 'negative' : ''}">
+          <div class="modifier-icon ${iconClass}">${active ? (positive ? '▲' : '▼') : '○'}</div>
+          <div class="modifier-info">
+            <div class="modifier-name">${m.name}</div>
+            <div class="modifier-reason" title="${m.reason}">${m.reason}</div>
+          </div>
+          <div class="modifier-adj" style="color:${adjColor}">${adjStr}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- ZONE THRESHOLDS -->
+    <div class="section-title">ZONE THRESHOLDS</div>
+    <div class="zones-bar">
+      ${[
+        { name: 'Easy Money', range: '75–100', risk: '1.5–2%', color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.3)' },
+        { name: 'Smart Money', range: '60–75', risk: '1%', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.3)' },
+        { name: 'Hard Money', range: '40–60', risk: '0.5%', color: '#eab308', bg: 'rgba(234,179,8,0.08)', border: 'rgba(234,179,8,0.3)' },
+        { name: 'No Money', range: '< 40', risk: '0%', color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.3)' },
+      ].map(z => {
+        const isCurrent = c.zone.includes(z.name);
+        return `<div class="zone-block ${isCurrent ? 'current' : ''}" style="background:${z.bg};border-color:${z.border};${isCurrent ? 'box-shadow:0 0 20px ' + z.color + '22' : ''}">
+          <div class="zone-block-name" style="color:${z.color}">${z.name}</div>
+          <div class="zone-block-range">MPS ${z.range}</div>
+          <div class="zone-block-risk" style="color:${z.color}">${z.risk} risk</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- RAW DATA -->
+    <div class="section-title">RAW INPUTS (${data.metadata?.daily_inputs || 18} DATA POINTS)</div>
+    <div class="raw-grid">
+      <div class="raw-section">
+        <div class="raw-section-title">CHARTINK (7 SCANNERS)</div>
+        ${Object.entries(data.raw_inputs?.chartink || {}).map(([k, v]) =>
+          `<div class="raw-row"><span class="raw-key">${k}</span><span class="raw-val">${typeof v === 'number' ? v.toLocaleString() : v}</span></div>`
+        ).join('')}
+      </div>
+      <div class="raw-section">
+        <div class="raw-section-title">NSE INDIA</div>
+        ${Object.entries(data.raw_inputs?.nse || {}).map(([k, v]) =>
+          `<div class="raw-row"><span class="raw-key">${k}</span><span class="raw-val">${typeof v === 'number' ? v.toLocaleString() : v}</span></div>`
+        ).join('')}
+      </div>
+      <div class="raw-section">
+        <div class="raw-section-title">STATE TRACKING</div>
+        ${Object.entries(data.state || {}).map(([k, v]) =>
+          `<div class="raw-row"><span class="raw-key">${k}</span><span class="raw-val">${typeof v === 'number' ? v.toLocaleString() : v}</span></div>`
+        ).join('')}
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      TradEdge MPS v${c.version} · By Dr. Rahul Ware · Generated ${data.metadata?.generated_at || c.date} · ✦ Trade the Pulse ✦
+    </div>
+  `;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// FETCH + INIT
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  let data = null;
+  let isLive = false;
+
+  try {
+    const resp = await fetch('./data/mps_latest.json', { cache: 'no-store' });
+    if (resp.ok) {
+      data = await resp.json();
+      // Validate the JSON has the expected structure
+      if (data?.current?.final_score !== undefined && data?.current?.pillar_scores?.length === 7) {
+        isLive = true;
+      } else {
+        console.warn('MPS JSON structure invalid, falling back to sample data');
+        data = null;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not fetch mps_latest.json:', e.message);
+  }
+
+  if (!data) {
+    data = SAMPLE_DATA;
+    isLive = false;
+  }
+
+  // Small delay for loading effect
+  await new Promise(r => setTimeout(r, 400));
+  render(data, isLive);
+}
+
+init();
+</script>
+</body>
+</html>
