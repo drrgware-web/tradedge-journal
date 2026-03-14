@@ -1,0 +1,86 @@
+# =============================================================================
+# RRG Daily Auto-Update — GitHub Action
+# =============================================================================
+name: RRG Daily Update
+
+on:
+  schedule:
+    - cron: '0 11 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: rrg-update
+  cancel-in-progress: false
+
+jobs:
+  update-rrg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance numpy
+
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Run RRG Fetcher
+        id: rrg
+        run: |
+          cd scripts
+          python rrg_fetcher.py \
+            --output ../data/rrg_data.json \
+            --config ../data/rrg_config.json \
+            --daily-tail 5 \
+            --weekly-tail 5 \
+            --window 10
+        continue-on-error: true
+
+      - name: Check if fetch succeeded
+        if: steps.rrg.outcome == 'failure'
+        run: |
+          echo "::warning::RRG fetch failed"
+          exit 0
+
+      - name: Commit and push
+        if: steps.rrg.outcome == 'success'
+        run: |
+          git config user.name "RRG Bot"
+          git config user.email "rrg-bot@tradedge.local"
+          git add data/rrg_data.json
+          DATE=$(date +%Y-%m-%d)
+          git commit -m "RRG ${DATE}: updated" || echo "No changes"
+          git push
+
+      - name: Summary
+        if: steps.rrg.outcome == 'success'
+        run: |
+          python3 << 'PYEOF'
+          import json
+          d = json.load(open('data/rrg_data.json'))
+          m = d.get('metadata', {})
+          print('## RRG Daily Summary')
+          print(f'**Date:** {m.get("date", "N/A")}')
+          print(f'**Benchmarks:** {", ".join(m.get("benchmarks_calculated", []))}')
+          print(f'**Sectors:** {m.get("total_sectors", 0)} | **ETFs:** {m.get("total_etfs", 0)} | **Drilldowns:** {m.get("total_drilldown_sectors", 0)}')
+
+          # Show quadrant summary for default benchmark
+          default_b = d.get('default_benchmark', '')
+          bd = d.get('benchmarks_data', {}).get(default_b, {})
+          daily = bd.get('daily', {})
+          qs = daily.get('quadrant_summary', {})
+          print(f'\n### Daily ({default_b})')
+          for q in ['Leading', 'Improving', 'Weakening', 'Lagging']:
+              names = qs.get(q, [])
+              icons = {'Leading': '+', 'Improving': '^', 'Weakening': 'v', 'Lagging': '-'}
+              print(f'- [{icons.get(q, "?")}] **{q}**: {", ".join(names) if names else "none"}')
+          PYEOF
+        shell: bash
