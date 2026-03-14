@@ -1,0 +1,85 @@
+# =============================================================================
+# RRG Daily Auto-Update — GitHub Action
+# =============================================================================
+# Runs Mon-Fri at 4:30 PM IST (11:00 UTC)
+# Fetches Yahoo Finance data, calculates daily+weekly RRG + stock drill-down
+# =============================================================================
+
+name: RRG Daily Update
+
+on:
+  schedule:
+    - cron: '0 11 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: rrg-update
+  cancel-in-progress: false
+
+jobs:
+  update-rrg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance numpy
+
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Run RRG Fetcher
+        id: rrg
+        run: |
+          cd scripts
+          python rrg_fetcher.py \
+            --output ../data/rrg_data.json \
+            --config ../data/rrg_config.json \
+            --benchmark "^NSEI" \
+            --daily-tail 5 \
+            --weekly-tail 5 \
+            --window 10
+        continue-on-error: true
+
+      - name: Check if fetch succeeded
+        if: steps.rrg.outcome == 'failure'
+        run: |
+          echo "::warning::RRG fetch failed — likely market holiday or API issue."
+          exit 0
+
+      - name: Commit and push
+        if: steps.rrg.outcome == 'success'
+        run: |
+          git config user.name "RRG Bot"
+          git config user.email "rrg-bot@tradedge.local"
+          git add data/rrg_data.json
+          DATE=$(date +%Y-%m-%d)
+          SECTORS=$(python3 -c "import json; d=json.load(open('data/rrg_data.json')); print(d['metadata']['total_sectors'])")
+          DRILL=$(python3 -c "import json; d=json.load(open('data/rrg_data.json')); print(d['metadata']['total_drilldown_sectors'])")
+          git commit -m "📊 RRG ${DATE}: ${SECTORS} sectors, ${DRILL} drilldowns" || echo "No changes"
+          git push
+
+      - name: Summary
+        if: steps.rrg.outcome == 'success'
+        run: |
+          python3 -c "
+          import json
+          d = json.load(open('data/rrg_data.json'))
+          print('## RRG Daily Summary')
+          print(f'**Benchmark:** {d[\"benchmark\"][\"name\"]}')
+          print(f'**Sectors:** {d[\"metadata\"][\"total_sectors\"]} | **ETFs:** {d[\"metadata\"][\"total_etfs\"]} | **Drilldowns:** {d[\"metadata\"][\"total_drilldown_sectors\"]}')
+          for tf in ['daily','weekly']:
+              print(f'\n### {tf.title()}')
+              for q in ['Leading','Improving','Weakening','Lagging']:
+                  ns = d[tf]['quadrant_summary'].get(q,[])
+                  e = {'Leading':'🟢','Improving':'🔵','Weakening':'🟡','Lagging':'🔴'}[q]
+                  print(f'- {e} **{q}**: {', '.join(ns) if ns else '—'}')
+          " >> $GITHUB_STEP_SUMMARY
