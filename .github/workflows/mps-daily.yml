@@ -1,15 +1,21 @@
 # =============================================================================
-# MPS v3 Daily Auto-Update — GitHub Action
+# MPS v3.1 Daily Auto-Update — GitHub Action
 # =============================================================================
 # Runs every trading day at 4:15 PM IST (10:45 AM UTC)
-# Fetches data from Chartink (7 scanners) + NSE, calculates MPS v3, commits JSON
+# Fetches data from Chartink (8 scanners) + NSE + Yahoo Finance macro,
+# calculates MPS v3.1, commits JSON
 #
-# v3 Changes from v2:
-#   - Calls mps_fetcher_v3.py (imports mps_engine_v3.py)
+# v3.1 Changes from v3.0:
+#   - Added yfinance dependency for macro data
+#   - 3 new macro modifiers (Crude, US 10Y, Rupee)
+#   - 21 daily data inputs (was 18)
+#   - 9 modifiers (was 6)
+#   - History record includes macro_summary
+#
+# v3.0 Changes from v2:
 #   - 7 Chartink scanners (was 4): + rsi_above_50, burst_4_5pct, atr_pct_above_4
 #   - 18 daily data inputs (was 14)
 #   - JSON output includes: 7 pillars, 6 modifiers, daily state, burst/ATR fields
-#   - History includes pillar breakdown + state
 #
 # Setup:
 #   1. Place this file in: .github/workflows/mps-daily.yml
@@ -51,12 +57,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests beautifulsoup4
+          pip install requests beautifulsoup4 yfinance
 
       - name: Create data directory
         run: mkdir -p data
 
-      - name: Run MPS v3 Fetcher
+      - name: Run MPS v3.1 Fetcher
         id: mps
         run: |
           cd scripts
@@ -71,6 +77,7 @@ jobs:
           echo "::warning::MPS fetch failed. This could be due to:"
           echo "  - Market holiday (no data available)"
           echo "  - Chartink/NSE website changes"
+          echo "  - Yahoo Finance API issues"
           echo "  - Network issues"
           echo "Skipping commit."
           exit 0
@@ -97,7 +104,7 @@ jobs:
           today = latest['current']['date']
           history = [h for h in history if h.get('date') != today]
           
-          # v3 history record — includes all pillar scores + state
+          # v3.1 history record — includes all pillar scores + state + macro
           record = {
               'date': today,
               'final_score': latest['current']['final_score'],
@@ -110,9 +117,16 @@ jobs:
               'rsi_breadth_pct': latest['current'].get('rsi_breadth_pct', 0),
               'atr_breadth_pct': latest['current'].get('atr_breadth_pct', 0),
               'atr_regime': latest['current'].get('atr_regime', ''),
+              'macro_summary': latest['current'].get('macro_summary', ''),
               'pillars': {p['name']: p['raw_score'] for p in latest['current']['pillar_scores']},
               'modifiers_active': [m['name'] for m in latest['current']['modifiers'] if m['triggered']],
           }
+          
+          # Include macro raw inputs if available
+          macro = latest.get('raw_inputs', {}).get('macro', {})
+          if macro:
+              record['macro'] = macro
+          
           history.append(record)
           
           # Keep last 365 days
@@ -138,7 +152,7 @@ jobs:
           STATE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['state'])")
           DATE=$(date +%Y-%m-%d)
           
-          git commit -m "📊 MPS v3 ${DATE}: ${SCORE} — ${ZONE} [${STATE}]" || echo "No changes to commit"
+          git commit -m "📊 MPS v3.1 ${DATE}: ${SCORE} — ${ZONE} [${STATE}]" || echo "No changes to commit"
           git push
 
       - name: Summary
@@ -149,7 +163,7 @@ jobs:
           with open('data/mps_latest.json') as f:
               d = json.load(f)
           c = d['current']
-          print('## MPS v3 Daily Summary')
+          print('## MPS v3.1 Daily Summary')
           print(f'**Score:** {c[\"final_score\"]}')
           print(f'**Zone:** {c[\"zone\"]} {c[\"zone_emoji\"]}')
           print(f'**State:** {c[\"state\"]} — {c[\"state_message\"]}')
@@ -157,18 +171,29 @@ jobs:
           print(f'**Burst:** {c.get(\"burst_ratio\", 0):.0f} [{c.get(\"burst_label\", \"\")}]')
           print(f'**RSI Breadth:** {c.get(\"rsi_breadth_pct\", 0):.1f}%')
           print(f'**ATR Breadth:** {c.get(\"atr_breadth_pct\", 0):.1f}% [{c.get(\"atr_regime\", \"\")}]')
+          print(f'**Macro:** {c.get(\"macro_summary\", \"N/A\")}')
           print()
           print('### Pillars (7)')
           for p in c['pillar_scores']:
               print(f'- {p[\"name\"]}: {p[\"raw_score\"]:.1f}/100 ({p[\"description\"]})')
           print()
-          print('### Modifiers (6)')
+          print('### Modifiers (9)')
           for m in c['modifiers']:
               status = '✅' if m['triggered'] else '⬜'
               print(f'- {status} {m[\"name\"]}: {m[\"adjustment\"]:+.1f} — {m[\"reason\"]}')
           print()
           print('### Data Sources')
-          print(f'- Chartink scanners: 7')
+          print(f'- Chartink scanners: 8')
           print(f'- NSE endpoints: 6')
-          print(f'- Total daily inputs: {d[\"metadata\"].get(\"daily_inputs\", 18)}')
+          print(f'- Yahoo Finance macro: 3')
+          print(f'- Total daily inputs: {d[\"metadata\"].get(\"daily_inputs\", 21)}')
+          
+          # Macro details
+          macro = d.get('raw_inputs', {}).get('macro', {})
+          if macro:
+              print()
+              print('### Macro Indicators')
+              print(f'- Brent Crude: \${macro.get(\"brent_crude\", 0):.2f}')
+              print(f'- US 10Y Yield: {macro.get(\"us10y_yield\", 0):.2f}%')
+              print(f'- USD/INR: ₹{macro.get(\"usd_inr\", 0):.2f} (20d ago: ₹{macro.get(\"usd_inr_20d_ago\", 0):.2f})')
           " >> $GITHUB_STEP_SUMMARY
