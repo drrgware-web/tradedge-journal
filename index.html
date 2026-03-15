@@ -8027,37 +8027,46 @@ function fundParseScreener(html, symbol){
   const qTable = doc.querySelectorAll('table')[0]; // First table = Quarterly Results
   if(!qTable) return null;
 
-  // Get quarter labels from headers (skip first empty header)
-  const headers = [...qTable.querySelectorAll('thead th, tr:first-child th, tr:first-child td')].map(th => th.textContent.trim());
-  const qLabels = headers.slice(1); // ['Dec 2022', 'Mar 2023', ...]
+  // Get all rows from the table (handle both <tbody> and direct <tr>)
+  const allRows = [...qTable.querySelectorAll('tr')];
+  if(allRows.length < 2) return null;
 
-  // Build row data map: { 'sales': [val1, val2, ...], 'opm %': [...], ... }
+  // First row = headers (quarter labels)
+  const headerCells = [...allRows[0].querySelectorAll('th, td')].map(c => c.textContent.trim());
+  const qLabels = headerCells.slice(1); // ['Dec 2022', 'Mar 2023', ...]
+
+  // Remaining rows = metric data
   const rowData = {};
-  const rows = qTable.querySelectorAll('tbody tr');
-  rows.forEach(row => {
-    const cells = [...row.querySelectorAll('td, th')];
-    if(cells.length < 2) return;
+  for(let r = 1; r < allRows.length; r++){
+    const cells = [...allRows[r].querySelectorAll('td, th')];
+    if(cells.length < 2) continue;
     const rowName = cells[0].textContent.replace(/[+\s]+$/,'').trim().toLowerCase();
-    if(!rowName || rowName === 'raw pdf') return;
+    if(!rowName || rowName === 'raw pdf') continue;
     rowData[rowName] = cells.slice(1).map(c => {
       const txt = c.textContent.replace(/,/g,'').replace('%','').trim();
       return parseFloat(txt) || 0;
     });
-  });
+  }
 
   // Transpose: build quarter objects (most recent = last column = last index)
-  // Screener shows oldest→newest left→right, so reverse for most-recent-first
   const numQuarters = qLabels.length;
   const allQuarters = [];
   for(let i = numQuarters - 1; i >= 0; i--){
+    // Handle both standard (Sales, Operating Profit, OPM %) and banking (Revenue, Financing Profit, Financing Margin %) formats
+    const sales = (rowData['sales'] || rowData['revenue'] || rowData['net interest income'] || [])[i] || 0;
+    const opProfit = (rowData['operating profit'] || rowData['financing profit'] || rowData['net profit before provisions'] || [])[i] || 0;
+    const opm = (rowData['opm %'] || rowData['opm'] || rowData['financing margin %'] || rowData['financing margin'] || rowData['net margin %'] || [])[i] || 0;
+    const netProfit = (rowData['net profit'] || rowData['pat'] || [])[i] || 0;
+    const eps = (rowData['eps in rs'] || rowData['eps'] || [])[i] || 0;
+
     allQuarters.push({
       label: qLabels[i] || '',
-      revenueCr: (rowData['sales'] || [])[i] || 0,
-      revenue: ((rowData['sales'] || [])[i] || 0) * 10000000,
-      operatingIncome: ((rowData['operating profit'] || [])[i] || 0) * 10000000,
-      opm: (rowData['opm %'] || rowData['opm']  || [])[i] || 0,
-      netIncome: ((rowData['net profit'] || [])[i] || 0) * 10000000,
-      eps: (rowData['eps in rs'] || rowData['eps'] || [])[i] || 0,
+      revenueCr: sales,
+      revenue: sales * 10000000,
+      operatingIncome: opProfit * 10000000,
+      opm: opm,
+      netIncome: netProfit * 10000000,
+      eps: eps,
     });
   }
 
