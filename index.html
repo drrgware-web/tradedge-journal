@@ -7962,12 +7962,28 @@ const FUND_PROXIES = [
 // ── Fetch Screener.in HTML page ──
 async function fundFetchScreener(symbol){
   const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
-  // Try consolidated first, fallback to standalone
+  // Use own Cloudflare Worker as Screener.in proxy (reliable, no CORS issues)
+  const workerUrl = localStorage.getItem('zd_worker_url') || '';
+
+  if(workerUrl){
+    try {
+      const r = await fetch(workerUrl, {
+        method: 'GET',
+        headers: { 'X-Kite-Action': 'screener', 'X-Screener-Symbol': sym },
+        signal: AbortSignal.timeout(15000),
+      });
+      if(r.ok){
+        const html = await r.text();
+        if(html.includes('Quarterly Results') || html.includes('quarterly-shp')) return html;
+      }
+    } catch(e){ console.warn('[FUND] Worker fetch failed for', sym, e.message); }
+  }
+
+  // Fallback: try public CORS proxies
   const urls = [
     `https://www.screener.in/company/${sym}/consolidated/`,
     `https://www.screener.in/company/${sym}/`,
   ];
-
   for(const pageUrl of urls){
     for(const proxy of FUND_PROXIES){
       try {
