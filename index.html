@@ -7992,99 +7992,83 @@ function fundParseScreener(html, symbol){
   if(!html) return null;
   const doc = new DOMParser().parseFromString(html, 'text/html');
 
-  // ── Company info from top section ──
-  const info = { name:'', sector:'', industry:'', mcapCr:0, pe:0, roe:0, currentPrice:0, bookValue:0, faceValue:0 };
+  // ── Company info from ratios list ──
+  const info = { name:'', sector:'', industry:'', mcapCr:0, pe:0, roe:0, roce:0, currentPrice:0, bookValue:0, faceValue:0, dividendYield:0 };
 
-  // Company name
+  // Company name from <h1>
   const h1 = doc.querySelector('h1');
   info.name = h1?.textContent?.trim() || symbol;
 
-  // Ratios list (#top-ratios or .company-ratios)
-  const ratioEls = doc.querySelectorAll('#top-ratios li, .company-ratios li, .ratios-table li');
-  ratioEls.forEach(li => {
-    const nameEl = li.querySelector('.name, span:first-child');
-    const valEl = li.querySelector('.value, .number, span:last-child');
-    if(!nameEl || !valEl) return;
-    const name = nameEl.textContent.trim().toLowerCase();
-    const val = parseFloat(valEl.textContent.replace(/[₹,]/g,'').trim()) || 0;
+  // Sector/Industry from links
+  doc.querySelectorAll('a').forEach(a => {
+    const href = a.getAttribute('href') || '';
+    if(href.includes('/sector/') && !info.sector) info.sector = a.textContent.trim();
+    if(href.includes('/industry/') && !info.industry) info.industry = a.textContent.trim();
+  });
+
+  // Top ratios: spans inside <li> elements
+  // Format: <li><span class="name">Market Cap</span><span class="value">₹ 80,150 Cr.</span></li>
+  const ratioLis = doc.querySelectorAll('#top-ratios li, .company-ratios li, .top-ratios li');
+  ratioLis.forEach(li => {
+    const spans = li.querySelectorAll('span');
+    if(spans.length < 2) return;
+    const name = spans[0].textContent.trim().toLowerCase();
+    const valText = spans[1].textContent.replace(/[₹,\s]/g,'').replace('Cr.','').replace('Cr','').replace('%','').trim();
+    const val = parseFloat(valText) || 0;
     if(name.includes('market cap')) info.mcapCr = val;
     else if(name.includes('current price')) info.currentPrice = val;
     else if(name.includes('stock p/e') || name.includes('pe ratio')) info.pe = val;
-    else if(name.includes('roe') || name.includes('return on equity')) info.roe = val;
     else if(name.includes('book value')) info.bookValue = val;
     else if(name.includes('face value')) info.faceValue = val;
-    else if(name.includes('sector')) info.sector = valEl.textContent.trim();
-    else if(name.includes('industry')) info.industry = valEl.textContent.trim();
+    else if(name.includes('roe')) info.roe = val;
+    else if(name.includes('roce')) info.roce = val;
+    else if(name.includes('dividend yield')) info.dividendYield = val;
   });
+  info.ttmPE = info.pe;
 
-  // Also try the company info section for sector/industry
-  const compInfo = doc.querySelectorAll('.company-info a, .sub a');
-  compInfo.forEach(a => {
-    const href = a.getAttribute('href') || '';
-    if(href.includes('/sector/')) info.sector = info.sector || a.textContent.trim();
-    if(href.includes('/industry/')) info.industry = info.industry || a.textContent.trim();
-  });
+  // ── Quarterly Results Table (Table 0) ──
+  // Structure: TRANSPOSED — quarters are COLUMNS, metrics are ROWS
+  // Headers: ['', 'Dec 2022', 'Mar 2023', ...]
+  // Rows: Sales, Expenses, Operating Profit, OPM %, Other Income, Interest, Depreciation, PBT, Tax %, Net Profit, EPS in Rs
+  const qTable = doc.querySelectorAll('table')[0]; // First table = Quarterly Results
+  if(!qTable) return null;
 
-  // ── Quarterly Results Table ──
-  // Find the table after "Quarterly Results" heading
-  let qTable = null;
-  const sections = doc.querySelectorAll('section, .card');
-  sections.forEach(sec => {
-    const heading = sec.querySelector('h2, .card-header');
-    if(heading && /quarterly results/i.test(heading.textContent)){
-      qTable = sec.querySelector('table');
-    }
-  });
-  // Fallback: find by table ID or class
-  if(!qTable) qTable = doc.querySelector('#quarters table, table.data-table');
+  // Get quarter labels from headers (skip first empty header)
+  const headers = [...qTable.querySelectorAll('thead th, tr:first-child th, tr:first-child td')].map(th => th.textContent.trim());
+  const qLabels = headers.slice(1); // ['Dec 2022', 'Mar 2023', ...]
 
-  const quarters = [];
-  if(qTable){
-    const headers = [...qTable.querySelectorAll('thead th, tr:first-child th, tr:first-child td')].map(th => th.textContent.trim());
-    const rows = qTable.querySelectorAll('tbody tr');
-
-    // Find column indices
-    const colIdx = {};
-    headers.forEach((h, i) => {
-      const hl = h.toLowerCase();
-      if(hl.includes('sales') || hl.includes('revenue')) colIdx.sales = i;
-      else if(hl.includes('operating profit') && !hl.includes('%')) colIdx.opProfit = i;
-      else if(hl.includes('opm')) colIdx.opm = i;
-      else if(hl.includes('net profit') || hl.includes('pat')) colIdx.netProfit = i;
-      else if(hl.includes('eps')) colIdx.eps = i;
+  // Build row data map: { 'sales': [val1, val2, ...], 'opm %': [...], ... }
+  const rowData = {};
+  const rows = qTable.querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    const cells = [...row.querySelectorAll('td, th')];
+    if(cells.length < 2) return;
+    const rowName = cells[0].textContent.replace(/[+\s]+$/,'').trim().toLowerCase();
+    if(!rowName || rowName === 'raw pdf') return;
+    rowData[rowName] = cells.slice(1).map(c => {
+      const txt = c.textContent.replace(/,/g,'').replace('%','').trim();
+      return parseFloat(txt) || 0;
     });
+  });
 
-    rows.forEach(row => {
-      const cells = [...row.querySelectorAll('td, th')];
-      if(cells.length < 3) return;
-      const label = cells[0]?.textContent?.trim();
-      if(!label || /ttm|trailing/i.test(label)) return;
-
-      const parseNum = idx => {
-        if(idx === undefined || !cells[idx]) return 0;
-        return parseFloat(cells[idx].textContent.replace(/,/g,'').trim()) || 0;
-      };
-
-      const q = {
-        label: label,
-        revenue: 0, revenueCr: 0,
-        operatingIncome: 0, netIncome: 0,
-        opm: 0, eps: 0,
-      };
-
-      q.revenueCr = parseNum(colIdx.sales);
-      q.revenue = q.revenueCr * 10000000; // Store in raw for growth calc
-      q.operatingIncome = parseNum(colIdx.opProfit) * 10000000;
-      q.opm = parseNum(colIdx.opm);
-      q.netIncome = parseNum(colIdx.netProfit) * 10000000;
-      q.eps = parseNum(colIdx.eps);
-
-      quarters.push(q);
+  // Transpose: build quarter objects (most recent = last column = last index)
+  // Screener shows oldest→newest left→right, so reverse for most-recent-first
+  const numQuarters = qLabels.length;
+  const allQuarters = [];
+  for(let i = numQuarters - 1; i >= 0; i--){
+    allQuarters.push({
+      label: qLabels[i] || '',
+      revenueCr: (rowData['sales'] || [])[i] || 0,
+      revenue: ((rowData['sales'] || [])[i] || 0) * 10000000,
+      operatingIncome: ((rowData['operating profit'] || [])[i] || 0) * 10000000,
+      opm: (rowData['opm %'] || rowData['opm']  || [])[i] || 0,
+      netIncome: ((rowData['net profit'] || [])[i] || 0) * 10000000,
+      eps: (rowData['eps in rs'] || rowData['eps'] || [])[i] || 0,
     });
   }
 
-  // Keep only first 5 quarters (most recent first on Screener)
-  const q5 = quarters.slice(0, 5);
+  // Take first 5 (most recent)
+  const q5 = allQuarters.slice(0, 5);
 
   // Calculate YoY and QoQ growth
   q5.forEach((q, i) => {
@@ -8103,27 +8087,23 @@ function fundParseScreener(html, symbol){
     }
   });
 
-  // PE
-  info.ttmPE = info.pe;
-
-  // Upcoming earnings date - Screener sometimes shows this
+  // Upcoming earnings / board meeting date
   info.nextEarnings = null;
   info.earningsDaysAway = null;
-  const boardMeet = doc.querySelector('.board-meetings, .upcoming-events');
-  if(boardMeet){
-    const text = boardMeet.textContent;
-    const dateMatch = text.match(/(\d{1,2}\s+\w+\s+\d{4})/);
-    if(dateMatch){
-      const d = new Date(dateMatch[1]);
-      if(!isNaN(d) && d > Date.now()){
-        info.nextEarnings = d;
-        info.earningsDaysAway = Math.ceil((d - Date.now()) / (1000*60*60*24));
-      }
+  // Screener sometimes has upcoming events text
+  const allText = doc.body?.textContent || '';
+  const boardMatch = allText.match(/board\s*meeting[^.]*?(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4})/i);
+  if(boardMatch){
+    const d = new Date(boardMatch[1]);
+    if(!isNaN(d) && d > Date.now()){
+      info.nextEarnings = d;
+      info.earningsDaysAway = Math.ceil((d - Date.now()) / (1000*60*60*24));
     }
   }
 
   if(!q5.length) return null;
   return { info, quarters: q5 };
+}
 
   // PE for each quarter (using current price / annualized EPS)
   if(quarters.length >= 4){
