@@ -6,11 +6,11 @@
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     ✦  T R A D E   T H E   P U L S E  ✦
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    MPS v3.0 — Market Pulse Score Engine
+    MPS v3.1 — Market Pulse Score Engine
     By Dr. Rahul Ware
 ================================================================================
 
-MPS (Market Pulse Score) Calculation Engine v3.0
+MPS (Market Pulse Score) Calculation Engine v3.1
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TradEdge Command Center — Unified Market Health Scoring System
 
@@ -27,12 +27,16 @@ Update: Daily EOD (~4:15 PM IST via GitHub Actions)
   6. Momentum    (13%) — RSI Breadth (% stocks with RSI > 50)
   7. Volatility  (12%) — ATR Breadth (% stocks with ATR% > 4%) [INVERSE]
 
-5 Smart Modifiers:
-  - Exhaustion Penalty    (RSI > 70 overheating)
-  - Persistence Boost     (21-day structural bull streak)
-  - Divergence Warning    (Nifty new high + falling breadth)
-  - FII Flow Warning      (5+ day consecutive FII selling)
-  - Warning Day           (3+ pillars scoring below 40% of max)
+9 Smart Modifiers:
+  1. Exhaustion Penalty    (RSI > 70 overheating)
+  2. Persistence Boost     (21-day structural bull streak)
+  3. Divergence Warning    (Nifty new high + falling breadth)
+  4. FII Flow Warning      (5+ day consecutive FII selling)
+  5. Warning Day           (3+ pillars scoring below 40% of max)
+  6. Volatility Regime     (ATR Breadth calm/danger/panic)
+  7. Crude Oil Stress      (Brent crude price impact)         ★ NEW v3.1
+  8. Global Yield Pressure (US 10Y yield EM impact)           ★ NEW v3.1
+  9. Rupee Stress          (USD/INR 20-day rate of change)    ★ NEW v3.1
 
 4 Daily States:
   - NORMAL        — Trend is healthy, trade your plan
@@ -44,6 +48,16 @@ Update: Daily EOD (~4:15 PM IST via GitHub Actions)
   - ATR Breadth < 20%   → +5 pts (calm = high confidence)
   - ATR Breadth > 30%   → -10 pts (erratic = danger)
   - ATR Breadth > 50%   → -15 pts (panic/capitulation)
+
+Changelog v3.1 (from v3.0):
+  - Added Modifier 7: Crude Oil Stress (Brent price impact on India)
+  - Added Modifier 8: Global Yield Pressure (US 10Y yield EM impact)
+  - Added Modifier 9: Rupee Stress (USD/INR 20-day rate of change)
+  - RawMarketData: added brent_crude, us10y_yield, usd_inr fields
+  - calculate_mps: added usd_inr_20d_ago parameter
+  - MPSResult: added macro_summary field
+  - 21 daily data inputs (was 18), 9 modifiers (was 6)
+  - Version bumped to 3.1
 
 Changelog v3.0 (from v2.0):
   - Structural/Breadth weights reduced 25% → 18% each
@@ -72,7 +86,7 @@ from typing import Optional, List
 # =============================================================================
 
 def print_banner(animate=True):
-    """Print the animated TradEdge MPS v3 banner."""
+    """Print the animated TradEdge MPS v3.1 banner."""
     CYAN = "\033[96m"
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
@@ -91,7 +105,7 @@ def print_banner(animate=True):
     
     slogan_text = "✦  T R A D E   T H E   P U L S E  ✦"
     credit_text = "By Dr. Rahul Ware"
-    version_text = "MPS v3.0 — Market Pulse Score Engine"
+    version_text = "MPS v3.1 — Market Pulse Score Engine"
     
     print(logo)
     print(border)
@@ -130,7 +144,7 @@ def print_banner(animate=True):
 
 @dataclass
 class RawMarketData:
-    """Raw inputs fetched from Chartink / NSE daily — 18 data points."""
+    """Raw inputs fetched from Chartink / NSE / Yahoo Finance daily — 21 data points."""
     date: str                          # YYYY-MM-DD
 
     # Structural (from Chartink)
@@ -173,6 +187,11 @@ class RawMarketData:
     # FII flow (from NSE / moneycontrol)
     fii_net_buy_crores: float = 0.0    # negative = selling
 
+    # Macro — Global (from Yahoo Finance via yfinance)    ★ NEW v3.1
+    brent_crude: float = 0.0               # Brent crude oil price in USD
+    us10y_yield: float = 0.0               # US 10-Year Treasury yield %
+    usd_inr: float = 0.0                   # USD/INR exchange rate
+
 
 @dataclass
 class PillarScore:
@@ -197,7 +216,7 @@ class ModifierResult:
 
 @dataclass
 class MPSResult:
-    """Final MPS v3 output for the day."""
+    """Final MPS v3.1 output for the day."""
     date: str
     version: str
     pillar_scores: list
@@ -209,13 +228,14 @@ class MPSResult:
     zone_emoji: str
     zone_action: str
     risk_per_trade: str
-    state: str                           # ★ NEW v3
-    state_message: str                   # ★ NEW v3
-    burst_ratio: float                   # ★ NEW v3
-    burst_label: str                     # ★ NEW v3
-    rsi_breadth_pct: float               # ★ NEW v3
-    atr_breadth_pct: float               # ★ NEW v3
-    atr_regime: str                      # ★ NEW v3
+    state: str
+    state_message: str
+    burst_ratio: float
+    burst_label: str
+    rsi_breadth_pct: float
+    atr_breadth_pct: float
+    atr_regime: str
+    macro_summary: str = ""                  # ★ NEW v3.1
 
 
 # =============================================================================
@@ -261,7 +281,7 @@ def score_breadth_composite(pct_above_50sma: float, ad_ratio: float) -> tuple:
 
 def score_spark_composite(stocks_up_4pct: int, burst_gainers: int, burst_losers: int) -> tuple:
     """
-    Pillar 3: Spark (13% weight) — Composite.  ★ UPDATED v3
+    Pillar 3: Spark (13% weight) — Composite.
     60% Stockbee 4% count + 40% Burst Ratio (4.5% gainers/losers).
     Returns: (composite_score, stockbee_score, burst_score, burst_ratio)
     """
@@ -313,7 +333,7 @@ def score_sentiment(vix: float, pcr: float) -> tuple:
 
 def score_momentum(pct_rsi_above_50: float) -> float:
     """
-    Pillar 6: Momentum / RSI Breadth (13% weight).  ★ NEW v3
+    Pillar 6: Momentum / RSI Breadth (13% weight).
     % of Nifty 500 with RSI(14) > 50.
     Linear 0–100 mapping.
     """
@@ -322,7 +342,7 @@ def score_momentum(pct_rsi_above_50: float) -> float:
 
 def score_volatility(pct_atr_above_4: float) -> tuple:
     """
-    Pillar 7: Volatility / ATR Breadth (12% weight).  ★ NEW v3
+    Pillar 7: Volatility / ATR Breadth (12% weight).
     INVERSE scoring — lower ATR breadth = calmer = better for swing trading.
     Returns: (score, regime_label)
     """
@@ -446,7 +466,7 @@ def check_fii_flow_warning(fii_net_consecutive_sell_days: int,
 
 def check_warning_day(pillar_scores: list) -> ModifierResult:
     """
-    Modifier 5: Warning Day.  ★ NEW v3
+    Modifier 5: Warning Day.
     When 3+ pillars score below 40% of their maximum → -10 points.
     """
     pillar_maxes = {
@@ -470,7 +490,7 @@ def check_warning_day(pillar_scores: list) -> ModifierResult:
 
 def check_volatility_regime(atr_breadth_pct: float) -> ModifierResult:
     """
-    Modifier 6: Volatility Regime.  ★ NEW v3
+    Modifier 6: Volatility Regime.
     ATR Breadth-based market calm/stress assessment.
     """
     if atr_breadth_pct > 50:
@@ -488,7 +508,96 @@ def check_volatility_regime(atr_breadth_pct: float) -> ModifierResult:
 
 
 # =============================================================================
-# 4. STATE DETERMINATION  ★ NEW v3
+# 3b. MACRO MODIFIERS  ★ NEW v3.1
+# =============================================================================
+
+def check_crude_oil_stress(brent_price: float) -> ModifierResult:
+    """
+    Modifier 7: Crude Oil Stress.  ★ NEW v3.1
+    India imports ~85% crude. High oil = imported inflation + margin compression.
+    """
+    if brent_price <= 0:
+        return ModifierResult("Crude Oil Stress", False, 0.0,
+                              "Crude data unavailable")
+    
+    if brent_price > 110:
+        return ModifierResult("Crude Oil Stress", True, -8.0,
+                              f"Brent ${brent_price:.1f} — emergency level, exit cyclicals")
+    elif brent_price > 95:
+        return ModifierResult("Crude Oil Stress", True, -5.0,
+                              f"Brent ${brent_price:.1f} — high stress, imported inflation risk")
+    elif brent_price < 65:
+        return ModifierResult("Crude Oil Stress", True, +3.0,
+                              f"Brent ${brent_price:.1f} — tailwind for India, lower input costs")
+    elif brent_price < 75:
+        return ModifierResult("Crude Oil Stress", True, +2.0,
+                              f"Brent ${brent_price:.1f} — comfortable zone, margin expansion")
+    else:
+        return ModifierResult("Crude Oil Stress", False, 0.0,
+                              f"Brent ${brent_price:.1f} — neutral range ($75-$95)")
+
+
+def check_global_yield_pressure(us10y: float) -> ModifierResult:
+    """
+    Modifier 8: Global Yield Pressure.  ★ NEW v3.1
+    Rising US yields pull FII money out of emerging markets.
+    """
+    if us10y <= 0:
+        return ModifierResult("Global Yield Pressure", False, 0.0,
+                              "US 10Y data unavailable")
+    
+    if us10y > 5.0:
+        return ModifierResult("Global Yield Pressure", True, -5.0,
+                              f"US 10Y {us10y:.2f}% — extreme EM pressure, FII exodus likely")
+    elif us10y > 4.25:
+        return ModifierResult("Global Yield Pressure", True, -3.0,
+                              f"US 10Y {us10y:.2f}% — gravity pulling capital to US")
+    elif us10y < 3.5:
+        return ModifierResult("Global Yield Pressure", True, +3.0,
+                              f"US 10Y {us10y:.2f}% — risk-on, FII inflows to EM")
+    elif us10y < 3.8:
+        return ModifierResult("Global Yield Pressure", True, +1.0,
+                              f"US 10Y {us10y:.2f}% — mild EM tailwind")
+    else:
+        return ModifierResult("Global Yield Pressure", False, 0.0,
+                              f"US 10Y {us10y:.2f}% — neutral range (3.8-4.25%)")
+
+
+def check_rupee_stress(usd_inr: float, usd_inr_20d_ago: float = 0.0) -> ModifierResult:
+    """
+    Modifier 9: Rupee Stress.  ★ NEW v3.1
+    Weak INR erodes FII returns and increases import costs.
+    Uses 20-day rate of change to detect acceleration.
+    """
+    if usd_inr <= 0:
+        return ModifierResult("Rupee Stress", False, 0.0,
+                              "USD/INR data unavailable")
+    
+    # Calculate 20-day depreciation rate
+    if usd_inr_20d_ago > 0:
+        depreciation_pct = ((usd_inr - usd_inr_20d_ago) / usd_inr_20d_ago) * 100
+    else:
+        depreciation_pct = 0.0
+    
+    if depreciation_pct > 3.0:
+        return ModifierResult("Rupee Stress", True, -5.0,
+                              f"INR ₹{usd_inr:.2f} — vertical spike ({depreciation_pct:+.1f}% in 20d), panic selling likely")
+    elif depreciation_pct > 2.0:
+        return ModifierResult("Rupee Stress", True, -3.0,
+                              f"INR ₹{usd_inr:.2f} — rapid weakening ({depreciation_pct:+.1f}% in 20d), FII headwind")
+    elif depreciation_pct < -1.0:
+        return ModifierResult("Rupee Stress", True, +2.0,
+                              f"INR ₹{usd_inr:.2f} — appreciating ({depreciation_pct:+.1f}% in 20d), FII confidence boost")
+    elif depreciation_pct < 0:
+        return ModifierResult("Rupee Stress", True, +1.0,
+                              f"INR ₹{usd_inr:.2f} — stable/strengthening ({depreciation_pct:+.1f}% in 20d)")
+    else:
+        return ModifierResult("Rupee Stress", False, 0.0,
+                              f"INR ₹{usd_inr:.2f} — stable ({depreciation_pct:+.1f}% in 20d)")
+
+
+# =============================================================================
+# 4. STATE DETERMINATION
 # =============================================================================
 
 def determine_state(modifiers: list, rsi_breadth_pct: float, structural_pct: float) -> tuple:
@@ -537,7 +646,7 @@ def classify_zone(score: float) -> tuple:
             "Hard Money Zone", "🟡",
             "Selective mean-reversion setups. Backtested edge exists at 0.5% risk. "
             "Tight stops, quick exits.",
-            "0.5% risk per trade"    # ★ UPDATED from 0.25% per backtest
+            "0.5% risk per trade"
         )
     else:
         return (
@@ -549,7 +658,31 @@ def classify_zone(score: float) -> tuple:
 
 
 # =============================================================================
-# 6. MAIN CALCULATION ENGINE
+# 6. MACRO SUMMARY BUILDER  ★ NEW v3.1
+# =============================================================================
+
+def build_macro_summary(modifiers: list) -> str:
+    """Build a human-readable macro summary from the 3 macro modifiers."""
+    macro_mods = [m for m in modifiers if m.name in (
+        "Crude Oil Stress", "Global Yield Pressure", "Rupee Stress"
+    )]
+    active = [m for m in macro_mods if m.triggered]
+    if not active:
+        return "Macro: All neutral — no global headwinds or tailwinds."
+    
+    total = sum(m.adjustment for m in active)
+    parts = []
+    for m in active:
+        sign = "+" if m.adjustment > 0 else ""
+        parts.append(f"{m.name} ({sign}{m.adjustment:.0f})")
+    
+    direction = "tailwind" if total > 0 else "headwind"
+    sign = "+" if total > 0 else ""
+    return f"Macro {direction} ({sign}{total:.0f}): {', '.join(parts)}"
+
+
+# =============================================================================
+# 7. MAIN CALCULATION ENGINE
 # =============================================================================
 
 def calculate_mps(
@@ -558,9 +691,10 @@ def calculate_mps(
     prev_pct_above_50sma: float = 0.0,
     fii_net_consecutive_sell_days: int = 0,
     fii_5day_net_crores: float = 0.0,
+    usd_inr_20d_ago: float = 0.0,          # ★ NEW v3.1
 ) -> MPSResult:
     """
-    Master function: takes raw market data and returns the full MPS v3 result.
+    Master function: takes raw market data and returns the full MPS v3.1 result.
     """
 
     # --- Calculate percentages ---
@@ -602,7 +736,7 @@ def calculate_mps(
         }
     ))
 
-    # P3: Spark — Composite (13%)  ★ UPDATED v3
+    # P3: Spark — Composite (13%)
     spark_comp, stockbee_sub, burst_sub, burst_ratio = score_spark_composite(
         data.stocks_up_4pct, data.burst_gainers_4_5pct, data.burst_losers_4_5pct
     )
@@ -638,14 +772,14 @@ def calculate_mps(
         sub_components={"vix_score": round(vix_sub, 1), "pcr_score": round(pcr_sub, 1)}
     ))
 
-    # P6: Momentum / RSI Breadth (13%)  ★ NEW v3
+    # P6: Momentum / RSI Breadth (13%)
     s6_raw = score_momentum(rsi_breadth_pct)
     pillars.append(PillarScore(
         "Momentum", rsi_breadth_pct, s6_raw, 0.13, s6_raw * 0.13,
         f"{rsi_breadth_pct:.1f}% of Nifty 500 with RSI(14) > 50"
     ))
 
-    # P7: Volatility / ATR Breadth (12%)  ★ NEW v3
+    # P7: Volatility / ATR Breadth (12%)
     s7_raw, atr_regime = score_volatility(atr_breadth_pct)
     pillars.append(PillarScore(
         "Volatility", atr_breadth_pct, s7_raw, 0.12, s7_raw * 0.12,
@@ -672,11 +806,21 @@ def calculate_mps(
     mod4 = check_fii_flow_warning(fii_net_consecutive_sell_days, fii_5day_net_crores)
     modifiers.append(mod4)
 
-    mod5 = check_warning_day(pillars)                    # ★ NEW v3
+    mod5 = check_warning_day(pillars)
     modifiers.append(mod5)
 
-    mod6 = check_volatility_regime(atr_breadth_pct)      # ★ NEW v3
+    mod6 = check_volatility_regime(atr_breadth_pct)
     modifiers.append(mod6)
+
+    # ★ NEW v3.1 — Macro modifiers
+    mod7 = check_crude_oil_stress(data.brent_crude)
+    modifiers.append(mod7)
+
+    mod8 = check_global_yield_pressure(data.us10y_yield)
+    modifiers.append(mod8)
+
+    mod9 = check_rupee_stress(data.usd_inr, usd_inr_20d_ago)
+    modifiers.append(mod9)
 
     total_modifier = sum(m.adjustment for m in modifiers)
 
@@ -686,12 +830,15 @@ def calculate_mps(
     # --- Zone classification ---
     zone_name, zone_emoji, zone_action, risk = classify_zone(final_score)
 
-    # --- Daily State ---  ★ NEW v3
+    # --- Daily State ---
     state, state_message = determine_state(modifiers, rsi_breadth_pct, pct_above_200sma)
+
+    # --- Macro Summary ---  ★ NEW v3.1
+    macro_summary = build_macro_summary(modifiers)
 
     return MPSResult(
         date=data.date,
-        version="3.0",
+        version="3.1",
         pillar_scores=[asdict(p) for p in pillars],
         base_score=round(base_score, 2),
         modifiers=[asdict(m) for m in modifiers],
@@ -708,15 +855,16 @@ def calculate_mps(
         rsi_breadth_pct=round(rsi_breadth_pct, 1),
         atr_breadth_pct=round(atr_breadth_pct, 1),
         atr_regime=atr_regime,
+        macro_summary=macro_summary,
     )
 
 
 # =============================================================================
-# 7. OUTPUT FORMATTERS
+# 8. OUTPUT FORMATTERS
 # =============================================================================
 
 def format_mps_report(result: MPSResult) -> str:
-    """Pretty-print the MPS v3 result for console/log output."""
+    """Pretty-print the MPS v3.1 result for console/log output."""
     lines = []
     lines.append("=" * 75)
     lines.append(f"  MPS COMMAND CENTER v{result.version} — {result.date}")
@@ -737,7 +885,7 @@ def format_mps_report(result: MPSResult) -> str:
     lines.append("")
 
     # Modifiers
-    lines.append("  SMART MODIFIERS (6 Modifiers)")
+    lines.append("  SMART MODIFIERS (9 Modifiers)")
     lines.append("  " + "─" * 65)
     for m in result.modifiers:
         status = "✅ ACTIVE" if m['triggered'] else "⬜ inactive"
@@ -748,6 +896,10 @@ def format_mps_report(result: MPSResult) -> str:
     lines.append(f"  {'Modifier Total':<22} {result.total_modifier:>36.2f}")
     lines.append("")
 
+    # Macro summary
+    lines.append(f"  {result.macro_summary}")
+    lines.append("")
+
     # State banner
     state_icons = {"NORMAL": "✦", "WARNING": "⚠️", "OVEREXTENDED": "🔥", "EXHAUSTED": "💀"}
     lines.append(f"  ┌{'─'*63}┐")
@@ -755,7 +907,9 @@ def format_mps_report(result: MPSResult) -> str:
     lines.append(f"  ├{'─'*63}┤")
     lines.append(f"  │  FINAL MPS: {result.final_score:6.2f}  {result.zone_emoji} {result.zone:<28s}│")
     lines.append(f"  │  Risk: {result.risk_per_trade:<51s}│")
-    lines.append(f"  │  Burst: {result.burst_ratio:.0f} [{result.burst_label}]  RSI: {result.rsi_breadth_pct:.1f}%  ATR: {result.atr_breadth_pct:.1f}% [{result.atr_regime}]{' '*(63-len(f'  Burst: {result.burst_ratio:.0f} [{result.burst_label}]  RSI: {result.rsi_breadth_pct:.1f}%  ATR: {result.atr_breadth_pct:.1f}% [{result.atr_regime}]'))}│")
+    burst_line = f"  Burst: {result.burst_ratio:.0f} [{result.burst_label}]  RSI: {result.rsi_breadth_pct:.1f}%  ATR: {result.atr_breadth_pct:.1f}% [{result.atr_regime}]"
+    pad = max(0, 63 - len(burst_line))
+    lines.append(f"  │{burst_line}{' ' * pad}│")
     lines.append(f"  └{'─'*63}┘")
     lines.append(f"  Action: {result.zone_action}")
     lines.append("")
@@ -764,12 +918,12 @@ def format_mps_report(result: MPSResult) -> str:
 
 
 def to_json(result: MPSResult) -> str:
-    """Export MPS v3 result as JSON (for GitHub Pages / mps_latest.json)."""
+    """Export MPS v3.1 result as JSON (for GitHub Pages / mps_latest.json)."""
     return json.dumps(asdict(result), indent=2, ensure_ascii=False)
 
 
 # =============================================================================
-# 8. DEMO / TEST SCENARIOS
+# 9. DEMO / TEST SCENARIOS
 # =============================================================================
 
 if __name__ == "__main__":
@@ -778,38 +932,43 @@ if __name__ == "__main__":
     print_banner(animate=True)
 
     # =========================================================================
-    # SCENARIO 1: Strong Bull Market Day (Easy Money)
+    # SCENARIO 1: Strong Bull Market Day (Easy Money) + Macro Tailwind
     # =========================================================================
-    print("\n📈 SCENARIO 1: Strong Bull Market Day")
+    print("\n📈 SCENARIO 1: Strong Bull + Macro Tailwind")
     bull_data = RawMarketData(
-        date="2026-03-14",
+        date="2026-03-15",
         stocks_above_200sma=340,
         stocks_above_50sma=310,
         advances=320, declines=150, unchanged=30,
         stocks_up_4pct=32,
-        burst_gainers_4_5pct=22, burst_losers_4_5pct=3,    # Strong burst
+        burst_gainers_4_5pct=22, burst_losers_4_5pct=3,
         new_52w_highs=85, new_52w_lows=12,
         india_vix=13.5, pcr=0.95,
-        stocks_rsi_above_50=342,                             # 68.4% RSI breadth
-        stocks_atr_pct_above_4=65,                           # 13% ATR — calm
+        stocks_rsi_above_50=342,
+        stocks_atr_pct_above_4=65,
         stocks_rsi_above_70=45,
         nifty_at_52w_high=False,
         fii_net_buy_crores=1250.0,
+        # ★ Macro v3.1
+        brent_crude=72.5,       # Low crude = tailwind
+        us10y_yield=3.6,        # Low yield = mild tailwind
+        usd_inr=85.20,          # Stable INR
     )
     result1 = calculate_mps(
         bull_data,
         structural_bull_streak_days=35,
         fii_net_consecutive_sell_days=0,
         fii_5day_net_crores=3200.0,
+        usd_inr_20d_ago=85.50,  # INR appreciated slightly
     )
     print(format_mps_report(result1))
 
     # =========================================================================
-    # SCENARIO 2: Warning Day — 3+ pillars weak
+    # SCENARIO 2: Warning Day + Macro Headwind
     # =========================================================================
-    print("\n⚠️ SCENARIO 2: Warning Day")
+    print("\n⚠️ SCENARIO 2: Warning Day + Macro Headwind")
     warning_data = RawMarketData(
-        date="2026-03-14",
+        date="2026-03-15",
         stocks_above_200sma=218,
         stocks_above_50sma=165,
         advances=680, declines=1320, unchanged=0,
@@ -818,25 +977,30 @@ if __name__ == "__main__":
         new_52w_highs=8, new_52w_lows=38,
         india_vix=22.8, pcr=0.72,
         stocks_rsi_above_50=191,
-        stocks_atr_pct_above_4=160,                          # 32% — danger
+        stocks_atr_pct_above_4=160,
         stocks_rsi_above_70=12,
         nifty_at_52w_high=False,
         fii_net_buy_crores=-3200.0,
+        # ★ Macro v3.1 — all headwinds
+        brent_crude=102.0,      # High crude = stress
+        us10y_yield=4.8,        # High yield = EM pressure
+        usd_inr=88.50,          # Weak rupee
     )
     result2 = calculate_mps(
         warning_data,
         structural_bull_streak_days=0,
         fii_net_consecutive_sell_days=8,
         fii_5day_net_crores=-12000.0,
+        usd_inr_20d_ago=86.20,  # INR depreciated ~2.7%
     )
     print(format_mps_report(result2))
 
     # =========================================================================
-    # SCENARIO 3: Bear Market / Exhausted State
+    # SCENARIO 3: Bear Market / Exhausted + Macro Neutral
     # =========================================================================
-    print("\n🔴 SCENARIO 3: Bear Market — Exhausted")
+    print("\n🔴 SCENARIO 3: Bear Market + Macro Neutral")
     bear_data = RawMarketData(
-        date="2026-03-14",
+        date="2026-03-15",
         stocks_above_200sma=100,
         stocks_above_50sma=75,
         advances=80, declines=390, unchanged=30,
@@ -844,46 +1008,24 @@ if __name__ == "__main__":
         burst_gainers_4_5pct=1, burst_losers_4_5pct=19,
         new_52w_highs=5, new_52w_lows=120,
         india_vix=32.0, pcr=1.8,
-        stocks_rsi_above_50=74,                              # 14.8% — very low
-        stocks_atr_pct_above_4=220,                          # 44% — panic
+        stocks_rsi_above_50=74,
+        stocks_atr_pct_above_4=220,
         stocks_rsi_above_70=3,
         nifty_at_52w_high=False,
         fii_net_buy_crores=-5800.0,
+        # ★ Macro v3.1
+        brent_crude=85.0,       # Neutral
+        us10y_yield=4.0,        # Neutral
+        usd_inr=86.50,          # Neutral
     )
     result3 = calculate_mps(
         bear_data,
         structural_bull_streak_days=0,
         fii_net_consecutive_sell_days=12,
         fii_5day_net_crores=-25000.0,
+        usd_inr_20d_ago=86.30,
     )
     print(format_mps_report(result3))
-
-    # =========================================================================
-    # SCENARIO 4: Overextended — everything too good
-    # =========================================================================
-    print("\n🔥 SCENARIO 4: Overextended Rally")
-    overext_data = RawMarketData(
-        date="2026-03-14",
-        stocks_above_200sma=385,
-        stocks_above_50sma=362,
-        advances=1450, declines=550, unchanged=0,
-        stocks_up_4pct=35,
-        burst_gainers_4_5pct=42, burst_losers_4_5pct=2,
-        new_52w_highs=68, new_52w_lows=2,
-        india_vix=11.2, pcr=1.42,
-        stocks_rsi_above_50=421,                             # 84.2% — high!
-        stocks_atr_pct_above_4=50,                           # 10% — squeeze
-        stocks_rsi_above_70=185,                             # 37% — exhausting
-        nifty_at_52w_high=False,
-        fii_net_buy_crores=4200.0,
-    )
-    result4 = calculate_mps(
-        overext_data,
-        structural_bull_streak_days=80,
-        fii_net_consecutive_sell_days=0,
-        fii_5day_net_crores=15000.0,
-    )
-    print(format_mps_report(result4))
 
     # --- Print JSON for Scenario 1 ---
     print("\n📋 JSON OUTPUT (Scenario 1 — for GitHub Pages):")
