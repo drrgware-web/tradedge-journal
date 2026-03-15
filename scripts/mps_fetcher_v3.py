@@ -1,21 +1,25 @@
 """
 ================================================================================
-MPS Data Fetcher v3.0 — Automated EOD Data Collection
+MPS Data Fetcher v3.1 — Automated EOD Data Collection
 ================================================================================
-Fetches all 18 MPS data points from Chartink + NSE India, runs the MPS v3
-engine, and outputs the result as JSON.
+Fetches all 21 MPS data points from Chartink + NSE India + Yahoo Finance,
+runs the MPS v3.1 engine, and outputs the result as JSON.
 
 Data Sources:
-  - Chartink (7 scanners):
+  - Chartink (8 scanners):
       1. above_200sma     — Structural pillar
       2. above_50sma      — Breadth pillar (positional)
       3. spark_4pct        — Spark pillar (Stockbee 4% breakout)
       4. rsi_above_70      — Exhaustion modifier
-      5. rsi_above_50      — Momentum pillar (RSI Breadth)       ★ NEW v3
-      6. burst_4_5pct_gainers — Spark pillar (Burst Ratio)       ★ NEW v3
-      7. burst_4_5pct_losers  — Spark pillar (Burst Ratio)       ★ NEW v3
-      8. atr_pct_above_4   — Volatility pillar (ATR Breadth)     ★ NEW v3
+      5. rsi_above_50      — Momentum pillar (RSI Breadth)
+      6. burst_4_5pct_gainers — Spark pillar (Burst Ratio)
+      7. burst_4_5pct_losers  — Spark pillar (Burst Ratio)
+      8. atr_pct_above_4   — Volatility pillar (ATR Breadth)
   - NSE India: A/D data, 52W Highs/Lows, VIX, PCR, FII flows
+  - Yahoo Finance (3 macro indicators):                        ★ NEW v3.1
+      1. Brent Crude Oil (BZ=F)
+      2. US 10-Year Treasury Yield (^TNX)
+      3. USD/INR Exchange Rate (USDINR=X) — current + 20d ago
 
 Usage:
   python mps_fetcher_v3.py                    # Fetch + calculate + print JSON
@@ -23,7 +27,7 @@ Usage:
   python mps_fetcher_v3.py --dry-run          # Use sample data (no network)
 
 Requirements:
-  pip install requests beautifulsoup4
+  pip install requests beautifulsoup4 yfinance
 ================================================================================
 """
 
@@ -39,7 +43,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-# Import the MPS v3 engine (must be in same directory or PYTHONPATH)
+# Import the MPS v3.1 engine (must be in same directory or PYTHONPATH)
 from mps_engine_v3 import RawMarketData, calculate_mps, format_mps_report, to_json
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -54,7 +58,7 @@ log = logging.getLogger("mps_fetcher")
 CHARTINK_URL = "https://chartink.com/screener/process"
 CHARTINK_BASE = "https://chartink.com/screener/"
 
-# Scanner queries — 7 scanners for v3 (was 4 in v2)
+# Scanner queries — 8 scanners for v3
 SCANNERS = {
     # ── Existing (v2) ──
     "above_200sma": {
@@ -158,8 +162,8 @@ def fetch_chartink_count(session, scanner_key):
 
 
 def fetch_all_chartink():
-    """Fetch all 7 Chartink scanners (was 4 in v2)."""
-    log.info("═══ CHARTINK DATA (7 scanners) ═══")
+    """Fetch all 8 Chartink scanners."""
+    log.info("═══ CHARTINK DATA (8 scanners) ═══")
     session = get_chartink_session()
     results = {}
 
@@ -172,7 +176,7 @@ def fetch_all_chartink():
 
 
 # =============================================================================
-# NSE FETCHER (unchanged from v2)
+# NSE FETCHER
 # =============================================================================
 
 def get_nse_session():
@@ -389,6 +393,64 @@ def fetch_all_nse():
 
 
 # =============================================================================
+# MACRO DATA FETCHER (Yahoo Finance)  ★ NEW v3.1
+# =============================================================================
+
+def fetch_macro_data():
+    """Fetch macro indicators from Yahoo Finance: Brent Crude, US 10Y, USD/INR."""
+    import yfinance as yf
+    
+    log.info("═══ MACRO DATA (Yahoo Finance) ═══")
+    macro = {
+        "brent_crude": 0.0,
+        "us10y_yield": 0.0,
+        "usd_inr": 0.0,
+        "usd_inr_20d_ago": 0.0,
+    }
+
+    # Brent Crude Oil
+    try:
+        oil = yf.Ticker("BZ=F")  # Brent Crude futures
+        hist = oil.history(period="5d")
+        if not hist.empty:
+            macro["brent_crude"] = round(float(hist['Close'].iloc[-1]), 2)
+            log.info(f"  ✓ Brent Crude: ${macro['brent_crude']}")
+        else:
+            log.warning("  ✗ Brent Crude: no data")
+    except Exception as e:
+        log.error(f"  ✗ Brent Crude: {e}")
+
+    # US 10-Year Treasury Yield
+    try:
+        tnx = yf.Ticker("^TNX")
+        hist = tnx.history(period="5d")
+        if not hist.empty:
+            macro["us10y_yield"] = round(float(hist['Close'].iloc[-1]), 2)
+            log.info(f"  ✓ US 10Y Yield: {macro['us10y_yield']}%")
+        else:
+            log.warning("  ✗ US 10Y Yield: no data")
+    except Exception as e:
+        log.error(f"  ✗ US 10Y Yield: {e}")
+
+    # USD/INR — current + 20 days ago (for rate of change)
+    try:
+        fx = yf.Ticker("USDINR=X")
+        hist = fx.history(period="2mo")
+        if not hist.empty and len(hist) >= 2:
+            macro["usd_inr"] = round(float(hist['Close'].iloc[-1]), 2)
+            # Get ~20 trading days ago
+            lookback = min(20, len(hist) - 1)
+            macro["usd_inr_20d_ago"] = round(float(hist['Close'].iloc[-lookback - 1]), 2)
+            log.info(f"  ✓ USD/INR: ₹{macro['usd_inr']} (20d ago: ₹{macro['usd_inr_20d_ago']})")
+        else:
+            log.warning("  ✗ USD/INR: no data")
+    except Exception as e:
+        log.error(f"  ✗ USD/INR: {e}")
+
+    return macro
+
+
+# =============================================================================
 # STATE MANAGEMENT (streaks + history)
 # =============================================================================
 
@@ -458,10 +520,10 @@ def update_state(state, raw_data, fii_net_today, mps_result):
 # =============================================================================
 
 def fetch_and_calculate(dry_run=False):
-    """Main function: fetch data, calculate MPS v3, return result."""
+    """Main function: fetch data, calculate MPS v3.1, return result."""
     today = datetime.now().strftime("%Y-%m-%d")
     log.info(f"╔══════════════════════════════════════════╗")
-    log.info(f"║  MPS v3 DAILY CALCULATION — {today}  ║")
+    log.info(f"║  MPS v3.1 DAILY CALCULATION — {today} ║")
     log.info(f"╚══════════════════════════════════════════╝")
 
     # Load state
@@ -474,7 +536,6 @@ def fetch_and_calculate(dry_run=False):
             "above_50sma": 285,
             "spark_4pct": 18,
             "rsi_above_70": 45,
-            # ★ NEW v3 scanners
             "rsi_above_50": 342,
             "burst_4_5pct_gainers": 22,
             "burst_4_5pct_losers": 3,
@@ -486,8 +547,15 @@ def fetch_and_calculate(dry_run=False):
             "vix": 13.2, "pcr": 1.18,
             "fii_net": 2100, "nifty_52w_high": False,
         }
+        # ★ NEW v3.1 — sample macro data
+        macro = {
+            "brent_crude": 82.5,
+            "us10y_yield": 4.1,
+            "usd_inr": 85.50,
+            "usd_inr_20d_ago": 85.20,
+        }
     else:
-        # Fetch from Chartink (7 scanners)
+        # Fetch from Chartink (8 scanners)
         chartink = fetch_all_chartink()
         if any(v is None for v in chartink.values()):
             log.error("Some Chartink data failed to fetch. Aborting.")
@@ -500,6 +568,9 @@ def fetch_and_calculate(dry_run=False):
             log.error("Critical NSE data missing. Aborting.")
             return None, None
 
+        # Fetch macro data from Yahoo Finance  ★ NEW v3.1
+        macro = fetch_macro_data()
+
     # Handle None values with safe defaults
     nse_fii = nse.get("fii_net") or 0
     nse_highs = nse.get("highs_52") or 0
@@ -510,7 +581,7 @@ def fetch_and_calculate(dry_run=False):
     nse_vix = nse.get("vix") or 15.0
     nse_pcr = nse.get("pcr") or 1.0
 
-    # Build RawMarketData — v3 with 18 data points
+    # Build RawMarketData — v3.1 with 21 data points
     raw = RawMarketData(
         date=today,
         # Structural
@@ -522,7 +593,7 @@ def fetch_and_calculate(dry_run=False):
         unchanged=nse_unchanged,
         # Spark — Stockbee
         stocks_up_4pct=chartink["spark_4pct"],
-        # Spark — Burst Ratio                          ★ NEW v3
+        # Spark — Burst Ratio
         burst_gainers_4_5pct=chartink["burst_4_5pct_gainers"],
         burst_losers_4_5pct=chartink["burst_4_5pct_losers"],
         # Quality
@@ -531,15 +602,19 @@ def fetch_and_calculate(dry_run=False):
         # Sentiment
         india_vix=nse_vix,
         pcr=nse_pcr,
-        # Momentum — RSI Breadth                       ★ NEW v3
+        # Momentum — RSI Breadth
         stocks_rsi_above_50=chartink["rsi_above_50"],
-        # Volatility — ATR Breadth                     ★ NEW v3
+        # Volatility — ATR Breadth
         stocks_atr_pct_above_4=chartink["atr_pct_above_4"],
         # Modifiers
         stocks_rsi_above_70=chartink["rsi_above_70"],
         nifty_at_52w_high=nse.get("nifty_52w_high", False),
         # FII
         fii_net_buy_crores=nse_fii,
+        # Macro  ★ NEW v3.1
+        brent_crude=macro["brent_crude"],
+        us10y_yield=macro["us10y_yield"],
+        usd_inr=macro["usd_inr"],
     )
 
     # Calculate FII 5-day net
@@ -547,14 +622,15 @@ def fetch_and_calculate(dry_run=False):
     fii_5day_with_today = fii_5day + [nse_fii]
     fii_5day_net = sum(fii_5day_with_today[-5:])
 
-    # Calculate MPS v3
-    log.info("═══ CALCULATING MPS v3 ═══")
+    # Calculate MPS v3.1
+    log.info("═══ CALCULATING MPS v3.1 ═══")
     result = calculate_mps(
         raw,
         structural_bull_streak_days=state.get("structural_bull_streak", 0),
         prev_pct_above_50sma=state.get("prev_pct_above_50sma", 50.0),
         fii_net_consecutive_sell_days=state.get("fii_consecutive_sell_days", 0),
         fii_5day_net_crores=fii_5day_net,
+        usd_inr_20d_ago=macro["usd_inr_20d_ago"],     # ★ NEW v3.1
     )
 
     # Print report
@@ -565,7 +641,7 @@ def fetch_and_calculate(dry_run=False):
     save_state(state)
 
     # =========================================================================
-    # Build output JSON — v3 schema
+    # Build output JSON — v3.1 schema
     # =========================================================================
     output = {
         "current": json.loads(to_json(result)),
@@ -576,7 +652,6 @@ def fetch_and_calculate(dry_run=False):
                 "above_50sma": chartink["above_50sma"],
                 "spark_4pct": chartink["spark_4pct"],
                 "rsi_above_70": chartink["rsi_above_70"],
-                # ★ NEW v3 raw inputs
                 "rsi_above_50": chartink["rsi_above_50"],
                 "burst_4_5pct_gainers": chartink["burst_4_5pct_gainers"],
                 "burst_4_5pct_losers": chartink["burst_4_5pct_losers"],
@@ -592,6 +667,12 @@ def fetch_and_calculate(dry_run=False):
                 "fii_net": nse_fii,
                 "nifty_52w_high": nse.get("nifty_52w_high", False),
             },
+            "macro": {                                      # ★ NEW v3.1
+                "brent_crude": macro["brent_crude"],
+                "us10y_yield": macro["us10y_yield"],
+                "usd_inr": macro["usd_inr"],
+                "usd_inr_20d_ago": macro["usd_inr_20d_ago"],
+            },
         },
         "state": {
             "structural_bull_streak": state["structural_bull_streak"],
@@ -599,12 +680,12 @@ def fetch_and_calculate(dry_run=False):
             "fii_5day_net": fii_5day_net,
         },
         "metadata": {
-            "version": "3.0",
+            "version": "3.1",
             "generated_at": datetime.now().isoformat(),
             "universe": "Nifty 500",
             "pillars": 7,
-            "modifiers": 6,
-            "daily_inputs": 18,
+            "modifiers": 9,
+            "daily_inputs": 21,
         },
     }
 
@@ -614,7 +695,7 @@ def fetch_and_calculate(dry_run=False):
 def main():
     global STATE_FILE
 
-    parser = argparse.ArgumentParser(description="MPS v3 Daily Fetcher & Calculator")
+    parser = argparse.ArgumentParser(description="MPS v3.1 Daily Fetcher & Calculator")
     parser.add_argument("--output", "-o", type=str, default=None, help="Output JSON file path")
     parser.add_argument("--dry-run", action="store_true", help="Use sample data (no network)")
     parser.add_argument("--state-file", type=str, default=STATE_FILE, help="State file path")
@@ -641,7 +722,7 @@ def main():
         print("=" * 60)
         print(json_str)
 
-    log.info(f"✅ MPS v3.0 — Final Score: {result.final_score:.2f} — {result.zone} — State: {result.state}")
+    log.info(f"✅ MPS v3.1 — Final Score: {result.final_score:.2f} — {result.zone} — State: {result.state}")
 
 
 if __name__ == "__main__":
