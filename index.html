@@ -6825,19 +6825,7 @@ setTimeout(() => {
   setPbmMode(savedMode);
 }, 1200);
 
-// ── RRM Position Intelligence boot (render from cache only, no fetch) ──
-setTimeout(() => {
-  if(trades.filter(t=>t.status==='Open'||t.status==='Partial').length > 0){
-    console.log('[RRM] Boot: rendering from cache (no fetch)');
-    // Render cached fundamentals on dashboard widget if available
-    const cachedFund = {};
-    trades.filter(t=>t.status==='Open'||t.status==='Partial').forEach(t=>{
-      const sym = t.symbol.toUpperCase();
-      if(_fundCache[sym]?.data) cachedFund[sym] = _fundCache[sym].data;
-    });
-    if(Object.keys(cachedFund).length) fundRenderAll(cachedFund);
-  }
-}, 3000);
+// ── RRM Position Intelligence: no auto-run on boot. User clicks Refresh. ──
 
 setTimeout(() => {
   // Supabase cloud sync (only if enabled)
@@ -7272,8 +7260,8 @@ const RRM_BASE = 'https://drrgware-web.github.io/tradedge-journal/data/';
 const RRM_DATA_URL = RRM_BASE + 'rrm_data.json';
 let _rrmRawData = null;  // Full rrm_data.json
 let _rrmStockIndex = { daily:{}, weekly:{} }; // Flat lookup: symbol → item
-let _rrmCache = JSON.parse(localStorage.getItem('te_rrm_cache') || '{}');
-let _rrmHistory = JSON.parse(localStorage.getItem('te_rrm_history') || '[]');
+let _rrmCache = {}; try { _rrmCache = JSON.parse(localStorage.getItem('te_rrm_cache') || '{}'); } catch(e){}
+let _rrmHistory = []; try { _rrmHistory = JSON.parse(localStorage.getItem('te_rrm_history') || '[]'); } catch(e){}
 let _rrmFilter = 'all';
 let _rrmResults = [];
 let _rrmBenchmark = '^NSEI'; // default
@@ -7955,19 +7943,14 @@ async function fundEODScan(){
 function initRRM(){
   rrmRequestNotifPermission();
   rrmStartAutoRefresh();
-  // Render from cache if available, user clicks Refresh for fresh data
-  const cachedFund = {};
-  trades.filter(t=>t.status==='Open'||t.status==='Partial').forEach(t=>{
-    const sym = t.symbol.toUpperCase();
-    if(_fundCache[sym]?.data) cachedFund[sym] = _fundCache[sym].data;
-  });
-  if(Object.keys(cachedFund).length) fundRenderAll(cachedFund);
+  // User clicks ↻ Refresh for data. No auto-fetch.
 }
 // ══════════════════════════════════════════════════
 // FUNDAMENTAL SCORECARD ENGINE
 // ══════════════════════════════════════════════════
 
-let _fundCache = JSON.parse(localStorage.getItem('te_fund_cache') || '{}');
+let _fundCache = {};
+try { _fundCache = JSON.parse(localStorage.getItem('te_fund_cache') || '{}'); } catch(e){ _fundCache = {}; }
 const FUND_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (quarterly data rarely changes)
 const FUND_PE_THRESHOLD = 40; // Alert if PE crosses this
 const FUND_PROXIES = [
@@ -8114,15 +8097,6 @@ function fundParseScreener(html, symbol){
 
   if(!q5.length) return null;
   return { info, quarters: q5 };
-}
-
-  // PE for each quarter (using current price / annualized EPS)
-  if(quarters.length >= 4){
-    const ttmEps = quarters.slice(0, 4).reduce((s, q) => s + (q.eps || 0), 0);
-    if(ttmEps > 0) info.ttmPE = Math.round(info.currentPrice / ttmEps * 10) / 10;
-  }
-
-  return { info, quarters };
 }
 
 // ── Fetch fundamentals for all open positions ──
