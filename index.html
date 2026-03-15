@@ -1974,6 +1974,7 @@ select.fi{cursor:pointer}
 
     <!-- ══ RRM POSITION INTELLIGENCE ══ -->
     <div class="page" id="page-rrm">
+      <div style="max-width:900px;margin:0 auto">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
         <div>
           <div style="font-size:18px;font-weight:700;color:var(--t1)">🎯 RRM Position Intelligence</div>
@@ -2089,6 +2090,7 @@ select.fi{cursor:pointer}
         </div>
       </div>
 
+      </div><!-- /max-width -->
     </div>
 
   </div><!-- /content -->
@@ -7795,26 +7797,34 @@ function rrmRenderPage(){
     const pnlC = pnl>=0?'var(--g)':'var(--r)';
     const borderC = r.meta?.color || 'var(--b1)';
     const secName = r.dailyQuad?.sector || r.weeklyQuad?.sector || '';
-    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--b1);border-left:3px solid ${borderC}">
-      <div style="min-width:90px">
-        <div style="font-size:13px;font-weight:800;color:var(--t1)">${r.symbol}</div>
-        <div style="font-size:10px;color:var(--t3)">${r.trade.side} · ${r.trade.status}</div>
-        ${secName?`<div style="font-size:9px;color:var(--t4);margin-top:1px">${secName}</div>`:''}
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${pnlC};font-weight:700;margin-top:2px">${pnl>=0?'+':''}₹${Math.abs(Math.round(pnl)).toLocaleString('en-IN')}</div>
+    const dC = {Leading:'#22c55e',Weakening:'#eab308',Improving:'#60a5fa',Lagging:'#f87171'}[r.dailyQuad?.name]||'var(--t4)';
+    const wC = {Leading:'#22c55e',Weakening:'#eab308',Improving:'#60a5fa',Lagging:'#f87171'}[r.weeklyQuad?.name]||'var(--t4)';
+    const src = r.dailyQuad?.source==='live'||r.weeklyQuad?.source==='live' ? '⚡' : '📦';
+    return `<div style="background:var(--bg2);border-radius:10px;border:1px solid var(--b1);border-left:3px solid ${borderC};padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-radius:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <span style="font-size:13px;font-weight:800;color:var(--t1)">${r.symbol}</span>
+          <span style="font-size:10px;color:var(--t3);margin-left:6px">${r.trade.side} · ${r.trade.status}</span>
+          ${secName?`<span style="font-size:9px;color:var(--t4);margin-left:6px">${secName}</span>`:''}
+        </div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${pnlC};font-weight:700">${pnl>=0?'+':''}₹${Math.abs(Math.round(pnl)).toLocaleString('en-IN')}</span>
       </div>
-      <div style="display:flex;gap:10px;flex:1;justify-content:center">
-        ${qBadge(r.dailyQuad,'Daily')}
-        ${qBadge(r.weeklyQuad,'Weekly')}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:9px;color:var(--t4)">${src}</span>
+          ${r.dailyQuad?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;background:${dC}18;color:${dC}">D: ${r.dailyQuad.name}</span>`:`<span style="font-size:10px;color:var(--t4)">D: —</span>`}
+          ${r.weeklyQuad?`<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;background:${wC}18;color:${wC}">W: ${r.weeklyQuad.name}</span>`:`<span style="font-size:10px;color:var(--t4)">W: —</span>`}
+          ${r.dailyQuad?`<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--t4)">R:${r.dailyQuad.ratio.toFixed(1)} M:${r.dailyQuad.momentum.toFixed(1)}</span>`:''}
+        </div>
+        <div style="text-align:right">
+          <span style="font-size:12px;font-weight:800;color:${r.meta?.color||'var(--t2)'}">${r.meta?.label||'—'}</span>
+        </div>
       </div>
-      <div style="min-width:110px;text-align:right">
-        <div style="font-size:12px;font-weight:800;color:${r.meta?.color||'var(--t2)'}">${r.meta?.label||'—'}</div>
-        <div style="font-size:10px;color:var(--t3);margin-top:3px;max-width:170px">${r.meta?.msg||''}</div>
-        ${r.sectorWarning?`<div style="font-size:9px;color:#f87171;margin-top:3px;font-weight:600">⚠ ${r.sectorWarning}</div>`:''}
-      </div>
+      ${r.sectorWarning?`<div style="font-size:9px;color:#f87171;font-weight:600">⚠ ${r.sectorWarning}</div>`:''}
     </div>`;
   }).join('');
 
-  container.innerHTML = rows;
+  container.innerHTML = `<div style="display:flex;flex-direction:column;gap:1px;background:var(--b1);border-radius:0">${rows}</div>`;
 
   // Render transition history
   rrmRenderHistory();
@@ -7962,7 +7972,6 @@ const FUND_PROXIES = [
 // ── Fetch Screener.in HTML page ──
 async function fundFetchScreener(symbol){
   const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
-  // Use own Cloudflare Worker as Screener.in proxy (reliable, no CORS issues)
   const workerUrl = localStorage.getItem('zd_worker_url') || '';
 
   if(workerUrl){
@@ -7973,155 +7982,51 @@ async function fundFetchScreener(symbol){
         signal: AbortSignal.timeout(15000),
       });
       if(r.ok){
-        const html = await r.text();
-        if(html.includes('Quarterly Results') || html.includes('quarterly-shp')) return html;
+        const data = await r.json();
+        if(data.quarters?.length) return data; // Already parsed JSON from worker
       }
     } catch(e){ console.warn('[FUND] Worker fetch failed for', sym, e.message); }
-  }
-
-  // Fallback: try public CORS proxies
-  const urls = [
-    `https://www.screener.in/company/${sym}/consolidated/`,
-    `https://www.screener.in/company/${sym}/`,
-  ];
-  for(const pageUrl of urls){
-    for(const proxy of FUND_PROXIES){
-      try {
-        const r = await fetch(proxy(pageUrl), { signal: AbortSignal.timeout(12000) });
-        if(!r.ok) continue;
-        const html = await r.text();
-        if(html.includes('Quarterly Results') || html.includes('quarterly-shp')) return html;
-      } catch(e){ continue; }
-    }
   }
   return null;
 }
 
-// ── Parse Screener.in HTML into structured data ──
-function fundParseScreener(html, symbol){
-  if(!html) return null;
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+// Worker returns pre-parsed JSON, so this just normalizes the format
+function fundParseScreener(data, symbol){
+  if(!data || !data.quarters?.length) return null;
 
-  // ── Company info from ratios list ──
-  const info = { name:'', sector:'', industry:'', mcapCr:0, pe:0, roe:0, roce:0, currentPrice:0, bookValue:0, faceValue:0, dividendYield:0 };
+  const info = {
+    name: data.info?.name || symbol,
+    sector: data.info?.sector || '',
+    industry: data.info?.industry || '',
+    mcapCr: data.info?.mcapCr || 0,
+    pe: data.info?.pe || 0,
+    ttmPE: data.info?.pe || 0,
+    roe: data.info?.roe || 0,
+    roce: data.info?.roce || 0,
+    currentPrice: data.info?.currentPrice || 0,
+    bookValue: data.info?.bookValue || 0,
+    faceValue: data.info?.faceValue || 0,
+    nextEarnings: null,
+    earningsDaysAway: null,
+  };
 
-  // Company name from <h1>
-  const h1 = doc.querySelector('h1');
-  info.name = h1?.textContent?.trim() || symbol;
+  const quarters = data.quarters.map(q => ({
+    label: q.label || '',
+    revenueCr: q.sales || 0,
+    revenue: (q.sales || 0) * 10000000,
+    operatingIncome: (q.opProfit || 0) * 10000000,
+    opm: q.opm || 0,
+    netIncome: (q.netProfit || 0) * 10000000,
+    eps: q.eps || 0,
+    epsYoY: q.epsYoY ?? null,
+    epsQoQ: q.epsQoQ ?? null,
+    salesYoY: q.salesYoY ?? null,
+    salesQoQ: q.salesQoQ ?? null,
+    opmYoY: q.opmYoY ?? null,
+    opmQoQ: q.opmQoQ ?? null,
+  }));
 
-  // Sector/Industry from links
-  doc.querySelectorAll('a').forEach(a => {
-    const href = a.getAttribute('href') || '';
-    if(href.includes('/sector/') && !info.sector) info.sector = a.textContent.trim();
-    if(href.includes('/industry/') && !info.industry) info.industry = a.textContent.trim();
-  });
-
-  // Top ratios: spans inside <li> elements
-  // Format: <li><span class="name">Market Cap</span><span class="value">₹ 80,150 Cr.</span></li>
-  const ratioLis = doc.querySelectorAll('#top-ratios li, .company-ratios li, .top-ratios li');
-  ratioLis.forEach(li => {
-    const spans = li.querySelectorAll('span');
-    if(spans.length < 2) return;
-    const name = spans[0].textContent.trim().toLowerCase();
-    const valText = spans[1].textContent.replace(/[₹,\s]/g,'').replace('Cr.','').replace('Cr','').replace('%','').trim();
-    const val = parseFloat(valText) || 0;
-    if(name.includes('market cap')) info.mcapCr = val;
-    else if(name.includes('current price')) info.currentPrice = val;
-    else if(name.includes('stock p/e') || name.includes('pe ratio')) info.pe = val;
-    else if(name.includes('book value')) info.bookValue = val;
-    else if(name.includes('face value')) info.faceValue = val;
-    else if(name.includes('roe')) info.roe = val;
-    else if(name.includes('roce')) info.roce = val;
-    else if(name.includes('dividend yield')) info.dividendYield = val;
-  });
-  info.ttmPE = info.pe;
-
-  // ── Quarterly Results Table (Table 0) ──
-  // Structure: TRANSPOSED — quarters are COLUMNS, metrics are ROWS
-  // Headers: ['', 'Dec 2022', 'Mar 2023', ...]
-  // Rows: Sales, Expenses, Operating Profit, OPM %, Other Income, Interest, Depreciation, PBT, Tax %, Net Profit, EPS in Rs
-  const qTable = doc.querySelectorAll('table')[0]; // First table = Quarterly Results
-  if(!qTable) return null;
-
-  // Get all rows from the table (handle both <tbody> and direct <tr>)
-  const allRows = [...qTable.querySelectorAll('tr')];
-  if(allRows.length < 2) return null;
-
-  // First row = headers (quarter labels)
-  const headerCells = [...allRows[0].querySelectorAll('th, td')].map(c => c.textContent.trim());
-  const qLabels = headerCells.slice(1); // ['Dec 2022', 'Mar 2023', ...]
-
-  // Remaining rows = metric data
-  const rowData = {};
-  for(let r = 1; r < allRows.length; r++){
-    const cells = [...allRows[r].querySelectorAll('td, th')];
-    if(cells.length < 2) continue;
-    const rowName = cells[0].textContent.replace(/[+\s]+$/,'').trim().toLowerCase();
-    if(!rowName || rowName === 'raw pdf') continue;
-    rowData[rowName] = cells.slice(1).map(c => {
-      const txt = c.textContent.replace(/,/g,'').replace('%','').trim();
-      return parseFloat(txt) || 0;
-    });
-  }
-
-  // Transpose: build quarter objects (most recent = last column = last index)
-  const numQuarters = qLabels.length;
-  const allQuarters = [];
-  for(let i = numQuarters - 1; i >= 0; i--){
-    // Handle both standard (Sales, Operating Profit, OPM %) and banking (Revenue, Financing Profit, Financing Margin %) formats
-    const sales = (rowData['sales'] || rowData['revenue'] || rowData['net interest income'] || [])[i] || 0;
-    const opProfit = (rowData['operating profit'] || rowData['financing profit'] || rowData['net profit before provisions'] || [])[i] || 0;
-    const opm = (rowData['opm %'] || rowData['opm'] || rowData['financing margin %'] || rowData['financing margin'] || rowData['net margin %'] || [])[i] || 0;
-    const netProfit = (rowData['net profit'] || rowData['pat'] || [])[i] || 0;
-    const eps = (rowData['eps in rs'] || rowData['eps'] || [])[i] || 0;
-
-    allQuarters.push({
-      label: qLabels[i] || '',
-      revenueCr: sales,
-      revenue: sales * 10000000,
-      operatingIncome: opProfit * 10000000,
-      opm: opm,
-      netIncome: netProfit * 10000000,
-      eps: eps,
-    });
-  }
-
-  // Take first 5 (most recent)
-  const q5 = allQuarters.slice(0, 5);
-
-  // Calculate YoY and QoQ growth
-  q5.forEach((q, i) => {
-    const prev = q5[i + 1];
-    if(prev){
-      q.epsQoQ = prev.eps ? ((q.eps - prev.eps) / Math.abs(prev.eps) * 100) : null;
-      q.salesQoQ = prev.revenueCr ? ((q.revenueCr - prev.revenueCr) / prev.revenueCr * 100) : null;
-      q.opmQoQ = prev.opm ? (q.opm - prev.opm) : null;
-    }
-    // YoY = compare with i+4 (same quarter last year)
-    const yoy = q5[i + 4];
-    if(yoy){
-      q.epsYoY = yoy.eps ? ((q.eps - yoy.eps) / Math.abs(yoy.eps) * 100) : null;
-      q.salesYoY = yoy.revenueCr ? ((q.revenueCr - yoy.revenueCr) / yoy.revenueCr * 100) : null;
-      q.opmYoY = yoy.opm ? (q.opm - yoy.opm) : null;
-    }
-  });
-
-  // Upcoming earnings / board meeting date
-  info.nextEarnings = null;
-  info.earningsDaysAway = null;
-  // Screener sometimes has upcoming events text
-  const allText = doc.body?.textContent || '';
-  const boardMatch = allText.match(/board\s*meeting[^.]*?(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4})/i);
-  if(boardMatch){
-    const d = new Date(boardMatch[1]);
-    if(!isNaN(d) && d > Date.now()){
-      info.nextEarnings = d;
-      info.earningsDaysAway = Math.ceil((d - Date.now()) / (1000*60*60*24));
-    }
-  }
-
-  if(!q5.length) return null;
-  return { info, quarters: q5 };
+  return { info, quarters };
 }
 
 // ── Fetch fundamentals for all open positions ──
@@ -8147,8 +8052,8 @@ async function fundFetchAll(){
         return;
       }
 
-      const html = await fundFetchScreener(sym);
-      const parsed = fundParseScreener(html, sym);
+      const raw = await fundFetchScreener(sym);
+      const parsed = fundParseScreener(raw, sym);
       if(parsed){
         results[sym] = parsed;
         _fundCache[sym] = { data: parsed, ts: Date.now() };
