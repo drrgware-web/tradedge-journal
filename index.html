@@ -6825,13 +6825,19 @@ setTimeout(() => {
   setPbmMode(savedMode);
 }, 1200);
 
-// ── RRM Position Intelligence boot (auto-scan on load) ──
+// ── RRM Position Intelligence boot (render from cache only, no fetch) ──
 setTimeout(() => {
   if(trades.filter(t=>t.status==='Open'||t.status==='Partial').length > 0){
-    console.log('[RRM] Boot scan…');
-    rrmRefresh(true);
+    console.log('[RRM] Boot: rendering from cache (no fetch)');
+    // Render cached fundamentals on dashboard widget if available
+    const cachedFund = {};
+    trades.filter(t=>t.status==='Open'||t.status==='Partial').forEach(t=>{
+      const sym = t.symbol.toUpperCase();
+      if(_fundCache[sym]?.data) cachedFund[sym] = _fundCache[sym].data;
+    });
+    if(Object.keys(cachedFund).length) fundRenderAll(cachedFund);
   }
-}, 5000);
+}, 3000);
 
 setTimeout(() => {
   // Supabase cloud sync (only if enabled)
@@ -7949,8 +7955,13 @@ async function fundEODScan(){
 function initRRM(){
   rrmRequestNotifPermission();
   rrmStartAutoRefresh();
-  // Auto-scan on page load
-  rrmRefresh();
+  // Render from cache if available, user clicks Refresh for fresh data
+  const cachedFund = {};
+  trades.filter(t=>t.status==='Open'||t.status==='Partial').forEach(t=>{
+    const sym = t.symbol.toUpperCase();
+    if(_fundCache[sym]?.data) cachedFund[sym] = _fundCache[sym].data;
+  });
+  if(Object.keys(cachedFund).length) fundRenderAll(cachedFund);
 }
 // ══════════════════════════════════════════════════
 // FUNDAMENTAL SCORECARD ENGINE
