@@ -7979,7 +7979,15 @@ function initRRM(){
 // ══════════════════════════════════════════════════
 
 let _fundCache = {};
-try { _fundCache = JSON.parse(localStorage.getItem('te_fund_cache') || '{}'); } catch(e){ _fundCache = {}; }
+try {
+  _fundCache = JSON.parse(localStorage.getItem('te_fund_cache') || '{}');
+  // Validate cache entries have proper quarter data (not stale HTML-parsed junk)
+  for(const [k,v] of Object.entries(_fundCache)){
+    if(v?.data?.quarters?.[0] && !v.data.quarters[0].label?.match(/\w{3}\s+\d{4}/)){
+      delete _fundCache[k]; // Remove entries with bad labels (row names instead of dates)
+    }
+  }
+} catch(e){ _fundCache = {}; }
 const FUND_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (quarterly data rarely changes)
 const FUND_PE_THRESHOLD = 40; // Alert if PE crosses this
 const FUND_PROXIES = [
