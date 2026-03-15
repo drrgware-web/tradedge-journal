@@ -1,1 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RRM — Relative Momentum Matrix | TradEdge</title>
+<link rel="icon" type="image/jpeg" href="./assets/logo.jpeg">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#06080d;--bg2:#0c1018;--bg3:#111827;--bg4:#1a2235;--bd:#1e293b;--bd2:#334155;--t1:#e2e8f0;--t2:#94a3b8;--t3:#64748b;--t4:#475569;--cyan:#22d3ee;--pink:#f472b6;--green:#4ade80;--fd:'Orbitron',sans-serif;--fm:'JetBrains Mono',monospace;--fb:'Exo 2',sans-serif;--r:10px}
+body{font-family:var(--fb);background:var(--bg);color:var(--t1);min-height:100vh}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:9999}
+.d{max-width:1400px;margin:0 auto;padding:16px 16px 60px}
+.hd{text-align:center;padding:0 0 14px;position:relative}
+.logo-strip{background:#101a29;padding:16px 0 12px;margin:0 -16px 10px;position:relative}
+.logo-strip::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.logo-strip::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(34,211,238,.15),transparent)}
+.logo-img{width:200px;height:auto;display:block;margin:0 auto 2px}
+.logo-tagline{font-family:var(--fb);font-size:10px;font-weight:500;letter-spacing:3.5px;text-transform:uppercase;color:#c9a84c;animation:tagP 4s ease-in-out infinite}
+@keyframes tagP{0%,100%{opacity:.4}50%{opacity:1}}
+.hd .sub{font-family:var(--fm);font-size:10px;color:var(--t4);letter-spacing:2px;margin-top:6px}
+.ctrl{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:8px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r)}
+.cg{display:flex;align-items:center;gap:5px}
+.cl{font-family:var(--fm);font-size:9px;color:var(--t3);letter-spacing:1px;text-transform:uppercase}
+.cb{padding:4px 12px;border-radius:5px;border:1px solid var(--bd);background:var(--bg3);color:var(--t2);font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;transition:.2s}
+.cb:hover{border-color:var(--bd2);color:var(--t1)}
+.cb.a{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,.08)}
+select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);background:var(--bg3);color:var(--t1);font-family:var(--fm);font-size:10px;cursor:pointer}
+.badge{font-family:var(--fm);font-size:9px;padding:3px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg3)}
+.badge .dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:3px;vertical-align:middle}
+.badge.live .dot{background:var(--green);animation:pd 2s infinite}
+.badge.sample .dot{background:#ef4444}
+@keyframes pd{0%,100%{opacity:1}50%{opacity:.3}}
+.bc{display:flex;align-items:center;gap:6px;margin-bottom:10px;font-family:var(--fm);font-size:11px}
+.bc span{color:var(--t3);cursor:pointer;transition:.2s}
+.bc span:hover{color:var(--cyan)}
+.bc .arr{color:var(--t4);cursor:default}
+.bc .cur{color:var(--cyan);font-weight:700;cursor:default}
+.ml{display:grid;grid-template-columns:1fr 260px;gap:12px}
+@media(max-width:900px){.ml{grid-template-columns:1fr}}
+.rp{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;position:relative}
+.rc{position:relative;width:100%;aspect-ratio:1.2/1;min-height:480px}
+.rc svg{width:100%;height:100%}
+.tt{position:absolute;display:none;background:var(--bg3);border:1px solid var(--bd2);border-radius:6px;padding:8px 10px;font-family:var(--fm);font-size:10px;pointer-events:none;z-index:100;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.tt b{display:block;margin-bottom:3px}
+.sb{display:flex;flex-direction:column;gap:8px}
+.qp{background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);padding:10px}
+.qt{font-family:var(--fd);font-size:10px;font-weight:600;letter-spacing:2px;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.qd{width:8px;height:8px;border-radius:50%}
+.sl{list-style:none}
+.si{display:flex;align-items:center;gap:5px;padding:3px 0;font-family:var(--fm);font-size:10px;color:var(--t2);cursor:pointer;transition:.15s}
+.si:hover{color:var(--t1)}
+.si .sd{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.si .sv{margin-left:auto;color:var(--t4);font-size:9px}
+.ft{text-align:center;padding:14px 0;font-family:var(--fm);font-size:9px;color:var(--t4);letter-spacing:1px;border-top:1px solid var(--bd);margin-top:16px}
+.ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:16px}
+.sp{width:40px;height:40px;border:3px solid var(--bd);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="d" id="app">
+  <div class="ld"><div class="sp"></div><div style="font-family:var(--fm);font-size:11px;color:var(--t3);letter-spacing:2px">LOADING RRM DATA...</div></div>
+</div>
+<script>
+let DATA=null,IS_LIVE=false,MODE='sectors',TF='daily',HIGHLIGHT=null,DRILLDOWN=null,STOCK_LIMIT=10,BENCH=null;
 
+// ═══ SAMPLE ═══
+const SAMPLE_BENCH_DATA={
+  daily:{sectors:[
+    {symbol:"^CNXIT",name:"Nifty IT",quadrant:"Improving",color:"#06b6d4",current:{rs_ratio:97.5,rs_momentum:103.2},tail:[{rs_ratio:95.8,rs_momentum:101.5},{rs_ratio:96.2,rs_momentum:102},{rs_ratio:96.8,rs_momentum:102.5},{rs_ratio:97.1,rs_momentum:103},{rs_ratio:97.5,rs_momentum:103.2}]},
+    {symbol:"^CNXPHARMA",name:"Nifty Pharma",quadrant:"Leading",color:"#f59e0b",current:{rs_ratio:102.8,rs_momentum:101.5},tail:[{rs_ratio:101.2,rs_momentum:100.5},{rs_ratio:101.8,rs_momentum:100.8},{rs_ratio:102.2,rs_momentum:101},{rs_ratio:102.5,rs_momentum:101.2},{rs_ratio:102.8,rs_momentum:101.5}]},
+    {symbol:"^NSEBANK",name:"Nifty Bank",quadrant:"Weakening",color:"#3b82f6",current:{rs_ratio:101.2,rs_momentum:98.8},tail:[{rs_ratio:102.5,rs_momentum:99.8},{rs_ratio:102.1,rs_momentum:99.5},{rs_ratio:101.8,rs_momentum:99.2},{rs_ratio:101.5,rs_momentum:99},{rs_ratio:101.2,rs_momentum:98.8}]},
+    {symbol:"^CNXAUTO",name:"Nifty Auto",quadrant:"Lagging",color:"#ef4444",current:{rs_ratio:98.2,rs_momentum:98.5},tail:[{rs_ratio:99.5,rs_momentum:99.2},{rs_ratio:99.1,rs_momentum:99},{rs_ratio:98.8,rs_momentum:98.8},{rs_ratio:98.5,rs_momentum:98.6},{rs_ratio:98.2,rs_momentum:98.5}]},
+    {symbol:"^CNXFMCG",name:"Nifty FMCG",quadrant:"Leading",color:"#22c55e",current:{rs_ratio:103.5,rs_momentum:101.8},tail:[{rs_ratio:102,rs_momentum:100.5},{rs_ratio:102.5,rs_momentum:101},{rs_ratio:103,rs_momentum:101.2},{rs_ratio:103.2,rs_momentum:101.5},{rs_ratio:103.5,rs_momentum:101.8}]},
+    {symbol:"^CNXMETAL",name:"Nifty Metal",quadrant:"Improving",color:"#8b5cf6",current:{rs_ratio:98.8,rs_momentum:102.2},tail:[{rs_ratio:97.2,rs_momentum:100.8},{rs_ratio:97.6,rs_momentum:101.2},{rs_ratio:98,rs_momentum:101.6},{rs_ratio:98.4,rs_momentum:102},{rs_ratio:98.8,rs_momentum:102.2}]},
+    {symbol:"^CNXREALTY",name:"Nifty Realty",quadrant:"Lagging",color:"#ec4899",current:{rs_ratio:97,rs_momentum:98.2},tail:[{rs_ratio:98.5,rs_momentum:99},{rs_ratio:98,rs_momentum:98.8},{rs_ratio:97.6,rs_momentum:98.5},{rs_ratio:97.3,rs_momentum:98.3},{rs_ratio:97,rs_momentum:98.2}]},
+    {symbol:"^CNXENERGY",name:"Nifty Energy",quadrant:"Leading",color:"#f97316",current:{rs_ratio:101.5,rs_momentum:100.8},tail:[{rs_ratio:100.5,rs_momentum:100.2},{rs_ratio:100.8,rs_momentum:100.4},{rs_ratio:101,rs_momentum:100.5},{rs_ratio:101.2,rs_momentum:100.7},{rs_ratio:101.5,rs_momentum:100.8}]},
+    {symbol:"^CNXPSUBANK",name:"Nifty PSU Bank",quadrant:"Weakening",color:"#0ea5e9",current:{rs_ratio:100.5,rs_momentum:97.5},tail:[{rs_ratio:102,rs_momentum:99},{rs_ratio:101.5,rs_momentum:98.5},{rs_ratio:101,rs_momentum:98},{rs_ratio:100.8,rs_momentum:97.8},{rs_ratio:100.5,rs_momentum:97.5}]},
+    {symbol:"^CNXINFRA",name:"Nifty Infra",quadrant:"Weakening",color:"#14b8a6",current:{rs_ratio:100.2,rs_momentum:99.2},tail:[{rs_ratio:100.8,rs_momentum:100},{rs_ratio:100.6,rs_momentum:99.8},{rs_ratio:100.5,rs_momentum:99.5},{rs_ratio:100.3,rs_momentum:99.3},{rs_ratio:100.2,rs_momentum:99.2}]}
+  ],etfs:[],quadrant_summary:{Leading:["Nifty Pharma","Nifty FMCG","Nifty Energy"],Improving:["Nifty IT","Nifty Metal"],Lagging:["Nifty Auto","Nifty Realty"],Weakening:["Nifty Bank","Nifty PSU Bank","Nifty Infra"]},tail_length:5},
+  weekly:{sectors:[],etfs:[],quadrant_summary:{Leading:[],Improving:[],Lagging:[],Weakening:[]},tail_length:5},
+  drilldown:{}
+};
+const SAMPLE={
+  benchmarks_data:{"^NSEI":SAMPLE_BENCH_DATA},
+  available_benchmarks:{"^NSEI":"Nifty 50","^NSEBANK":"Nifty Bank","^CRSLDX":"Nifty 500"},
+  default_benchmark:"^NSEI",
+  config:{window:10,center:100},
+  metadata:{generated_at:"2026-03-15T16:30:00",date:"2026-03-15",benchmarks_calculated:["^NSEI"],total_sectors:10,total_etfs:0,total_drilldown_sectors:0,timeframes:["daily","weekly"]}
+};
+
+// ═══ GET CURRENT BENCHMARK DATA ═══
+function getBD(){
+  if(!DATA)return SAMPLE_BENCH_DATA;
+  const bd=DATA.benchmarks_data||{};
+  return bd[BENCH]||bd[DATA.default_benchmark]||Object.values(bd)[0]||SAMPLE_BENCH_DATA;
+}
+
+// ═══ RENDER ═══
+function render(){
+  const d=DATA,app=document.getElementById('app');
+  const bd=getBD();
+  const tf_data=bd[TF]||bd.daily;
+  const benchName=(d.available_benchmarks||{})[BENCH]||BENCH;
+  let items,displayBench=benchName,breadcrumb='';
+
+  if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
+    const dd=bd.drilldown[DRILLDOWN];
+    const ddTF=TF==='weekly'?(dd.weekly||[]):(dd.daily||[]);
+    items=STOCK_LIMIT==='all'?ddTF:ddTF.slice(0,parseInt(STOCK_LIMIT));
+    displayBench=dd.sector_name;
+    breadcrumb=`<div class="bc"><span onclick="exitDrill()">Sectors</span><span class="arr">›</span><span class="cur">${dd.sector_name} — Stocks vs ${dd.sector_name}</span></div>`;
+  } else {
+    items=MODE==='etfs'?(tf_data.etfs||[]):MODE==='assets'?(tf_data.asset_classes||[]):MODE==='segments'?(tf_data.market_segments||[]):(tf_data.sectors||[]);
+  }
+
+  const grp={Leading:[],Improving:[],Weakening:[],Lagging:[]};
+  items.forEach(s=>{if(grp[s.quadrant])grp[s.quadrant].push(s)});
+
+  // Benchmark dropdown options
+  const benchOpts=Object.entries(d.available_benchmarks||{}).map(([k,v])=>`<option value="${k}" ${k===BENCH?'selected':''}>${v}</option>`).join('');
+  const hasBenchData=Object.keys(d.benchmarks_data||{}).length>1;
+
+  app.innerHTML=`
+    <div class="hd">
+      <div class="logo-strip">
+        <img class="logo-img" src="data:image/jpeg;base64,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" alt="TradEdge">
+        <div class="logo-tagline">Define Your Edge with TradEdge</div>
+      </div>
+      <p class="sub">RELATIVE MOMENTUM MATRIX · SECTOR ROTATION · ${d.metadata?.date||''}</p>
+    </div>
+    <div class="ctrl">
+      <div class="cg"><span class="cl">Mode:</span>
+        <button class="cb ${!DRILLDOWN&&MODE==='sectors'?'a':''}" onclick="setMode('sectors')">Sectors</button>
+        <button class="cb ${!DRILLDOWN&&MODE==='etfs'?'a':''}" onclick="setMode('etfs')">ETFs</button>
+        <button class="cb ${!DRILLDOWN&&MODE==='assets'?'a':''}" onclick="setMode('assets')">Assets</button>
+        <button class="cb ${!DRILLDOWN&&MODE==='segments'?'a':''}" onclick="setMode('segments')">Segments</button>
+      </div>
+      <div class="cg"><span class="cl">Period:</span>
+        <button class="cb ${TF==='daily'?'a':''}" onclick="setTF('daily')">Daily</button>
+        <button class="cb ${TF==='weekly'?'a':''}" onclick="setTF('weekly')">Weekly</button>
+      </div>
+      ${DRILLDOWN?`<div class="cg"><span class="cl">Stocks:</span>
+        <select class="cs" onchange="setLimit(this.value)">
+          <option value="5" ${STOCK_LIMIT==5?'selected':''}>Top 5</option>
+          <option value="10" ${STOCK_LIMIT==10?'selected':''}>Top 10</option>
+          <option value="all" ${STOCK_LIMIT==='all'?'selected':''}>All</option>
+        </select></div>`:''}
+      <div class="cg"><span class="cl">Benchmark:</span>
+        ${hasBenchData?`<select class="cs" onchange="setBench(this.value)">${benchOpts}</select>`
+        :`<span style="font-family:var(--fm);font-size:11px;color:var(--cyan);font-weight:600">${benchName}</span>`}
+      </div>
+      <span class="badge ${IS_LIVE?'live':'sample'}"><span class="dot"></span>${IS_LIVE?'LIVE':'SAMPLE'}</span>
+    </div>
+    ${breadcrumb}
+    <div class="ml">
+      <div class="rp"><div class="rc" id="rc"></div><div class="tt" id="tt"></div></div>
+      <div class="sb">
+        ${qPanel('Leading','#22c55e',grp.Leading)}
+        ${qPanel('Improving','#3b82f6',grp.Improving)}
+        ${qPanel('Weakening','#eab308',grp.Weakening)}
+        ${qPanel('Lagging','#ef4444',grp.Lagging)}
+      </div>
+    </div>
+    <div class="ft">TradEdge RRM v3.1 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
+  drawChart(items);
+}
+
+function qPanel(n,c,items){
+  return`<div class="qp"><div class="qt"><div class="qd" style="background:${c}"></div><span style="color:${c}">${n}</span><span style="font-family:var(--fm);font-size:9px;color:var(--t4);margin-left:auto">${items.length}</span></div>
+  <ul class="sl">${items.length===0?'<li style="font-family:var(--fm);font-size:9px;color:var(--t4);padding:3px 0">—</li>':
+    items.map(s=>`<li class="si" onmouseenter="hl('${s.symbol}')" onmouseleave="hl(null)" ${!DRILLDOWN&&MODE==='sectors'?`ondblclick="drill('${s.symbol}')"`:''}><span class="sd" style="background:${s.color}"></span><span>${s.name}</span><span class="sv">${s.current.rs_ratio.toFixed(1)}/${s.current.rs_momentum.toFixed(1)}</span></li>`).join('')}</ul></div>`;
+}
+
+// ═══ SVG ═══
+function drawChart(items){
+  const el=document.getElementById('rc');if(!el)return;
+  const W=800,H=660,P={t:30,r:30,b:40,l:50},iw=W-P.l-P.r,ih=H-P.t-P.b,C=100;
+  let ax=[],ay=[];
+  items.forEach(s=>s.tail.forEach(t=>{ax.push(t.rs_ratio);ay.push(t.rs_momentum)}));
+  if(!ax.length){ax=[96,104];ay=[96,104]}
+  const mg=1.5,xn=Math.min(Math.min(...ax)-mg,C-4),xx=Math.max(Math.max(...ax)+mg,C+4),yn=Math.min(Math.min(...ay)-mg,C-4),yx=Math.max(Math.max(...ay)+mg,C+4);
+  const tX=v=>P.l+((v-xn)/(xx-xn))*iw,tY=v=>P.t+ih-((v-yn)/(yx-yn))*ih,cx=tX(C),cy=tY(C);
+
+  let s=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  s+=`<rect x="${P.l}" y="${P.t}" width="${cx-P.l}" height="${cy-P.t}" fill="rgba(59,130,246,.05)"/>`;
+  s+=`<rect x="${cx}" y="${P.t}" width="${W-P.r-cx}" height="${cy-P.t}" fill="rgba(34,197,94,.05)"/>`;
+  s+=`<rect x="${P.l}" y="${cy}" width="${cx-P.l}" height="${H-P.b-cy}" fill="rgba(239,68,68,.05)"/>`;
+  s+=`<rect x="${cx}" y="${cy}" width="${W-P.r-cx}" height="${H-P.b-cy}" fill="rgba(234,179,8,.05)"/>`;
+  s+=`<text x="${(P.l+cx)/2}" y="${P.t+18}" text-anchor="middle" font-size="11" font-family="Orbitron" font-weight="600" fill="rgba(59,130,246,.35)" letter-spacing="2">IMPROVING</text>`;
+  s+=`<text x="${(cx+W-P.r)/2}" y="${P.t+18}" text-anchor="middle" font-size="11" font-family="Orbitron" font-weight="600" fill="rgba(34,197,94,.35)" letter-spacing="2">LEADING</text>`;
+  s+=`<text x="${(P.l+cx)/2}" y="${H-P.b-8}" text-anchor="middle" font-size="11" font-family="Orbitron" font-weight="600" fill="rgba(239,68,68,.35)" letter-spacing="2">LAGGING</text>`;
+  s+=`<text x="${(cx+W-P.r)/2}" y="${H-P.b-8}" text-anchor="middle" font-size="11" font-family="Orbitron" font-weight="600" fill="rgba(234,179,8,.35)" letter-spacing="2">WEAKENING</text>`;
+  for(let v=Math.ceil(xn);v<=Math.floor(xx);v++){const x=tX(v),ic=v===C;s+=`<line x1="${x}" y1="${P.t}" x2="${x}" y2="${H-P.b}" stroke="${ic?'#475569':'#1e293b'}" stroke-width="${ic?1.5:.5}" ${ic?'':'stroke-dasharray="2,4"'}/>`;if(v%2===0)s+=`<text x="${x}" y="${H-P.b+16}" text-anchor="middle" font-size="9" fill="#475569" font-family="JetBrains Mono">${v}</text>`}
+  for(let v=Math.ceil(yn);v<=Math.floor(yx);v++){const y=tY(v),ic=v===C;s+=`<line x1="${P.l}" y1="${y}" x2="${W-P.r}" y2="${y}" stroke="${ic?'#475569':'#1e293b'}" stroke-width="${ic?1.5:.5}" ${ic?'':'stroke-dasharray="2,4"'}/>`;if(v%2===0)s+=`<text x="${P.l-6}" y="${y+3}" text-anchor="end" font-size="9" fill="#475569" font-family="JetBrains Mono">${v}</text>`}
+  s+=`<text x="${W/2}" y="${H-4}" text-anchor="middle" font-size="10" fill="#64748b" font-family="JetBrains Mono" letter-spacing="2">JdK RS-RATIO →</text>`;
+  s+=`<text x="12" y="${H/2}" text-anchor="middle" font-size="10" fill="#64748b" font-family="JetBrains Mono" letter-spacing="2" transform="rotate(-90,12,${H/2})">JdK RS-MOMENTUM →</text>`;
+
+  items.forEach(sec=>{
+    const isH=HIGHLIGHT===sec.symbol,op=HIGHLIGHT&&!isH?.12:1;
+    if(sec.tail.length<2)return;
+    let pd='';sec.tail.forEach((t,i)=>{pd+=(i===0?'M':'L')+tX(t.rs_ratio).toFixed(1)+','+tY(t.rs_momentum).toFixed(1)});
+    s+=`<path d="${pd}" fill="none" stroke="${sec.color}" stroke-width="${isH?2.5:1.5}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`;
+    sec.tail.forEach((t,i)=>{const x=tX(t.rs_ratio),y=tY(t.rs_momentum),last=i===sec.tail.length-1,r=last?(isH?6:4.5):2;s+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${sec.color}" stroke="${last?'#0c1018':'none'}" stroke-width="${last?2:0}" opacity="${op}"/>`});
+    const l=sec.tail[sec.tail.length-1],p=sec.tail[sec.tail.length-2],lx=tX(l.rs_ratio),ly=tY(l.rs_momentum),px=tX(p.rs_ratio),py=tY(p.rs_momentum),a=Math.atan2(ly-py,lx-px),al=8;
+    s+=`<polygon points="${lx},${ly} ${lx+al*Math.cos(a+2.6)},${ly+al*Math.sin(a+2.6)} ${lx+al*Math.cos(a-2.6)},${ly+al*Math.sin(a-2.6)}" fill="${sec.color}" opacity="${op}"/>`;
+    if(op>.5){const nm=sec.name.replace('Nifty ','');s+=`<text x="${lx+8}" y="${ly-6}" font-size="${isH?11:9}" fill="${sec.color}" font-family="JetBrains Mono" font-weight="${isH?700:500}" opacity="${Math.min(op+.2,1)}">${nm}</text>`}
+  });
+  s+='</svg>';el.innerHTML=s;
+
+  const svg=el.querySelector('svg');
+  svg.onmousemove=e=>{
+    const r=svg.getBoundingClientRect(),sx=W/r.width,sy=H/r.height,mx=(e.clientX-r.left)*sx,my=(e.clientY-r.top)*sy;
+    let cl=null,cd=20;items.forEach(sec=>{const t=sec.tail[sec.tail.length-1],d=Math.hypot(mx-tX(t.rs_ratio),my-tY(t.rs_momentum));if(d<cd){cd=d;cl=sec}});
+    const tt=document.getElementById('tt');
+    if(cl){tt.style.display='block';tt.style.left=(e.clientX-el.closest('.rp').getBoundingClientRect().left+14)+'px';tt.style.top=(e.clientY-el.closest('.rp').getBoundingClientRect().top-10)+'px';
+      tt.innerHTML=`<b style="color:${cl.color}">${cl.name}</b><span style="font-size:9px;color:var(--t3)">${cl.quadrant}</span><div style="margin-top:4px">RS-Ratio: <b>${cl.current.rs_ratio.toFixed(2)}</b><br>RS-Mom: <b>${cl.current.rs_momentum.toFixed(2)}</b></div>${!DRILLDOWN&&MODE==='sectors'?'<div style="margin-top:4px;font-size:9px;color:var(--cyan)">Double-click → stock drill-down</div>':''}`;
+      HIGHLIGHT=cl.symbol;drawChart(items)}else{tt.style.display='none';if(HIGHLIGHT){HIGHLIGHT=null;drawChart(items)}}};
+  svg.onmouseleave=()=>{document.getElementById('tt').style.display='none';if(HIGHLIGHT){HIGHLIGHT=null;drawChart(items)}};
+  if(!DRILLDOWN&&MODE==='sectors'){svg.ondblclick=e=>{const r=svg.getBoundingClientRect(),sx=W/r.width,sy=H/r.height,mx=(e.clientX-r.left)*sx,my=(e.clientY-r.top)*sy;let cl=null,cd=20;items.forEach(sec=>{const t=sec.tail[sec.tail.length-1],d=Math.hypot(mx-tX(t.rs_ratio),my-tY(t.rs_momentum));if(d<cd){cd=d;cl=sec}});if(cl)drill(cl.symbol)}}
+}
+
+// ═══ ACTIONS ═══
+function setMode(m){DRILLDOWN=null;MODE=m;HIGHLIGHT=null;render()}
+function setTF(t){TF=t;HIGHLIGHT=null;render()}
+function setLimit(v){STOCK_LIMIT=v;render()}
+function setBench(b){BENCH=b;DRILLDOWN=null;HIGHLIGHT=null;render()}
+function hl(sym){HIGHLIGHT=sym;const bd=getBD(),tf=bd[TF]||bd.daily;let items;if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){const dd=bd.drilldown[DRILLDOWN];items=TF==='weekly'?(dd.weekly||[]):(dd.daily||[]);if(STOCK_LIMIT!=='all')items=items.slice(0,parseInt(STOCK_LIMIT))}else{items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[])}drawChart(items)}
+function drill(sym){const bd=getBD();if(bd.drilldown&&bd.drilldown[sym]){DRILLDOWN=sym;HIGHLIGHT=null;render()}else{alert('No drill-down data for this sector yet.\nRun the RRM GitHub Action to generate stock-level data.')}}
+function exitDrill(){DRILLDOWN=null;HIGHLIGHT=null;render()}
+
+// ═══ INIT ═══
+async function init(){
+  let d=null;
+  // Try new RRM filename first, then fall back to legacy RRG filename
+  try{const r=await fetch('./data/rrm_data.json',{cache:'no-store'});if(r.ok){d=await r.json();if(d?.benchmarks_data&&Object.keys(d.benchmarks_data).length>0)IS_LIVE=true;else d=null}}catch(e){console.warn('RRM fetch:',e)}
+  if(!d){try{const r=await fetch('./data/rrg_data.json',{cache:'no-store'});if(r.ok){d=await r.json();if(d?.benchmarks_data&&Object.keys(d.benchmarks_data).length>0)IS_LIVE=true;else d=null}}catch(e){console.warn('RRG fallback fetch:',e)}}
+  if(!d){d=SAMPLE;IS_LIVE=false}
+  DATA=d;BENCH=d.default_benchmark||Object.keys(d.available_benchmarks||{})[0]||'^NSEI';
+  await new Promise(r=>setTimeout(r,300));render();
+}
+init();
+</script>
+</body>
+</html>
