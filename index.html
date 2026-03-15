@@ -7959,113 +7959,171 @@ function initRRM(){
 let _fundCache = JSON.parse(localStorage.getItem('te_fund_cache') || '{}');
 const FUND_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (quarterly data rarely changes)
 const FUND_PE_THRESHOLD = 40; // Alert if PE crosses this
+const FUND_PROXIES = [
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
 
-// Yahoo Finance quoteSummary modules we need
-const FUND_MODULES = 'earnings,incomeStatementHistoryQuarterly,defaultKeyStatistics,financialData,calendarEvents,summaryProfile,price';
-
-async function fundFetchQuoteSummary(symbol){
-  const ticker = symbol.includes('.') ? symbol : symbol + '.NS';
-  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=${FUND_MODULES}`;
-
-  const attempts = [
-    () => fetch(url),
-    ...RRM_PROXIES.map(p => () => fetch(p(url)))
+// ── Fetch Screener.in HTML page ──
+async function fundFetchScreener(symbol){
+  const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
+  // Try consolidated first, fallback to standalone
+  const urls = [
+    `https://www.screener.in/company/${sym}/consolidated/`,
+    `https://www.screener.in/company/${sym}/`,
   ];
 
-  for(const attempt of attempts){
-    try {
-      const r = await attempt();
-      if(!r.ok) continue;
-      const data = await r.json();
-      const result = data?.quoteSummary?.result?.[0];
-      if(result) return result;
-    } catch(e){ continue; }
+  for(const pageUrl of urls){
+    for(const proxy of FUND_PROXIES){
+      try {
+        const r = await fetch(proxy(pageUrl), { signal: AbortSignal.timeout(12000) });
+        if(!r.ok) continue;
+        const html = await r.text();
+        if(html.includes('Quarterly Results') || html.includes('quarterly-shp')) return html;
+      } catch(e){ continue; }
+    }
   }
   return null;
 }
 
-function fundParseQuarterly(raw){
-  if(!raw) return null;
+// ── Parse Screener.in HTML into structured data ──
+function fundParseScreener(html, symbol){
+  if(!html) return null;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
 
-  const earnings = raw.earnings?.earningsChart?.quarterly || [];
-  const incomeStmts = raw.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
-  const calEvents = raw.calendarEvents?.earnings || {};
-  const keyStats = raw.defaultKeyStatistics || {};
-  const finData = raw.financialData || {};
-  const profile = raw.summaryProfile || {};
-  const priceData = raw.price || {};
+  // ── Company info from top section ──
+  const info = { name:'', sector:'', industry:'', mcapCr:0, pe:0, roe:0, currentPrice:0, bookValue:0, faceValue:0 };
 
-  // Company info
-  const info = {
-    name: priceData.longName || priceData.shortName || '',
-    sector: profile.sector || '',
-    industry: profile.industry || '',
-    marketCap: keyStats.marketCap?.raw || priceData.marketCap?.raw || 0,
-    pe: keyStats.trailingPE?.raw || finData.trailingPE?.raw || 0,
-    forwardPE: keyStats.forwardPE?.raw || 0,
-    roe: finData.returnOnEquity?.raw || 0,
-    currentPrice: finData.currentPrice?.raw || priceData.regularMarketPrice?.raw || 0,
-  };
+  // Company name
+  const h1 = doc.querySelector('h1');
+  info.name = h1?.textContent?.trim() || symbol;
 
-  // Market cap in Crores
-  info.mcapCr = Math.round(info.marketCap / 10000000);
-
-  // Upcoming earnings date
-  const earningsDates = calEvents.earningsDate || [];
-  info.nextEarnings = earningsDates.length ? new Date(earningsDates[0].raw * 1000) : null;
-  info.earningsDaysAway = info.nextEarnings ? Math.ceil((info.nextEarnings - Date.now()) / (1000*60*60*24)) : null;
-
-  // Parse quarterly income statements (last 5 quarters)
-  const quarters = incomeStmts.slice(0, 5).map(q => {
-    const endDate = new Date((q.endDate?.raw || 0) * 1000);
-    const qLabel = endDate.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
-    const revenue = q.totalRevenue?.raw || 0;
-    const operatingIncome = q.operatingIncome?.raw || 0;
-    const netIncome = q.netIncome?.raw || 0;
-    const opm = revenue > 0 ? (operatingIncome / revenue * 100) : 0;
-
-    return {
-      date: endDate,
-      label: qLabel,
-      revenue: revenue,
-      revenueCr: Math.round(revenue / 10000000), // Convert to Crores
-      operatingIncome,
-      netIncome,
-      opm: Math.round(opm * 10) / 10,
-    };
+  // Ratios list (#top-ratios or .company-ratios)
+  const ratioEls = doc.querySelectorAll('#top-ratios li, .company-ratios li, .ratios-table li');
+  ratioEls.forEach(li => {
+    const nameEl = li.querySelector('.name, span:first-child');
+    const valEl = li.querySelector('.value, .number, span:last-child');
+    if(!nameEl || !valEl) return;
+    const name = nameEl.textContent.trim().toLowerCase();
+    const val = parseFloat(valEl.textContent.replace(/[₹,]/g,'').trim()) || 0;
+    if(name.includes('market cap')) info.mcapCr = val;
+    else if(name.includes('current price')) info.currentPrice = val;
+    else if(name.includes('stock p/e') || name.includes('pe ratio')) info.pe = val;
+    else if(name.includes('roe') || name.includes('return on equity')) info.roe = val;
+    else if(name.includes('book value')) info.bookValue = val;
+    else if(name.includes('face value')) info.faceValue = val;
+    else if(name.includes('sector')) info.sector = valEl.textContent.trim();
+    else if(name.includes('industry')) info.industry = valEl.textContent.trim();
   });
 
-  // Match EPS from earnings data
-  const epsQuarterly = earnings.slice(0, 5);
-  quarters.forEach((q, i) => {
-    if(epsQuarterly[i]){
-      q.eps = epsQuarterly[i].actual?.raw ?? 0;
-      q.epsEstimate = epsQuarterly[i].estimate?.raw ?? 0;
+  // Also try the company info section for sector/industry
+  const compInfo = doc.querySelectorAll('.company-info a, .sub a');
+  compInfo.forEach(a => {
+    const href = a.getAttribute('href') || '';
+    if(href.includes('/sector/')) info.sector = info.sector || a.textContent.trim();
+    if(href.includes('/industry/')) info.industry = info.industry || a.textContent.trim();
+  });
+
+  // ── Quarterly Results Table ──
+  // Find the table after "Quarterly Results" heading
+  let qTable = null;
+  const sections = doc.querySelectorAll('section, .card');
+  sections.forEach(sec => {
+    const heading = sec.querySelector('h2, .card-header');
+    if(heading && /quarterly results/i.test(heading.textContent)){
+      qTable = sec.querySelector('table');
     }
   });
+  // Fallback: find by table ID or class
+  if(!qTable) qTable = doc.querySelector('#quarters table, table.data-table');
 
-  // If no EPS from earnings chart, compute from netIncome
-  // (Yahoo sometimes doesn't have earnings chart for Indian stocks)
-  // We'll compute EPS growth from netIncome as fallback
+  const quarters = [];
+  if(qTable){
+    const headers = [...qTable.querySelectorAll('thead th, tr:first-child th, tr:first-child td')].map(th => th.textContent.trim());
+    const rows = qTable.querySelectorAll('tbody tr');
+
+    // Find column indices
+    const colIdx = {};
+    headers.forEach((h, i) => {
+      const hl = h.toLowerCase();
+      if(hl.includes('sales') || hl.includes('revenue')) colIdx.sales = i;
+      else if(hl.includes('operating profit') && !hl.includes('%')) colIdx.opProfit = i;
+      else if(hl.includes('opm')) colIdx.opm = i;
+      else if(hl.includes('net profit') || hl.includes('pat')) colIdx.netProfit = i;
+      else if(hl.includes('eps')) colIdx.eps = i;
+    });
+
+    rows.forEach(row => {
+      const cells = [...row.querySelectorAll('td, th')];
+      if(cells.length < 3) return;
+      const label = cells[0]?.textContent?.trim();
+      if(!label || /ttm|trailing/i.test(label)) return;
+
+      const parseNum = idx => {
+        if(idx === undefined || !cells[idx]) return 0;
+        return parseFloat(cells[idx].textContent.replace(/,/g,'').trim()) || 0;
+      };
+
+      const q = {
+        label: label,
+        revenue: 0, revenueCr: 0,
+        operatingIncome: 0, netIncome: 0,
+        opm: 0, eps: 0,
+      };
+
+      q.revenueCr = parseNum(colIdx.sales);
+      q.revenue = q.revenueCr * 10000000; // Store in raw for growth calc
+      q.operatingIncome = parseNum(colIdx.opProfit) * 10000000;
+      q.opm = parseNum(colIdx.opm);
+      q.netIncome = parseNum(colIdx.netProfit) * 10000000;
+      q.eps = parseNum(colIdx.eps);
+
+      quarters.push(q);
+    });
+  }
+
+  // Keep only first 5 quarters (most recent first on Screener)
+  const q5 = quarters.slice(0, 5);
 
   // Calculate YoY and QoQ growth
-  quarters.forEach((q, i) => {
-    // QoQ (vs previous quarter)
-    const prev = quarters[i + 1];
+  q5.forEach((q, i) => {
+    const prev = q5[i + 1];
     if(prev){
-      q.epsQoQ = prev.eps && q.eps ? ((q.eps - prev.eps) / Math.abs(prev.eps) * 100) : null;
-      q.salesQoQ = prev.revenue ? ((q.revenue - prev.revenue) / prev.revenue * 100) : null;
-      q.opmQoQ = q.opm - prev.opm; // OPM change in percentage points
+      q.epsQoQ = prev.eps ? ((q.eps - prev.eps) / Math.abs(prev.eps) * 100) : null;
+      q.salesQoQ = prev.revenueCr ? ((q.revenueCr - prev.revenueCr) / prev.revenueCr * 100) : null;
+      q.opmQoQ = prev.opm ? (q.opm - prev.opm) : null;
     }
-
-    // YoY (vs same quarter last year = index i+4)
-    const yoy = quarters[i + 4];
+    // YoY = compare with i+4 (same quarter last year)
+    const yoy = q5[i + 4];
     if(yoy){
-      q.epsYoY = yoy.eps && q.eps ? ((q.eps - yoy.eps) / Math.abs(yoy.eps) * 100) : null;
-      q.salesYoY = yoy.revenue ? ((q.revenue - yoy.revenue) / yoy.revenue * 100) : null;
-      q.opmYoY = q.opm - yoy.opm;
+      q.epsYoY = yoy.eps ? ((q.eps - yoy.eps) / Math.abs(yoy.eps) * 100) : null;
+      q.salesYoY = yoy.revenueCr ? ((q.revenueCr - yoy.revenueCr) / yoy.revenueCr * 100) : null;
+      q.opmYoY = yoy.opm ? (q.opm - yoy.opm) : null;
     }
   });
+
+  // PE
+  info.ttmPE = info.pe;
+
+  // Upcoming earnings date - Screener sometimes shows this
+  info.nextEarnings = null;
+  info.earningsDaysAway = null;
+  const boardMeet = doc.querySelector('.board-meetings, .upcoming-events');
+  if(boardMeet){
+    const text = boardMeet.textContent;
+    const dateMatch = text.match(/(\d{1,2}\s+\w+\s+\d{4})/);
+    if(dateMatch){
+      const d = new Date(dateMatch[1]);
+      if(!isNaN(d) && d > Date.now()){
+        info.nextEarnings = d;
+        info.earningsDaysAway = Math.ceil((d - Date.now()) / (1000*60*60*24));
+      }
+    }
+  }
+
+  if(!q5.length) return null;
+  return { info, quarters: q5 };
 
   // PE for each quarter (using current price / annualized EPS)
   if(quarters.length >= 4){
@@ -8086,9 +8144,9 @@ async function fundFetchAll(){
   const statusEl = document.getElementById('fund-live-status');
 
   let done = 0;
-  // Batch fetch (3 at a time to avoid rate limits)
-  for(let i = 0; i < symbols.length; i += 3){
-    const batch = symbols.slice(i, i + 3);
+  // Batch fetch (2 at a time — Screener.in may rate-limit)
+  for(let i = 0; i < symbols.length; i += 2){
+    const batch = symbols.slice(i, i + 2);
     await Promise.all(batch.map(async sym => {
       // Check cache first
       const cached = _fundCache[sym];
@@ -8099,8 +8157,8 @@ async function fundFetchAll(){
         return;
       }
 
-      const raw = await fundFetchQuoteSummary(sym);
-      const parsed = fundParseQuarterly(raw);
+      const html = await fundFetchScreener(sym);
+      const parsed = fundParseScreener(html, sym);
       if(parsed){
         results[sym] = parsed;
         _fundCache[sym] = { data: parsed, ts: Date.now() };
@@ -8108,6 +8166,8 @@ async function fundFetchAll(){
       done++;
       if(statusEl) statusEl.textContent = `Fundamentals: ${done}/${symbols.length}`;
     }));
+    // Small delay between batches to be polite to Screener.in
+    if(i + 2 < symbols.length) await new Promise(r => setTimeout(r, 500));
   }
 
   // Save cache
