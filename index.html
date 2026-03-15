@@ -1973,6 +1973,329 @@ select.fi{cursor:pointer}
     </div>
 
     <!-- ══ RRM POSITION INTELLIGENCE ══ -->
+    <div class="page" id="page-settings">
+      <div class="settings-wrap">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Portfolio</span></div>
+          <div class="card-body">
+            <div class="fg2" style="margin-bottom:14px">
+              <div class="fg"><label class="fl">Total Capital (₹)</label><input class="fi" id="s-cap" type="number" placeholder="874000"></div>
+              <div class="fg"><label class="fl">Risk per Trade (%)</label><input class="fi" id="s-risk" type="number" step="0.1" placeholder="0.5"></div>
+            </div>
+            <button class="btn btn-y btn-sm" onclick="saveSettings()">Save</button>
+          </div>
+        </div>
+
+        <!-- DHAN SYNC -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Dhan API</span>
+            <span class="sync-dot" id="dhan-dot"></span>
+          </div>
+          <div class="card-body">
+            <div class="fg2" style="margin-bottom:14px">
+              <div class="fg"><label class="fl">Client ID</label><input class="fi" id="s-dhan-id" placeholder="1000XXXXXX"></div>
+              <div class="fg"><label class="fl">Access Token</label><input class="fi" id="s-dhan-tk" type="password" placeholder="eyJ…"></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-green btn-sm" onclick="saveDhanCreds()">Save Credentials</button>
+              <button class="btn btn-ghost btn-sm" onclick="syncDhan()">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                Sync Now
+              </button>
+              <div class="fg" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3)">
+                <input type="checkbox" id="dhan-auto" onchange="toggleAuto('dhan',this.checked)" style="accent-color:var(--y)"> Auto-sync every 15 min
+              </div>
+            </div>
+            <div id="dhan-log" style="font-size:11px;color:var(--t3);margin-top:10px"></div>
+
+            <!-- Dhan CSV Import fallback -->
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--b1)">
+              <div style="font-size:11px;font-weight:700;color:var(--y);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📥 Import from Dhan Tradebook (Recommended)</div>
+              <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.6">
+                Since Dhan blocks direct API calls from browsers, use this instead — it takes only 30 seconds:<br>
+                <span style="color:var(--t2)">1.</span> Go to <b style="color:var(--t1)">Dhan App</b> → <b style="color:var(--t1)">Reports</b> → <b style="color:var(--t1)">Tradebook</b><br>
+                <span style="color:var(--t2)">2.</span> Select date range → click <b style="color:var(--t1)">Download CSV</b><br>
+                <span style="color:var(--t2)">3.</span> Click the button below and upload that file
+              </div>
+              <button class="btn btn-y btn-sm" onclick="openDhanCSVImport()">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Upload Dhan Tradebook CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ZERODHA SYNC -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Zerodha KiteConnect</span>
+            <span class="sync-dot" id="zd-dot"></span>
+          </div>
+          <div class="card-body">
+
+            <!-- Step 1 -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:22px;height:22px;border-radius:50%;background:var(--y);color:var(--bg0);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+              <div style="font-size:12px;font-weight:700;color:var(--t2)">Enter your API Key</div>
+            </div>
+            <div class="fg2" style="margin-bottom:14px">
+              <div class="fg"><label class="fl">API Key</label><input class="fi" id="s-zd-key" placeholder="e.g. mndbx5rbi016aptp"></div>
+              <div class="fg"><label class="fl">API Secret</label><input class="fi" id="s-zd-sec" type="password" placeholder="From app settings page"></div>
+            </div>
+            <button class="btn btn-green btn-sm" onclick="saveZdCreds()" style="margin-bottom:20px">💾 Save Credentials</button>
+
+            <!-- Step 2 -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:22px;height:22px;border-radius:50%;background:var(--y);color:var(--bg0);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+              <div style="font-size:12px;font-weight:700;color:var(--t2)">Set Redirect URL in your Kite app</div>
+            </div>
+            <div style="font-size:11.5px;background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin-bottom:14px;line-height:1.9;color:var(--t2)">
+              In <a href="https://developers.kite.trade/apps" target="_blank" style="color:var(--y)">Kite Developer Console</a> → click <b>TradEdge</b> app → Edit → set <b>Redirect URL</b> to:<br>
+              <div style="margin-top:6px;padding:7px 10px;background:var(--bg0);border-radius:7px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <span id="zd-redirect-display" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--y);word-break:break-all">https://drrgware-web.github.io/tradedge-journal/</span>
+                <button onclick="copyZdRedirect()" style="background:var(--bg4);border:1px solid var(--b2);border-radius:5px;color:var(--t2);padding:3px 8px;font-size:10px;cursor:pointer;white-space:nowrap;font-family:'Outfit',sans-serif">Copy</button>
+              </div>
+              <span style="font-size:10.5px;color:var(--t3)">Save the app, then come back here.</span>
+            </div>
+
+            <!-- Step 3 -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:22px;height:22px;border-radius:50%;background:var(--y);color:var(--bg0);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+              <div style="font-size:12px;font-weight:700;color:var(--t2)">Login & get your daily access token</div>
+            </div>
+            <button class="btn btn-y btn-sm" id="zd-login-btn" onclick="openZdLogin()" style="margin-bottom:8px">
+              🔗 Open Zerodha Login
+            </button>
+            <div style="font-size:11px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.7">
+              After login you'll see a <b style="color:var(--r)">"This site can't be reached"</b> page — that's normal.<br>
+              👉 Copy the <b style="color:var(--y)">full URL</b> from the address bar and paste below.
+            </div>
+            <div class="fg" style="margin-bottom:10px">
+              <label class="fl">Paste redirect URL (http://127.0.0.1/?request_token=…)</label>
+              <input class="fi" id="zd-redirect-url" placeholder="http://127.0.0.1/?request_token=AbCd1234…&action=login&status=success" oninput="onZdUrlPaste(this.value)">
+            </div>
+            <div id="zd-token-preview" style="display:none;margin-bottom:14px;padding:10px 14px;background:var(--gd);border:1px solid rgba(0,229,160,.3);border-radius:8px;font-size:12px">
+              ✅ Request token found: <span id="zd-req-token" style="font-family:'IBM Plex Mono',monospace;color:var(--g);font-weight:700"></span>
+            </div>
+
+            <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+              <div style="font-size:12px;font-weight:700;color:var(--y);margin-bottom:6px">⚡ Cloudflare Worker URL</div>
+              <div style="font-size:11px;color:var(--t3);margin-bottom:8px;line-height:1.6">Required for Zerodha/Dhan/Definedge sync. Deploy the free worker (2 min) at <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--y)">workers.cloudflare.com</a> and paste URL below.</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="fi" id="s-zd-worker" placeholder="https://your-worker.workers.dev" style="flex:1;font-size:11.5px">
+                <button class="btn btn-ghost btn-sm" onclick="saveZdWorkerUrl()">💾 Save</button>
+              </div>
+              <div id="zd-worker-status" style="font-size:11px;color:var(--t3);margin-top:6px"></div>
+            </div>
+
+            <!-- Step 4: manual access token fallback -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:22px;height:22px;border-radius:50%;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</div>
+              <div style="font-size:12px;font-weight:600;color:var(--t3)">Or paste Access Token directly <span style="font-weight:400;font-size:10.5px">(skip steps 2–3)</span></div>
+            </div>
+            <div class="fg" style="margin-bottom:14px">
+              <label class="fl">Access Token <span style="color:var(--y);font-size:10px">(renew daily)</span></label>
+              <input class="fi" id="s-zd-tk" placeholder="Paste access token here if you have it…">
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-y btn-sm" onclick="saveZdCreds()">💾 Save & Sync</button>
+              <button class="btn btn-ghost btn-sm" onclick="syncZerodha()">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                Sync Now
+              </button>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3)">
+                <input type="checkbox" id="zd-auto" onchange="toggleAuto('zd',this.checked)" style="accent-color:var(--y)"> Auto-sync daily
+              </div>
+            </div>
+            <div id="zd-log" style="font-size:11px;color:var(--t3);margin-top:10px"></div>
+
+            <!-- Zerodha CSV Import -->
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--b1)">
+              <div style="font-size:11px;font-weight:700;color:var(--y);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📥 Import from Zerodha Console (Free — No API needed)</div>
+              <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.6">
+                <span style="color:var(--t2)">1.</span> Go to <b style="color:var(--t1)">console.zerodha.com</b> → <b style="color:var(--t1)">Reports</b> → <b style="color:var(--t1)">Tradebook</b><br>
+                <span style="color:var(--t2)">2.</span> Select date range → click <b style="color:var(--t1)">Download</b> (CSV)<br>
+                <span style="color:var(--t2)">3.</span> Click the button below and upload that file
+              </div>
+              <button class="btn btn-y btn-sm" onclick="openBrokerCSVImport('zerodha')">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Upload Zerodha Tradebook CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- DEFINEDGE SYNC -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Definedge (RZone)</span>
+            <span class="sync-dot" id="de-dot"></span>
+          </div>
+          <div class="card-body">
+            <div style="font-size:11.5px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+              ℹ️ Definedge Integrate API — Get credentials from <b style="color:var(--y)">myaccount.definedgesecurities.com → Account → Show my API Secret</b>
+            </div>
+            <div class="fg2" style="margin-bottom:10px">
+              <div class="fg"><label class="fl">API Token</label><input class="fi" id="s-de-tk" placeholder="616f60ac-92d7-…"></div>
+              <div class="fg"><label class="fl">API Secret</label><input class="fi" id="s-de-sec" type="password" placeholder="glABMCFjrOH…"></div>
+            </div>
+            <button class="btn btn-green btn-sm" onclick="saveDefinedgeCreds()" style="margin-bottom:14px">💾 Save Credentials</button>
+            <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+              <div style="font-size:12px;font-weight:700;color:var(--y);margin-bottom:8px">🔐 Daily Session Key (required every day)</div>
+              <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.8">
+                <b style="color:var(--t2)">Step 1:</b> Open login link in <b style="color:var(--t1)">Incognito window</b> → enter your credentials + OTP<br>
+                <b style="color:var(--t2)">Step 2:</b> After login, click <b style="color:var(--t1)">"Regenerate Token"</b> — you'll see your <code style="color:var(--g)">api_session_key</code><br>
+                <b style="color:var(--t2)">Step 3:</b> Copy and paste that key below → click <b style="color:var(--t1)">Save & Sync</b>
+              </div>
+              <button class="btn btn-y btn-sm" onclick="window.open('https://myaccount.definedgesecurities.com','_blank')" style="margin-bottom:12px">🔗 Open Definedge Login</button>
+              <div class="fg" style="margin-bottom:8px">
+                <label class="fl">Paste api_session_key here (renew daily)</label>
+                <input class="fi" id="s-de-session" placeholder="Paste your api_session_key…">
+              </div>
+              <button class="btn btn-green btn-sm" onclick="deManualSession()">💾 Save & Sync</button>
+            </div>
+            <div id="de-session-box" style="display:none;background:var(--gd);border:1px solid rgba(0,229,160,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">✅ Session key active — <span id="de-session-time" style="color:var(--t3)"></span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-ghost btn-sm" onclick="syncDefinedge()">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                Sync Now
+              </button>
+              <div class="fg" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3)">
+                <input type="checkbox" id="de-auto" onchange="toggleAuto('de',this.checked)" style="accent-color:var(--y)"> Auto-sync every 15 min
+              </div>
+            </div>
+            <div id="de-log" style="font-size:11px;color:var(--t3);margin-top:10px"></div>
+
+            <!-- Definedge CSV Import -->
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--b1)">
+              <div style="font-size:11px;font-weight:700;color:var(--y);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📥 Import from Definedge RZone (Free — No API needed)</div>
+              <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.6">
+                <span style="color:var(--t2)">1.</span> Open <b style="color:var(--t1)">Definedge RZone</b> → <b style="color:var(--t1)">Reports</b> → <b style="color:var(--t1)">Trade Report</b><br>
+                <span style="color:var(--t2)">2.</span> Select date range → click <b style="color:var(--t1)">Export to CSV</b><br>
+                <span style="color:var(--t2)">3.</span> Click the button below and upload that file
+              </div>
+              <button class="btn btn-y btn-sm" onclick="openBrokerCSVImport('definedge')">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Upload Definedge Tradebook CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIVE PRICES -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Live Prices</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="live-status" style="font-size:10.5px;color:var(--t3)">Not refreshed</span>
+              <span class="sync-dot" id="live-dot"></span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="font-size:11.5px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+              📡 Live CMP fetched via Yahoo Finance (NSE). Updates open position P&L in real time. No API key needed.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-y btn-sm" onclick="refreshLivePrices(true)">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                Refresh Now
+              </button>
+              <div class="fg" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3)">
+                <input type="checkbox" id="live-auto" onchange="toggleLiveAuto(this.checked)" style="accent-color:var(--y)"> Auto-refresh every 3 min (market hours)
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- ☁️ SUPABASE CLOUD SYNC -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">☁️ Cloud Sync (Supabase)</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="sb-status-txt" style="font-size:10.5px;color:var(--t3)">Not configured</span>
+              <span class="sync-dot" id="sb-dot"></span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="font-size:11.5px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.7">
+              🔐 Sync your trades across all devices using your own <b style="color:var(--y)">Supabase</b> project. Your data stays in your database.<br>
+              <span style="font-size:10.5px">Get your URL &amp; anon key from <b style="color:var(--t1)">supabase.com → Project → Settings → API</b></span>
+              <span id="file-proto-warn" style="display:none;color:var(--r);font-size:10.5px;display:block;margin-top:6px">
+                ⚠️ <b>You are running this file directly (file:// protocol)</b> — browsers block all network requests from local files due to CORS. 
+                Open it via a local server: <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">python -m http.server 8080</code> or VS Code Live Server.
+              </span>
+            </div>
+            <div class="fg2" style="margin-bottom:14px">
+              <div class="fg f-full"><label class="fl">Supabase Project URL</label><input class="fi" id="s-sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
+              <div class="fg f-full"><label class="fl">Anon / Public Key</label><input class="fi" id="s-sb-key" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+              <button class="btn btn-green btn-sm" onclick="saveSbCreds()">💾 Save Credentials</button>
+              <button class="btn btn-y btn-sm" onclick="sbPush()">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                Push to Cloud
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="sbPull()">
+                <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Pull from Cloud
+              </button>
+              <button class="btn btn-sm" style="background:rgba(255,69,96,.15);border:1px solid rgba(255,69,96,.4);color:#FF4560" onclick="sbPull(true)">⚡ Force Pull</button>
+              <button class="btn btn-ghost btn-sm" onclick="sbTestConnection()" title="Test if Supabase is reachable">🔌 Test Connection</button>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3)">
+                <input type="checkbox" id="sb-auto" onchange="toggleSbAuto(this.checked)" style="accent-color:var(--y)"> Auto-sync on every save
+              </div>
+            </div>
+            <div id="sb-log" style="font-size:11px;color:var(--t3);margin-top:4px;min-height:16px"></div>
+            <div id="sb-diag" style="font-size:11px;color:var(--t3);margin-top:6px;padding:6px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--b1)">📦 localStorage: <b id="sb-ls-count">—</b> &nbsp;|&nbsp; 🧠 Memory: <b id="sb-mem-count">—</b> &nbsp;<button onclick="sbDiagRefresh()" style="background:none;border:none;color:var(--y);cursor:pointer;font-size:11px;padding:0">🔄</button></div>
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b1);font-size:10.5px;color:var(--t4);line-height:1.7">
+              ⚠️ The <b style="color:var(--t3t3)">tradedge_trades</b> table — run this SQL once in Supabase → SQL Editor:
+              <pre style="background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:10px;font-size:10px;color:var(--y);overflow-x:auto;margin-top:8px;line-height:1.7">-- ① Fresh install: create table
+CREATE TABLE IF NOT EXISTS tradedge_trades (
+  device_id   TEXT PRIMARY KEY,
+  trades_json TEXT,
+  ledger_json TEXT,
+  cfg_json    TEXT,
+  fund_json   TEXT,
+  alerts_json TEXT,
+  prefs_json  TEXT,
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE tradedge_trades ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON tradedge_trades
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- ② Existing table: add missing columns (run if ledger not syncing)
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS ledger_json TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS cfg_json    TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS fund_json   TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS alerts_json TEXT;
+ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">NSE Symbol Database</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:12px;color:var(--t2)">Update stock symbols from NSE's official listing (~2200+ symbols). Auto-updates whenever you click refresh.</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-y btn-sm" onclick="fetchNSESymbolList()">↻ Refresh NSE Symbols</button>
+              <span id="nse-db-status" style="font-size:11px;color:var(--t3)"></span>
+            </div>
+            <div style="font-size:10px;color:var(--t4)">Source: <a href="https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv" target="_blank" style="color:var(--b)">nsearchives.nseindia.com/content/equities/EQUITY_L.csv</a></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Data</span></div>
+          <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+            <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All Trades</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="page" id="page-rrm">
       <div style="max-width:900px;margin:0 auto">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
