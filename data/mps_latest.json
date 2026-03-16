@@ -127,19 +127,19 @@
         "name": "Crude Oil Stress",
         "triggered": true,
         "adjustment": -5.0,
-        "reason": "Brent $96.9 — high stress, imported inflation risk"
+        "reason": "Brent $96.3 — high stress, imported inflation risk"
       },
       {
         "name": "Global Yield Pressure",
         "triggered": false,
         "adjustment": 0.0,
-        "reason": "US 10Y 4.24% — neutral range (3.8-4.25%)"
+        "reason": "US 10Y 4.22% — neutral range (3.8-4.25%)"
       },
       {
         "name": "Rupee Stress",
         "triggered": false,
         "adjustment": 0.0,
-        "reason": "INR ₹92.23 — stable (+1.8% in 20d)"
+        "reason": "INR ₹92.14 — stable (+1.7% in 20d)"
       }
     ],
     "total_modifier": -10.0,
@@ -182,13 +182,13 @@
       "new_52w_lows": 75,
       "india_vix": 21.6,
       "pcr": 1.0,
-      "fii_net": 0,
+      "fii_net": -10716.64,
       "nifty_52w_high": false
     },
     "macro": {
-      "brent_crude": 96.94,
-      "us10y_yield": 4.24,
-      "usd_inr": 92.23,
+      "brent_crude": 96.32,
+      "us10y_yield": 4.22,
+      "usd_inr": 92.14,
       "usd_inr_20d_ago": 90.57
     },
     "data_sources": {
@@ -196,23 +196,23 @@
       "ad_ratio": "yahoo_finance_estimated",
       "52w_highs_lows": "yahoo_finance_estimated",
       "pcr": "nse_fallback",
-      "fii": "nse_fallback",
+      "fii": "groww_primary_nse_fallback",
       "nifty_52w": "yahoo_finance",
       "macro": "yahoo_finance"
     }
   },
   "state": {
     "structural_bull_streak": 0,
-    "fii_consecutive_sell_days": 0,
-    "fii_5day_net": 0
+    "fii_consecutive_sell_days": 1,
+    "fii_5day_net": -10716.64
   },
   "metadata": {
-    "version": "3.1.1",
-    "generated_at": "2026-03-16T13:11:17.880821",
+    "version": "3.1.2",
+    "generated_at": "2026-03-16T14:25:12.653995",
     "universe": "Nifty 500",
     "pillars": 7,
     "modifiers": 9,
     "daily_inputs": 21,
-    "note": "Market data via Yahoo Finance (NSE IP-blocked on GitHub Actions)"
+    "note": "FII via Groww.in, market data via Yahoo Finance (NSE IP-blocked on GH Actions)"
   }
 }
