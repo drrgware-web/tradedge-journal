@@ -2380,6 +2380,19 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
         </div>
       </div>
 
+      <!-- All Positions RRG Chart -->
+      <div class="card" style="padding:12px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">📊 All Positions — Relative Rotation Matrix vs Nifty 50</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="allRrgSetTF('daily')" id="allrrg-tf-d" class="btn btn-ghost btn-xs" style="border:1px solid #00e5ff;color:#00e5ff;font-weight:700">Daily</button>
+            <button onclick="allRrgSetTF('weekly')" id="allrrg-tf-w" class="btn btn-ghost btn-xs" style="border:1px solid var(--b2);color:var(--t4)">Weekly</button>
+          </div>
+        </div>
+        <canvas id="all-rrg-canvas" width="960" height="480" style="width:100%;border-radius:8px;background:#080d14;cursor:crosshair"></canvas>
+        <div id="all-rrg-status" style="font-size:10px;color:var(--t4);margin-top:4px"></div>
+      </div>
+
       <!-- 2-Column Layout: Position Scanner | Fundamentals -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
 
@@ -3438,7 +3451,7 @@ function renderDash(){
     <td class="${g.totalUnreal>=0?'col-g':'col-r'} mono">${fmt(g.totalUnreal)}</td>
     <td><span class="rbdg ${g.avgRR>0?'pos':g.avgRR<0?'neg':'neu'}">${g.avgRR.toFixed(2)}R</span></td>
     <td class="mono">${g.holdDays}d</td>
-    <td><button class="btn btn-ghost btn-xs" onclick="openChart('${g.id}')">📈 Chart</button></td>
+    <td><button class="btn btn-ghost btn-xs" onclick="openChart('${g.id}')">📈 Chart</button><button class="btn btn-ghost btn-xs" onclick="openMiniRRG('${g.symbol}')" style="margin-left:4px" title="Mini RRG">🎯</button></td>
   </tr>`).join('')+'</tbody></table>';
 }
 
@@ -7285,7 +7298,26 @@ setTimeout(() => {
   setPbmMode(savedMode);
 }, 1200);
 
-// ── RRM Position Intelligence: no auto-run on boot. User clicks Refresh. ──
+// ── RRM Position Intelligence: auto-refresh every 15 min during market hours ──
+let _rrmAutoInterval = null;
+function startRrmAutoRefresh(){
+  if(_rrmAutoInterval) return;
+  // Initial run after 8 seconds
+  setTimeout(()=>{
+    const ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+    const h=ist.getHours(),mi=ist.getMinutes(),day=ist.getDay();
+    const mktOpen=day>=1&&day<=5&&(h>9||(h===9&&mi>=15))&&(h<15||(h===15&&mi<=30));
+    if(mktOpen && trades.some(t=>t.status==='Open'||t.status==='Partial')) rrmRefresh(true);
+  }, 8000);
+  // Then every 15 min
+  _rrmAutoInterval = setInterval(()=>{
+    const ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+    const h=ist.getHours(),mi=ist.getMinutes(),day=ist.getDay();
+    const mktOpen=day>=1&&day<=5&&(h>9||(h===9&&mi>=15))&&(h<15||(h===15&&mi<=30));
+    if(mktOpen && trades.some(t=>t.status==='Open'||t.status==='Partial')) rrmRefresh(true);
+  }, 15*60*1000);
+}
+startRrmAutoRefresh();
 
 setTimeout(() => {
   // Supabase cloud sync (only if enabled)
@@ -10032,6 +10064,249 @@ function execFromPosSize(){
     execFetchPrice(sym);
   },200);
 }
+// ══════════════════════════════════════════════════
+// ALL POSITIONS RRG CHART
+// ══════════════════════════════════════════════════
+let _allRrgTF='daily',_allRrgData={},_allRrgComputed=false;
+const _allRrgColors=['#00e5ff','#f59e0b','#22c55e','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1','#14b8a6','#d946ef','#0ea5e9','#eab308','#a855f7','#fb923c','#34d399','#3b82f6','#fbbf24','#64748b'];
+
+function allRrgSetTF(tf){
+  _allRrgTF=tf;
+  const d=document.getElementById('allrrg-tf-d'),w=document.getElementById('allrrg-tf-w');
+  if(d)d.style.cssText=tf==='daily'?'border:1px solid #00e5ff;color:#00e5ff;font-weight:700':'border:1px solid var(--b2);color:var(--t4)';
+  if(w)w.style.cssText=tf==='weekly'?'border:1px solid #00e5ff;color:#00e5ff;font-weight:700':'border:1px solid var(--b2);color:var(--t4)';
+  allRrgDraw();
+}
+
+async function allRrgCompute(){
+  const syms=[...new Set(trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol.toUpperCase()).filter(Boolean))];
+  if(!syms.length) return;
+  const st=document.getElementById('all-rrg-status');
+  if(st) st.textContent=`Computing RRM for ${syms.length} positions...`;
+  try{
+    const [bD,bW]=await Promise.all([rrmFetchYahooHistory('^NSEI','1y','1d'),rrmFetchYahooHistory('^NSEI','2y','1wk')]);
+    if(!bD||!bW){if(st)st.textContent='⚠️ Benchmark fetch failed';return;}
+    for(let i=0;i<syms.length;i+=5){
+      const batch=syms.slice(i,i+5);
+      await Promise.all(batch.map(async sym=>{
+        const tk=sym+'.NS';
+        const [sD,sW]=await Promise.all([rrmFetchYahooHistory(tk,'1y','1d'),rrmFetchYahooHistory(tk,'2y','1wk')]);
+        const dT=sD?miniRrgTrail(sD.map(v=>v.close),bD.map(v=>v.close),sD.map(v=>v.ts),10,10):null;
+        const wT=sW?miniRrgTrail(sW.map(v=>v.close),bW.map(v=>v.close),sW.map(v=>v.ts),10,8):null;
+        _allRrgData[sym]={daily:dT,weekly:wT,color:_allRrgColors[Object.keys(_allRrgData).length%_allRrgColors.length]};
+      }));
+    }
+    _allRrgComputed=true;
+    if(st)st.textContent=`✓ ${syms.length} positions computed · ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+    allRrgDraw();
+  }catch(e){if(st)st.textContent='Error: '+e.message;}
+}
+
+function allRrgDraw(){
+  const c=document.getElementById('all-rrg-canvas');if(!c)return;
+  const ctx=c.getContext('2d'),W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#080d14';ctx.fillRect(0,0,W,H);
+
+  // Collect all trails for scale
+  const allTrails=[];
+  Object.entries(_allRrgData).forEach(([sym,d])=>{
+    const trail=d[_allRrgTF];
+    if(trail&&trail.length) allTrails.push({sym,trail,color:d.color});
+  });
+
+  let rMin=96,rMax=104,mMin=96,mMax=104;
+  allTrails.forEach(({trail})=>trail.forEach(p=>{rMin=Math.min(rMin,p.r-0.5);rMax=Math.max(rMax,p.r+0.5);mMin=Math.min(mMin,p.m-0.5);mMax=Math.max(mMax,p.m+0.5)}));
+  rMin-=2;rMax+=2;mMin-=2;mMax+=2;
+
+  const mg={l:48,r:16,t:24,b:28},cw=W-mg.l-mg.r,ch=H-mg.t-mg.b;
+  const tX=v=>mg.l+(v-rMin)/(rMax-rMin)*cw,tY=v=>mg.t+(1-(v-mMin)/(mMax-mMin))*ch;
+  const cx=tX(100),cy=tY(100);
+
+  // Quadrant fills
+  ctx.fillStyle='rgba(0,255,100,0.04)';ctx.fillRect(cx,mg.t,W-mg.r-cx,cy-mg.t);
+  ctx.fillStyle='rgba(59,130,246,0.04)';ctx.fillRect(mg.l,mg.t,cx-mg.l,cy-mg.t);
+  ctx.fillStyle='rgba(249,115,22,0.04)';ctx.fillRect(cx,cy,W-mg.r-cx,H-mg.b-cy);
+  ctx.fillStyle='rgba(239,68,68,0.04)';ctx.fillRect(mg.l,cy,cx-mg.l,H-mg.b-cy);
+
+  // Grid lines
+  ctx.strokeStyle='#1e293b';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx,mg.t);ctx.lineTo(cx,H-mg.b);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(mg.l,cy);ctx.lineTo(W-mg.r,cy);ctx.stroke();
+
+  // Labels
+  ctx.font='11px sans-serif';ctx.globalAlpha=0.3;
+  ctx.fillStyle='#22c55e';ctx.fillText('LEADING',cx+8,mg.t+16);
+  ctx.fillStyle='#3b82f6';ctx.fillText('IMPROVING',mg.l+4,mg.t+16);
+  ctx.fillStyle='#f97316';ctx.fillText('WEAKENING',cx+8,H-mg.b-8);
+  ctx.fillStyle='#ef4444';ctx.fillText('LAGGING',mg.l+4,H-mg.b-8);
+  ctx.globalAlpha=1;
+
+  // Axes
+  ctx.fillStyle='#475569';ctx.font='9px sans-serif';
+  ctx.save();ctx.translate(13,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('JdK RS-Momentum',0,0);ctx.restore();
+  ctx.fillText('JdK RS-Ratio',W/2-28,H-5);
+  ctx.fillStyle='#334155';ctx.font='9px monospace';
+  for(let v=Math.ceil(rMin);v<=Math.floor(rMax);v+=2)ctx.fillText(v,tX(v)-8,H-mg.b+14);
+  for(let v=Math.ceil(mMin);v<=Math.floor(mMax);v+=2)ctx.fillText(v,2,tY(v)+3);
+
+  if(!allTrails.length){
+    ctx.fillStyle='#64748b';ctx.font='13px sans-serif';
+    ctx.fillText('Click Refresh to compute RRM for open positions',W/2-170,H/2);
+    return;
+  }
+
+  // Draw each stock's trail
+  allTrails.forEach(({sym,trail,color})=>{
+    // Trail line
+    ctx.shadowColor=color;ctx.shadowBlur=6;
+    ctx.beginPath();
+    trail.forEach((p,i)=>{const x=tX(p.r),y=tY(p.m);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
+    ctx.shadowBlur=0;
+
+    // Dots
+    trail.forEach((p,i)=>{
+      const x=tX(p.r),y=tY(p.m),last=i===trail.length-1;
+      ctx.globalAlpha=0.3+0.7*(i/(trail.length-1));
+      ctx.beginPath();ctx.arc(x,y,last?5:2,0,Math.PI*2);
+      ctx.fillStyle=color;ctx.fill();
+      if(last){
+        ctx.strokeStyle='#0c1018';ctx.lineWidth=1.5;ctx.stroke();
+        // Pulsing glow
+        const pulse=Math.sin(Date.now()/300)*0.5+0.5;
+        ctx.globalAlpha=0.15+0.25*pulse;
+        ctx.beginPath();ctx.arc(x,y,8+3*pulse,0,Math.PI*2);
+        ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    });
+
+    // Label
+    const cur=trail[trail.length-1];
+    ctx.font='bold 10px sans-serif';ctx.fillStyle=color;
+    ctx.fillText(sym,tX(cur.r)+8,tY(cur.m)-6);
+  });
+}
+
+// Hook into rrmRefresh to auto-compute all-positions RRG
+const _origRrmRefresh=rrmRefresh;
+rrmRefresh=async function(silent=false){
+  await _origRrmRefresh(silent);
+  await allRrgCompute();
+};
+
+// Animate all-positions RRG
+(function _allRrgPulse(){requestAnimationFrame(_allRrgPulse);
+  const c=document.getElementById('all-rrg-canvas');
+  if(c&&c.offsetParent!==null&&_allRrgComputed) allRrgDraw();
+})();
+
+// ══════════════════════════════════════════════════
+// MINI RRG POPUP
+// ══════════════════════════════════════════════════
+async function openMiniRRG(symbol){
+  let modal=document.getElementById('mini-rrg-modal');
+  if(!modal){
+    modal=document.createElement('div');modal.id='mini-rrg-modal';
+    modal.innerHTML=`<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeMiniRRG()"><div style="background:#0c1018;border:1px solid #1e293b;border-radius:12px;width:520px;max-width:95vw;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.8)"><div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e293b"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px">🎯</span><span id="mini-rrg-title" style="font-size:14px;font-weight:700;color:#e2e8f0">Mini RRG</span></div><div style="display:flex;gap:8px;align-items:center"><button onclick="miniRrgSetTF('daily')" id="mini-tf-d" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid #00e5ff;background:#00e5ff22;color:#00e5ff;cursor:pointer;font-weight:700">Daily</button><button onclick="miniRrgSetTF('weekly')" id="mini-tf-w" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid #334155;background:transparent;color:#64748b;cursor:pointer;font-weight:600">Weekly</button><button onclick="closeMiniRRG()" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;padding:0 4px">✕</button></div></div><div style="padding:12px 18px"><div id="mini-rrg-status" style="color:#64748b;font-size:11px;margin-bottom:8px">Loading...</div><canvas id="mini-rrg-canvas" width="480" height="380" style="width:100%;border-radius:8px;background:#080d14"></canvas><div id="mini-rrg-info" style="margin-top:10px;display:flex;gap:16px;font-size:11px;color:#94a3b8;flex-wrap:wrap"></div></div></div></div>`;
+    document.body.appendChild(modal);
+  }
+  modal.style.display='block';
+  document.getElementById('mini-rrg-title').textContent=symbol+' — Mini RRG vs Nifty 50';
+  document.getElementById('mini-rrg-status').textContent='Fetching data...';
+  _miniRrgSym=symbol;_miniRrgTF='daily';
+  document.getElementById('mini-tf-d').style.cssText='font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid #00e5ff;background:#00e5ff22;color:#00e5ff;cursor:pointer;font-weight:700';
+  document.getElementById('mini-tf-w').style.cssText='font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid #334155;background:transparent;color:#64748b;cursor:pointer;font-weight:600';
+  await miniRrgCompute(symbol);
+}
+function closeMiniRRG(){const m=document.getElementById('mini-rrg-modal');if(m)m.style.display='none';}
+let _miniRrgSym='',_miniRrgTF='daily',_miniRrgCache={};
+function miniRrgSetTF(tf){
+  _miniRrgTF=tf;
+  const act='font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid #00e5ff;background:#00e5ff22;color:#00e5ff;cursor:pointer;font-weight:700';
+  const off='font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid #334155;background:transparent;color:#64748b;cursor:pointer;font-weight:600';
+  document.getElementById('mini-tf-d').style.cssText=tf==='daily'?act:off;
+  document.getElementById('mini-tf-w').style.cssText=tf==='weekly'?act:off;
+  miniRrgDraw();
+}
+async function miniRrgCompute(sym){
+  const ticker=sym.includes('.')?sym:sym+'.NS';
+  if(_miniRrgCache[ticker]&&Date.now()-_miniRrgCache[ticker].ts<300000){miniRrgDraw();return;}
+  try{
+    const [sD,sW,bD,bW]=await Promise.all([rrmFetchYahooHistory(ticker,'1y','1d'),rrmFetchYahooHistory(ticker,'2y','1wk'),rrmFetchYahooHistory('^NSEI','1y','1d'),rrmFetchYahooHistory('^NSEI','2y','1wk')]);
+    const dT=sD&&bD?miniRrgTrail(sD.map(v=>v.close),bD.map(v=>v.close),sD.map(v=>v.ts)):null;
+    const wT=sW&&bW?miniRrgTrail(sW.map(v=>v.close),bW.map(v=>v.close),sW.map(v=>v.ts)):null;
+    _miniRrgCache[ticker]={daily:dT,weekly:wT,ts:Date.now()};
+    document.getElementById('mini-rrg-status').textContent='';miniRrgDraw();
+  }catch(e){document.getElementById('mini-rrg-status').textContent='Error: '+e.message;}
+}
+function miniRrgTrail(sc,bc,ts,w=10,tail=12){
+  const n=Math.min(sc.length,bc.length);if(n<w*3)return null;
+  const s=sc.slice(-n),b=bc.slice(-n),t=ts.slice(-n);
+  const rr=s.map((v,i)=>b[i]>0?v/b[i]:1);
+  const rn=new Array(rr.length).fill(NaN);
+  for(let i=w-1;i<rr.length;i++){let sm=0;for(let j=i-w+1;j<=i;j++)sm+=rr[j];rn[i]=sm/w>0?(rr[i]/(sm/w)*100):100;}
+  const a=2/(w+1),ratio=new Array(rn.length).fill(NaN);ratio[w-1]=rn[w-1];
+  for(let i=w;i<rn.length;i++){if(!isNaN(rn[i])&&!isNaN(ratio[i-1]))ratio[i]=a*rn[i]+(1-a)*ratio[i-1];}
+  const mom=new Array(ratio.length).fill(NaN);
+  for(let i=w;i<ratio.length;i++){if(!isNaN(ratio[i])&&!isNaN(ratio[i-w])){const p=ratio[i-w];mom[i]=p>0?(ratio[i]/p*100):100;}}
+  const v=[];for(let i=0;i<ratio.length;i++){if(!isNaN(ratio[i])&&!isNaN(mom[i]))v.push({r:Math.round(ratio[i]*100)/100,m:Math.round(mom[i]*100)/100,t:t[i]||0});}
+  return v.slice(-tail);
+}
+function miniRrgDraw(){
+  const c=document.getElementById('mini-rrg-canvas');if(!c)return;
+  const ctx=c.getContext('2d'),W=c.width,H=c.height;
+  const tk=_miniRrgSym.includes('.')?_miniRrgSym:_miniRrgSym+'.NS';
+  const cache=_miniRrgCache[tk];const trail=cache?cache[_miniRrgTF]:null;
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#080d14';ctx.fillRect(0,0,W,H);
+  let rMin=96,rMax=104,mMin=96,mMax=104;
+  if(trail&&trail.length){trail.forEach(p=>{rMin=Math.min(rMin,p.r-1);rMax=Math.max(rMax,p.r+1);mMin=Math.min(mMin,p.m-1);mMax=Math.max(mMax,p.m+1)});rMin-=2;rMax+=2;mMin-=2;mMax+=2;}
+  const mg={l:42,r:12,t:22,b:22},cw=W-mg.l-mg.r,ch=H-mg.t-mg.b;
+  const tX=v=>mg.l+(v-rMin)/(rMax-rMin)*cw,tY=v=>mg.t+(1-(v-mMin)/(mMax-mMin))*ch;
+  const cx=tX(100),cy=tY(100);
+  ctx.fillStyle='rgba(0,255,100,0.04)';ctx.fillRect(cx,mg.t,W-mg.r-cx,cy-mg.t);
+  ctx.fillStyle='rgba(59,130,246,0.04)';ctx.fillRect(mg.l,mg.t,cx-mg.l,cy-mg.t);
+  ctx.fillStyle='rgba(249,115,22,0.04)';ctx.fillRect(cx,cy,W-mg.r-cx,H-mg.b-cy);
+  ctx.fillStyle='rgba(239,68,68,0.04)';ctx.fillRect(mg.l,cy,cx-mg.l,H-mg.b-cy);
+  ctx.strokeStyle='#1e293b';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx,mg.t);ctx.lineTo(cx,H-mg.b);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(mg.l,cy);ctx.lineTo(W-mg.r,cy);ctx.stroke();
+  ctx.font='10px sans-serif';ctx.globalAlpha=0.35;
+  ctx.fillStyle='#22c55e';ctx.fillText('LEADING',cx+6,mg.t+13);
+  ctx.fillStyle='#3b82f6';ctx.fillText('IMPROVING',mg.l+3,mg.t+13);
+  ctx.fillStyle='#f97316';ctx.fillText('WEAKENING',cx+6,H-mg.b-5);
+  ctx.fillStyle='#ef4444';ctx.fillText('LAGGING',mg.l+3,H-mg.b-5);
+  ctx.globalAlpha=1;ctx.fillStyle='#334155';ctx.font='8px monospace';
+  for(let v=Math.ceil(rMin);v<=Math.floor(rMax);v+=2)ctx.fillText(v,tX(v)-6,H-mg.b+12);
+  for(let v=Math.ceil(mMin);v<=Math.floor(mMax);v+=2)ctx.fillText(v,1,tY(v)+3);
+  ctx.fillStyle='#475569';ctx.font='9px sans-serif';
+  ctx.save();ctx.translate(11,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('RS-Momentum',0,0);ctx.restore();
+  ctx.fillText('RS-Ratio',W/2-18,H-3);
+  if(!trail||!trail.length){ctx.fillStyle='#64748b';ctx.font='13px sans-serif';ctx.fillText('No data available',W/2-50,H/2);return;}
+  const col='#00e5ff';ctx.shadowColor=col;ctx.shadowBlur=8;
+  ctx.beginPath();trail.forEach((p,i)=>{const x=tX(p.r),y=tY(p.m);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+  ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();ctx.shadowBlur=0;
+  trail.forEach((p,i)=>{
+    const x=tX(p.r),y=tY(p.m),last=i===trail.length-1,op=0.3+0.7*(i/(trail.length-1));
+    ctx.globalAlpha=op;ctx.beginPath();const r=last?6:2.5;ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+    if(last){ctx.strokeStyle='#0c1018';ctx.lineWidth=2;ctx.stroke();
+      const pulse=Math.sin(Date.now()/300)*0.5+0.5;
+      ctx.globalAlpha=0.2+0.3*pulse;ctx.beginPath();ctx.arc(x,y,r+4+3*pulse,0,Math.PI*2);ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+      ctx.globalAlpha=0.4+0.5*pulse;ctx.beginPath();ctx.arc(x,y,r*0.4,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+    }ctx.globalAlpha=1;
+  });
+  if(trail.length>=2){const l=trail[trail.length-1],p=trail[trail.length-2],lx=tX(l.r),ly=tY(l.m),px=tX(p.r),py=tY(p.m),a=Math.atan2(ly-py,lx-px),al=10;
+    ctx.fillStyle=col;ctx.globalAlpha=0.8;ctx.beginPath();ctx.moveTo(lx+al*Math.cos(a),ly+al*Math.sin(a));ctx.lineTo(lx+al*Math.cos(a+2.5),ly+al*Math.sin(a+2.5));ctx.lineTo(lx+al*Math.cos(a-2.5),ly+al*Math.sin(a-2.5));ctx.closePath();ctx.fill();ctx.globalAlpha=1;}
+  const cur=trail[trail.length-1],qd=cur.r>=100&&cur.m>=100?'Leading':cur.r>=100?'Weakening':cur.m>=100?'Improving':'Lagging';
+  const qC={Leading:'#22c55e',Weakening:'#f97316',Improving:'#3b82f6',Lagging:'#ef4444'};
+  ctx.font='bold 11px sans-serif';ctx.fillStyle=qC[qd]||'#fff';ctx.fillText(_miniRrgSym+' · '+qd,tX(cur.r)+10,tY(cur.m)-8);
+  const info=document.getElementById('mini-rrg-info');
+  if(info){const dt=cur.t?new Date(cur.t*1000).toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
+    info.innerHTML=`<div><span style="color:#64748b">RS-Ratio:</span> <b style="color:#e2e8f0">${cur.r.toFixed(2)}</b></div><div><span style="color:#64748b">RS-Mom:</span> <b style="color:#e2e8f0">${cur.m.toFixed(2)}</b></div><div><span style="color:#64748b">Quadrant:</span> <b style="color:${qC[qd]}">${qd}</b></div><div><span style="color:#64748b">Trail:</span> <b style="color:#e2e8f0">${trail.length} pts</b></div>${dt?`<div><span style="color:#64748b">As of:</span> <b style="color:#e2e8f0">${dt}</b></div>`:''}`;
+  }
+}
+let _miniRrgAnimId=0;
+(function _miniPulse(){_miniRrgAnimId=requestAnimationFrame(_miniPulse);const m=document.getElementById('mini-rrg-modal');if(m&&m.style.display==='block')miniRrgDraw()})();
 
 </script>
 </body>
