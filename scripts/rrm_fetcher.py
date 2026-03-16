@@ -62,38 +62,11 @@ def DEFAULT_CONFIG():
             "^CNXCONSUM":   {"name": "Nifty Consumption",  "color": "#e879f9"},
             "^CNXCMDT":     {"name": "Nifty Commodities",  "color": "#d97706"},
             "^CNXMNC":      {"name": "Nifty MNC",          "color": "#64748b"},
-            # ── NEW: 30 additional sectors from Definedge ──
-            # Yahoo Finance uses underscores for NSE index tickers with spaces
-            "NIFTY_CONSR_DURBL.NS":  {"name": "Nifty Consumer Durables",  "color": "#fb7185"},
-            "NIFTY_HEALTHCARE.NS":   {"name": "Nifty Healthcare",         "color": "#34d399"},
-            "NIFTY_IND_DIGITAL.NS":  {"name": "Nifty India Digital",      "color": "#60a5fa"},
-            "NIFTY_INDIA_MFG.NS":    {"name": "Nifty India Mfg",          "color": "#a78bfa"},
-            "NIFTY_OIL_AND_GAS.NS":  {"name": "Nifty Oil & Gas",          "color": "#fbbf24"},
-            "NIFTY_CPSE.NS":         {"name": "Nifty CPSE",               "color": "#4ade80"},
-            "NIFTY_CAPITAL_MKT.NS":  {"name": "Nifty Capital Mkt",        "color": "#f472b6"},
-            "NIFTY_CHEMICALS.NS":    {"name": "Nifty Chemicals",          "color": "#c084fc"},
-            "NIFTY_COREHOUSING.NS":  {"name": "Nifty CoreHousing",        "color": "#fca5a5"},
-            "NIFTY_CORP_MAATR.NS":   {"name": "Nifty Corp MAATR",         "color": "#86efac"},
-            "NIFTY_EV.NS":           {"name": "Nifty EV",                 "color": "#67e8f9"},
-            "NIFTYFINSRV25_50.NS":   {"name": "Nifty FinSrv25 50",       "color": "#d8b4fe"},
-            "NIFTY_HOUSING.NS":      {"name": "Nifty Housing",            "color": "#fda4af"},
-            "NIFTY_IND_DEFENCE.NS":  {"name": "Nifty India Defence",      "color": "#bef264"},
-            "NIFTY_IND_TOURISM.NS":  {"name": "Nifty India Tourism",      "color": "#5eead4"},
-            "NIFTY_INFRALOG.NS":     {"name": "Nifty InfraLog",           "color": "#93c5fd"},
-            "NIFTY_INTERNET.NS":     {"name": "Nifty Internet",           "color": "#fcd34d"},
-            "NIFTY_MS_FIN_SERV.NS":  {"name": "Nifty MS Fin Serv",       "color": "#c4b5fd"},
-            "NIFTY_MS_IT_TELCM.NS":  {"name": "Nifty MS IT Telecom",     "color": "#7dd3fc"},
-            "NIFTY_MS_IND_CONS.NS":  {"name": "Nifty MS Ind Consumers",  "color": "#fdba74"},
-            "NIFTY_MIDSML_HLTH.NS":  {"name": "Nifty MidSml Health",     "color": "#6ee7b7"},
-            "NIFTY_MOBILITY.NS":     {"name": "Nifty Mobility",           "color": "#fca5a5"},
-            "NIFTY_NEW_CONSUMP.NS":  {"name": "Nifty New Consumption",   "color": "#a5b4fc"},
-            "NIFTY_NONCYC_CONS.NS":  {"name": "Nifty NonCyclic Cons",    "color": "#86efac"},
+            # ── Additional sectors (only those with working Yahoo Finance API data) ──
             "^CNXPSE":               {"name": "Nifty PSE",                "color": "#fde68a"},
-            "NIFTY_PVT_BANK.NS":     {"name": "Nifty Pvt Bank",          "color": "#99f6e4"},
-            "NIFTY_RURAL.NS":        {"name": "Nifty Rural",              "color": "#e9d5ff"},
-            "NIFTY_FINSEREXBNK.NS":  {"name": "Nifty FinServ Ex-Bank",   "color": "#bae6fd"},
-            "NIFTY_TRANS_LOGIS.NS":  {"name": "Nifty Transport Logistics","color": "#fed7aa"},
-            "NIFTY_WAVES.NS":        {"name": "Nifty Waves",              "color": "#c7d2fe"},
+            # NOTE: 29 newer NSE thematic indices (Healthcare, EV, Defence, Digital, etc.)
+            # are not available via yfinance API as of March 2026. Their themes are covered
+            # by corresponding ETFs in the ETFs section below. Re-check periodically.
         },
         # ═══════════════════════════════════════════════════════
         # 54 ETFs (full Definedge universe)
@@ -154,7 +127,6 @@ def DEFAULT_CONFIG():
             "OILIETF.NS":     {"name": "Oil & Gas ETF",        "color": "#fbbf24"},
             "PVTBANIETF.NS":  {"name": "Pvt Bank ETF",         "color": "#99f6e4"},
             "SELECTIPO.NS":   {"name": "Select IPO ETF",       "color": "#fda4af"},
-            "TNDETF.NS":      {"name": "Digital ETF",           "color": "#7dd3fc"},
             "TOP10ADD.NS":    {"name": "Top 10 ETF",            "color": "#fed7aa"},
         },
         # ── Asset classes (unchanged from v3.1) ──
@@ -226,25 +198,12 @@ def quadrant(r, m):
 # =============================================================================
 def fetch_prices(symbols, period="5y"):
     log.info(f"Fetching {len(symbols)} symbols from Yahoo Finance...")
-    from datetime import timedelta
-    
-    # Map period string to days for fallback start/end approach
-    period_days = {"1y": 365, "2y": 730, "3y": 1095, "5y": 1825, "10y": 3650, "max": 7300}
-    days = period_days.get(period, 1825)
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
-    start_str = start_date.strftime("%Y-%m-%d")
-    end_str = end_date.strftime("%Y-%m-%d")
-    
     out = {}
-    retry_syms = []
-    
-    # PASS 1: Try Ticker.history(period=...) for all symbols
     for sym in symbols:
         try:
             h = yf.Ticker(sym).history(period=period, interval="1d")
             if h.empty or len(h) < 30:
-                retry_syms.append(sym)
+                log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows")
                 continue
             out[sym] = {
                 "closes": h['Close'].dropna().tolist(),
@@ -252,33 +211,7 @@ def fetch_prices(symbols, period="5y"):
             }
             log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days")
         except Exception as e:
-            retry_syms.append(sym)
-    
-    # PASS 2: Retry failed symbols with yf.download(start=..., end=...)
-    if retry_syms:
-        log.info(f"  Retrying {len(retry_syms)} symbols with yf.download(start/end)...")
-        for sym in retry_syms:
-            try:
-                h = yf.download(sym, start=start_str, end=end_str, interval="1d", progress=False, auto_adjust=True)
-                if hasattr(h.columns, 'levels'):
-                    h.columns = h.columns.droplevel(1)
-                if h.empty or len(h) < 30:
-                    # PASS 3: Last resort — try period="max"
-                    h = yf.download(sym, period="max", interval="1d", progress=False, auto_adjust=True)
-                    if hasattr(h.columns, 'levels'):
-                        h.columns = h.columns.droplevel(1)
-                if h.empty or len(h) < 30:
-                    log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows (all methods failed)")
-                    continue
-                closes = h['Close'].dropna()
-                out[sym] = {
-                    "closes": closes.tolist(),
-                    "dates": [d.strftime("%Y-%m-%d") for d in closes.index],
-                }
-                log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days (via download fallback)")
-            except Exception as e:
-                log.error(f"  ✗ {sym}: {e}")
-    
+            log.error(f"  ✗ {sym}: {e}")
     log.info(f"  Total fetched: {len(out)}/{len(symbols)} symbols")
     return out
 
