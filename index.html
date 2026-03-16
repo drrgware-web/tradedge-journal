@@ -10093,23 +10093,32 @@ async function allRrgCompute(){
     const wLive=_rrmLiveData.weekly?.[sym];
 
     // Build trail from pre-computed rrm_data.json (has .tail array)
-    const dTrail=(dIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
-    const wTrail=(wIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
+    let dTrail=(dIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
+    let wTrail=(wIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
 
-    // If live data exists, append as latest point
-    if(dLive && dTrail.length){
+    // If no pre-computed trail but live data exists, create single-point trail
+    if(!dTrail.length && dLive){
+      dTrail=[{r:dLive.rs_ratio,m:dLive.rs_momentum,t:0}];
+    } else if(dLive && dTrail.length){
       const last=dTrail[dTrail.length-1];
       if(Math.abs(last.r-dLive.rs_ratio)>0.01||Math.abs(last.m-dLive.rs_momentum)>0.01)
         dTrail.push({r:dLive.rs_ratio,m:dLive.rs_momentum,t:0});
-    } else if(dLive){
-      dTrail.push({r:dLive.rs_ratio,m:dLive.rs_momentum,t:0});
     }
-    if(wLive && wTrail.length){
+
+    if(!wTrail.length && wLive){
+      wTrail=[{r:wLive.rs_ratio,m:wLive.rs_momentum,t:0}];
+    } else if(wLive && wTrail.length){
       const last=wTrail[wTrail.length-1];
       if(Math.abs(last.r-wLive.rs_ratio)>0.01||Math.abs(last.m-wLive.rs_momentum)>0.01)
         wTrail.push({r:wLive.rs_ratio,m:wLive.rs_momentum,t:0});
-    } else if(wLive){
-      wTrail.push({r:wLive.rs_ratio,m:wLive.rs_momentum,t:0});
+    }
+
+    // Also check pre-computed current point (no trail but has .current)
+    if(!dTrail.length && dIdx?.current){
+      dTrail=[{r:dIdx.current.rs_ratio,m:dIdx.current.rs_momentum,t:0}];
+    }
+    if(!wTrail.length && wIdx?.current){
+      wTrail=[{r:wIdx.current.rs_ratio,m:wIdx.current.rs_momentum,t:0}];
     }
 
     if(dTrail.length||wTrail.length){
@@ -10119,13 +10128,18 @@ async function allRrgCompute(){
   });
 
   _allRrgComputed=found>0;
-  if(st) st.textContent=found?`✓ ${found}/${syms.length} positions plotted · ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`:'No RRM data available — try Refresh during market hours';
+  if(st) st.textContent=found?`✓ ${found}/${syms.length} positions plotted · ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`:'No RRM data — click Refresh during market hours';
   allRrgDraw();
 }
 
 function allRrgDraw(){
   const c=document.getElementById('all-rrg-canvas');if(!c)return;
-  const ctx=c.getContext('2d'),W=c.width,H=c.height;
+  const dpr=window.devicePixelRatio||1;
+  const dispW=c.clientWidth,dispH=c.clientHeight||Math.round(dispW*0.5);
+  if(c.width!==dispW*dpr||c.height!==dispH*dpr){c.width=dispW*dpr;c.height=dispH*dpr;}
+  const ctx=c.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W=dispW,H=dispH;
   ctx.clearRect(0,0,W,H);ctx.fillStyle='#080d14';ctx.fillRect(0,0,W,H);
 
   // Collect all trails for scale
