@@ -10082,24 +10082,45 @@ async function allRrgCompute(){
   const syms=[...new Set(trades.filter(t=>t.status==='Open'||t.status==='Partial').map(t=>t.symbol.toUpperCase()).filter(Boolean))];
   if(!syms.length) return;
   const st=document.getElementById('all-rrg-status');
-  if(st) st.textContent=`Computing RRM for ${syms.length} positions...`;
-  try{
-    const [bD,bW]=await Promise.all([rrmFetchYahooHistory('^NSEI','1y','1d'),rrmFetchYahooHistory('^NSEI','2y','1wk')]);
-    if(!bD||!bW){if(st)st.textContent='⚠️ Benchmark fetch failed';return;}
-    for(let i=0;i<syms.length;i+=5){
-      const batch=syms.slice(i,i+5);
-      await Promise.all(batch.map(async sym=>{
-        const tk=sym+'.NS';
-        const [sD,sW]=await Promise.all([rrmFetchYahooHistory(tk,'1y','1d'),rrmFetchYahooHistory(tk,'2y','1wk')]);
-        const dT=sD?miniRrgTrail(sD.map(v=>v.close),bD.map(v=>v.close),sD.map(v=>v.ts),10,10):null;
-        const wT=sW?miniRrgTrail(sW.map(v=>v.close),bW.map(v=>v.close),sW.map(v=>v.ts),10,8):null;
-        _allRrgData[sym]={daily:dT,weekly:wT,color:_allRrgColors[Object.keys(_allRrgData).length%_allRrgColors.length]};
-      }));
+
+  _allRrgData={};
+  let found=0;
+
+  syms.forEach((sym,i)=>{
+    const dIdx=_rrmStockIndex.daily?.[sym];
+    const wIdx=_rrmStockIndex.weekly?.[sym];
+    const dLive=_rrmLiveData.daily?.[sym];
+    const wLive=_rrmLiveData.weekly?.[sym];
+
+    // Build trail from pre-computed rrm_data.json (has .tail array)
+    const dTrail=(dIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
+    const wTrail=(wIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
+
+    // If live data exists, append as latest point
+    if(dLive && dTrail.length){
+      const last=dTrail[dTrail.length-1];
+      if(Math.abs(last.r-dLive.rs_ratio)>0.01||Math.abs(last.m-dLive.rs_momentum)>0.01)
+        dTrail.push({r:dLive.rs_ratio,m:dLive.rs_momentum,t:0});
+    } else if(dLive){
+      dTrail.push({r:dLive.rs_ratio,m:dLive.rs_momentum,t:0});
     }
-    _allRrgComputed=true;
-    if(st)st.textContent=`✓ ${syms.length} positions computed · ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
-    allRrgDraw();
-  }catch(e){if(st)st.textContent='Error: '+e.message;}
+    if(wLive && wTrail.length){
+      const last=wTrail[wTrail.length-1];
+      if(Math.abs(last.r-wLive.rs_ratio)>0.01||Math.abs(last.m-wLive.rs_momentum)>0.01)
+        wTrail.push({r:wLive.rs_ratio,m:wLive.rs_momentum,t:0});
+    } else if(wLive){
+      wTrail.push({r:wLive.rs_ratio,m:wLive.rs_momentum,t:0});
+    }
+
+    if(dTrail.length||wTrail.length){
+      _allRrgData[sym]={daily:dTrail.length?dTrail:null,weekly:wTrail.length?wTrail:null,color:_allRrgColors[i%_allRrgColors.length]};
+      found++;
+    }
+  });
+
+  _allRrgComputed=found>0;
+  if(st) st.textContent=found?`✓ ${found}/${syms.length} positions plotted · ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`:'No RRM data available — try Refresh during market hours';
+  allRrgDraw();
 }
 
 function allRrgDraw(){
