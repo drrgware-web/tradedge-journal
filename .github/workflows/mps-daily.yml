@@ -1,41 +1,49 @@
 # =============================================================================
-# MPS v3.1 Daily Auto-Update — GitHub Action
+# MPS v3.1.1 Hourly + EOD Auto-Update — GitHub Action
 # =============================================================================
-# Runs every trading day at 4:15 PM IST (10:45 AM UTC)
-# Fetches data from Chartink (8 scanners) + NSE + Yahoo Finance macro,
-# calculates MPS v3.1, commits JSON
+# Runs every hour during market hours (9:15 AM - 3:30 PM IST)
+# + one final EOD run at 4:15 PM IST (after FII data publishes)
 #
-# v3.1 Changes from v3.0:
-#   - Added yfinance dependency for macro data
-#   - 3 new macro modifiers (Crude, US 10Y, Rupee)
-#   - 21 daily data inputs (was 18)
-#   - 9 modifiers (was 6)
-#   - History record includes macro_summary
+# Schedule (IST → UTC):
+#   9:45 AM IST  = 04:15 UTC  (first intraday, 30 min after open)
+#   10:45 AM IST = 05:15 UTC
+#   11:45 AM IST = 06:15 UTC
+#   12:45 PM IST = 07:15 UTC
+#   1:45 PM IST  = 08:15 UTC
+#   2:45 PM IST  = 09:15 UTC
+#   3:45 PM IST  = 10:15 UTC  (15 min after close)
+#   4:15 PM IST  = 10:45 UTC  (EOD final — FII data available)
 #
-# v3.0 Changes from v2:
-#   - 7 Chartink scanners (was 4): + rsi_above_50, burst_4_5pct, atr_pct_above_4
-#   - 18 daily data inputs (was 14)
-#   - JSON output includes: 7 pillars, 6 modifiers, daily state, burst/ATR fields
+# Intraday runs use last known FII value from state file.
+# EOD run refreshes FII + commits final daily record to history.
 #
-# Setup:
-#   1. Place this file in: .github/workflows/mps-daily.yml
-#   2. Place mps_engine_v3.py and mps_fetcher_v3.py in /scripts/
-#   3. Action creates/updates data/mps_latest.json, data/mps_history.json, data/mps_state.json
-#   4. Dashboard reads from these JSON files via GitHub Pages
+# v3.1.1 Changes:
+#   - Yahoo Finance as primary market data source (NSE blocked on GH Actions)
+#   - Hourly updates during market hours
+#   - data/mps_latest.json updates every hour (dashboard stays fresh)
+#   - data/mps_history.json only appends on EOD run
 # =============================================================================
 
 name: MPS Daily Update
 
 on:
   schedule:
-    # 10:45 UTC = 4:15 PM IST (after market close at 3:30 PM)
-    # Runs Mon-Fri only (but we also check in the script)
-    - cron: '45 10 * * 1-5'
+    # Hourly during market hours (IST → UTC, Mon-Fri)
+    - cron: '15 4,5,6,7,8,9 * * 1-5'    # 9:45 AM to 2:45 PM IST (hourly)
+    - cron: '15 10 * * 1-5'               # 3:45 PM IST (post-close)
+    - cron: '45 10 * * 1-5'               # 4:15 PM IST (EOD final)
 
-  # Allow manual trigger for testing
   workflow_dispatch:
+    inputs:
+      force_eod:
+        description: 'Force EOD mode (updates history)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
-# Prevent concurrent runs
 concurrency:
   group: mps-update
   cancel-in-progress: false
@@ -62,7 +70,27 @@ jobs:
       - name: Create data directory
         run: mkdir -p data
 
-      - name: Run MPS v3.1 Fetcher
+      - name: Determine run mode (intraday vs EOD)
+        id: mode
+        run: |
+          # Current UTC hour
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          FORCE_EOD="${{ github.event.inputs.force_eod }}"
+          
+          # EOD = 10:45 UTC (4:15 PM IST) or forced
+          if [ "$HOUR" = "10" ] && [ "$MINUTE" -ge "40" ]; then
+            echo "mode=eod" >> $GITHUB_OUTPUT
+            echo "📊 Mode: EOD (final daily update + history)"
+          elif [ "$FORCE_EOD" = "true" ]; then
+            echo "mode=eod" >> $GITHUB_OUTPUT
+            echo "📊 Mode: EOD (forced)"
+          else
+            echo "mode=intraday" >> $GITHUB_OUTPUT
+            echo "⚡ Mode: INTRADAY (live update, no history append)"
+          fi
+
+      - name: Run MPS v3.1.1 Fetcher
         id: mps
         run: |
           cd scripts
@@ -76,23 +104,20 @@ jobs:
         run: |
           echo "::warning::MPS fetch failed. This could be due to:"
           echo "  - Market holiday (no data available)"
-          echo "  - Chartink/NSE website changes"
-          echo "  - Yahoo Finance API issues"
+          echo "  - Chartink/Yahoo Finance issues"
           echo "  - Network issues"
           echo "Skipping commit."
           exit 0
 
-      - name: Update history file
-        if: steps.mps.outcome == 'success'
+      - name: Update history file (EOD only)
+        if: steps.mps.outcome == 'success' && steps.mode.outputs.mode == 'eod'
         run: |
           python3 -c "
           import json
           
-          # Read latest
           with open('data/mps_latest.json') as f:
               latest = json.load(f)
           
-          # Read or create history
           history_file = 'data/mps_history.json'
           try:
               with open(history_file) as f:
@@ -100,11 +125,9 @@ jobs:
           except FileNotFoundError:
               history = []
           
-          # Append today's data (avoid duplicates)
           today = latest['current']['date']
           history = [h for h in history if h.get('date') != today]
           
-          # v3.1 history record — includes all pillar scores + state + macro
           record = {
               'date': today,
               'final_score': latest['current']['final_score'],
@@ -122,20 +145,17 @@ jobs:
               'modifiers_active': [m['name'] for m in latest['current']['modifiers'] if m['triggered']],
           }
           
-          # Include macro raw inputs if available
           macro = latest.get('raw_inputs', {}).get('macro', {})
           if macro:
               record['macro'] = macro
           
           history.append(record)
-          
-          # Keep last 365 days
           history = history[-365:]
           
           with open(history_file, 'w') as f:
               json.dump(history, f, indent=2)
           
-          print(f'History updated: {len(history)} records')
+          print(f'📊 EOD: History updated — {len(history)} records')
           "
 
       - name: Commit and push
@@ -144,56 +164,54 @@ jobs:
           git config user.name "MPS Bot"
           git config user.email "mps-bot@tradedge.local"
           
-          git add data/mps_latest.json data/mps_history.json data/mps_state.json
+          MODE="${{ steps.mode.outputs.mode }}"
           
-          # Get zone, score, and state for commit message
+          if [ "$MODE" = "eod" ]; then
+            git add data/mps_latest.json data/mps_history.json data/mps_state.json
+          else
+            git add data/mps_latest.json data/mps_state.json
+          fi
+          
           ZONE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['zone'])")
           SCORE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['final_score'])")
           STATE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['state'])")
           DATE=$(date +%Y-%m-%d)
+          TIME=$(TZ='Asia/Kolkata' date +%H:%M)
           
-          git commit -m "📊 MPS v3.1 ${DATE}: ${SCORE} — ${ZONE} [${STATE}]" || echo "No changes to commit"
+          if [ "$MODE" = "eod" ]; then
+            git commit -m "📊 MPS v3.1.1 EOD ${DATE}: ${SCORE} — ${ZONE} [${STATE}]" || echo "No changes to commit"
+          else
+            git commit -m "⚡ MPS ${DATE} ${TIME} IST: ${SCORE} — ${ZONE}" || echo "No changes to commit"
+          fi
+          
           git push
 
       - name: Summary
         if: steps.mps.outcome == 'success'
         run: |
+          MODE="${{ steps.mode.outputs.mode }}"
           python3 -c "
           import json
           with open('data/mps_latest.json') as f:
               d = json.load(f)
           c = d['current']
-          print('## MPS v3.1 Daily Summary')
+          mode = '${MODE}'
+          
+          print(f'## MPS v3.1.1 {\"EOD\" if mode == \"eod\" else \"Intraday\"} Summary')
           print(f'**Score:** {c[\"final_score\"]}')
           print(f'**Zone:** {c[\"zone\"]} {c[\"zone_emoji\"]}')
           print(f'**State:** {c[\"state\"]} — {c[\"state_message\"]}')
           print(f'**Risk:** {c[\"risk_per_trade\"]}')
-          print(f'**Burst:** {c.get(\"burst_ratio\", 0):.0f} [{c.get(\"burst_label\", \"\")}]')
-          print(f'**RSI Breadth:** {c.get(\"rsi_breadth_pct\", 0):.1f}%')
-          print(f'**ATR Breadth:** {c.get(\"atr_breadth_pct\", 0):.1f}% [{c.get(\"atr_regime\", \"\")}]')
-          print(f'**Macro:** {c.get(\"macro_summary\", \"N/A\")}')
           print()
-          print('### Pillars (7)')
-          for p in c['pillar_scores']:
-              print(f'- {p[\"name\"]}: {p[\"raw_score\"]:.1f}/100 ({p[\"description\"]})')
-          print()
-          print('### Modifiers (9)')
-          for m in c['modifiers']:
-              status = '✅' if m['triggered'] else '⬜'
-              print(f'- {status} {m[\"name\"]}: {m[\"adjustment\"]:+.1f} — {m[\"reason\"]}')
-          print()
-          print('### Data Sources')
-          print(f'- Chartink scanners: 8')
-          print(f'- NSE endpoints: 6')
-          print(f'- Yahoo Finance macro: 3')
-          print(f'- Total daily inputs: {d[\"metadata\"].get(\"daily_inputs\", 21)}')
-          
-          # Macro details
-          macro = d.get('raw_inputs', {}).get('macro', {})
-          if macro:
+          if mode == 'eod':
+              print('### Pillars')
+              for p in c['pillar_scores']:
+                  print(f'- {p[\"name\"]}: {p[\"raw_score\"]:.1f}/100')
               print()
-              print('### Macro Indicators')
-              print(f'- Brent Crude: \${macro.get(\"brent_crude\", 0):.2f}')
-              print(f'- US 10Y Yield: {macro.get(\"us10y_yield\", 0):.2f}%')
-              print(f'- USD/INR: ₹{macro.get(\"usd_inr\", 0):.2f} (20d ago: ₹{macro.get(\"usd_inr_20d_ago\", 0):.2f})')
+              print('### Data Sources')
+              sources = d.get('raw_inputs', {}).get('data_sources', {})
+              for k, v in sources.items():
+                  print(f'- {k}: {v}')
+          else:
+              print('_Intraday snapshot — history updates at EOD (4:15 PM IST)_')
           " >> $GITHUB_STEP_SUMMARY
