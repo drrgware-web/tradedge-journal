@@ -3598,43 +3598,51 @@ function mergeSelected(){
   const syms=new Set(selected.map(t=>t.symbol));
   const sides=new Set(selected.map(t=>t.side));
   if(syms.size>1||sides.size>1){
-    if(!confirm(`⚠️ Selected trades have different symbols or sides:\n${[...syms].join(', ')} / ${[...sides].join(', ')}\n\nMerge anyway? (entries will be combined into first trade)`)) return;
+    if(!confirm(`⚠️ Selected trades have different symbols or sides:\n${[...syms].join(', ')} / ${[...sides].join(', ')}\n\nMerge anyway?`)) return;
   }
   
-  // Merge: combine all entries and exits into the first trade
+  // Collect all entries and exits, then consolidate into single averaged entry
   const base=selected[0];
   const rest=selected.slice(1);
   
-  let allEntries=[...(base.entries||[])];
-  let allExits=[...(base.exits||[])];
+  let tQty=0, tVal=0, firstDate='';
+  let allExits=[];
+  let eQty=0, eVal=0;
   
-  rest.forEach(t=>{
-    (t.entries||[]).forEach(e=>allEntries.push({...e}));
-    (t.exits||[]).forEach(e=>allExits.push({...e}));
+  selected.forEach(t=>{
+    (t.entries||[]).forEach(e=>{
+      tQty+=(+e.qty||0);
+      tVal+=(+e.price||0)*(+e.qty||0);
+      if(!firstDate && e.date) firstDate=e.date;
+    });
+    (t.exits||[]).forEach(e=>{
+      eQty+=(+e.qty||0);
+      eVal+=(+e.price||0)*(+e.qty||0);
+    });
   });
   
-  // Sort entries and exits by date
-  allEntries.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  allExits.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const avgEntry=tQty>0?+(tVal/tQty).toFixed(2):0;
+  const avgExit=eQty>0?+(eVal/eQty).toFixed(2):0;
   
-  base.entries=allEntries;
-  base.exits=allExits;
+  // Single consolidated entry
+  base.entries=[{date:firstDate, price:avgEntry, qty:tQty}];
+  
+  // Single consolidated exit (if any)
+  base.exits=eQty>0?[{date:allExits[0]?.date||firstDate, price:avgExit, qty:eQty}]:[];
   
   // Recalculate status
-  const totalEntryQty=allEntries.reduce((s,e)=>s+(+e.qty||0),0);
-  const totalExitQty=allExits.reduce((s,e)=>s+(+e.qty||0),0);
-  if(totalExitQty>=totalEntryQty && totalExitQty>0) base.status='Closed';
-  else if(totalExitQty>0) base.status='Partial';
+  if(eQty>=tQty && eQty>0) base.status='Closed';
+  else if(eQty>0) base.status='Partial';
   else base.status='Open';
   
-  base.notes=`Merged ${selected.length} trades. ${base.notes||''}`.trim();
+  base.notes=`Merged ${selected.length} trades (${tQty} qty @ ₹${avgEntry}). ${base.notes||''}`.trim();
   
   // Remove the rest
   const restIds=new Set(rest.map(t=>t.id));
   trades=trades.filter(t=>!restIds.has(t.id));
   
   save(); renderTrades(); renderDash();
-  toast(`✅ Merged ${selected.length} trades → ${base.symbol} (${allEntries.length} entries, ${totalEntryQty} qty)`,'🔀');
+  toast(`✅ Merged ${selected.length} trades → ${base.symbol} · ${tQty} qty @ ₹${avgEntry}`,'🔀');
 }
 
 // ══════════════════════════════════════════════════
