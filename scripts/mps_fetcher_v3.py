@@ -37,6 +37,7 @@ import sys
 import time
 import argparse
 import logging
+import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -96,18 +97,43 @@ SCANNERS = {
     },
 }
 
-# NSE endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+# NSE CONFIG — v3.1 FIX: Robust headers + correct endpoints
+# ─────────────────────────────────────────────────────────────────────────────
 NSE_BASE = "https://www.nseindia.com"
+
+# Rotate User-Agents to reduce 403 risk from GitHub Actions IPs
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+]
+
 NSE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": random.choice(_USER_AGENTS),
     "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
     "Referer": "https://www.nseindia.com/",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
 }
+
+# FII endpoint — v3.1 FIX: NSE changed the URL (hyphenated)
+NSE_FII_ENDPOINTS = [
+    "/api/fiidii-activity",        # ← Current (hyphenated)
+    "/api/fiidiiActivity",         # ← Legacy fallback
+]
 
 # Historical state file (tracks streaks and previous values)
 STATE_FILE = "mps_state.json"
+
+# Retry config for NSE
+NSE_MAX_RETRIES = 3
+NSE_RETRY_DELAY = 3  # seconds (base, with jitter)
 
 
 # =============================================================================
@@ -176,184 +202,261 @@ def fetch_all_chartink():
 
 
 # =============================================================================
-# NSE FETCHER
+# NSE FETCHER — v3.1 FIX: Robust session + retries
 # =============================================================================
 
 def get_nse_session():
-    """Get a session with cookies from NSE."""
+    """
+    Establish a proper NSE session by visiting the homepage first
+    to collect cookies (bm_sv, nsit, nseappid, ak_bmsc etc.).
+    
+    v3.1 FIX: Multi-step warm-up to avoid 403.
+    """
     session = requests.Session()
     session.headers.update(NSE_HEADERS)
 
-    try:
-        resp = session.get(NSE_BASE, timeout=15)
-        resp.raise_for_status()
-        log.info("NSE session established")
-    except Exception as e:
-        log.error(f"Failed to establish NSE session: {e}")
+    for attempt in range(NSE_MAX_RETRIES):
+        try:
+            # Step 1: Hit homepage to get initial cookies
+            log.info(f"  NSE session attempt {attempt + 1}/{NSE_MAX_RETRIES}...")
+            resp = session.get(NSE_BASE, timeout=20)
+            resp.raise_for_status()
 
-    return session
+            # Step 2: Small delay to mimic real browser
+            time.sleep(1 + random.uniform(0.5, 1.5))
+
+            # Step 3: Hit a lightweight API to "warm" the session cookies
+            warm_resp = session.get(
+                f"{NSE_BASE}/api/marketStatus",
+                timeout=15,
+            )
+            if warm_resp.status_code == 200:
+                log.info("  ✓ NSE session established (cookies + warm-up OK)")
+                return session
+            else:
+                log.warning(f"  NSE warm-up got status {warm_resp.status_code}, retrying...")
+
+        except requests.exceptions.HTTPError as e:
+            log.warning(f"  NSE session attempt {attempt + 1} failed: {e}")
+        except Exception as e:
+            log.warning(f"  NSE session attempt {attempt + 1} error: {e}")
+
+        # Wait before retry with jitter
+        if attempt < NSE_MAX_RETRIES - 1:
+            wait = NSE_RETRY_DELAY * (attempt + 1) + random.uniform(0, 2)
+            log.info(f"  Waiting {wait:.1f}s before retry...")
+            time.sleep(wait)
+
+    log.error("  ✗ Failed to establish NSE session after all retries")
+    return session  # Return session anyway — individual fetches will fail gracefully
+
+
+def _nse_get_with_retry(session, url, label="data", max_retries=2):
+    """
+    Helper: GET an NSE API endpoint with retry + backoff.
+    Returns parsed JSON or None on failure.
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            resp = session.get(url, timeout=15)
+            if resp.status_code == 401:
+                # Session expired — re-warm
+                log.warning(f"  NSE 401 on {label}, re-establishing session...")
+                session.get(NSE_BASE, timeout=20)
+                time.sleep(2)
+                resp = session.get(url, timeout=15)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.HTTPError as e:
+            log.warning(f"  NSE {label} attempt {attempt + 1} failed: {e}")
+        except (json.JSONDecodeError, ValueError) as e:
+            log.warning(f"  NSE {label} JSON parse error: {e}")
+        except Exception as e:
+            log.warning(f"  NSE {label} error: {e}")
+
+        if attempt < max_retries:
+            wait = 2 * (attempt + 1) + random.uniform(0, 1)
+            time.sleep(wait)
+
+    log.error(f"  ✗ Failed to fetch {label} after {max_retries + 1} attempts")
+    return None
 
 
 def fetch_nse_market_status(session):
     """Fetch advance/decline data from NSE."""
     log.info("  Fetching: Market A/D data...")
-    try:
-        resp = session.get(
+
+    # Try equity stock indices first (more reliable)
+    data = _nse_get_with_retry(
+        session,
+        f"{NSE_BASE}/api/equity-stockIndices?index=NIFTY%20500",
+        label="A/D data",
+    )
+
+    if data is None:
+        # Fallback: pre-open data
+        data = _nse_get_with_retry(
+            session,
             f"{NSE_BASE}/api/market-data-pre-open?key=NIFTY%20500",
-            timeout=15,
+            label="A/D data (pre-open)",
         )
-        if resp.status_code != 200:
-            resp = session.get(f"{NSE_BASE}/api/equity-stockIndices?index=NIFTY%20500", timeout=15)
 
-        resp.raise_for_status()
-        data = resp.json()
-
-        advances = 0
-        declines = 0
-        unchanged = 0
-
-        if "advance" in data:
-            advances = int(data.get("advance", {}).get("advances", 0))
-            declines = int(data.get("advance", {}).get("declines", 0))
-            unchanged = int(data.get("advance", {}).get("unchanged", 0))
-        elif "data" in data:
-            for stock in data["data"]:
-                change = stock.get("pChange", 0) or stock.get("change", 0)
-                if isinstance(change, str):
-                    change = float(change) if change else 0
-                if change > 0:
-                    advances += 1
-                elif change < 0:
-                    declines += 1
-                else:
-                    unchanged += 1
-
-        log.info(f"  → A/D: {advances}A / {declines}D / {unchanged}U")
-        return advances, declines, unchanged
-
-    except Exception as e:
-        log.error(f"  ✗ Failed to fetch A/D data: {e}")
+    if data is None:
         return None, None, None
+
+    advances = 0
+    declines = 0
+    unchanged = 0
+
+    if "advance" in data:
+        advances = int(data.get("advance", {}).get("advances", 0))
+        declines = int(data.get("advance", {}).get("declines", 0))
+        unchanged = int(data.get("advance", {}).get("unchanged", 0))
+    elif "data" in data:
+        for stock in data["data"]:
+            change = stock.get("pChange", 0) or stock.get("change", 0)
+            if isinstance(change, str):
+                change = float(change) if change else 0
+            if change > 0:
+                advances += 1
+            elif change < 0:
+                declines += 1
+            else:
+                unchanged += 1
+
+    log.info(f"  → A/D: {advances}A / {declines}D / {unchanged}U")
+    return advances, declines, unchanged
 
 
 def fetch_nse_52w_highlow(session):
     """Fetch 52-week high/low counts from NSE."""
     log.info("  Fetching: 52-week Highs/Lows...")
-    try:
-        resp = session.get(f"{NSE_BASE}/api/live-analysis-52Week?type=high", timeout=15)
-        resp.raise_for_status()
-        highs_data = resp.json()
-        highs = len(highs_data.get("data", []))
 
-        time.sleep(0.5)
+    highs_data = _nse_get_with_retry(
+        session,
+        f"{NSE_BASE}/api/live-analysis-52Week?type=high",
+        label="52W highs",
+    )
+    highs = len(highs_data.get("data", [])) if highs_data else None
 
-        resp = session.get(f"{NSE_BASE}/api/live-analysis-52Week?type=low", timeout=15)
-        resp.raise_for_status()
-        lows_data = resp.json()
-        lows = len(lows_data.get("data", []))
+    time.sleep(0.8)
 
+    lows_data = _nse_get_with_retry(
+        session,
+        f"{NSE_BASE}/api/live-analysis-52Week?type=low",
+        label="52W lows",
+    )
+    lows = len(lows_data.get("data", [])) if lows_data else None
+
+    if highs is not None and lows is not None:
         log.info(f"  → 52W: {highs} Highs, {lows} Lows")
-        return highs, lows
-
-    except Exception as e:
-        log.error(f"  ✗ Failed to fetch 52W data: {e}")
-        return None, None
+    return highs, lows
 
 
 def fetch_nse_vix(session):
     """Fetch India VIX from NSE."""
     log.info("  Fetching: India VIX...")
-    try:
-        resp = session.get(f"{NSE_BASE}/api/allIndices", timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
 
-        for idx in data.get("data", []):
-            if "VIX" in idx.get("index", "").upper() or "VIX" in idx.get("indexSymbol", "").upper():
-                vix = float(idx.get("last", 0) or idx.get("closePrice", 0))
-                log.info(f"  → VIX: {vix:.2f}")
-                return vix
-
-        log.warning("  ✗ VIX not found in index data")
+    data = _nse_get_with_retry(
+        session,
+        f"{NSE_BASE}/api/allIndices",
+        label="VIX",
+    )
+    if data is None:
         return None
 
-    except Exception as e:
-        log.error(f"  ✗ Failed to fetch VIX: {e}")
-        return None
+    for idx in data.get("data", []):
+        if "VIX" in idx.get("index", "").upper() or "VIX" in idx.get("indexSymbol", "").upper():
+            vix = float(idx.get("last", 0) or idx.get("closePrice", 0))
+            log.info(f"  → VIX: {vix:.2f}")
+            return vix
+
+    log.warning("  ✗ VIX not found in index data")
+    return None
 
 
 def fetch_nse_pcr(session):
     """Fetch Nifty Put-Call Ratio from NSE option chain."""
     log.info("  Fetching: Nifty PCR...")
-    try:
-        resp = session.get(f"{NSE_BASE}/api/option-chain-indices?symbol=NIFTY", timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
 
-        total_put_oi = 0
-        total_call_oi = 0
-
-        for record in data.get("records", {}).get("data", []):
-            if "CE" in record:
-                total_call_oi += record["CE"].get("openInterest", 0)
-            if "PE" in record:
-                total_put_oi += record["PE"].get("openInterest", 0)
-
-        pcr = total_put_oi / total_call_oi if total_call_oi > 0 else 1.0
-        log.info(f"  → PCR: {pcr:.3f} (Put OI: {total_put_oi:,} / Call OI: {total_call_oi:,})")
-        return round(pcr, 3)
-
-    except Exception as e:
-        log.error(f"  ✗ Failed to fetch PCR: {e}")
+    data = _nse_get_with_retry(
+        session,
+        f"{NSE_BASE}/api/option-chain-indices?symbol=NIFTY",
+        label="PCR",
+    )
+    if data is None:
         return None
+
+    total_put_oi = 0
+    total_call_oi = 0
+
+    for record in data.get("records", {}).get("data", []):
+        if "CE" in record:
+            total_call_oi += record["CE"].get("openInterest", 0)
+        if "PE" in record:
+            total_put_oi += record["PE"].get("openInterest", 0)
+
+    pcr = total_put_oi / total_call_oi if total_call_oi > 0 else 1.0
+    log.info(f"  → PCR: {pcr:.3f} (Put OI: {total_put_oi:,} / Call OI: {total_call_oi:,})")
+    return round(pcr, 3)
 
 
 def fetch_nse_fii(session):
-    """Fetch FII/FPI net buy/sell data from NSE."""
+    """
+    Fetch FII/FPI net buy/sell data from NSE.
+    
+    v3.1 FIX: Try multiple endpoints (NSE changed from camelCase to hyphenated).
+    """
     log.info("  Fetching: FII/FPI flow...")
-    try:
-        resp = session.get(f"{NSE_BASE}/api/fiidiiActivity", timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
 
-        fii_net = 0
-        for entry in data.get("data", []):
-            category = entry.get("category", "").upper()
-            if "FII" in category or "FPI" in category:
-                buy = float(entry.get("buyValue", 0) or 0)
-                sell = float(entry.get("sellValue", 0) or 0)
-                fii_net = buy - sell
-                break
+    data = None
+    for endpoint in NSE_FII_ENDPOINTS:
+        url = f"{NSE_BASE}{endpoint}"
+        data = _nse_get_with_retry(session, url, label=f"FII ({endpoint})", max_retries=1)
+        if data is not None:
+            log.info(f"  ✓ FII endpoint resolved: {endpoint}")
+            break
+        else:
+            log.info(f"  ↳ Endpoint {endpoint} didn't work, trying next...")
 
-        log.info(f"  → FII Net: ₹{fii_net:,.2f} Cr")
-        return round(fii_net, 2)
-
-    except Exception as e:
-        log.error(f"  ✗ Failed to fetch FII data: {e}")
+    if data is None:
+        log.error("  ✗ All FII endpoints failed")
         return None
+
+    fii_net = 0
+    for entry in data if isinstance(data, list) else data.get("data", []):
+        category = entry.get("category", "").upper()
+        if "FII" in category or "FPI" in category:
+            buy = float(entry.get("buyValue", 0) or entry.get("fii_buy", 0) or 0)
+            sell = float(entry.get("sellValue", 0) or entry.get("fii_sell", 0) or 0)
+            fii_net = buy - sell
+            break
+
+    log.info(f"  → FII Net: ₹{fii_net:,.2f} Cr")
+    return round(fii_net, 2)
 
 
 def fetch_nifty_52w_check(session):
     """Check if Nifty is at/near its 52-week high."""
     log.info("  Fetching: Nifty 52W high check...")
-    try:
-        resp = session.get(f"{NSE_BASE}/api/allIndices", timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
 
-        for idx in data.get("data", []):
-            if idx.get("index") == "NIFTY 50" or idx.get("indexSymbol") == "NIFTY 50":
-                current = float(idx.get("last", 0))
-                high_52w = float(idx.get("yearHigh", 0))
-                is_at_high = current >= high_52w * 0.99
-                log.info(f"  → Nifty: {current:.2f} vs 52W High: {high_52w:.2f} → {'AT HIGH' if is_at_high else 'Below'}")
-                return is_at_high
-
+    data = _nse_get_with_retry(
+        session,
+        f"{NSE_BASE}/api/allIndices",
+        label="Nifty 52W",
+    )
+    if data is None:
         return False
 
-    except Exception as e:
-        log.error(f"  ✗ Failed to check Nifty 52W: {e}")
-        return False
+    for idx in data.get("data", []):
+        if idx.get("index") == "NIFTY 50" or idx.get("indexSymbol") == "NIFTY 50":
+            current = float(idx.get("last", 0))
+            high_52w = float(idx.get("yearHigh", 0))
+            is_at_high = current >= high_52w * 0.99
+            log.info(f"  → Nifty: {current:.2f} vs 52W High: {high_52w:.2f} → {'AT HIGH' if is_at_high else 'Below'}")
+            return is_at_high
+
+    return False
 
 
 def fetch_all_nse():
@@ -363,16 +466,16 @@ def fetch_all_nse():
     time.sleep(1)
 
     advances, declines, unchanged = fetch_nse_market_status(session)
-    time.sleep(0.8)
+    time.sleep(1.0)
 
     highs_52, lows_52 = fetch_nse_52w_highlow(session)
-    time.sleep(0.8)
+    time.sleep(1.0)
 
     vix = fetch_nse_vix(session)
-    time.sleep(0.8)
+    time.sleep(1.0)
 
     pcr = fetch_nse_pcr(session)
-    time.sleep(0.8)
+    time.sleep(1.0)
 
     fii_net = fetch_nse_fii(session)
     time.sleep(0.8)
