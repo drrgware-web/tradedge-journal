@@ -8190,10 +8190,12 @@ function rrmProcessAlerts(results){
       if(t.rankDrop){
         toast(`📉 ${t.sym} RS Rank dropped: ${t.from} → ${t.to}`, '⚠️');
         rrmPlayAlert('caution');
+        rrmTelegramAlert(t, r, 'caution');
       } else if(toQ === 'Lagging'){
         toast(`🔴 ${t.sym} moved to ${t.tf} Lagging (from ${t.from})`, '🔴');
         rrmPlayAlert(r.action === 'urgent' ? 'urgent' : 'exit');
         rrmPushNotify(`🔴 ${t.sym} — EXIT SIGNAL`, `${t.tf}: ${t.from} → Lagging`, 'rrm-'+t.sym);
+        rrmTelegramAlert(t, r, 'exit');
 
         // Auto-create alert in TradEdge alerts system
         const alertId = 'rrm_lag_'+t.sym+'_'+t.tf;
@@ -8212,19 +8214,69 @@ function rrmProcessAlerts(results){
         toast(`🚀 ${t.sym} entered ${t.tf} Leading (from ${t.from})`, '📈');
         rrmPlayAlert('pyramid');
         rrmPushNotify(`🚀 ${t.sym} — LEADING`, `${t.tf}: ${t.from} → Leading`, 'rrm-'+t.sym);
+        rrmTelegramAlert(t, r, 'pyramid');
       } else if(toQ === 'Weakening'){
         toast(`⚠️ ${t.sym} ${t.tf}: ${t.from} → Weakening`, '⚠️');
         rrmPlayAlert('caution');
+        rrmTelegramAlert(t, r, 'caution');
       } else if(toQ === 'Improving'){
         toast(`📈 ${t.sym} ${t.tf}: ${t.from} → Improving`, '📈');
+        rrmTelegramAlert(t, r, 'improving');
       }
     }
   }
+
+  // Send batch summary to Telegram if multiple transitions
+  if(allTransitions.length > 1) rrmTelegramBatchSummary(allTransitions, results);
 
   // Trim history to 200 entries
   if(_rrmHistory.length > 200) _rrmHistory = _rrmHistory.slice(0, 200);
   localStorage.setItem('te_rrm_history', JSON.stringify(_rrmHistory));
   localStorage.setItem('te_rrm_cache', JSON.stringify(_rrmCache));
+}
+
+// ── Send individual transition alert to Telegram ──
+async function rrmTelegramAlert(transition, result, severity){
+  const icons={exit:'🔴',urgent:'🚨',pyramid:'🚀',caution:'⚠️',improving:'📈'};
+  const icon=icons[severity]||'🔄';
+  const action=result?.meta?.label||severity.toUpperCase();
+  const dQ=result?.dailyQuad;
+  const wQ=result?.weeklyQuad;
+  const msg=`${icon} <b>RRM TRANSITION</b>\n\n`+
+    `<b>${transition.sym}</b>: ${transition.tf} ${transition.from} → <b>${transition.to}</b>\n`+
+    (dQ?`Daily: ${dQ.name} (R:${dQ.ratio?.toFixed(1)} M:${dQ.momentum?.toFixed(1)})\n`:'')+
+    (wQ?`Weekly: ${wQ.name} (R:${wQ.ratio?.toFixed(1)} M:${wQ.momentum?.toFixed(1)})\n`:'')+
+    `Action: <b>${action}</b>\n`+
+    `Time: ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+  rrmSendTelegram(msg);
+}
+
+// ── Send batch summary if multiple transitions in one scan ──
+async function rrmTelegramBatchSummary(transitions, results){
+  const exits=transitions.filter(t=>t.to==='Lagging');
+  const leads=transitions.filter(t=>t.to==='Leading');
+  const warns=transitions.filter(t=>t.to==='Weakening');
+  const improves=transitions.filter(t=>t.to==='Improving');
+  let msg=`🎯 <b>RRM BATCH ALERT</b> · ${transitions.length} transitions\n\n`;
+  if(exits.length) msg+=`🔴 EXIT: ${exits.map(t=>t.sym).join(', ')}\n`;
+  if(warns.length) msg+=`⚠️ WEAKENING: ${warns.map(t=>t.sym).join(', ')}\n`;
+  if(leads.length) msg+=`🚀 LEADING: ${leads.map(t=>t.sym).join(', ')}\n`;
+  if(improves.length) msg+=`📈 IMPROVING: ${improves.map(t=>t.sym).join(', ')}\n`;
+  msg+=`\nTime: ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+  rrmSendTelegram(msg);
+}
+
+// ── Direct Telegram API call (no worker needed) ──
+async function rrmSendTelegram(text){
+  const botToken=localStorage.getItem('te_tg_bot')||'8659936599:AAGoa-eJV35BxhLUogzel_0JcLp6d8yZz2U';
+  const chatId=localStorage.getItem('te_tg_chat')||'183752078';
+  if(!botToken||!chatId) return;
+  try{
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId,text,parse_mode:'HTML',disable_web_page_preview:true})
+    });
+  }catch(e){console.warn('Telegram send failed:',e.message);}
 }
 
 // ── Main refresh ──
