@@ -10150,6 +10150,15 @@ async function allRrgCompute(){
       wTrail=[{r:wIdx.current.rs_ratio,m:wIdx.current.rs_momentum,t:0}];
     }
 
+    // Fallback: use _rrmCache from position scanner (has ratio/momentum from any source)
+    const cached=_rrmCache?.[sym];
+    if(!dTrail.length && cached?.dailyRatio!=null && cached?.dailyMom!=null){
+      dTrail=[{r:cached.dailyRatio,m:cached.dailyMom,t:0}];
+    }
+    if(!wTrail.length && cached?.weeklyRatio!=null && cached?.weeklyMom!=null){
+      wTrail=[{r:cached.weeklyRatio,m:cached.weeklyMom,t:0}];
+    }
+
     if(dTrail.length||wTrail.length){
       _allRrgData[sym]={daily:dTrail.length?dTrail:null,weekly:wTrail.length?wTrail:null,color:_allRrgColors[i%_allRrgColors.length]};
       found++;
