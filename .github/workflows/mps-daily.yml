@@ -166,10 +166,11 @@ jobs:
           
           MODE="${{ steps.mode.outputs.mode }}"
           
+          # Add files that exist (state file may be new on first run)
+          git add data/mps_latest.json || true
+          [ -f data/mps_state.json ] && git add data/mps_state.json || true
           if [ "$MODE" = "eod" ]; then
-            git add data/mps_latest.json data/mps_history.json data/mps_state.json
-          else
-            git add data/mps_latest.json data/mps_state.json
+            [ -f data/mps_history.json ] && git add data/mps_history.json || true
           fi
           
           ZONE=$(python3 -c "import json; print(json.load(open('data/mps_latest.json'))['current']['zone'])")
