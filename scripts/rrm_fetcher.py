@@ -223,7 +223,7 @@ def quadrant(r, m):
 # =============================================================================
 # FETCH PRICES
 # =============================================================================
-def fetch_prices(symbols, period="2y"):
+def fetch_prices(symbols, period="5y"):
     log.info(f"Fetching {len(symbols)} symbols from Yahoo Finance...")
     out = {}
     for sym in symbols:
@@ -433,7 +433,7 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     log.info(f"Total symbols to fetch: {len(all_syms)} ({len(sectors)} sectors, {len(etfs)} ETFs, {len(asset_classes)} assets, {len(market_segments)} segments)")
 
     # Single fetch for ALL symbols (efficient)
-    price_data = fetch_prices(list(all_syms), period="2y")
+    price_data = fetch_prices(list(all_syms), period="5y")
 
     # Calculate RRM for EACH benchmark
     benchmarks_data = {}
