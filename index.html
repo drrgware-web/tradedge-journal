@@ -891,8 +891,13 @@ select.fi{cursor:pointer}
             <div class="pill" onclick="fStatus('Partial',this)">Partial</div>
             <div class="pill" onclick="fStatus('Closed',this)">Closed</div>
           </div>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="mergeTrades()">🔀 Merge Fills</button>
+          <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <div id="merge-sel-bar" style="display:none;gap:6px;align-items:center">
+              <span id="merge-sel-count" style="font-size:11px;color:var(--y)"></span>
+              <button class="btn btn-sm" style="background:var(--y);color:var(--bg0);font-weight:700" onclick="mergeSelected()">🔀 Merge Selected</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearMergeSel()">✕</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="mergeTrades()">🔀 Auto-Merge All</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export</button>
           </div>
         </div>
@@ -3449,10 +3454,11 @@ function renderTrades(){
   if(!rows.length){el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No trades found</div></div>';return;}
 
   el.innerHTML=`<table><thead><tr>
-    <th style="width:24px"></th><th>Symbol</th><th>Side</th><th>Entries</th><th>Avg Entry</th><th>Exits</th><th>Avg Exit</th><th>Qty</th><th>Status</th><th>Realised P&L</th><th>Unreal P&L</th><th>R:R</th><th>SL%</th><th>Days</th><th></th>
+    <th style="width:28px"><input type="checkbox" id="merge-all-cb" onchange="toggleAllMergeCb(this.checked)" style="accent-color:var(--y);cursor:pointer" title="Select all"></th><th style="width:24px"></th><th>Symbol</th><th>Side</th><th>Entries</th><th>Avg Entry</th><th>Exits</th><th>Avg Exit</th><th>Qty</th><th>Status</th><th>Realised P&L</th><th>Unreal P&L</th><th>R:R</th><th>SL%</th><th>Days</th><th></th>
   </tr></thead><tbody>`+
   rows.map(t=>`
     <tr onclick="toggleExp('${t.id}')">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="merge-cb" data-id="${t.id}" data-sym="${t.symbol}" data-side="${t.side}" onchange="updateMergeBar()" style="accent-color:var(--y);cursor:pointer"></td>
       <td id="ei-${t.id}" style="color:var(--t3);font-size:10px">▶</td>
       <td><div class="sym-cell"><div class="sym-icon">${t.symbol.slice(0,3)}</div><div><div class="sym-name">${t.symbol}</div><div class="sym-date">${t.entries?.[0]?.date||'—'}</div></div></div></td>
       <td><span class="bdg bdg-${t.side.toLowerCase()}">${t.side}</span></td>
@@ -3478,7 +3484,7 @@ function renderTrades(){
         </button>
       </td>
     </tr>
-    <tr><td colspan="15" style="padding:0;border-bottom:1px solid var(--b1)">
+    <tr><td colspan="16" style="padding:0;border-bottom:1px solid var(--b1)">
       <div class="exp-content" id="ec-${t.id}">
         <div class="exp-grid">
           <div><div class="exp-lbl">Setup</div><div class="exp-val">${t.setup||'—'}</div></div>
@@ -3544,6 +3550,91 @@ function mergeTrades(){
   });
   save(); renderTrades(); renderDash();
   toast(`Merged ${merged} groups`,'🔀');
+}
+
+// ── SELECTIVE MERGE ──
+function updateMergeBar(){
+  const cbs=[...document.querySelectorAll('.merge-cb:checked')];
+  const bar=document.getElementById('merge-sel-bar');
+  const cnt=document.getElementById('merge-sel-count');
+  if(cbs.length>=2){
+    // Validate: all same symbol+side
+    const syms=new Set(cbs.map(c=>c.dataset.sym+'_'+c.dataset.side));
+    bar.style.display='flex';
+    if(syms.size>1){
+      cnt.textContent=`${cbs.length} selected (⚠ mixed symbols/sides)`;
+      cnt.style.color='var(--r)';
+    } else {
+      cnt.textContent=`${cbs.length} selected · ${cbs[0].dataset.sym} ${cbs[0].dataset.side}`;
+      cnt.style.color='var(--y)';
+    }
+  } else {
+    bar.style.display=cbs.length===1?'flex':'none';
+    if(cbs.length===1) cnt.textContent='Select 2+ trades to merge';
+    cnt.style.color='var(--t3)';
+  }
+}
+
+function toggleAllMergeCb(checked){
+  document.querySelectorAll('.merge-cb').forEach(cb=>{cb.checked=checked;});
+  updateMergeBar();
+}
+
+function clearMergeSel(){
+  document.querySelectorAll('.merge-cb').forEach(cb=>{cb.checked=false;});
+  const allCb=document.getElementById('merge-all-cb');
+  if(allCb) allCb.checked=false;
+  document.getElementById('merge-sel-bar').style.display='none';
+}
+
+function mergeSelected(){
+  const cbs=[...document.querySelectorAll('.merge-cb:checked')];
+  if(cbs.length<2){toast('Select at least 2 trades to merge','⚠️');return;}
+  
+  const ids=new Set(cbs.map(c=>c.dataset.id));
+  const selected=trades.filter(t=>ids.has(t.id));
+  
+  // Validate same symbol + side
+  const syms=new Set(selected.map(t=>t.symbol));
+  const sides=new Set(selected.map(t=>t.side));
+  if(syms.size>1||sides.size>1){
+    if(!confirm(`⚠️ Selected trades have different symbols or sides:\n${[...syms].join(', ')} / ${[...sides].join(', ')}\n\nMerge anyway? (entries will be combined into first trade)`)) return;
+  }
+  
+  // Merge: combine all entries and exits into the first trade
+  const base=selected[0];
+  const rest=selected.slice(1);
+  
+  let allEntries=[...(base.entries||[])];
+  let allExits=[...(base.exits||[])];
+  
+  rest.forEach(t=>{
+    (t.entries||[]).forEach(e=>allEntries.push({...e}));
+    (t.exits||[]).forEach(e=>allExits.push({...e}));
+  });
+  
+  // Sort entries and exits by date
+  allEntries.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  allExits.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  
+  base.entries=allEntries;
+  base.exits=allExits;
+  
+  // Recalculate status
+  const totalEntryQty=allEntries.reduce((s,e)=>s+(+e.qty||0),0);
+  const totalExitQty=allExits.reduce((s,e)=>s+(+e.qty||0),0);
+  if(totalExitQty>=totalEntryQty && totalExitQty>0) base.status='Closed';
+  else if(totalExitQty>0) base.status='Partial';
+  else base.status='Open';
+  
+  base.notes=`Merged ${selected.length} trades. ${base.notes||''}`.trim();
+  
+  // Remove the rest
+  const restIds=new Set(rest.map(t=>t.id));
+  trades=trades.filter(t=>!restIds.has(t.id));
+  
+  save(); renderTrades(); renderDash();
+  toast(`✅ Merged ${selected.length} trades → ${base.symbol} (${allEntries.length} entries, ${totalEntryQty} qty)`,'🔀');
 }
 
 // ══════════════════════════════════════════════════
@@ -3908,7 +3999,7 @@ async function syncDhan(){
       setLog('dhan-log','No trades found — try after market hours or check if trades exist.');
       return;
     }
-    const {added,skipped,matched}=mergeApiOrders(orders,'dhan');
+    const {added,skipped,matched,pyramided}=mergeApiOrders(orders,'dhan');
     save();renderDash();renderTrades();
     const msg=`✓ ${added} added · ${skipped} skipped`;
     toast('Dhan synced! '+msg,'✅');
@@ -3952,7 +4043,7 @@ async function syncZerodha(){
     if(!data) throw new Error('Unexpected response from Zerodha');
     const trds=(data?.data||[]).filter(t=>t.exchange==='NSE'||t.exchange==='BSE');
     if(!trds.length){toast('No trades found today','ℹ️');setDot('zd-sync-dot','');setDot('zd-dot','');setLog('zd-log','No equity trades today.');return;}
-    const {added,skipped,matched}=mergeApiOrders(trds,'zerodha');
+    const {added,skipped,matched,pyramided}=mergeApiOrders(trds,'zerodha');
     save();renderDash();renderTrades();
     const msg=`✓ ${added} new · ${matched||0} exits · ${pyramided||0} pyramids · ${skipped} skipped`;
     toast('Zerodha synced! '+msg,'✅');setDot('zd-sync-dot','connected');setDot('zd-dot','connected');
