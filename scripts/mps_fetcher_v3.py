@@ -349,9 +349,75 @@ def fetch_nse_pcr_fallback():
         return 1.0
 
 
-def fetch_nse_fii_fallback():
-    """Try to fetch FII data from NSE. Returns 0 on failure."""
-    log.info("  Fetching: FII/FPI flow (NSE fallback)...")
+def _parse_crore_value(text):
+    """Parse a ₹ Crore value from text like '-10,716.64' or '+9,977.42'."""
+    if not text:
+        return None
+    cleaned = text.strip().replace("₹", "").replace("Cr", "").replace("crore", "")
+    cleaned = cleaned.replace(",", "").replace(" ", "")
+    try:
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return None
+
+
+def fetch_fii_from_groww():
+    """
+    Scrape FII net buy/sell (₹ Cr) from Groww.in's FII/DII page.
+    
+    Groww renders data server-side in HTML tables — works from
+    GitHub Actions without JS or special session handling.
+    
+    Returns: float (FII net in ₹ Crores, negative = selling)
+    """
+    log.info("═══ FII DATA (Groww.in — Primary) ═══")
+    
+    url = "https://groww.in/fii-dii-data"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    
+    try:
+        resp = requests.get(url, headers=headers, timeout=20)
+        resp.raise_for_status()
+        
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Find table rows with date + FII data
+        # Columns: Date | FII Buy | FII Sell | FII Net | DII Buy | DII Sell | DII Net
+        import re
+        tables = soup.find_all("table")
+        
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows[1:]:  # Skip header
+                cells = row.find_all(["td", "th"])
+                if len(cells) >= 4:
+                    first_cell = cells[0].get_text(strip=True)
+                    if re.match(r'\d{1,2}\s+\w{3}\s+\d{4}', first_cell):
+                        # Data row — FII net is 4th column (index 3)
+                        fii_net_text = cells[3].get_text(strip=True)
+                        fii_net = _parse_crore_value(fii_net_text)
+                        
+                        if fii_net is not None:
+                            log.info(f"  ✓ FII Net from Groww ({first_cell}): ₹{fii_net:,.2f} Cr")
+                            return round(fii_net, 2)
+        
+        log.warning("  ✗ Could not parse FII data from Groww table")
+        
+    except Exception as e:
+        log.warning(f"  ✗ Groww FII scrape failed: {e}")
+    
+    # ── Fallback: Try NSE (may fail from datacenter IPs) ──
+    return _fetch_nse_fii_fallback()
+
+
+def _fetch_nse_fii_fallback():
+    """NSE FII fallback — last resort, usually blocked from GitHub Actions."""
+    log.info("  Trying NSE FII fallback...")
     
     session = requests.Session()
     session.headers.update(NSE_HEADERS)
@@ -376,12 +442,12 @@ def fetch_nse_fii_fallback():
                     buy = float(entry.get("buyValue", 0) or 0)
                     sell = float(entry.get("sellValue", 0) or 0)
                     fii_net = buy - sell
-                    log.info(f"  ✓ FII Net: ₹{fii_net:,.2f} Cr")
+                    log.info(f"  ✓ FII Net from NSE: ₹{fii_net:,.2f} Cr")
                     return round(fii_net, 2)
         except Exception:
             continue
     
-    log.warning("  ✗ All FII endpoints failed, using default 0")
+    log.warning("  ✗ All FII sources failed, using default 0")
     return 0
 
 
@@ -532,7 +598,7 @@ def fetch_and_calculate(dry_run=False):
         
         # ── Step 3: NSE fallback for PCR + FII ──
         market["pcr"] = fetch_nse_pcr_fallback()
-        market["fii_net"] = fetch_nse_fii_fallback()
+        market["fii_net"] = fetch_fii_from_groww()
 
         # ── Safe defaults for any missing data ──
         if market.get("vix") is None:
@@ -639,7 +705,7 @@ def fetch_and_calculate(dry_run=False):
                 "ad_ratio": "yahoo_finance_estimated",
                 "52w_highs_lows": "yahoo_finance_estimated",
                 "pcr": "nse_fallback",
-                "fii": "nse_fallback",
+                "fii": "groww_primary_nse_fallback",
                 "nifty_52w": "yahoo_finance",
                 "macro": "yahoo_finance",
             },
@@ -650,13 +716,13 @@ def fetch_and_calculate(dry_run=False):
             "fii_5day_net": fii_5day_net,
         },
         "metadata": {
-            "version": "3.1.1",
+            "version": "3.1.2",
             "generated_at": datetime.now().isoformat(),
             "universe": "Nifty 500",
             "pillars": 7,
             "modifiers": 9,
             "daily_inputs": 21,
-            "note": "Market data via Yahoo Finance (NSE IP-blocked on GitHub Actions)",
+            "note": "FII via Groww.in, market data via Yahoo Finance (NSE IP-blocked on GH Actions)",
         },
     }
 
