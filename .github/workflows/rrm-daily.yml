@@ -1,108 +1,55 @@
-# =============================================================================
-# RRM v3.1 Daily Auto-Update — GitHub Action
-# =============================================================================
-# Renamed from RRG (Relative Rotation Graph) to RRM (Relative Momentum Matrix)
-#
-# Runs every trading day at 4:30 PM IST (11:00 AM UTC)
-# Fetches sector/ETF prices from Yahoo Finance, calculates RRM, commits JSON
-#
-# Setup:
-#   1. Place this file in: .github/workflows/rrm-daily.yml
-#   2. Place rrm_fetcher.py in /scripts/
-#   3. Optional: data/rrm_config.json for custom symbols
-#   4. Output: data/rrm_data.json (read by rrm.html dashboard)
-# =============================================================================
-
-name: RRM Daily Update
+name: RRM Daily Update v4.0
 
 on:
   schedule:
-    # 11:00 UTC = 4:30 PM IST (after market close)
+    # Run at 4:30 PM IST (11:00 UTC) on weekdays
     - cron: '0 11 * * 1-5'
-
   workflow_dispatch:
 
-concurrency:
-  group: rrm-update
-  cancel-in-progress: false
+permissions:
+  contents: write
 
 jobs:
   update-rrm:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install yfinance numpy
+        run: pip install yfinance numpy
 
-      - name: Create data directory
-        run: mkdir -p data
-
-      - name: Run RRM Fetcher
-        id: rrm
+      - name: Run RRM Fetcher v4.0
         run: |
           cd scripts
-          python rrm_fetcher.py \
+          python rrm_fetcher_v4.py \
             --output ../data/rrm_data.json \
             --daily-tail 5 \
-            --weekly-tail 5
-        continue-on-error: true
+            --weekly-tail 5 \
+            --monthly-tail 5 \
+            --window 10
 
-      - name: Check if fetch succeeded
-        if: steps.rrm.outcome == 'failure'
+      - name: Count results
         run: |
-          echo "::warning::RRM fetch failed. Possible reasons:"
-          echo "  - Market holiday"
-          echo "  - Yahoo Finance API issues"
-          echo "  - Network issues"
-          exit 0
+          SECTORS=$(python3 -c "import json; d=json.load(open('data/rrm_data.json')); print(d['metadata']['total_sectors'])")
+          ETFS=$(python3 -c "import json; d=json.load(open('data/rrm_data.json')); print(d['metadata']['total_etfs'])")
+          DRILLS=$(python3 -c "import json; d=json.load(open('data/rrm_data.json')); print(d['metadata']['total_drilldown_sectors'])")
+          echo "SECTORS=${SECTORS}" >> $GITHUB_ENV
+          echo "ETFS=${ETFS}" >> $GITHUB_ENV
+          echo "DRILLS=${DRILLS}" >> $GITHUB_ENV
 
-      - name: Commit and push
-        if: steps.rrm.outcome == 'success'
+      - name: Commit & Push
         run: |
-          git config user.name "RRM Bot"
-          git config user.email "rrm-bot@tradedge.local"
-          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/rrm_data.json
-          
-          DATE=$(date +%Y-%m-%d)
-          SECTORS=$(python3 -c "import json; d=json.load(open('data/rrm_data.json')); print(d['metadata'].get('total_sectors', 0))")
-          
-          git commit -m "📊 RRM v3.1 ${DATE}: ${SECTORS} sectors updated" || echo "No changes to commit"
+          DATE=$(date -u +"%Y-%m-%d")
+          git commit -m "📊 RRM v4.0 ${DATE}: ${SECTORS} sectors, ${ETFS} ETFs, ${DRILLS} drilldowns (D+W+M)" || echo "No changes"
           git push
-
-      - name: Summary
-        if: steps.rrm.outcome == 'success'
-        run: |
-          python3 -c "
-          import json
-          with open('data/rrm_data.json') as f:
-              d = json.load(f)
-          m = d['metadata']
-          print('## RRM v3.1 Daily Summary')
-          print(f'**Date:** {m[\"date\"]}')
-          print(f'**Benchmarks:** {len(m[\"benchmarks_calculated\"])}')
-          print(f'**Sectors:** {m[\"total_sectors\"]}')
-          print(f'**ETFs:** {m[\"total_etfs\"]}')
-          print(f'**Drilldowns:** {m[\"total_drilldown_sectors\"]}')
-          print()
-          # Show quadrant summary for default benchmark
-          default = d.get('default_benchmark', '^NSEI')
-          bd = d.get('benchmarks_data', {}).get(default, {})
-          qs = bd.get('daily', {}).get('quadrant_summary', {})
-          if qs:
-              print(f'### Quadrant Summary ({default})')
-              for q in ['Leading', 'Improving', 'Weakening', 'Lagging']:
-                  items = qs.get(q, [])
-                  print(f'- **{q}:** {', '.join(items) if items else '—'}')
-          " >> $GITHUB_STEP_SUMMARY
