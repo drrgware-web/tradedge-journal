@@ -216,3 +216,99 @@ jobs:
           else:
               print('_Intraday snapshot — history updates at EOD (4:15 PM IST)_')
           " >> $GITHUB_STEP_SUMMARY
+
+      # ═══════════════════════════════════════════════════
+      # TELEGRAM ALERTS — Brief hourly + Detailed EOD
+      # ═══════════════════════════════════════════════════
+      - name: Send Telegram Alert
+        if: steps.mps.outcome == 'success'
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          
+          # Skip if secrets not configured
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+            echo "Telegram secrets not configured, skipping alert"
+            exit 0
+          fi
+          
+          # Build message using Python (reads JSON for accurate data)
+          MESSAGE=$(python3 -c "
+          import json
+          
+          with open('data/mps_latest.json') as f:
+              d = json.load(f)
+          c = d['current']
+          mode = '${MODE}'
+          
+          score = c['final_score']
+          zone = c['zone']
+          emoji = c['zone_emoji']
+          state = c['state']
+          state_msg = c['state_message']
+          risk = c['risk_per_trade']
+          base = c['base_score']
+          mod = c['total_modifier']
+          macro = c.get('macro_summary', '')
+          
+          import datetime
+          ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+          time_str = ist.strftime('%H:%M IST')
+          date_str = ist.strftime('%d %b %Y')
+          
+          if mode == 'eod':
+              # ═══ DETAILED EOD ALERT ═══
+              pillars = ''
+              for p in c['pillar_scores']:
+                  bar = '█' * int(p['raw_score'] / 10) + '░' * (10 - int(p['raw_score'] / 10))
+                  pillars += f\"  {p['name'][:6]:6s} {bar} {p['raw_score']:.1f}\n\"
+              
+              mods_active = [m for m in c['modifiers'] if m['triggered']]
+              mod_lines = ''
+              for m in mods_active:
+                  sign = '+' if m['adjustment'] > 0 else ''
+                  mod_lines += f\"  {sign}{m['adjustment']:.0f} {m['name']}\n\"
+              if not mod_lines:
+                  mod_lines = '  None active\n'
+              
+              msg = f'''📊 TradEdge MPS EOD Alert
+          ━━━━━━━━━━━━━━━━━━━━
+          {emoji} {zone}
+          Score: {score:.1f}  |  Risk: {risk}
+          State: {state} — {state_msg}
+          ━━━━━━━━━━━━━━━━━━━━
+          Base: {base:.1f} | Modifier: {'+' if mod >= 0 else ''}{mod:.1f}
+          
+          📊 Pillars:
+          {pillars}
+          🔧 Active Modifiers ({len(mods_active)}):
+          {mod_lines}'''
+              
+              if macro:
+                  msg += f\"🌍 {macro}\n\"
+              
+              msg += f'''━━━━━━━━━━━━━━━━━━━━
+          ACTION: {c['zone_action'][:120]}
+          ━━━━━━━━━━━━━━━━━━━━
+          {date_str} · {time_str}'''
+          
+          else:
+              # ═══ BRIEF HOURLY ALERT ═══
+              msg = f'''⚡ MPS {time_str}: {score:.1f} {emoji} {zone}
+          Base {base:.1f} {'+' if mod >= 0 else ''}{mod:.1f}mod | {risk}
+          {state}: {state_msg}'''
+              if macro:
+                  msg += f\"\n🌍 {macro[:80]}\"
+          
+          # Escape special chars for Telegram
+          print(msg)
+          ")
+          
+          # Send via Telegram Bot API
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" \
+            -d text="${MESSAGE}" \
+            -d parse_mode="" \
+            --fail || echo "Telegram send failed (non-critical)"
