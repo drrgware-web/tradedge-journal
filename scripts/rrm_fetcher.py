@@ -1,23 +1,13 @@
 """
 ================================================================================
-RRM Data Fetcher v3.1 — Multi-Benchmark Relative Momentum Matrix Engine
+RRM Data Fetcher v4.0 — Multi-Benchmark Relative Momentum Matrix Engine
 ================================================================================
-Renamed from RRG (Relative Rotation Graph) to RRM (Relative Momentum Matrix)
-for TradEdge branding.
-
-Pre-calculates RRM for ALL benchmarks (Nifty 50, Nifty Bank, Nifty 500).
-Daily + Weekly timeframes. Sector drill-down with stock-level RRM.
-Config-driven: reads symbols from data/rrm_config.json (falls back to rrg_config.json)
-
-Output JSON structure:
-  { "benchmarks_data": {
-      "^NSEI":  { daily: {...}, weekly: {...}, drilldown: {...} },
-      "^NSEBANK": { daily: {...}, weekly: {...}, drilldown: {...} },
-      "^CRSLDX":  { daily: {...}, weekly: {...}, drilldown: {...} }
-    },
-    "available_benchmarks": {...},
-    "metadata": {...}
-  }
+UPGRADE from v3.1:
+  - 46 sectors (was 16) — full Definedge universe
+  - 54 ETFs (was 11) — full Definedge universe
+  - Monthly timeframe (was daily+weekly only)
+  - Monthly drill-down for stock-level multi-TF alignment
+  - Backward compatible JSON structure
 
 Requirements:  pip install yfinance numpy
 ================================================================================
@@ -43,46 +33,156 @@ def load_config(config_path):
             return cfg
         except Exception as e:
             log.warning(f"Config load failed: {e}")
-    log.info("Using built-in defaults")
+    log.info("Using built-in defaults (v4.0 — 46 sectors, 54 ETFs)")
+    return DEFAULT_CONFIG()
+
+def DEFAULT_CONFIG():
     return {
         "benchmarks": {"^NSEI": "Nifty 50", "^NSEBANK": "Nifty Bank", "^CRSLDX": "Nifty 500"},
         "default_benchmark": "^NSEI",
+        # ═══════════════════════════════════════════════════════
+        # 46 SECTORS (full Definedge universe)
+        # Yahoo Finance tickers for NSE sectoral/thematic indices
+        # ═══════════════════════════════════════════════════════
         "sectors": {
-            "^CNXAUTO": {"name": "Nifty Auto", "color": "#ef4444"},
-            "^NSEBANK": {"name": "Nifty Bank", "color": "#3b82f6"},
-            "^CNXFIN": {"name": "Nifty Financial Services", "color": "#6366f1"},
-            "^CNXFMCG": {"name": "Nifty FMCG", "color": "#22c55e"},
-            "^CNXPHARMA": {"name": "Nifty Pharma", "color": "#f59e0b"},
-            "^CNXIT": {"name": "Nifty IT", "color": "#06b6d4"},
-            "^CNXMETAL": {"name": "Nifty Metal", "color": "#8b5cf6"},
-            "^CNXREALTY": {"name": "Nifty Realty", "color": "#ec4899"},
-            "^CNXENERGY": {"name": "Nifty Energy", "color": "#f97316"},
-            "^CNXINFRA": {"name": "Nifty Infra", "color": "#14b8a6"},
-            "^CNXMEDIA": {"name": "Nifty Media", "color": "#a855f7"},
-            "^CNXPSUBANK": {"name": "Nifty PSU Bank", "color": "#0ea5e9"},
-            "^CNXSERVICE": {"name": "Nifty Services", "color": "#84cc16"},
-            "^CNXCONSUM": {"name": "Nifty Consumption", "color": "#e879f9"},
-            "^CNXCMDT": {"name": "Nifty Commodities", "color": "#d97706"},
-            "^CNXMNC": {"name": "Nifty MNC", "color": "#64748b"},
+            # ── Original 16 sectors (v3.1) ──
+            "^CNXAUTO":     {"name": "Nifty Auto",         "color": "#ef4444"},
+            "^NSEBANK":     {"name": "Nifty Bank",         "color": "#3b82f6"},
+            "^CNXFIN":      {"name": "Nifty Fin Service",  "color": "#6366f1"},
+            "^CNXFMCG":     {"name": "Nifty FMCG",         "color": "#22c55e"},
+            "^CNXPHARMA":   {"name": "Nifty Pharma",       "color": "#f59e0b"},
+            "^CNXIT":       {"name": "Nifty IT",           "color": "#06b6d4"},
+            "^CNXMETAL":    {"name": "Nifty Metal",        "color": "#8b5cf6"},
+            "^CNXREALTY":   {"name": "Nifty Realty",       "color": "#ec4899"},
+            "^CNXENERGY":   {"name": "Nifty Energy",       "color": "#f97316"},
+            "^CNXINFRA":    {"name": "Nifty Infra",        "color": "#14b8a6"},
+            "^CNXMEDIA":    {"name": "Nifty Media",        "color": "#a855f7"},
+            "^CNXPSUBANK":  {"name": "Nifty PSU Bank",     "color": "#0ea5e9"},
+            "^CNXSERVICE":  {"name": "Nifty Services",     "color": "#84cc16"},
+            "^CNXCONSUM":   {"name": "Nifty Consumption",  "color": "#e879f9"},
+            "^CNXCMDT":     {"name": "Nifty Commodities",  "color": "#d97706"},
+            "^CNXMNC":      {"name": "Nifty MNC",          "color": "#64748b"},
+            # ── NEW: 30 additional sectors from Definedge ──
+            "NIFTY CONSR DURBL.NS":  {"name": "Nifty Consumer Durables",  "color": "#fb7185"},
+            "NIFTY HEALTHCARE.NS":   {"name": "Nifty Healthcare",         "color": "#34d399"},
+            "NIFTY IND DIGITAL.NS":  {"name": "Nifty India Digital",      "color": "#60a5fa"},
+            "NIFTY INDIA MFG.NS":    {"name": "Nifty India Mfg",          "color": "#a78bfa"},
+            "NIFTY OIL AND GAS.NS":  {"name": "Nifty Oil & Gas",          "color": "#fbbf24"},
+            "NIFTY CPSE.NS":         {"name": "Nifty CPSE",               "color": "#4ade80"},
+            "NIFTY CAPITAL MKT.NS":  {"name": "Nifty Capital Mkt",        "color": "#f472b6"},
+            "NIFTY CHEMICALS.NS":    {"name": "Nifty Chemicals",          "color": "#c084fc"},
+            "NIFTY COREHOUSING.NS":  {"name": "Nifty CoreHousing",        "color": "#fca5a5"},
+            "NIFTY CORP MAATR.NS":   {"name": "Nifty Corp MAATR",         "color": "#86efac"},
+            "NIFTY EV.NS":           {"name": "Nifty EV",                 "color": "#67e8f9"},
+            "NIFTY FINSRV25 50.NS":  {"name": "Nifty FinSrv25 50",       "color": "#d8b4fe"},
+            "NIFTY HOUSING.NS":      {"name": "Nifty Housing",            "color": "#fda4af"},
+            "NIFTY IND DEFENCE.NS":  {"name": "Nifty India Defence",      "color": "#bef264"},
+            "NIFTY IND TOURISM.NS":  {"name": "Nifty India Tourism",      "color": "#5eead4"},
+            "NIFTY INFRALOG.NS":     {"name": "Nifty InfraLog",           "color": "#93c5fd"},
+            "NIFTY INTERNET.NS":     {"name": "Nifty Internet",           "color": "#fcd34d"},
+            "NIFTY MS FIN SERV.NS":  {"name": "Nifty MS Fin Serv",       "color": "#c4b5fd"},
+            "NIFTY MS IT TELCM.NS":  {"name": "Nifty MS IT Telecom",     "color": "#7dd3fc"},
+            "NIFTY MS IND CONS.NS":  {"name": "Nifty MS Ind Consumers",  "color": "#fdba74"},
+            "NIFTY MIDSML HLTH.NS":  {"name": "Nifty MidSml Health",     "color": "#6ee7b7"},
+            "NIFTY MOBILITY.NS":     {"name": "Nifty Mobility",           "color": "#fca5a5"},
+            "NIFTY NEW CONSUMP.NS":  {"name": "Nifty New Consumption",   "color": "#a5b4fc"},
+            "NIFTY NONCYC CONS.NS":  {"name": "Nifty NonCyclic Cons",    "color": "#86efac"},
+            "^CNXPSE":               {"name": "Nifty PSE",                "color": "#fde68a"},
+            "NIFTY PVT BANK.NS":     {"name": "Nifty Pvt Bank",          "color": "#99f6e4"},
+            "NIFTY RURAL.NS":        {"name": "Nifty Rural",              "color": "#e9d5ff"},
+            "NIFTY FINSEREXBNK.NS":  {"name": "Nifty FinServ Ex-Bank",   "color": "#bae6fd"},
+            "NIFTY TRANS LOGIS.NS":  {"name": "Nifty Transport Logistics","color": "#fed7aa"},
+            "NIFTY WAVES.NS":        {"name": "Nifty Waves",              "color": "#c7d2fe"},
         },
+        # ═══════════════════════════════════════════════════════
+        # 54 ETFs (full Definedge universe)
+        # ═══════════════════════════════════════════════════════
         "etfs": {
-            "NIFTYBEES.NS": {"name": "Nifty 50 ETF", "color": "#3b82f6"},
-            "BANKBEES.NS": {"name": "Bank ETF", "color": "#6366f1"},
-            "ITBEES.NS": {"name": "IT ETF", "color": "#06b6d4"},
-            "PHARMABEES.NS": {"name": "Pharma ETF", "color": "#f59e0b"},
-            "PSUBNKBEES.NS": {"name": "PSU Bank ETF", "color": "#0ea5e9"},
-            "JUNIORBEES.NS": {"name": "Nifty Next 50 ETF", "color": "#8b5cf6"},
-            "AUTOBEES.NS": {"name": "Auto ETF", "color": "#ef4444"},
-            "MID150BEES.NS": {"name": "Midcap 150 ETF", "color": "#ec4899"},
-            "GOLDBEES.NS": {"name": "Gold ETF", "color": "#eab308"},
-            "SILVERBEES.NS": {"name": "Silver ETF", "color": "#94a3b8"},
-            "MON100.NS": {"name": "NASDAQ 100 ETF", "color": "#22d3ee"},
+            # ── Original 11 ETFs (v3.1) ──
+            "NIFTYBEES.NS":   {"name": "Nifty 50 ETF",        "color": "#3b82f6"},
+            "BANKBEES.NS":    {"name": "Bank ETF",             "color": "#6366f1"},
+            "ITBEES.NS":      {"name": "IT ETF",               "color": "#06b6d4"},
+            "PHARMABEES.NS":  {"name": "Pharma ETF",           "color": "#f59e0b"},
+            "PSUBNKBEES.NS":  {"name": "PSU Bank ETF",         "color": "#0ea5e9"},
+            "JUNIORBEES.NS":  {"name": "Next 50 ETF",          "color": "#8b5cf6"},
+            "AUTOBEES.NS":    {"name": "Auto ETF",             "color": "#ef4444"},
+            "MID150BEES.NS":  {"name": "Midcap 150 ETF",       "color": "#ec4899"},
+            "GOLDBEES.NS":    {"name": "Gold ETF",             "color": "#eab308"},
+            "SILVERBEES.NS":  {"name": "Silver ETF",           "color": "#94a3b8"},
+            "MON100.NS":      {"name": "NASDAQ 100 ETF",       "color": "#22d3ee"},
+            # ── NEW: 43 additional ETFs from Definedge ──
+            "ABSLPSE.NS":     {"name": "PSE ETF",              "color": "#fde68a"},
+            "ALPHA.NS":       {"name": "Alpha ETF",            "color": "#a78bfa"},
+            "AONETOTAL.NS":   {"name": "Top 750 ETF",          "color": "#67e8f9"},
+            "BFSI.NS":        {"name": "BFSI ETF",             "color": "#c084fc"},
+            "COMMOIETF.NS":   {"name": "Commodities ETF",      "color": "#d97706"},
+            "CONSUMBEES.NS":  {"name": "Consumption ETF",      "color": "#e879f9"},
+            "CONSUMER.NS":    {"name": "New Age Consumption ETF","color": "#fb7185"},
+            "CPSEETF.NS":     {"name": "CPSE ETF",             "color": "#4ade80"},
+            "DIVOPPBEES.NS":  {"name": "Dividend Opp 50 ETF",  "color": "#fbbf24"},
+            "ESG.NS":         {"name": "ESG Leaders ETF",      "color": "#34d399"},
+            "FINIETF.NS":     {"name": "FinServ Ex-Bank ETF",  "color": "#60a5fa"},
+            "FMCGIETF.NS":   {"name": "FMCG ETF",             "color": "#22c55e"},
+            "GILT5YBEES.NS":  {"name": "Gilt 5Y ETF",          "color": "#0ea5e9"},
+            "GROWWEV.NS":     {"name": "EV Auto ETF",          "color": "#67e8f9"},
+            "GROWWRAIL.NS":   {"name": "Railways PSU ETF",     "color": "#bef264"},
+            "HDFCGROWTH.NS":  {"name": "Growth Sectors ETF",   "color": "#f472b6"},
+            "HDFCSML250.NS":  {"name": "SmallCap 250 ETF",     "color": "#fca5a5"},
+            "HEALTHIETF.NS":  {"name": "Healthcare ETF",       "color": "#34d399"},
+            "HNGSNGBEES.NS":  {"name": "Hang Seng ETF",        "color": "#fb923c"},
+            "ICICIB22.NS":    {"name": "Bharat 22 ETF",        "color": "#14b8a6"},
+            "INFRAIETF.NS":   {"name": "Infra ETF",            "color": "#14b8a6"},
+            "LIQUIDCASE.NS":  {"name": "Liquid Assets ETF",    "color": "#06b6d4"},
+            "LOWVOLIETF.NS":  {"name": "Low Vol Top 100 ETF",  "color": "#93c5fd"},
+            "LTGILTBEES.NS":  {"name": "Long Term Gilt ETF",   "color": "#7dd3fc"},
+            "MAFANG.NS":      {"name": "NYSE FANG ETF",        "color": "#a855f7"},
+            "MAHKTECH.NS":    {"name": "Hang Seng Tech ETF",   "color": "#fcd34d"},
+            "MAKEINDIA.NS":   {"name": "Make in India ETF",    "color": "#bef264"},
+            "MASPTOP50.NS":   {"name": "S&P 500 Top 50 ETF",   "color": "#6366f1"},
+            "METALIETF.NS":   {"name": "Metal ETF",            "color": "#8b5cf6"},
+            "MIDSMALL.NS":    {"name": "MidSmallCap ETF",      "color": "#d946ef"},
+            "MNC.NS":         {"name": "MNC ETF",              "color": "#64748b"},
+            "MOCAPITAL.NS":   {"name": "Capital Markets ETF",  "color": "#f472b6"},
+            "MODEFENCE.NS":   {"name": "Defence ETF",          "color": "#84cc16"},
+            "MOM30IETF.NS":   {"name": "Momentum Top 200 ETF", "color": "#fdba74"},
+            "MOMENTUM50.NS":  {"name": "Momentum Top 500 ETF", "color": "#c4b5fd"},
+            "MONQ50.NS":      {"name": "NASDAQ Q50 ETF",       "color": "#5eead4"},
+            "MOREALTY.NS":    {"name": "Realty ETF",            "color": "#ec4899"},
+            "MSCIINDIA.NS":   {"name": "MSCI India ETF",       "color": "#86efac"},
+            "MULTICAP.NS":    {"name": "Multicap ETF",          "color": "#a5b4fc"},
+            "OILIETF.NS":     {"name": "Oil & Gas ETF",        "color": "#fbbf24"},
+            "PVTBANIETF.NS":  {"name": "Pvt Bank ETF",         "color": "#99f6e4"},
+            "SELECTIPO.NS":   {"name": "Select IPO ETF",       "color": "#fda4af"},
+            "TNDETF.NS":      {"name": "Digital ETF",           "color": "#7dd3fc"},
+            "TOP10ADD.NS":    {"name": "Top 10 ETF",            "color": "#fed7aa"},
+        },
+        # ── Asset classes (unchanged from v3.1) ──
+        "asset_classes": {
+            "GC=F":           {"name": "Gold",              "color": "#eab308"},
+            "SI=F":           {"name": "Silver",            "color": "#94a3b8"},
+            "CL=F":           {"name": "Crude Oil",         "color": "#f97316"},
+            "USDINR=X":       {"name": "USD/INR",           "color": "#22c55e"},
+            "BTC-USD":        {"name": "Bitcoin",           "color": "#f59e0b"},
+            "^TNX":           {"name": "US 10Y Yield",      "color": "#ef4444"},
+            "ICICIB22.NS":    {"name": "ICICI G-Sec 2027",  "color": "#14b8a6"},
+            "GILT5YBEES.NS":  {"name": "Gilt 5Y ETF",       "color": "#0ea5e9"},
+            "LIQUIDBEES.NS":  {"name": "Liquid Fund",        "color": "#06b6d4"},
+            "^DJI":           {"name": "Dow Jones",          "color": "#8b5cf6"},
+            "^GSPC":          {"name": "S&P 500",            "color": "#6366f1"},
+            "^IXIC":          {"name": "NASDAQ",             "color": "#a855f7"},
+        },
+        # ── Market segments (unchanged from v3.1) ──
+        "market_segments": {
+            "^NSMIDCP":           {"name": "Nifty Next 50",   "color": "#6366f1"},
+            "NIFTYMIDCAP150.NS":  {"name": "Midcap 150",      "color": "#a855f7"},
+            "^NSEMDCP50":         {"name": "Midcap 50",        "color": "#d946ef"},
+            "^NSEBANK":           {"name": "Bank Index",       "color": "#0ea5e9"},
         },
         "sector_constituents": {},
     }
 
 # =============================================================================
-# JdK RS-RATIO / RS-MOMENTUM
+# JdK RS-RATIO / RS-MOMENTUM (unchanged from v3.1)
 # =============================================================================
 def calc_rs(sector_prices, bench_prices, window=10):
     if len(sector_prices) < window * 3 or len(bench_prices) < window * 3:
@@ -153,8 +253,21 @@ def resample_weekly(closes, dates):
         wc.append(lc); wd.append(ld)
     return wc, wd
 
+def resample_monthly(closes, dates):
+    """Resample daily data to monthly (last close of each month)."""
+    from datetime import datetime as dt
+    mc, md, cm = [], [], None
+    for c, d in zip(closes, dates):
+        ym = dt.strptime(d, "%Y-%m-%d").strftime("%Y-%m")
+        if cm is not None and ym != cm:
+            mc.append(lc); md.append(ld)
+        cm = ym; lc = c; ld = d
+    if cm is not None:
+        mc.append(lc); md.append(ld)
+    return mc, md
+
 # =============================================================================
-# SECTOR CONSTITUENTS
+# SECTOR CONSTITUENTS (unchanged)
 # =============================================================================
 def auto_fetch_constituents(sector_symbol):
     try:
@@ -190,7 +303,11 @@ def stock_color(name, idx):
 # =============================================================================
 # RRM FOR A SET OF ITEMS (one timeframe)
 # =============================================================================
-def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, window, weekly=False):
+def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, window, resample_fn=None):
+    """
+    Generic RRM calculation for any timeframe.
+    resample_fn: None for daily, resample_weekly for weekly, resample_monthly for monthly
+    """
     results = []
     for entry in items_cfg:
         sym = entry["symbol"]
@@ -201,9 +318,9 @@ def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, w
         sc, sd = price_data[sym]["closes"], price_data[sym]["dates"]
         bc, bd = bench_closes, bench_dates
 
-        if weekly:
-            sc, sd = resample_weekly(sc, sd)
-            bc, bd = resample_weekly(bc, bd)
+        if resample_fn:
+            sc, sd = resample_fn(sc, sd)
+            bc, bd = resample_fn(bc, bd)
 
         rs_r, rs_m = calc_rs(sc, bc, window)
         if rs_r is None: continue
@@ -223,7 +340,7 @@ def qsum(items):
 # =============================================================================
 # CALCULATE RRM FOR ONE BENCHMARK
 # =============================================================================
-def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail, weekly_tail, window):
+def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail, weekly_tail, monthly_tail, window):
     if bench_sym not in price_data:
         log.warning(f"Benchmark {bench_sym} not in price data, skipping")
         return None
@@ -241,14 +358,23 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail,
     sec_list, etf_list = to_list(sectors), to_list(etfs)
     ac_list, ms_list = to_list(asset_classes), to_list(market_segments)
 
-    d_sec = calc_rrm_items(price_data, sec_list, bc, bd, daily_tail, window, weekly=False)
-    d_etf = calc_rrm_items(price_data, etf_list, bc, bd, daily_tail, window, weekly=False)
-    d_ac = calc_rrm_items(price_data, ac_list, bc, bd, daily_tail, window, weekly=False)
-    d_ms = calc_rrm_items(price_data, ms_list, bc, bd, daily_tail, window, weekly=False)
-    w_sec = calc_rrm_items(price_data, sec_list, bc, bd, weekly_tail, window, weekly=True)
-    w_etf = calc_rrm_items(price_data, etf_list, bc, bd, weekly_tail, window, weekly=True)
-    w_ac = calc_rrm_items(price_data, ac_list, bc, bd, weekly_tail, window, weekly=True)
-    w_ms = calc_rrm_items(price_data, ms_list, bc, bd, weekly_tail, window, weekly=True)
+    # Daily
+    d_sec = calc_rrm_items(price_data, sec_list, bc, bd, daily_tail, window, resample_fn=None)
+    d_etf = calc_rrm_items(price_data, etf_list, bc, bd, daily_tail, window, resample_fn=None)
+    d_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, daily_tail, window, resample_fn=None)
+    d_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, daily_tail, window, resample_fn=None)
+
+    # Weekly
+    w_sec = calc_rrm_items(price_data, sec_list, bc, bd, weekly_tail, window, resample_fn=resample_weekly)
+    w_etf = calc_rrm_items(price_data, etf_list, bc, bd, weekly_tail, window, resample_fn=resample_weekly)
+    w_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, weekly_tail, window, resample_fn=resample_weekly)
+    w_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, weekly_tail, window, resample_fn=resample_weekly)
+
+    # Monthly
+    m_sec = calc_rrm_items(price_data, sec_list, bc, bd, monthly_tail, window, resample_fn=resample_monthly)
+    m_etf = calc_rrm_items(price_data, etf_list, bc, bd, monthly_tail, window, resample_fn=resample_monthly)
+    m_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
+    m_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
 
     # Drill-down (stocks within each sector, benchmarked against the sector index)
     drilldown = {}
@@ -258,25 +384,27 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail,
         sec_name = sectors.get(sec_sym, {}).get("name", sec_sym)
         stock_items = [{"symbol": s["symbol"], "name": s["name"], "color": stock_color(s["name"], i)} for i, s in enumerate(stocks)]
 
-        dd_d = calc_rrm_items(price_data, stock_items, sbc, sbd, daily_tail, window, weekly=False)
-        dd_w = calc_rrm_items(price_data, stock_items, sbc, sbd, weekly_tail, window, weekly=True)
+        dd_d = calc_rrm_items(price_data, stock_items, sbc, sbd, daily_tail, window, resample_fn=None)
+        dd_w = calc_rrm_items(price_data, stock_items, sbc, sbd, weekly_tail, window, resample_fn=resample_weekly)
+        dd_m = calc_rrm_items(price_data, stock_items, sbc, sbd, monthly_tail, window, resample_fn=resample_monthly)
 
-        if dd_d or dd_w:
-            drilldown[sec_sym] = {"sector_name": sec_name, "benchmark": sec_sym, "daily": dd_d, "weekly": dd_w}
+        if dd_d or dd_w or dd_m:
+            drilldown[sec_sym] = {"sector_name": sec_name, "benchmark": sec_sym, "daily": dd_d, "weekly": dd_w, "monthly": dd_m}
 
     return {
-        "daily": {"sectors": d_sec, "etfs": d_etf, "asset_classes": d_ac, "market_segments": d_ms, "quadrant_summary": qsum(d_sec), "tail_length": daily_tail},
-        "weekly": {"sectors": w_sec, "etfs": w_etf, "asset_classes": w_ac, "market_segments": w_ms, "quadrant_summary": qsum(w_sec), "tail_length": weekly_tail},
+        "daily":   {"sectors": d_sec, "etfs": d_etf, "asset_classes": d_ac, "market_segments": d_ms, "quadrant_summary": qsum(d_sec), "tail_length": daily_tail},
+        "weekly":  {"sectors": w_sec, "etfs": w_etf, "asset_classes": w_ac, "market_segments": w_ms, "quadrant_summary": qsum(w_sec), "tail_length": weekly_tail},
+        "monthly": {"sectors": m_sec, "etfs": m_etf, "asset_classes": m_ac, "market_segments": m_ms, "quadrant_summary": qsum(m_sec), "tail_length": monthly_tail},
         "drilldown": drilldown,
     }
 
 # =============================================================================
 # MAIN
 # =============================================================================
-def calculate_rrm(config, daily_tail=5, weekly_tail=5, window=10):
+def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10):
     today = datetime.now().strftime("%Y-%m-%d")
     log.info(f"╔════════════════════════════════════════════════╗")
-    log.info(f"║  RRM v3.1 MULTI-BENCHMARK — {today}        ║")
+    log.info(f"║  RRM v4.0 MULTI-BENCHMARK + MONTHLY — {today} ║")
     log.info(f"╚════════════════════════════════════════════════╝")
 
     benchmarks = config.get("benchmarks", {})
@@ -302,6 +430,8 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, window=10):
             for s in constituents:
                 all_syms.add(s["symbol"])
 
+    log.info(f"Total symbols to fetch: {len(all_syms)} ({len(sectors)} sectors, {len(etfs)} ETFs, {len(asset_classes)} assets, {len(market_segments)} segments)")
+
     # Single fetch for ALL symbols (efficient)
     price_data = fetch_prices(list(all_syms), period="2y")
 
@@ -309,11 +439,12 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, window=10):
     benchmarks_data = {}
     for bench_sym, bench_name in benchmarks.items():
         log.info(f"\n═══ BENCHMARK: {bench_name} ({bench_sym}) ═══")
-        result = calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail, weekly_tail, window)
+        result = calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail, weekly_tail, monthly_tail, window)
         if result:
             benchmarks_data[bench_sym] = result
             log.info(f"  Daily sectors: {len(result['daily']['sectors'])}, ETFs: {len(result['daily']['etfs'])}")
             log.info(f"  Weekly sectors: {len(result['weekly']['sectors'])}, ETFs: {len(result['weekly']['etfs'])}")
+            log.info(f"  Monthly sectors: {len(result['monthly']['sectors'])}, ETFs: {len(result['monthly']['etfs'])}")
             log.info(f"  Drilldowns: {len(result['drilldown'])}")
 
     output = {
@@ -328,35 +459,36 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, window=10):
             "total_sectors": max((len(b["daily"]["sectors"]) for b in benchmarks_data.values()), default=0),
             "total_etfs": max((len(b["daily"]["etfs"]) for b in benchmarks_data.values()), default=0),
             "total_drilldown_sectors": max((len(b["drilldown"]) for b in benchmarks_data.values()), default=0),
-            "timeframes": ["daily", "weekly"],
+            "timeframes": ["daily", "weekly", "monthly"],
         },
     }
 
     log.info(f"\n═══ FINAL SUMMARY ═══")
     log.info(f"Benchmarks: {', '.join(benchmarks_data.keys())}")
     log.info(f"Sectors: {output['metadata']['total_sectors']}, ETFs: {output['metadata']['total_etfs']}, Drilldowns: {output['metadata']['total_drilldown_sectors']}")
+    log.info(f"Timeframes: daily, weekly, monthly")
 
     return output
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RRM v3.1 Multi-Benchmark Fetcher (Relative Momentum Matrix)")
+    parser = argparse.ArgumentParser(description="RRM v4.0 Multi-Benchmark + Monthly Fetcher")
     parser.add_argument("--output", "-o", type=str, default=None)
     parser.add_argument("--config", "-c", type=str, default=None)
     parser.add_argument("--daily-tail", type=int, default=5)
     parser.add_argument("--weekly-tail", type=int, default=5)
+    parser.add_argument("--monthly-tail", type=int, default=5)
     parser.add_argument("--window", "-w", type=int, default=10)
     args = parser.parse_args()
 
     cp = args.config
     if not cp:
-        # Try RRM config first, fall back to legacy RRG config
         for c in ["../data/rrm_config.json", "data/rrm_config.json", "rrm_config.json",
                    "../data/rrg_config.json", "data/rrg_config.json", "rrg_config.json"]:
             if os.path.exists(c): cp = c; break
 
     cfg = load_config(cp)
-    out = calculate_rrm(cfg, args.daily_tail, args.weekly_tail, args.window)
+    out = calculate_rrm(cfg, args.daily_tail, args.weekly_tail, args.monthly_tail, args.window)
 
     if not out:
         sys.exit(1)
