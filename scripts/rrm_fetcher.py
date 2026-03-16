@@ -226,12 +226,25 @@ def quadrant(r, m):
 # =============================================================================
 def fetch_prices(symbols, period="5y"):
     log.info(f"Fetching {len(symbols)} symbols from Yahoo Finance...")
+    from datetime import timedelta
+    
+    # Map period string to days for fallback start/end approach
+    period_days = {"1y": 365, "2y": 730, "3y": 1095, "5y": 1825, "10y": 3650, "max": 7300}
+    days = period_days.get(period, 1825)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    start_str = start_date.strftime("%Y-%m-%d")
+    end_str = end_date.strftime("%Y-%m-%d")
+    
     out = {}
+    retry_syms = []
+    
+    # PASS 1: Try Ticker.history(period=...) for all symbols
     for sym in symbols:
         try:
             h = yf.Ticker(sym).history(period=period, interval="1d")
             if h.empty or len(h) < 30:
-                log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows")
+                retry_syms.append(sym)
                 continue
             out[sym] = {
                 "closes": h['Close'].dropna().tolist(),
@@ -239,7 +252,34 @@ def fetch_prices(symbols, period="5y"):
             }
             log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days")
         except Exception as e:
-            log.error(f"  ✗ {sym}: {e}")
+            retry_syms.append(sym)
+    
+    # PASS 2: Retry failed symbols with yf.download(start=..., end=...)
+    if retry_syms:
+        log.info(f"  Retrying {len(retry_syms)} symbols with yf.download(start/end)...")
+        for sym in retry_syms:
+            try:
+                h = yf.download(sym, start=start_str, end=end_str, interval="1d", progress=False, auto_adjust=True)
+                if hasattr(h.columns, 'levels'):
+                    h.columns = h.columns.droplevel(1)
+                if h.empty or len(h) < 30:
+                    # PASS 3: Last resort — try period="max"
+                    h = yf.download(sym, period="max", interval="1d", progress=False, auto_adjust=True)
+                    if hasattr(h.columns, 'levels'):
+                        h.columns = h.columns.droplevel(1)
+                if h.empty or len(h) < 30:
+                    log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows (all methods failed)")
+                    continue
+                closes = h['Close'].dropna()
+                out[sym] = {
+                    "closes": closes.tolist(),
+                    "dates": [d.strftime("%Y-%m-%d") for d in closes.index],
+                }
+                log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days (via download fallback)")
+            except Exception as e:
+                log.error(f"  ✗ {sym}: {e}")
+    
+    log.info(f"  Total fetched: {len(out)}/{len(symbols)} symbols")
     return out
 
 def resample_weekly(closes, dates):
