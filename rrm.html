@@ -417,15 +417,23 @@ function drawChart(items){
       ctx.fillStyle=sec.color;ctx.fill();
       if(last){
         ctx.strokeStyle='#0c1018';ctx.lineWidth=2;ctx.stroke();
-        // Pulsing outer ring on current position
-        if(!ANIM_PLAYING||i===tail.length-1){
-          ctx.globalAlpha=op*0.3;
-          ctx.beginPath();ctx.arc(x,y,r+4,0,Math.PI*2);
-          ctx.strokeStyle=sec.color;ctx.lineWidth=1.5;ctx.stroke();
-          ctx.globalAlpha=op*0.12;
-          ctx.beginPath();ctx.arc(x,y,r+8,0,Math.PI*2);
-          ctx.strokeStyle=sec.color;ctx.lineWidth=1;ctx.stroke();
-        }
+        // Animated pulsing glow on current position
+        const pulse=Math.sin(Date.now()/300)*0.5+0.5; // 0→1 oscillation
+        const pulse2=Math.sin(Date.now()/500)*0.5+0.5;
+        // Inner glow ring
+        ctx.globalAlpha=op*(0.15+0.35*pulse);
+        ctx.shadowColor=sec.color;ctx.shadowBlur=isH?20*pulse:10*pulse;
+        ctx.beginPath();ctx.arc(x,y,r+3+3*pulse,0,Math.PI*2);
+        ctx.strokeStyle=sec.color;ctx.lineWidth=2;ctx.stroke();
+        ctx.shadowBlur=0;
+        // Outer glow ring
+        ctx.globalAlpha=op*(0.08+0.18*pulse2);
+        ctx.beginPath();ctx.arc(x,y,r+8+5*pulse2,0,Math.PI*2);
+        ctx.strokeStyle=sec.color;ctx.lineWidth=1;ctx.stroke();
+        // Core bright flash
+        ctx.globalAlpha=op*(0.5+0.5*pulse);
+        ctx.beginPath();ctx.arc(x,y,r*0.4,0,Math.PI*2);
+        ctx.fillStyle='#fff';ctx.fill();
       }
     });
     ctx.globalAlpha=op;
@@ -556,6 +564,9 @@ async function init(){
   if(!d){d=SAMPLE;IS_LIVE=false}
   DATA=d;BENCH=d.default_benchmark||Object.keys(d.available_benchmarks||{})[0]||'^NSEI';
   await new Promise(r=>setTimeout(r,300));render();
+  // Continuous animation loop for pulsating glow on tips (~20fps)
+  let _lastPulse=0;
+  (function pulseLoop(t){requestAnimationFrame(pulseLoop);if(DATA&&t-_lastPulse>50){_lastPulse=t;render()}})(0);
   // Resize handler
   window.addEventListener('resize',()=>{if(DATA)render()});
 }
