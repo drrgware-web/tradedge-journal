@@ -2380,19 +2380,6 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
         </div>
       </div>
 
-      <!-- All Positions RRG Chart -->
-      <div class="card" style="padding:12px;margin-bottom:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">📊 All Positions — Relative Rotation Matrix vs Nifty 50</div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <button onclick="allRrgSetTF('daily')" id="allrrg-tf-d" class="btn btn-ghost btn-xs" style="border:1px solid #00e5ff;color:#00e5ff;font-weight:700">Daily</button>
-            <button onclick="allRrgSetTF('weekly')" id="allrrg-tf-w" class="btn btn-ghost btn-xs" style="border:1px solid var(--b2);color:var(--t4)">Weekly</button>
-          </div>
-        </div>
-        <canvas id="all-rrg-canvas" width="960" height="480" style="width:100%;border-radius:8px;background:#080d14;cursor:crosshair"></canvas>
-        <div id="all-rrg-status" style="font-size:10px;color:var(--t4);margin-top:4px"></div>
-      </div>
-
       <!-- 2-Column Layout: Position Scanner | Fundamentals -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
 
@@ -2441,6 +2428,19 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
           <div style="padding:16px;text-align:center;color:var(--t4);font-size:11px">No transitions yet</div>
         </div>
       </details>
+
+      <!-- All Positions RRM Chart -->
+      <div class="card" style="padding:12px;margin-top:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">📊 All Positions — Relative Rotation Matrix vs Nifty 50</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="allRrgSetTF('daily')" id="allrrg-tf-d" class="btn btn-ghost btn-xs" style="border:1px solid #00e5ff;color:#00e5ff;font-weight:700">Daily</button>
+            <button onclick="allRrgSetTF('weekly')" id="allrrg-tf-w" class="btn btn-ghost btn-xs" style="border:1px solid var(--b2);color:var(--t4)">Weekly</button>
+          </div>
+        </div>
+        <canvas id="all-rrg-canvas" width="960" height="480" style="width:100%;border-radius:8px;background:#080d14;cursor:crosshair"></canvas>
+        <div id="all-rrg-status" style="font-size:10px;color:var(--t4);margin-top:4px"></div>
+      </div>
 
       <!-- Responsive: stack on mobile -->
       <style>@media(max-width:900px){#page-rrm>div:nth-child(5){grid-template-columns:1fr!important}}</style>
