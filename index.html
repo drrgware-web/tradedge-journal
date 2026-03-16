@@ -7758,6 +7758,26 @@ let _rrmFilter = 'all';
 let _rrmResults = [];
 let _rrmBenchmark = '^NSEI'; // default
 let _rrmLiveData = { daily:{}, weekly:{} }; // Live-computed RRM per symbol
+let _rrmLiveTrails = { daily:{}, weekly:{} }; // Accumulated trail points per symbol
+// Load saved trails from localStorage
+try{const saved=JSON.parse(localStorage.getItem('te_rrm_trails')||'{}');
+  if(saved.daily)_rrmLiveTrails.daily=saved.daily;
+  if(saved.weekly)_rrmLiveTrails.weekly=saved.weekly;
+}catch(e){}
+function rrmSaveTrails(){try{localStorage.setItem('te_rrm_trails',JSON.stringify(_rrmLiveTrails))}catch(e){}}
+function rrmAppendTrailPoint(tf,sym,r,m){
+  if(!_rrmLiveTrails[tf][sym])_rrmLiveTrails[tf][sym]=[];
+  const trail=_rrmLiveTrails[tf][sym];
+  const today=new Date().toISOString().slice(0,10);
+  // Only add if different day or significantly different values from last point
+  const last=trail[trail.length-1];
+  if(last&&last.d===today&&Math.abs(last.r-r)<0.1&&Math.abs(last.m-m)<0.1) return;
+  // Replace same-day point with latest
+  if(last&&last.d===today){trail[trail.length-1]={r:Math.round(r*100)/100,m:Math.round(m*100)/100,d:today};}
+  else{trail.push({r:Math.round(r*100)/100,m:Math.round(m*100)/100,d:today});}
+  // Keep max 15 points
+  if(trail.length>15) _rrmLiveTrails[tf][sym]=trail.slice(-15);
+}
 let _rrmAutoTimer = null;
 const RRM_WINDOW = 10; // JdK smoothing window
 const RRM_PROXIES = [
@@ -7973,6 +7993,7 @@ async function rrmLiveCompute(symbols){
           if(dailyResult){
             const key = sym.replace('.NS','').replace('.BO','').toUpperCase();
             _rrmLiveData.daily[key] = { ...dailyResult, name:key, computedAt:Date.now() };
+            rrmAppendTrailPoint('daily',key,dailyResult.rs_ratio,dailyResult.rs_momentum);
           }
         }
         if(weeklyData){
@@ -7980,6 +8001,7 @@ async function rrmLiveCompute(symbols){
           if(weeklyResult){
             const key = sym.replace('.NS','').replace('.BO','').toUpperCase();
             _rrmLiveData.weekly[key] = { ...weeklyResult, name:key, computedAt:Date.now() };
+            rrmAppendTrailPoint('weekly',key,weeklyResult.rs_ratio,weeklyResult.rs_momentum);
           }
         }
         computed++;
@@ -7991,6 +8013,7 @@ async function rrmLiveCompute(symbols){
   }
 
   console.log(`[RRM] Live computed: ${computed}/${symbols.length} stocks (daily: ${Object.keys(_rrmLiveData.daily).length}, weekly: ${Object.keys(_rrmLiveData.weekly).length})`);
+  rrmSaveTrails();
   if(statusEl) statusEl.textContent = `✓ ${computed} stocks computed`;
 }
 
@@ -10095,6 +10118,12 @@ async function allRrgCompute(){
     // Build trail from pre-computed rrm_data.json (has .tail array)
     let dTrail=(dIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
     let wTrail=(wIdx?.tail||[]).map(t=>({r:t.rs_ratio,m:t.rs_momentum,t:0}));
+
+    // Use accumulated live trails if available (built over days from localStorage)
+    const savedDT=_rrmLiveTrails.daily?.[sym]||[];
+    const savedWT=_rrmLiveTrails.weekly?.[sym]||[];
+    if(savedDT.length>dTrail.length) dTrail=savedDT.map(p=>({r:p.r,m:p.m,t:0}));
+    if(savedWT.length>wTrail.length) wTrail=savedWT.map(p=>({r:p.r,m:p.m,t:0}));
 
     // If no pre-computed trail but live data exists, create single-point trail
     if(!dTrail.length && dLive){
