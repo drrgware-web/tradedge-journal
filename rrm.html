@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RRM v6 — Relative Momentum Matrix | TradEdge</title>
+<title>RRM v6.1 — Relative Momentum Matrix | TradEdge</title>
 <link rel="icon" type="image/jpeg" href="./assets/logo.jpeg">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,6 +109,44 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .mtf-item-heading{font-size:9px;color:var(--t3);margin-left:4px}
 .mtf-item-metrics{display:flex;gap:8px;font-family:var(--fm);font-size:8px;color:var(--t4);margin-left:auto}
 .mtf-empty{color:var(--t4);font-family:var(--fm);font-size:10px;font-style:italic;padding:8px 0}
+/* v6.1: Trade Journal / My Positions Panel */
+.pos-panel{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.pos-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.pos-title{font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:3px;color:var(--t3);text-transform:uppercase}
+.pos-source{font-family:var(--fm);font-size:9px;color:var(--t4);padding:2px 8px;background:var(--bg3);border-radius:4px}
+.pos-toggle{display:flex;align-items:center;gap:6px}
+.pos-toggle label{font-family:var(--fm);font-size:9px;color:var(--t4);cursor:pointer}
+.pos-toggle input{accent-color:var(--cyan)}
+.pos-stats{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.pos-stat{padding:8px 14px;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);flex:1;min-width:100px}
+.pos-stat-label{font-family:var(--fm);font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.pos-stat-value{font-family:var(--fd);font-size:16px;font-weight:700}
+.pos-stat-value.profit{color:#4ade80}
+.pos-stat-value.loss{color:#f87171}
+.pos-stat-value.neutral{color:var(--t1)}
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.pos-card{padding:10px 12px;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;display:flex;flex-direction:column;gap:6px;transition:.2s;cursor:pointer}
+.pos-card:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.pos-card.alert{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.05)}
+.pos-card-row{display:flex;align-items:center;gap:8px}
+.pos-card-symbol{font-family:var(--fd);font-size:12px;font-weight:700;color:var(--t1)}
+.pos-card-side{font-family:var(--fm);font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px}
+.pos-card-side.buy{background:rgba(34,197,94,.2);color:#4ade80}
+.pos-card-side.sell{background:rgba(239,68,68,.2);color:#f87171}
+.pos-card-qty{font-family:var(--fm);font-size:9px;color:var(--t3);margin-left:auto}
+.pos-card-entry{font-family:var(--fm);font-size:9px;color:var(--t4)}
+.pos-card-pnl{font-family:var(--fm);font-size:10px;font-weight:600}
+.pos-card-pnl.profit{color:#4ade80}
+.pos-card-pnl.loss{color:#f87171}
+.pos-card-rotation{display:flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px}
+.pos-card-rotation .quad{padding:1px 5px;border-radius:3px;font-weight:600}
+.pos-card-rotation .quad.Leading{background:rgba(34,197,94,.15);color:#4ade80}
+.pos-card-rotation .quad.Improving{background:rgba(59,130,246,.15);color:#60a5fa}
+.pos-card-rotation .quad.Weakening{background:rgba(234,179,8,.15);color:#facc15}
+.pos-card-rotation .quad.Lagging{background:rgba(239,68,68,.15);color:#f87171}
+.pos-card-alert{font-family:var(--fm);font-size:8px;color:#f87171;background:rgba(239,68,68,.1);padding:3px 6px;border-radius:4px;margin-top:2px}
+.pos-empty{color:var(--t4);font-family:var(--fm);font-size:10px;font-style:italic;padding:8px 0;text-align:center}
+.pos-error{color:#f87171;font-family:var(--fm);font-size:10px;padding:8px;background:rgba(239,68,68,.1);border-radius:4px;text-align:center}
 .ft{text-align:center;padding:14px 0;font-family:var(--fm);font-size:9px;color:var(--t4);letter-spacing:1px;border-top:1px solid var(--bd);margin-top:16px}
 .ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:16px}
 .sp{width:40px;height:40px;border:3px solid var(--bd);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
@@ -129,6 +167,19 @@ let SELECT_ALL_MODE=true;
 
 // v6: MTF conviction filter threshold
 let MTF_MIN_CONVICTION=0; // 0 = show all, 50 = show only conviction >= 50
+
+// v6.1: Trade Journal integration
+let TRADE_JOURNAL_DATA = null;  // { trades: [...], loadedFrom: 'localStorage'|'supabase'|null }
+let TRADE_JOURNAL_LOADING = false;
+let TRADE_JOURNAL_ERROR = null;
+let SHOW_POSITIONS_OVERLAY = true;
+
+// Supabase config — enables cross-device sync with Trade Journal
+const SUPABASE_CONFIG = {
+  url: 'https://urnrdpyhncezljirpnmy.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzY5MDIsImV4cCI6MjA4ODM1MjkwMn0.eExEFw1XGAlYBGECqCpl928UvXv5Jchuyr1YYkcrbdw',
+  deviceId: null  // Will auto-detect from localStorage
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // v6.0 ADVANCED METRICS ENGINE
@@ -793,6 +844,359 @@ function renderMarketPulsePanel() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// v6.1: TRADE JOURNAL INTEGRATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Normalize symbol for matching (handle NSE-specific formats)
+function normalizeSymbol(sym) {
+  if (!sym) return '';
+  // Remove .NS suffix, NIFTY prefixes, etc.
+  return sym.replace(/\.NS$/i, '')
+            .replace(/^NIFTY\s*/i, '')
+            .replace(/\s+/g, '')
+            .toUpperCase();
+}
+
+// Find RRM item that matches a trade symbol
+function findRRMItemForTrade(trade) {
+  if (!trade?.symbol) return null;
+  const items = getAllItems();
+  const tradeNorm = normalizeSymbol(trade.symbol);
+  
+  // Try exact match first
+  let match = items.find(i => normalizeSymbol(i.symbol) === tradeNorm || normalizeSymbol(i.name) === tradeNorm);
+  
+  // Try partial match
+  if (!match) {
+    match = items.find(i => 
+      normalizeSymbol(i.name).includes(tradeNorm) || 
+      tradeNorm.includes(normalizeSymbol(i.name))
+    );
+  }
+  
+  return match;
+}
+
+// Fetch trades from localStorage
+function fetchTradesFromLocalStorage() {
+  try {
+    // Try common localStorage keys used by Trade Journal
+    const possibleKeys = [
+      'te_trades',        // ← Primary key used by TradEdge Trade Journal
+      'tradedge_trades',
+      'tradedge-trades', 
+      'trades',
+      'tradeJournal',
+      'trade_journal'
+    ];
+    
+    for (const key of possibleKeys) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) return data;
+        if (data?.trades && Array.isArray(data.trades)) return data.trades;
+      }
+    }
+    
+    // Also check for Supabase-style device_id pattern
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const raw = localStorage.getItem(key);
+      try {
+        const data = JSON.parse(raw);
+        if (data?.trades_json) {
+          const trades = typeof data.trades_json === 'string' ? JSON.parse(data.trades_json) : data.trades_json;
+          if (Array.isArray(trades)) return trades;
+        }
+      } catch(e) {}
+    }
+    
+    return null;
+  } catch(e) {
+    console.error('Trade Journal localStorage error:', e);
+    return null;
+  }
+}
+
+// Fetch trades from Supabase (if configured)
+async function fetchTradesFromSupabase() {
+  if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) return null;
+  
+  try {
+    // Try multiple possible device ID keys used by Trade Journal
+    const deviceId = SUPABASE_CONFIG.deviceId || 
+                     localStorage.getItem('te_device_id') ||
+                     localStorage.getItem('tradedge_device_id') ||
+                     localStorage.getItem('device_id') ||
+                     localStorage.getItem('dhan_id');
+    
+    if (!deviceId) {
+      console.log('No device ID found for Supabase sync');
+      return null;
+    }
+    
+    const url = `${SUPABASE_CONFIG.url}/rest/v1/tradedge_trades?device_id=eq.${encodeURIComponent(deviceId)}&select=trades_json`;
+    const resp = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    
+    if (!resp.ok) {
+      console.log('Supabase fetch failed:', resp.status);
+      return null;
+    }
+    
+    const rows = await resp.json();
+    if (rows.length > 0 && rows[0].trades_json) {
+      const trades = typeof rows[0].trades_json === 'string' ? JSON.parse(rows[0].trades_json) : rows[0].trades_json;
+      return Array.isArray(trades) ? trades : null;
+    }
+    
+    return null;
+  } catch(e) {
+    console.error('Trade Journal Supabase error:', e);
+    return null;
+  }
+}
+
+// Main fetch function — tries localStorage first, then Supabase
+async function fetchTradeJournal() {
+  if (TRADE_JOURNAL_LOADING) return;
+  
+  TRADE_JOURNAL_LOADING = true;
+  TRADE_JOURNAL_ERROR = null;
+  
+  try {
+    // Try localStorage first (faster, works offline)
+    let trades = fetchTradesFromLocalStorage();
+    let source = 'localStorage';
+    
+    // If localStorage empty and Supabase configured, try Supabase
+    if (!trades && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+      trades = await fetchTradesFromSupabase();
+      source = 'supabase';
+    }
+    
+    if (trades && trades.length > 0) {
+      TRADE_JOURNAL_DATA = { trades, loadedFrom: source };
+    } else {
+      TRADE_JOURNAL_DATA = { trades: [], loadedFrom: null };
+    }
+  } catch(e) {
+    TRADE_JOURNAL_ERROR = e.message;
+    TRADE_JOURNAL_DATA = { trades: [], loadedFrom: null };
+  }
+  
+  TRADE_JOURNAL_LOADING = false;
+}
+
+// Filter to open positions only
+function getOpenPositions() {
+  if (!TRADE_JOURNAL_DATA?.trades) return [];
+  
+  return TRADE_JOURNAL_DATA.trades.filter(t => {
+    const status = (t.status || '').toLowerCase();
+    return status === 'open' || status === 'partial';
+  });
+}
+
+// Compute position analytics
+function computePositionAnalytics() {
+  const positions = getOpenPositions();
+  if (positions.length === 0) {
+    return {
+      count: 0,
+      totalInvested: 0,
+      totalUnrealPnL: 0,
+      alerts: [],
+      positions: []
+    };
+  }
+  
+  let totalInvested = 0;
+  let totalUnrealPnL = 0;
+  const alerts = [];
+  const enrichedPositions = [];
+  
+  positions.forEach(pos => {
+    // Parse values (handle string formats like "₹1690.90")
+    const avgEntry = parseFloat(String(pos.avgEntry || pos.avg_entry || pos.entry || 0).replace(/[₹,]/g, ''));
+    const qty = parseInt(pos.qty || pos.quantity || 0);
+    const unrealPnL = parseFloat(String(pos.unrealPnL || pos.unreal_pnl || pos.unrealisedPnL || 0).replace(/[₹,]/g, '')) || 0;
+    const realisedPnL = parseFloat(String(pos.realisedPnL || pos.realised_pnl || pos.realisedPnL || 0).replace(/[₹,−-]/g, '')) || 0;
+    const days = parseInt(pos.days || pos.holdingDays || 0);
+    const side = (pos.side || 'buy').toLowerCase();
+    
+    const invested = avgEntry * qty;
+    totalInvested += invested;
+    totalUnrealPnL += unrealPnL;
+    
+    // Find matching RRM item
+    const rrmItem = findRRMItemForTrade(pos);
+    
+    // Generate alerts
+    const posAlerts = [];
+    if (rrmItem) {
+      if (rrmItem.quadrant === 'Lagging') {
+        posAlerts.push({ type: 'danger', msg: 'In Lagging quadrant — consider exit' });
+      }
+      if (rrmItem.quadrant === 'Weakening' && rrmItem.headingInfo?.label === 'SW') {
+        posAlerts.push({ type: 'warning', msg: 'Weakening + SW heading — watch closely' });
+      }
+      if (rrmItem.distance > 5) {
+        posAlerts.push({ type: 'info', msg: 'Overextended — profit booking zone' });
+      }
+      if (rrmItem.hasHook) {
+        posAlerts.push({ type: 'bullish', msg: 'V-Hook detected — momentum turning' });
+      }
+    }
+    
+    if (posAlerts.length > 0) {
+      alerts.push({ symbol: pos.symbol, alerts: posAlerts });
+    }
+    
+    enrichedPositions.push({
+      ...pos,
+      avgEntry,
+      qty,
+      unrealPnL,
+      realisedPnL,
+      days,
+      side,
+      invested,
+      rrmItem,
+      posAlerts
+    });
+  });
+  
+  return {
+    count: positions.length,
+    totalInvested,
+    totalUnrealPnL,
+    alerts,
+    positions: enrichedPositions
+  };
+}
+
+// Render My Positions panel
+function renderMyPositionsPanel() {
+  // Don't render if no Trade Journal data loaded
+  if (!TRADE_JOURNAL_DATA) {
+    // Return link to load/connect
+    return `<div class="pos-panel">
+      <div class="pos-header">
+        <div class="pos-title">📊 MY POSITIONS</div>
+        <button class="cb" onclick="fetchTradeJournal().then(render)" style="font-size:9px">Load Trade Journal</button>
+      </div>
+      <div class="pos-empty">No Trade Journal data loaded. Click "Load Trade Journal" or open Trade Journal in another tab.</div>
+    </div>`;
+  }
+  
+  if (TRADE_JOURNAL_ERROR) {
+    return `<div class="pos-panel">
+      <div class="pos-header"><div class="pos-title">📊 MY POSITIONS</div></div>
+      <div class="pos-error">Error: ${TRADE_JOURNAL_ERROR}</div>
+    </div>`;
+  }
+  
+  const a = computePositionAnalytics();
+  
+  if (a.count === 0) {
+    return `<div class="pos-panel">
+      <div class="pos-header">
+        <div class="pos-title">📊 MY POSITIONS</div>
+        <div class="pos-source">${TRADE_JOURNAL_DATA.loadedFrom || 'No data'}</div>
+      </div>
+      <div class="pos-empty">No open positions in Trade Journal</div>
+    </div>`;
+  }
+  
+  const pnlClass = a.totalUnrealPnL >= 0 ? 'profit' : 'loss';
+  const pnlSign = a.totalUnrealPnL >= 0 ? '+' : '';
+  
+  const formatCurrency = (v) => {
+    const abs = Math.abs(v);
+    if (abs >= 10000000) return '₹' + (v / 10000000).toFixed(2) + ' Cr';
+    if (abs >= 100000) return '₹' + (v / 100000).toFixed(2) + ' L';
+    return '₹' + v.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  };
+  
+  const alertCount = a.alerts.reduce((sum, x) => sum + x.alerts.length, 0);
+  
+  const posCardsHtml = a.positions.map(p => {
+    const pnlClass = p.unrealPnL >= 0 ? 'profit' : 'loss';
+    const sideClass = p.side === 'buy' ? 'buy' : 'sell';
+    const hasAlert = p.posAlerts.length > 0;
+    
+    const rrmInfo = p.rrmItem 
+      ? `<div class="pos-card-rotation">
+          <span class="quad ${p.rrmItem.quadrant}">${p.rrmItem.quadrant}</span>
+          <span style="color:${p.rrmItem.headingInfo?.color || 'var(--t3)'}">${p.rrmItem.headingInfo?.emoji || '—'}</span>
+          <span style="color:var(--t4);font-size:8px">Score ${p.rrmItem.rotationScore}</span>
+        </div>`
+      : '<div class="pos-card-rotation"><span style="color:var(--t4);font-size:8px">Not in current RRM view</span></div>';
+    
+    const alertsHtml = p.posAlerts.length > 0
+      ? p.posAlerts.map(al => `<div class="pos-card-alert">⚠ ${al.msg}</div>`).join('')
+      : '';
+    
+    return `<div class="pos-card ${hasAlert ? 'alert' : ''}" onclick="hl('${p.rrmItem?.symbol || ''}')">
+      <div class="pos-card-row">
+        <span class="pos-card-symbol">${p.symbol}</span>
+        <span class="pos-card-side ${sideClass}">${p.side.toUpperCase()}</span>
+        <span class="pos-card-qty">${p.qty} qty</span>
+      </div>
+      <div class="pos-card-row">
+        <span class="pos-card-entry">Entry ₹${p.avgEntry.toFixed(2)}</span>
+        <span class="pos-card-pnl ${pnlClass}">${p.unrealPnL >= 0 ? '+' : ''}₹${p.unrealPnL.toLocaleString('en-IN')}</span>
+        <span style="color:var(--t4);font-size:8px;margin-left:auto">${p.days}d</span>
+      </div>
+      ${rrmInfo}
+      ${alertsHtml}
+    </div>`;
+  }).join('');
+  
+  return `<div class="pos-panel">
+    <div class="pos-header">
+      <div class="pos-title">📊 MY POSITIONS · ${a.count} OPEN</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="pos-toggle">
+          <input type="checkbox" id="posOverlay" ${SHOW_POSITIONS_OVERLAY ? 'checked' : ''} onchange="SHOW_POSITIONS_OVERLAY=this.checked;render()">
+          <label for="posOverlay">Show on chart</label>
+        </div>
+        <div class="pos-source">${TRADE_JOURNAL_DATA.loadedFrom}</div>
+      </div>
+    </div>
+    
+    <div class="pos-stats">
+      <div class="pos-stat">
+        <div class="pos-stat-label">INVESTED</div>
+        <div class="pos-stat-value neutral">${formatCurrency(a.totalInvested)}</div>
+      </div>
+      <div class="pos-stat">
+        <div class="pos-stat-label">UNREAL P&L</div>
+        <div class="pos-stat-value ${pnlClass}">${pnlSign}${formatCurrency(a.totalUnrealPnL)}</div>
+      </div>
+      <div class="pos-stat">
+        <div class="pos-stat-label">ALERTS</div>
+        <div class="pos-stat-value ${alertCount > 0 ? 'loss' : 'neutral'}">${alertCount}</div>
+      </div>
+    </div>
+    
+    <div class="pos-grid">${posCardsHtml}</div>
+  </div>`;
+}
+
+// Toggle positions overlay visibility
+function togglePositionsOverlay(show) {
+  SHOW_POSITIONS_OVERLAY = show;
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -861,6 +1265,7 @@ function render(){
       <span class="badge ${IS_LIVE?'live':'sample'}"><span class="dot"></span>${IS_LIVE?'LIVE':'SAMPLE'}</span>
     </div>
     ${renderMarketPulsePanel()}
+    ${renderMyPositionsPanel()}
     ${renderEnhancedAlignmentPanel()}
     ${breadcrumb}
     <div class="toolbar">
@@ -893,7 +1298,7 @@ function render(){
         ${qPanel('Lagging','#ef4444',grp.Lagging)}
       </div>
     </div>
-    <div class="ft">TradEdge RRM v6.0 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
+    <div class="ft">TradEdge RRM v6.1 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
   drawChart(items);
 }
 
@@ -1085,6 +1490,69 @@ function drawChart(items){
     ctx.restore();
   });
 
+  // v6.1: Draw position overlay markers (stars for open positions)
+  if (SHOW_POSITIONS_OVERLAY && TRADE_JOURNAL_DATA?.trades) {
+    const positions = getOpenPositions();
+    positions.forEach(pos => {
+      const rrmItem = findRRMItemForTrade(pos);
+      if (!rrmItem || !rrmItem.current) return;
+      
+      const x = tX(rrmItem.current.rs_ratio);
+      const y = tY(rrmItem.current.rs_momentum);
+      const hasAlert = rrmItem.quadrant === 'Lagging' || 
+                      (rrmItem.quadrant === 'Weakening' && rrmItem.headingInfo?.label === 'SW');
+      
+      // Draw star marker
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      
+      // Outer glow
+      ctx.shadowColor = hasAlert ? '#ef4444' : '#f59e0b';
+      ctx.shadowBlur = 15;
+      
+      // Star shape
+      const drawStar = (cx, cy, spikes, outerR, innerR) => {
+        let rot = Math.PI / 2 * 3;
+        let step = Math.PI / spikes;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - outerR);
+        for (let i = 0; i < spikes; i++) {
+          let xp = cx + Math.cos(rot) * outerR;
+          let yp = cy - Math.sin(rot) * outerR;
+          ctx.lineTo(xp, yp);
+          rot += step;
+          xp = cx + Math.cos(rot) * innerR;
+          yp = cy - Math.sin(rot) * innerR;
+          ctx.lineTo(xp, yp);
+          rot += step;
+        }
+        ctx.lineTo(cx, cy - outerR);
+        ctx.closePath();
+      };
+      
+      drawStar(x, y, 5, 12, 6);
+      ctx.fillStyle = hasAlert ? '#ef4444' : '#f59e0b';
+      ctx.fill();
+      ctx.strokeStyle = '#0c1018';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Inner highlight
+      ctx.shadowBlur = 0;
+      drawStar(x, y, 5, 6, 3);
+      ctx.fillStyle = hasAlert ? '#fca5a5' : '#fcd34d';
+      ctx.fill();
+      
+      // "MY" label below star
+      ctx.fillStyle = hasAlert ? '#ef4444' : '#f59e0b';
+      ctx.font = '700 8px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText('MY', x, y + 20);
+      
+      ctx.restore();
+    });
+  }
+
   canvas.onmousemove=e=>{
     const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
     let cl=null,cd=20;
@@ -1190,6 +1658,13 @@ function init(){
   try {
     // Render immediately with sample data
     render();
+    
+    // Load Trade Journal data (non-blocking)
+    fetchTradeJournal().then(() => {
+      if (TRADE_JOURNAL_DATA?.trades?.length > 0) {
+        render(); // Re-render with positions
+      }
+    });
     
     // Start pulse animation
     let _lastPulse=0;
