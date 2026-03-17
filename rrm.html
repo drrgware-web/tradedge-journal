@@ -613,6 +613,202 @@ function renderEnhancedAlignmentPanel(){
   </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v6.2: STOCK-LEVEL MTF ALIGNMENT FOR POSITIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function computePositionMTFAlignments() {
+  const positions = getOpenPositions();
+  if (!positions.length) return { power: [], pullback: [], early: [], exhaustion: [], hold: [] };
+  
+  // Get te_rrm_cache from localStorage
+  let rrmCache = null;
+  try {
+    const cacheStr = localStorage.getItem('te_rrm_cache');
+    if (cacheStr) rrmCache = JSON.parse(cacheStr);
+  } catch(e) {}
+  
+  if (!rrmCache) return { power: [], pullback: [], early: [], exhaustion: [], hold: [] };
+  
+  const power = [], pullback = [], early = [], exhaustion = [], hold = [];
+  
+  positions.forEach(pos => {
+    const symbol = pos.symbol;
+    const stockData = rrmCache[symbol];
+    if (!stockData) return;
+    
+    const dQ = stockData.daily;   // Daily quadrant
+    const wQ = stockData.weekly;  // Weekly quadrant
+    
+    // Calculate simple conviction based on RS values
+    const dRatio = stockData.dailyRatio || 100;
+    const dMom = stockData.dailyMom || 100;
+    const wRatio = stockData.weeklyRatio || 100;
+    const wMom = stockData.weeklyMom || 100;
+    
+    // Score: higher ratio + momentum = higher conviction
+    let conviction = Math.round(
+      ((dRatio - 95) * 3 + (dMom - 95) * 3 + (wRatio - 95) * 2 + (wMom - 95) * 2) / 2
+    );
+    conviction = Math.max(0, Math.min(100, conviction + 50));
+    
+    // Get position P&L info
+    let avgEntry = 0, totalQty = 0;
+    if (pos.entries && Array.isArray(pos.entries)) {
+      let totalCost = 0;
+      pos.entries.forEach(e => {
+        totalCost += (parseFloat(e.price) || 0) * (parseInt(e.qty) || 0);
+        totalQty += parseInt(e.qty) || 0;
+      });
+      avgEntry = totalQty > 0 ? totalCost / totalQty : 0;
+    }
+    
+    const info = {
+      symbol,
+      name: symbol,
+      color: dQ === 'Leading' ? '#22c55e' : dQ === 'Improving' ? '#3b82f6' : dQ === 'Weakening' ? '#eab308' : '#ef4444',
+      conviction,
+      dQ,
+      wQ,
+      dRatio: dRatio.toFixed(1),
+      dMom: dMom.toFixed(1),
+      avgEntry: avgEntry.toFixed(2),
+      qty: totalQty
+    };
+    
+    // MTF Pattern matching (Weekly + Daily only since we don't have monthly for stocks)
+    // Power: W=Leading + D=Leading/Improving
+    if (wQ === 'Leading' && (dQ === 'Leading' || dQ === 'Improving')) {
+      power.push(info);
+    }
+    // Pullback: W=Leading + D=Weakening/Lagging (dip in strong trend)
+    else if (wQ === 'Leading' && (dQ === 'Weakening' || dQ === 'Lagging')) {
+      pullback.push(info);
+    }
+    // Early Reversal: W=Improving + D=Leading (turning up)
+    else if (wQ === 'Improving' && dQ === 'Leading') {
+      early.push(info);
+    }
+    // Exhaustion: W=Weakening/Lagging + D=Lagging (avoid)
+    else if ((wQ === 'Weakening' || wQ === 'Lagging') && dQ === 'Lagging') {
+      exhaustion.push(info);
+    }
+    // Hold: everything else
+    else {
+      hold.push(info);
+    }
+  });
+  
+  // Sort by conviction
+  power.sort((a, b) => b.conviction - a.conviction);
+  pullback.sort((a, b) => b.conviction - a.conviction);
+  early.sort((a, b) => b.conviction - a.conviction);
+  exhaustion.sort((a, b) => b.conviction - a.conviction);
+  hold.sort((a, b) => b.conviction - a.conviction);
+  
+  return { power, pullback, early, exhaustion, hold };
+}
+
+function renderPositionMTFPanel() {
+  if (!TRADE_JOURNAL_DATA?.trades || getOpenPositions().length === 0) {
+    return ''; // Don't render if no positions
+  }
+  
+  const a = computePositionMTFAlignments();
+  const totalMatched = a.power.length + a.pullback.length + a.early.length + a.exhaustion.length + a.hold.length;
+  
+  if (totalMatched === 0) {
+    return ''; // No RRM data for positions
+  }
+  
+  const cardData = [
+    {
+      key: 'power',
+      name: 'POWER',
+      emoji: '⚡',
+      color: '#22c55e',
+      border: 'rgba(34,197,94,.4)',
+      bg: 'rgba(34,197,94,.06)',
+      desc: 'W:Lead + D:Lead/Imp — ride it',
+      items: a.power
+    },
+    {
+      key: 'pullback',
+      name: 'PULLBACK',
+      emoji: '🔄',
+      color: '#3b82f6',
+      border: 'rgba(59,130,246,.4)',
+      bg: 'rgba(59,130,246,.06)',
+      desc: 'W:Lead + D:Weak/Lag — add more?',
+      items: a.pullback
+    },
+    {
+      key: 'early',
+      name: 'EARLY',
+      emoji: '🌱',
+      color: '#f59e0b',
+      border: 'rgba(245,158,11,.4)',
+      bg: 'rgba(245,158,11,.06)',
+      desc: 'W:Imp + D:Lead — watch for confirm',
+      items: a.early
+    },
+    {
+      key: 'exhaustion',
+      name: 'EXIT',
+      emoji: '🚨',
+      color: '#ef4444',
+      border: 'rgba(239,68,68,.4)',
+      bg: 'rgba(239,68,68,.06)',
+      desc: 'W:Weak/Lag + D:Lag — consider exit',
+      items: a.exhaustion
+    },
+    {
+      key: 'hold',
+      name: 'HOLD',
+      emoji: '⏳',
+      color: '#94a3b8',
+      border: 'rgba(148,163,184,.3)',
+      bg: 'rgba(148,163,184,.04)',
+      desc: 'Mixed signals — monitor',
+      items: a.hold
+    }
+  ];
+  
+  const renderPosItem = (i) => {
+    const convClass = i.conviction >= 65 ? 'high' : i.conviction >= 40 ? 'med' : 'low';
+    return `<div class="mtf-item" onclick="hl('${i.symbol}')" style="cursor:pointer">
+      <div class="mtf-item-dot" style="background:${i.color}"></div>
+      <div class="mtf-item-name">${i.symbol}</div>
+      <span style="font-size:8px;color:var(--t4)">${i.dQ?.charAt(0)}/${i.wQ?.charAt(0)}</span>
+      <span style="font-size:8px;color:var(--t4)">R:${i.dRatio}</span>
+      <div class="mtf-item-conviction ${convClass}">${i.conviction}</div>
+    </div>`;
+  };
+  
+  const renderPosCard = (c) => {
+    const itemsHtml = c.items.length 
+      ? c.items.map(i => renderPosItem(i)).join('') 
+      : '<div class="mtf-empty">—</div>';
+    
+    return `<div class="mtf-card" style="border-color:${c.border};background:${c.bg};min-width:180px">
+      <div class="mtf-card-header">
+        <div class="mtf-card-name" style="color:${c.color};font-size:10px">${c.emoji} ${c.name}</div>
+        <div class="mtf-card-count">${c.items.length}</div>
+      </div>
+      <div class="mtf-card-desc" style="font-size:8px">${c.desc}</div>
+      <div class="mtf-card-list">${itemsHtml}</div>
+    </div>`;
+  };
+  
+  return `<div class="mtf-panel" style="margin-bottom:14px">
+    <div class="mtf-header">
+      <div class="mtf-title">📊 MY HOLDINGS MTF · ${totalMatched} STOCKS <span style="font-family:var(--fm);font-size:9px;color:var(--t4);font-weight:400;letter-spacing:1px;margin-left:6px">W + D aligned</span></div>
+    </div>
+    <div class="mtf-grid" style="grid-template-columns:repeat(5,1fr)">${cardData.map(c => renderPosCard(c)).join('')}
+    </div>
+  </div>`;
+}
+
 function renderMTFCard(c) {
   const itemsHtml = c.items.length 
     ? c.items.map(i => renderMTFItem(i)).join('') 
@@ -1339,6 +1535,7 @@ function render(){
     </div>
     ${renderMarketPulsePanel()}
     ${renderMyPositionsPanel()}
+    ${renderPositionMTFPanel()}
     ${renderEnhancedAlignmentPanel()}
     ${breadcrumb}
     <div class="toolbar">
