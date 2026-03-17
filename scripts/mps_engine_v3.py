@@ -50,6 +50,7 @@ class MPSResult:
     total_modifier:float;final_score:float;zone:str;zone_emoji:str;zone_action:str
     risk_per_trade:str;state:str;state_message:str;burst_ratio:float;burst_label:str
     rsi_breadth_pct:float;atr_breadth_pct:float;atr_regime:str;macro_summary:str=""
+    paradox_alerts:list=field(default_factory=list)
 
 def _interpolate(value,breakpoints):
     if value<=breakpoints[0][0]:return float(breakpoints[0][1])
@@ -204,6 +205,180 @@ def build_macro_summary(mods):
     parts=[f"{m.name} ({'+' if m.adjustment>0 else ''}{m.adjustment:.0f})" for m in active]
     return f"Macro {'tailwind' if t>0 else 'headwind'} ({'+' if t>0 else ''}{t:.0f}): {', '.join(parts)}"
 
+# ═══ PARADOX DETECTOR v3.2 ═══
+
+def detect_paradoxes(pillars, mods, final_score, burst_ratio, burst_label,
+                     rsi_pct, atr_pct, atr_regime, p200, p50,
+                     structural_streak, fii_sell_days):
+    """
+    Detect divergence scenarios where individual indicators tell a different
+    story than the overall MPS score. These paradoxes are where alpha lives.
+    Returns list of dicts: [{name, emoji, severity, description, action}]
+    """
+    alerts = []
+    
+    # Helper: get pillar raw_score by name
+    def ps(name):
+        for p in pillars:
+            if p.name == name: return p.raw_score
+        return 0
+    
+    # Helper: check if modifier active
+    def mod_active(name):
+        for m in mods:
+            if m.name == name and m.triggered: return True
+        return False
+    
+    def mod_adj(name):
+        for m in mods:
+            if m.name == name: return m.adjustment
+        return 0
+    
+    sent = ps("Sentiment")
+    struct = ps("Structural")
+    breadth = ps("Breadth")
+    spark = ps("Spark")
+    quality = ps("Quality")
+    momentum = ps("Momentum")
+    volatility = ps("Volatility")
+    
+    # ── 1. STOCK PICKER'S MARKET ──
+    # High Burst + Low MPS = pockets of momentum in weak market
+    if burst_ratio > 200 and final_score < 40:
+        alerts.append({
+            "name": "Stock Picker's Market",
+            "emoji": "🎯",
+            "severity": "opportunity",
+            "description": f"Burst {burst_ratio:.0f} [{burst_label}] but MPS {final_score:.0f}. "
+                f"Pockets of explosive momentum in specific stocks while broad market bleeds.",
+            "action": "Don't take broad exposure. If already in the right stocks, they're moving well. "
+                "Focus on momentum leaders only."
+        })
+    
+    # ── 2. BULL TRAP ──
+    # High Sentiment + Low everything else
+    if sent > 65 and struct < 30 and breadth < 40 and quality < 20:
+        alerts.append({
+            "name": "Bull Trap",
+            "emoji": "🪤",
+            "severity": "danger",
+            "description": f"Sentiment {sent:.0f} (calm VIX/healthy PCR) but Structural {struct:.0f}, "
+                f"Breadth {breadth:.0f}, Quality {quality:.0f}. Market feels calm but internals are rotting.",
+            "action": "Don't trust the calm surface. Smart money distributing quietly. "
+                "Avoid new longs. Tighten all stops."
+        })
+    
+    # ── 3. NARROW RALLY ──
+    # Quality surging + Momentum dying
+    if quality > 50 and momentum < 25:
+        alerts.append({
+            "name": "Narrow Rally",
+            "emoji": "📍",
+            "severity": "caution",
+            "description": f"Quality {quality:.0f} (net new highs strong) but Momentum {momentum:.0f} "
+                f"(only {rsi_pct:.0f}% RSI>50). Few heavyweights dragging index up while majority sinks.",
+            "action": "Only play the index leaders. Avoid midcap/smallcap breakouts — "
+                "they lack momentum support."
+        })
+    
+    # ── 4. TURNING POINT ──
+    # Persistence active + Warning Day active
+    if mod_active("Persistence Boost") and mod_active("Warning Day"):
+        alerts.append({
+            "name": "Turning Point",
+            "emoji": "⚡",
+            "severity": "danger",
+            "description": f"Bull streak {structural_streak}d active (Persistence +{mod_adj('Persistence Boost'):.0f}) "
+                f"but Warning Day triggered (-10). The long streak says 'strong' but pillars just broke.",
+            "action": "This is your early exit signal. Typically appears 2-3 days before sharp correction. "
+                "Reduce exposure immediately."
+        })
+    
+    # ── 5. ROTATION SIGNAL ──
+    # FII selling + Rupee strengthening
+    if fii_sell_days >= 5 and mod_adj("Rupee Stress") > 0:
+        alerts.append({
+            "name": "Rotation Signal",
+            "emoji": "🔄",
+            "severity": "opportunity",
+            "description": f"FII selling {fii_sell_days}d straight but INR strengthening. "
+                f"DII buying overwhelming FII outflow.",
+            "action": "DII absorption = FII selling will exhaust. Start building bounce watchlists. "
+                "Historically resolves bullishly in 2-3 weeks."
+        })
+    
+    # ── 6. COILED SPRING ──
+    # Volatility squeeze + Low spark
+    if atr_pct < 10 and spark < 15:
+        alerts.append({
+            "name": "Coiled Spring",
+            "emoji": "🌀",
+            "severity": "caution",
+            "description": f"ATR Breadth {atr_pct:.1f}% [Squeeze] with Spark {spark:.0f}. "
+                f"Market extremely compressed — no one moving.",
+            "action": "Massive directional move imminent. Prepare both long AND short watchlists. "
+                "Don't predict direction — react to the breakout."
+        })
+    
+    # ── 7. BLOW-OFF TOP ──
+    # Exhaustion active + Easy Money zone
+    if mod_active("Exhaustion Penalty") and final_score >= 75:
+        alerts.append({
+            "name": "Blow-Off Top",
+            "emoji": "🔥",
+            "severity": "danger",
+            "description": f"MPS {final_score:.0f} (Easy Money) but Exhaustion Penalty active "
+                f"({mod_adj('Exhaustion Penalty'):+.0f}). Everything overbought simultaneously.",
+            "action": "Final vertical leg. Aggressively trail stops. Take profits on distribution candles. "
+                "Markets typically correct 8-12% within 2 weeks."
+        })
+    
+    # ── 8. MACRO TUG-OF-WAR ──
+    # Crude tailwind + Yield/FII headwind
+    crude_adj = mod_adj("Crude Oil Stress")
+    yield_adj = mod_adj("Global Yield Pressure")
+    if crude_adj > 0 and (yield_adj < 0 or fii_sell_days >= 5):
+        alerts.append({
+            "name": "Macro Tug-of-War",
+            "emoji": "⚔️",
+            "severity": "caution",
+            "description": f"Crude tailwind (+{crude_adj:.0f}) but "
+                f"{'Yield headwind (' + str(yield_adj) + ')' if yield_adj < 0 else ''}"
+                f"{' + ' if yield_adj < 0 and fii_sell_days >= 5 else ''}"
+                f"{'FII selling ' + str(fii_sell_days) + 'd' if fii_sell_days >= 5 else ''}. "
+                f"Cheap oil helps India but global capital fleeing EM.",
+            "action": "Favor domestic consumption plays (FMCG, Auto, Cement) over "
+                "export-oriented or FII-heavy stocks."
+        })
+    
+    # ── 9. ZOMBIE MARKET ──
+    # Structural bull + Quality bear
+    if struct > 55 and quality < 15 and momentum > 30 and momentum < 60:
+        alerts.append({
+            "name": "Zombie Market",
+            "emoji": "🧟",
+            "severity": "caution",
+            "description": f"Structural {struct:.0f} (many above 200 SMA) but Quality {quality:.0f} "
+                f"(no new highs). Market drifting sideways — not crashing, not breaking out.",
+            "action": "Switch to mean-reversion. Buy support, sell resistance. "
+                "Worst environment for breakout traders."
+        })
+    
+    # ── 10. CAPITULATION BOUNCE ──
+    # Everything destroyed + Sentiment extreme fear
+    if final_score < 10 and sent < 20 and atr_pct > 40:
+        alerts.append({
+            "name": "Capitulation Setup",
+            "emoji": "💎",
+            "severity": "opportunity",
+            "description": f"MPS {final_score:.0f}, Sentiment {sent:.0f} (extreme fear), "
+                f"ATR {atr_pct:.0f}% [Panic]. Maximum pessimism — everyone has already sold.",
+            "action": "Watch for reversal candles (hammer, engulfing). When VIX spikes above 30 "
+                "then reverses, that's your entry. Small positions only — catch the knife carefully."
+        })
+    
+    return alerts
+
 # ═══ MAIN ENGINE ═══
 
 def calculate_mps(data, structural_bull_streak_days=0, prev_pct_above_50sma=0.0,
@@ -243,12 +418,18 @@ def calculate_mps(data, structural_bull_streak_days=0, prev_pct_above_50sma=0.0,
     zn,ze,za,rk=classify_zone(fs)
     st,sm=determine_state(mods,rsi_pct,p200)
     ms=build_macro_summary(mods)
+    
+    # ── Paradox Detection ──
+    paradoxes = detect_paradoxes(
+        pillars, mods, fs, br, bl, rsi_pct, atr_pct, ar, p200, p50,
+        structural_bull_streak_days, fii_net_consecutive_sell_days)
 
-    return MPSResult(date=data.date,version="3.1.2",pillar_scores=[asdict(p) for p in pillars],
+    return MPSResult(date=data.date,version="3.2",pillar_scores=[asdict(p) for p in pillars],
         base_score=round(base,2),modifiers=[asdict(m) for m in mods],total_modifier=round(tm,2),
         final_score=round(fs,2),zone=zn,zone_emoji=ze,zone_action=za,risk_per_trade=rk,
         state=st,state_message=sm,burst_ratio=round(br,1),burst_label=bl,
-        rsi_breadth_pct=round(rsi_pct,1),atr_breadth_pct=round(atr_pct,1),atr_regime=ar,macro_summary=ms)
+        rsi_breadth_pct=round(rsi_pct,1),atr_breadth_pct=round(atr_pct,1),atr_regime=ar,
+        macro_summary=ms,paradox_alerts=paradoxes)
 
 def format_mps_report(result):
     lines=[]
@@ -275,6 +456,21 @@ def format_mps_report(result):
     bl=f"  Burst: {result.burst_ratio:.0f} [{result.burst_label}]  RSI: {result.rsi_breadth_pct:.1f}%  ATR: {result.atr_breadth_pct:.1f}% [{result.atr_regime}]"
     lines.append(f"  │{bl}{' '*max(0,63-len(bl))}│");lines.append(f"  └{'─'*63}┘")
     lines.append(f"  Action: {result.zone_action}");lines.append("")
+    
+    # Paradox Alerts
+    if result.paradox_alerts:
+        lines.append("  PARADOX ALERTS")
+        lines.append("  " + "─" * 65)
+        sev_icons = {"danger": "🔴", "caution": "🟡", "opportunity": "🟢"}
+        for p in result.paradox_alerts:
+            icon = sev_icons.get(p['severity'], '⚪')
+            lines.append(f"  {p['emoji']} {icon} {p['name'].upper()}")
+            lines.append(f"     {p['description']}")
+            lines.append(f"     → {p['action']}")
+            lines.append("")
+        lines.append("  " + "─" * 65)
+        lines.append("")
+    
     return "\n".join(lines)
 
 def to_json(result):return json.dumps(asdict(result),indent=2,ensure_ascii=False)
@@ -282,5 +478,7 @@ def to_json(result):return json.dumps(asdict(result),indent=2,ensure_ascii=False
 if __name__=="__main__":
     print_banner(animate=True)
     d=RawMarketData(date="2026-03-17",stocks_above_200sma=116,stocks_above_50sma=77,advances=305,declines=195,stocks_up_4pct=5,burst_gainers_4_5pct=11,burst_losers_4_5pct=2,new_52w_highs=0,new_52w_lows=75,india_vix=19.79,pcr=1.0,stocks_rsi_above_50=61,stocks_atr_pct_above_4=199,stocks_rsi_above_70=3,fii_net_buy_crores=-9365.52,brent_crude=101.87,us10y_yield=4.20,usd_inr=92.34)
-    r=calculate_mps(d,fii_net_consecutive_sell_days=1,fii_5day_net_crores=-9365.52,fii_5day_history=[-9365.52],usd_inr_20d_ago=90.78)
+    r=calculate_mps(d,fii_net_consecutive_sell_days=11,fii_5day_net_crores=-42764.86,
+        fii_5day_history=[-3296,-8753,-3753,-6030,-6346,-4673,-6267,-7050,-10717,-9366],
+        usd_inr_20d_ago=90.78)
     print(format_mps_report(r))
