@@ -582,12 +582,11 @@ def fetch_fii_from_groww():
     """
     Scrape FII net buy/sell (₹ Cr) from Groww.in's FII/DII page.
     
-    Groww renders data server-side in HTML tables — works from
-    GitHub Actions without JS or special session handling.
-    
-    Returns: float (FII net in ₹ Crores, negative = selling)
+    Returns: tuple (fii_net_today, fii_history_list)
+      - fii_net_today: float (latest FII net in ₹ Crores)
+      - fii_history_list: list of floats (last 10 days, newest first)
     """
-    log.info("═══ FII DATA (Groww.in — Primary) ═══")
+    log.info("═══ FII DATA (Groww.in — Primary + Backfill) ═══")
     
     url = "https://groww.in/fii-dii-data"
     headers = {
@@ -603,10 +602,10 @@ def fetch_fii_from_groww():
         
         soup = BeautifulSoup(resp.text, "html.parser")
         
-        # Find table rows with date + FII data
-        # Columns: Date | FII Buy | FII Sell | FII Net | DII Buy | DII Sell | DII Net
         import re
         tables = soup.find_all("table")
+        
+        all_fii_rows = []  # List of (date_str, fii_net_value)
         
         for table in tables:
             rows = table.find_all("tr")
@@ -615,21 +614,41 @@ def fetch_fii_from_groww():
                 if len(cells) >= 4:
                     first_cell = cells[0].get_text(strip=True)
                     if re.match(r'\d{1,2}\s+\w{3}\s+\d{4}', first_cell):
-                        # Data row — FII net is 4th column (index 3)
                         fii_net_text = cells[3].get_text(strip=True)
                         fii_net = _parse_crore_value(fii_net_text)
-                        
                         if fii_net is not None:
-                            log.info(f"  ✓ FII Net from Groww ({first_cell}): ₹{fii_net:,.2f} Cr")
-                            return round(fii_net, 2)
+                            all_fii_rows.append((first_cell, fii_net))
+        
+        if all_fii_rows:
+            # Latest value (first row = most recent date)
+            latest_date, latest_net = all_fii_rows[0]
+            log.info(f"  ✓ FII Net from Groww ({latest_date}): ₹{latest_net:,.2f} Cr")
+            
+            # History: reverse to oldest-first order for state tracking
+            history = [row[1] for row in reversed(all_fii_rows)]
+            
+            # Count consecutive sell days from history
+            sell_streak = 0
+            for val in reversed(history):  # newest first
+                if val < 0:
+                    sell_streak += 1
+                else:
+                    break
+            
+            log.info(f"  ✓ FII History: {len(all_fii_rows)} days scraped, {sell_streak} consecutive sell days")
+            for date_str, val in all_fii_rows[:5]:
+                log.info(f"    {date_str}: ₹{val:+,.2f} Cr")
+            
+            return round(latest_net, 2), history, sell_streak
         
         log.warning("  ✗ Could not parse FII data from Groww table")
         
     except Exception as e:
         log.warning(f"  ✗ Groww FII scrape failed: {e}")
     
-    # ── Fallback: Try NSE (may fail from datacenter IPs) ──
-    return _fetch_nse_fii_fallback()
+    # ── Fallback: Try NSE ──
+    fallback_val = _fetch_nse_fii_fallback()
+    return fallback_val, [], 0
 
 
 def _fetch_nse_fii_fallback():
@@ -825,7 +844,15 @@ def fetch_and_calculate(dry_run=False):
         
         # ── Step 3: NSE fallback for PCR + FII ──
         market["pcr"] = fetch_nse_pcr_fallback()
-        market["fii_net"] = fetch_fii_from_groww()
+        fii_result = fetch_fii_from_groww()
+        fii_today, fii_groww_history, fii_groww_streak = fii_result
+        market["fii_net"] = fii_today
+        
+        # ── Backfill FII history from Groww (instant 5-10 day history) ──
+        if fii_groww_history and len(fii_groww_history) > 0:
+            state["fii_5day_history"] = fii_groww_history[-5:]
+            state["fii_consecutive_sell_days"] = fii_groww_streak
+            log.info(f"  ✓ FII backfilled: {len(fii_groww_history)} days history, {fii_groww_streak}d sell streak")
 
         # ── Safe defaults for any missing data ──
         if market.get("vix") is None:
