@@ -90,6 +90,37 @@ body.light{
 .sl-mode-btn{ padding:0 10px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:var(--bg3);color:var(--t3);border-left:1px solid var(--b2);transition:all .15s;white-space:nowrap; }
 .sl-mode-btn.active{ background:var(--yd);color:var(--y); }
 
+/* ── GTT ORDERS ── */
+.gtt-card{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;transition:border-color .2s}
+.gtt-card:hover{border-color:var(--b3)}
+.gtt-card .gtt-sym{font-weight:800;color:var(--t1);font-size:13px}
+.gtt-card .gtt-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em}
+.gtt-type-single{background:rgba(59,139,255,.12);color:var(--b)}
+.gtt-type-oco{background:rgba(168,85,247,.12);color:var(--p)}
+.gtt-card .gtt-level{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--t2)}
+.gtt-card .gtt-status{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
+.gtt-st-active{background:rgba(0,229,160,.12);color:var(--g)}
+.gtt-st-triggered{background:var(--yd);color:var(--y)}
+.gtt-st-cancelled{background:var(--rd);color:var(--r)}
+.gtt-st-expired{background:rgba(139,160,184,.12);color:var(--t3)}
+.gtt-st-local{background:rgba(34,211,238,.12);color:var(--c)}
+
+/* ── RISK NUDGE ── */
+.nudge-item{display:flex;align-items:flex-start;gap:6px;padding:4px 0;font-size:10.5px;line-height:1.4}
+.nudge-icon{flex-shrink:0;width:16px;text-align:center;font-size:11px}
+.nudge-ok .nudge-icon{color:var(--g)}
+.nudge-warn .nudge-icon{color:var(--y)}
+.nudge-danger .nudge-icon{color:var(--r)}
+.nudge-info .nudge-icon{color:var(--b)}
+.nudge-ok .nudge-text{color:var(--t3)}
+.nudge-warn .nudge-text{color:var(--y)}
+.nudge-danger .nudge-text{color:var(--r);font-weight:600}
+.nudge-info .nudge-text{color:var(--t2)}
+.gtt-actions{display:flex;gap:5px;flex-shrink:0}
+.gtt-divider{width:1px;background:var(--b1);margin:0 6px;align-self:stretch}
+.gtt-tab{padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:var(--bg3);color:var(--t3);transition:all .15s;border-bottom:2px solid transparent}
+.gtt-tab.active{color:var(--y);border-bottom-color:var(--y);background:rgba(245,197,66,.06)}
+
 /* ── CHART IMAGE BOX ── */
 .chart-img-box{
   background:var(--bg3);border:1.5px dashed var(--b2);border-radius:8px;
@@ -1320,6 +1351,20 @@ select.fi{cursor:pointer}
         <div id="trade-alerts-list" style="display:flex;flex-direction:column;gap:6px"></div>
       </div>
 
+      <!-- GTT Orders Summary on Alerts page -->
+      <div id="gtt-alerts-section" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">🎯 Active GTT Orders</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span id="gtt-alert-count" style="font-size:10px;color:var(--t4)"></span>
+            <button class="btn btn-ghost btn-xs" onclick="nav('execute')" style="font-size:10px">Manage →</button>
+          </div>
+        </div>
+        <div id="gtt-alerts-list" style="display:flex;flex-direction:column;gap:6px">
+          <div style="color:var(--t4);font-size:12px;padding:10px 0">No active GTT orders.</div>
+        </div>
+      </div>
+
       <!-- Custom alerts -->
       <div>
         <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Custom Alerts</div>
@@ -1727,7 +1772,7 @@ select.fi{cursor:pointer}
             <div class="fg2">
               <div class="fg">
                 <label class="fl">Quantity</label>
-                <input type="number" class="fi" id="exec-qty" placeholder="1" min="1" value="">
+                <input type="number" class="fi" id="exec-qty" placeholder="1" min="1" value="" onchange="execRerunNudges()">
               </div>
               <div class="fg" id="exec-limit-wrap">
                 <label class="fl">Price (₹)</label>
@@ -1803,6 +1848,16 @@ select.fi{cursor:pointer}
                   <div id="exec-zd-slm-preview" style="font-size:10px;color:var(--y);margin-top:2px;min-height:14px"></div>
                 </div>
               </div>
+            </div>
+
+            <!-- Pre-trade Risk Nudges -->
+            <div id="exec-nudge-panel" style="display:none;border:1px solid var(--b2);border-radius:8px;overflow:hidden;background:var(--bg3)">
+              <div style="padding:6px 10px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:6px">
+                <span style="font-size:12px">🛡️</span>
+                <span style="font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em">Pre-Trade Checks</span>
+                <span id="exec-nudge-score" style="font-size:10px;font-weight:800;margin-left:auto;padding:2px 8px;border-radius:10px"></span>
+              </div>
+              <div id="exec-nudge-list" style="padding:6px 10px;display:flex;flex-direction:column;gap:3px"></div>
             </div>
 
             <button class="btn btn-y" style="width:100%;justify-content:center;padding:10px;font-size:13px" onclick="execPlaceOrder()" id="exec-place-btn">
@@ -1982,6 +2037,194 @@ select.fi{cursor:pointer}
             </div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- ── GTT Orders Manager ── -->
+      <div style="margin-top:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:15px;font-weight:700;color:var(--t1)">🎯 GTT Orders</div>
+            <span id="gtt-count-badge" style="font-size:10px;background:rgba(59,139,255,.12);color:var(--b);padding:2px 8px;border-radius:20px;font-weight:700">0 active</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="gttAutoFromJournal()" title="Auto-create GTTs from open trades with SL/Target set">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Auto from Journal
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="gttFetchFromBroker()">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+              Fetch Broker GTTs
+            </button>
+            <button class="btn btn-y btn-sm" onclick="openGTTModal()">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Place GTT
+            </button>
+          </div>
+        </div>
+
+        <!-- GTT Tabs: Active | Triggered | All -->
+        <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px 8px 0 0;overflow:hidden;background:var(--bg3)">
+          <button class="gtt-tab active" id="gtt-tab-active" onclick="gttSwitchTab('active')">🟢 Active</button>
+          <button class="gtt-tab" id="gtt-tab-triggered" onclick="gttSwitchTab('triggered')">🔔 Triggered</button>
+          <button class="gtt-tab" id="gtt-tab-local" onclick="gttSwitchTab('local')">📌 Local</button>
+          <button class="gtt-tab" id="gtt-tab-all" onclick="gttSwitchTab('all')">All</button>
+        </div>
+        <div class="card" style="border-radius:0 0 10px 10px;border-top:none">
+          <div id="gtt-list-container" style="min-height:60px;max-height:450px;overflow-y:auto">
+            <div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">
+              <div style="font-size:20px;margin-bottom:6px">🎯</div>
+              No GTT orders yet — Place one or Auto-create from journal
+            </div>
+          </div>
+        </div>
+        <div id="gtt-status-msg" style="font-size:10px;color:var(--t3);margin-top:6px;text-align:center;min-height:14px"></div>
+      </div>
+
+    </div>
+
+    <!-- ══ GTT MODAL — Place / Edit ══ -->
+    <div class="overlay" id="m-gtt" onclick="if(event.target===this)closeM('m-gtt')">
+      <div class="modal" style="max-width:480px">
+        <div class="m-head">
+          <div class="m-title" id="gtt-modal-title">🎯 Place GTT Order</div>
+          <button class="m-x" onclick="closeM('m-gtt')">✕</button>
+        </div>
+        <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
+          <!-- GTT Type -->
+          <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
+            <button class="sl-mode-btn active" id="gtt-mode-single" onclick="setGTTMode('single')" style="flex:1;padding:8px;font-size:12px;font-weight:700;background:var(--yd);color:var(--y)">Single Trigger</button>
+            <button class="sl-mode-btn" id="gtt-mode-oco" onclick="setGTTMode('oco')" style="flex:1;padding:8px;font-size:12px;font-weight:700">OCO (SL + Target)</button>
+          </div>
+
+          <div class="fg f-full">
+            <label class="fl">Symbol</label>
+            <div class="sym-wrap" style="position:relative">
+              <input class="fi" id="gtt-sym" placeholder="Type symbol e.g. RELIANCE, INFY…"
+                autocomplete="off" style="text-transform:uppercase"
+                oninput="onGttSymInput(this.value)"
+                onkeydown="onGttSymKey(event)"
+                onfocus="onGttSymInput(this.value)"
+                onblur="setTimeout(closeGttSymDrop,200)">
+              <div class="sym-dropdown" id="gtt-sym-drop"></div>
+            </div>
+            <div id="gtt-cmp-status" style="font-size:10px;color:var(--t3);margin-top:3px;min-height:14px"></div>
+          </div>
+
+          <div class="fg2">
+            <div class="fg">
+              <label class="fl">Exchange</label>
+              <select class="fi" id="gtt-exchange">
+                <option value="NSE">NSE</option>
+                <option value="BSE">BSE</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="fl">Product</label>
+              <select class="fi" id="gtt-product">
+                <option value="CNC">CNC (Delivery)</option>
+                <option value="MIS">MIS (Intraday)</option>
+                <option value="NRML">NRML</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Single Trigger Fields -->
+          <div id="gtt-single-fields">
+            <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">Trigger Condition</div>
+            <div class="fg2">
+              <div class="fg">
+                <label class="fl">Trigger Price ₹</label>
+                <input type="number" class="fi" id="gtt-trigger1" placeholder="0.00" step="0.05">
+              </div>
+              <div class="fg">
+                <label class="fl">Limit Price ₹</label>
+                <input type="number" class="fi" id="gtt-limit1" placeholder="0.00" step="0.05">
+              </div>
+            </div>
+            <div class="fg2" style="margin-top:10px">
+              <div class="fg">
+                <label class="fl">Side</label>
+                <select class="fi" id="gtt-side1">
+                  <option value="SELL">SELL</option>
+                  <option value="BUY">BUY</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="fl">Quantity</label>
+                <input type="number" class="fi" id="gtt-qty1" placeholder="1" min="1">
+              </div>
+            </div>
+          </div>
+
+          <!-- OCO Fields -->
+          <div id="gtt-oco-fields" style="display:none">
+            <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">Shared</div>
+            <div class="fg2">
+              <div class="fg">
+                <label class="fl">Side</label>
+                <select class="fi" id="gtt-oco-side">
+                  <option value="SELL">SELL (Exit Long)</option>
+                  <option value="BUY">BUY (Exit Short)</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="fl">Quantity</label>
+                <input type="number" class="fi" id="gtt-oco-qty" placeholder="1" min="1">
+              </div>
+            </div>
+
+            <!-- Stop Loss Leg -->
+            <div style="margin-top:12px;padding:10px;border:1px solid rgba(255,69,96,.25);border-radius:8px;background:rgba(255,69,96,.04)">
+              <div style="font-size:10px;font-weight:700;color:var(--r);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🔻 Stop Loss Leg</div>
+              <div class="fg2">
+                <div class="fg">
+                  <label class="fl">Trigger (SL Hit) ₹</label>
+                  <input type="number" class="fi" id="gtt-oco-sl-trigger" placeholder="0.00" step="0.05">
+                </div>
+                <div class="fg">
+                  <label class="fl">Limit Price ₹</label>
+                  <input type="number" class="fi" id="gtt-oco-sl-limit" placeholder="0.00" step="0.05">
+                </div>
+              </div>
+            </div>
+
+            <!-- Target Leg -->
+            <div style="margin-top:10px;padding:10px;border:1px solid rgba(0,229,160,.25);border-radius:8px;background:rgba(0,229,160,.04)">
+              <div style="font-size:10px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🔺 Target Leg</div>
+              <div class="fg2">
+                <div class="fg">
+                  <label class="fl">Trigger (Target Hit) ₹</label>
+                  <input type="number" class="fi" id="gtt-oco-tgt-trigger" placeholder="0.00" step="0.05">
+                </div>
+                <div class="fg">
+                  <label class="fl">Limit Price ₹</label>
+                  <input type="number" class="fi" id="gtt-oco-tgt-limit" placeholder="0.00" step="0.05">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Source mode: broker or local -->
+          <div style="border-top:1px solid var(--b1);padding-top:12px">
+            <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
+              <button class="sl-mode-btn active" id="gtt-src-broker" onclick="setGTTSource('broker')" style="flex:1;padding:6px;font-size:11px;font-weight:700;background:var(--yd);color:var(--y)">⚡ Place via Broker API</button>
+              <button class="sl-mode-btn" id="gtt-src-local" onclick="setGTTSource('local')" style="flex:1;padding:6px;font-size:11px;font-weight:700">📌 Track Locally Only</button>
+            </div>
+            <div id="gtt-src-hint" style="font-size:10px;color:var(--t4);margin-top:6px;text-align:center">Order placed via broker API — executes automatically when price hits trigger.</div>
+          </div>
+
+          <div class="fg f-full">
+            <label class="fl">Note (optional)</label>
+            <input class="fi" id="gtt-note" placeholder="e.g. Breakout re-entry, trailing SL update…">
+          </div>
+        </div>
+        <div class="m-foot">
+          <button class="btn btn-ghost" onclick="closeM('m-gtt')">Cancel</button>
+          <button class="btn btn-y" onclick="gttPlaceOrder()" id="gtt-place-btn">
+            <svg viewBox="0 0 24 24" style="width:13px;height:13px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Place GTT
+          </button>
         </div>
       </div>
     </div>
@@ -5638,6 +5881,7 @@ function updateAlertBadge() {
 function renderAlerts() {
   checkNotifPermission();
   updateAlertBadge();
+  try{ renderGTTAlerts(); }catch(e){}
   
   // Trade alerts
   const tradeAlerts = getTradeAlertLevels();
@@ -6043,7 +6287,25 @@ const NSE_SYMBOLS = [
   ["QPOWER","Quasi Power","Energy"],["MANINDS","Man Industries","Metal"],
   ["GVT&D","GVT & D","Industrial"],["MRPL","MRPL","Energy"],
   ["FORTIS","Fortis Healthcare","Healthcare"],["HINDCOPPER","Hindustan Copper","Metal"],
-  ["PRUDENT","Prudent Corporate Advisory","Finance"],["SILVERBEES","Silver Bees ETF","ETF"],
+  ["PRUDENT","Prudent Corporate Advisory","Finance"],["SILVERBEES","ETF - SILVER","ETF"],
+  ["ABSLPSE","ETF - PSE","ETF"],["ALPHA","ETF - Alpha","ETF"],["AONETOTAL","ETF - Top 750","ETF"],
+  ["AUTOBEES","ETF - Auto","ETF"],["BANKBEES","ETF - Bank","ETF"],["BFSI","ETF - Fin Services","ETF"],
+  ["COMMOIETF","ETF - Commodities","ETF"],["CONSUMBEES","ETF - Consumption","ETF"],["CONSUMER","ETF - New Age Consumption","ETF"],
+  ["CPSEETF","ETF - CPSE","ETF"],["DIVOPPBEES","ETF - Dividend Opp 50","ETF"],["ESG","ETF - Nifty 100 ESG","ETF"],
+  ["FINIETF","ETF - Fin Svc Ex-Bank","ETF"],["FMCGIETF","ETF - FMCG","ETF"],["GILT5YBEES","ETF - Fixed Income 5Y","ETF"],
+  ["GOLDBEES","ETF - GOLD","ETF"],["GROWWEV","ETF - EV & New Auto","ETF"],["GROWWRAIL","ETF - Railways PSU","ETF"],
+  ["HDFCGROWTH","ETF - Growth Sectors 15","ETF"],["HDFCSML250","ETF - SmallCap 250","ETF"],["HEALTHIETF","ETF - Healthcare","ETF"],
+  ["HNGSNGBEES","ETF - Hang Seng","ETF"],["ICICIB22","ETF - Bharat 22","ETF"],["INFRAIETF","ETF - Infrastructure","ETF"],
+  ["ITBEES","ETF - IT","ETF"],["JUNIORBEES","ETF - Nifty Next 50","ETF"],["LIQUIDCASE","ETF - Liquid","ETF"],
+  ["LOWVOLIETF","ETF - Low Vol 100","ETF"],["LTGILTBEES","ETF - Long Gilt","ETF"],["MAFANG","ETF - NYSE FANG","ETF"],
+  ["MAHKTECH","ETF - Hang Seng Tech","ETF"],["MAKEINDIA","ETF - Manufacturing","ETF"],["MASPTOP50","ETF - S&P 500 Top 50","ETF"],
+  ["METALIETF","ETF - Metal","ETF"],["MID150BEES","ETF - MidCap 150","ETF"],["MIDSMALL","ETF - MidSmallCap","ETF"],
+  ["MNC","ETF - MNC","ETF"],["MOCAPITAL","ETF - Capital Markets","ETF"],["MODEFENCE","ETF - Defence","ETF"],
+  ["MOM30IETF","ETF - Momentum 200","ETF"],["MOMENTUM50","ETF - Momentum 500","ETF"],["MON100","ETF - NASDAQ 100","ETF"],
+  ["MONQ50","ETF - NASDAQ Q50","ETF"],["MOREALTY","ETF - Realty","ETF"],["MSCIINDIA","ETF - MSCI India","ETF"],
+  ["MULTICAP","ETF - Multicap","ETF"],["NIFTYBEES","ETF - Nifty 50","ETF"],["OILIETF","ETF - Oil & Gas","ETF"],
+  ["PHARMABEES","ETF - Pharma","ETF"],["PSUBNKBEES","ETF - PSU Bank","ETF"],["PVTBANIETF","ETF - Pvt Bank","ETF"],
+  ["SELECTIPO","ETF - BSE Select IPO","ETF"],["TNIDETF","ETF - Digital","ETF"],["TOP10ADD","ETF - Top 10","ETF"],
   ["IIFLCAPS","IIFL Capital Services","Finance"],["BHARATFORG","Bharat Forge","Auto Ancillary"],
   ["DICIND","DIC India","Chemical"],["THANGAMAYL","Thangamayil Jewellery","Jewellery"],
 ];
@@ -6060,7 +6322,10 @@ async function fetchNSESymbolList(){
   const statusEl = document.getElementById('nse-db-status');
   if(statusEl) statusEl.innerHTML = '⏳ Fetching NSE symbols…';
   const NSE_CSV = 'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv';
+  const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
   const PROXIES = [
+    // Priority 1: Your own worker proxy (most reliable)
+    ...(workerUrl ? [u=>`${workerUrl}?action=cors-proxy&url=${encodeURIComponent(u)}`] : []),
     u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
     u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
@@ -6079,6 +6344,36 @@ async function fetchNSESymbolList(){
     return parsed;
   }
   let lastErr=null;
+
+  // Try worker direct fetch first (most reliable if worker supports it)
+  if(workerUrl){
+    try{
+      if(statusEl) statusEl.innerHTML='⏳ Fetching via worker proxy…';
+      const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),15000);
+      const r=await fetch(workerUrl,{
+        headers:{'X-Kite-Action':'nse-symbols','Content-Type':'application/json'},
+        signal:ctrl.signal
+      }); clearTimeout(t);
+      if(r.ok){
+        const text=await r.text();
+        // Worker might return CSV directly or JSON array
+        let parsed;
+        try{ parsed=JSON.parse(text); }catch(e){ parsed=parseCSV(text); }
+        if(Array.isArray(parsed)&&parsed.length>100){
+          const sectorMap={};
+          NSE_SYMBOLS.forEach(([s,n,sec])=>sectorMap[s]=sec);
+          NSE_EXTENDED_SYMBOLS=(parsed[0]?.length?parsed:parsed.map(s=>[s.symbol||s[0],s.name||s[1],s.sector||''])).map(([s,n,sec])=>[s,n,sectorMap[s]||sec||'']);
+          localStorage.setItem('te_nse_ext',JSON.stringify(NSE_EXTENDED_SYMBOLS));
+          localStorage.setItem('te_nse_ext_ts',new Date().toISOString());
+          if(statusEl) statusEl.innerHTML=`<span style="color:var(--g)">✅ ${NSE_EXTENDED_SYMBOLS.length} symbols loaded via worker</span> (${new Date().toLocaleString('en-IN')})`;
+          toast(`NSE database updated: ${NSE_EXTENDED_SYMBOLS.length} symbols (worker)`,'✅');
+          return;
+        }
+      }
+    }catch(e){ lastErr=e.name==='AbortError'?new Error('Worker timeout'):e; }
+  }
+
+  // Fallback to CORS proxies
   for(let i=0;i<PROXIES.length;i++){
     try{
       if(statusEl) statusEl.innerHTML=`⏳ Trying proxy ${i+1}/${PROXIES.length}…`;
@@ -6456,6 +6751,7 @@ async function sbPush(){
     const cfg      = localStorage.getItem('te_cfg')       || '{}';
     const fund     = localStorage.getItem('te_fund')      || '{}';
     const alerts   = localStorage.getItem('te_alerts')    || '[]';
+    const gttJson  = localStorage.getItem('te_gtt')        || '[]';
     const rrmCache  = localStorage.getItem('te_rrm_cache')  || '{}';
     const mpsUrl    = localStorage.getItem('te_mps_url')   || '';
     const theme     = localStorage.getItem('te_theme')     || 'dark';
@@ -6471,18 +6767,28 @@ async function sbPush(){
       cfg_json:    cfg,
       fund_json:   fund,
       alerts_json: alerts,
-      prefs_json:  JSON.stringify({rrmCache:JSON.parse(rrmCache), mpsUrl, theme, workerUrl, zdKey, zdSec, deSec}),
+      gtt_json:    gttJson,
+      prefs_json:  JSON.stringify({rrmCache:JSON.parse(rrmCache), mpsUrl, theme, workerUrl, zdKey, zdSec, deSec, gttOrders:gttJson}),
       updated_at:  new Date().toISOString()
     };
     const sizeKB = Math.round(JSON.stringify(payload).length/1024);
     if(sizeKB > 4000) toast(`⚠️ Large upload (${sizeKB}KB) — charts included, may take a moment`, 'ℹ️');
-    await sbApi('POST', 'tradedge_trades?on_conflict=device_id', payload);
+    try{
+      await sbApi('POST', 'tradedge_trades?on_conflict=device_id', payload);
+    }catch(pushErr){
+      // If gtt_json column doesn't exist, retry without it (GTT stored in prefs_json fallback)
+      if(pushErr.message && pushErr.message.includes('gtt_json')){
+        delete payload.gtt_json;
+        await sbApi('POST', 'tradedge_trades?on_conflict=device_id', payload);
+      } else { throw pushErr; }
+    }
     localStorage.setItem('te_last_save', String(Date.now()));
     const ts = new Date().toLocaleTimeString('en-IN');
     const lc = JSON.parse(ledger).length;
     const cc = pushTrades.filter(t=>t.entryImg||t.exitImg).length;
-    setSbStatus(`Pushed ${pushTrades.length} trades · ${lc} ledger · ${cc} charts · ${sizeKB}KB ✅ · ${ts}`, 'ok');
-    toast(`☁️ ${pushTrades.length} trades + ${lc} ledger + ${cc} charts pushed (${sizeKB}KB)`, '☁️');
+    const gc = JSON.parse(gttJson).length;
+    setSbStatus(`Pushed ${pushTrades.length} trades · ${lc} ledger · ${gc} GTTs · ${cc} charts · ${sizeKB}KB ✅ · ${ts}`, 'ok');
+    toast(`☁️ ${pushTrades.length} trades + ${lc} ledger + ${gc} GTTs + ${cc} charts pushed (${sizeKB}KB)`, '☁️');
   }catch(e){
     const hint = e.message.includes('Network') ? ' — use HTTPS not file://' : '';
     setSbStatus('Push failed: '+e.message+hint, '');
@@ -6497,7 +6803,13 @@ async function sbPull(){
   if(!url.includes('.supabase.co')){ toast('Invalid Supabase URL','⚠️'); return; }
   setSbStatus('Pulling…', 'sync');
   try{
-    const rows = await sbApi('GET','tradedge_trades?device_id=eq.tradedge_main&select=trades_json,ledger_json,cfg_json,fund_json,alerts_json,prefs_json,updated_at&limit=1');
+    let rows;
+    try{
+      rows = await sbApi('GET','tradedge_trades?device_id=eq.tradedge_main&select=trades_json,ledger_json,cfg_json,fund_json,alerts_json,gtt_json,prefs_json,updated_at&limit=1');
+    }catch(e1){
+      // Fallback if gtt_json column doesn't exist yet
+      rows = await sbApi('GET','tradedge_trades?device_id=eq.tradedge_main&select=trades_json,ledger_json,cfg_json,fund_json,alerts_json,prefs_json,updated_at&limit=1');
+    }
     if(!rows||!rows.length){ setSbStatus('No cloud data — push first',''); toast('No cloud data — push first','ℹ️'); return; }
     const row         = rows[0];
     const cloudTrades = JSON.parse(row.trades_json||'[]');
@@ -6513,6 +6825,7 @@ async function sbPull(){
       if(row.cfg_json)    localStorage.setItem('te_cfg',       row.cfg_json);
       if(row.fund_json)   localStorage.setItem('te_fund',      row.fund_json);
       if(row.alerts_json) localStorage.setItem('te_alerts',    row.alerts_json);
+      if(row.gtt_json)    { localStorage.setItem('te_gtt', row.gtt_json); try{ gttOrders=JSON.parse(row.gtt_json); }catch(e2){} }
       if(row.prefs_json){
         try{
           const prefs=JSON.parse(row.prefs_json);
@@ -6523,11 +6836,18 @@ async function sbPull(){
           if(prefs.zdKey)    localStorage.setItem('zd_key',       prefs.zdKey);
           if(prefs.zdSec)    localStorage.setItem('zd_sec',       prefs.zdSec);
           if(prefs.deSec)    localStorage.setItem('de_sec',       prefs.deSec);
+          // GTT fallback: restore from prefs if gtt_json column missing
+          if(!row.gtt_json && prefs.gttOrders){
+            const gttStr = typeof prefs.gttOrders==='string'?prefs.gttOrders:JSON.stringify(prefs.gttOrders);
+            localStorage.setItem('te_gtt', gttStr);
+            try{ gttOrders=JSON.parse(gttStr); }catch(e3){}
+          }
         }catch(e2){}
       }
       localStorage.setItem('te_last_save', String(cloudTime));
       renderDash(); renderTrades();
       try{ renderAlerts(); }catch(e2){}
+      try{ renderGTTList(); renderGTTAlerts(); }catch(e2){}
       const lc = JSON.parse(row.ledger_json||'[]').length;
       const cc = cloudTrades.filter(t=>t.entryImg||t.exitImg).length;
       const ts = new Date().toLocaleTimeString('en-IN');
@@ -9781,6 +10101,7 @@ let execSymFocusIdx = -1;
 function initExecPage(){
   execPopulateJournalDropdown();
   execCheckBrokerStatus();
+  renderGTTList();
 }
 
 function setExecBroker(b){
@@ -9822,6 +10143,15 @@ function getExecHeaders(){
   return h;
 }
 
+function scoreMatch(sym, name, q){
+  if(sym===q) return 100;
+  if(sym.startsWith(q)) return 80+Math.min(q.length,10);
+  if(name.startsWith(q)) return 60;
+  if(sym.includes(q)) return 40;
+  if(name.includes(q)) return 20;
+  return -1;
+}
+
 function onExecSymInput(val){
   const q=val.trim().toUpperCase(); const drop=document.getElementById('exec-sym-drop');
   if(!q||q.length<1){drop.classList.remove('open');return;}
@@ -9845,9 +10175,22 @@ function onExecSymKey(e){
 
 async function execFetchPrice(sym){
   if(!sym)return; const st=document.getElementById('exec-price-status'); if(st) st.textContent='⏳ Fetching CMP…';
-  try{ const ticker=sym.includes('.')?sym:sym+'.NS'; const r=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`)}`); const d=await r.json(); const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice||d?.chart?.result?.[0]?.meta?.previousClose;
+  const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
+  try{
+    let d;
+    const ticker=sym.includes('.')?sym:sym+'.NS';
+    if(workerUrl){
+      const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker,range:'2d',interval:'1d'})});
+      d=await r.json();
+    } else {
+      const r=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`)}`);
+      d=await r.json();
+    }
+    const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice||d?.chart?.result?.[0]?.meta?.previousClose;
     if(price){ document.getElementById('exec-price').value=price.toFixed(2); if(st) st.innerHTML=`<span style="color:var(--g)">✓ CMP: ₹${price.toFixed(2)}</span>`; }
     else { if(st) st.innerHTML=`<span style="color:var(--y)">⚠ Price unavailable</span>`; }
+    // Run pre-trade risk nudges
+    try{ await execRunNudges(sym); }catch(e2){}
   }catch(e){ if(st) st.innerHTML=`<span style="color:var(--t3)">Fetch failed</span>`; }
 }
 
@@ -9898,6 +10241,206 @@ function execMktProtectChange(){
       zdPreview.textContent=`→ Will send SL-M with trigger ₹${trigger.toFixed(2)}`;
     } else { zdPreview.textContent=`→ MARKET will be sent as SL-M (+${pct}%)`; }
   } else if(zdPreview) { zdPreview.textContent=''; }
+}
+
+// ── ASM/GSM/Surveillance Lists (known symbols, updated periodically) ──
+const _ASM_KEYWORDS=['ASM','SURVEILLANCE','ADDITIONAL'];
+const _GSM_KEYWORDS=['GSM','GRADED'];
+
+function execRerunNudges(){
+  const sym=(document.getElementById('exec-sym').value||'').trim().toUpperCase();
+  if(sym) execRunNudges(sym);
+}
+
+// ── Pre-Trade Risk Nudge Engine ──
+let _lastNudgeData = null;
+
+async function execRunNudges(sym){
+  const panel=document.getElementById('exec-nudge-panel');
+  const listEl=document.getElementById('exec-nudge-list');
+  const scoreEl=document.getElementById('exec-nudge-score');
+  if(!panel||!listEl) return;
+
+  if(!sym){panel.style.display='none';return;}
+  panel.style.display='';
+  listEl.innerHTML='<div class="nudge-item nudge-info"><span class="nudge-icon">⏳</span><span class="nudge-text">Scanning risks…</span></div>';
+  scoreEl.textContent='';
+
+  const nudges=[];
+  let score=100; // Start at 100, deduct for issues
+
+  try{
+    // 1. Fetch detailed quote via worker (Kite quote has depth, circuit limits)
+    const workerUrl=getExecWorkerUrl();
+    let quoteData=null, yahooData=null;
+
+    if(workerUrl){
+      try{
+        const r=await fetch(workerUrl,{headers:{...getExecHeaders(),'X-Kite-Action':'quote','X-Kite-Symbol':'NSE:'+sym}});
+        const d=await r.json();
+        quoteData=d?.data?.['NSE:'+sym]||null;
+      }catch(e){}
+    }
+
+    // 2. Also fetch Yahoo for volume/avg data
+    const ticker=sym.includes('.')?sym:sym+'.NS';
+    try{
+      const yUrl=workerUrl
+        ?await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker,range:'1mo',interval:'1d'})}).then(r=>r.json())
+        :await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1mo`)}`).then(r=>r.json());
+      yahooData=yUrl?.chart?.result?.[0]||null;
+    }catch(e){}
+
+    _lastNudgeData={quote:quoteData,yahoo:yahooData};
+
+    const cmp=quoteData?.last_price||yahooData?.meta?.regularMarketPrice||0;
+    const qty=parseInt(document.getElementById('exec-qty').value)||0;
+    const orderVal=cmp*qty;
+
+    // ── CHECK 1: Bid-Ask Spread (Illiquidity) ──
+    if(quoteData?.depth){
+      const bestBid=quoteData.depth.buy?.[0]?.price||0;
+      const bestAsk=quoteData.depth.sell?.[0]?.price||0;
+      if(bestBid>0&&bestAsk>0&&cmp>0){
+        const spread=((bestAsk-bestBid)/cmp*100);
+        if(spread>2){
+          nudges.push({level:'danger',icon:'🔴',text:`Wide bid-ask spread: ${spread.toFixed(2)}% — highly illiquid, MARKET order will get bad fill`});
+          score-=30;
+        } else if(spread>0.8){
+          nudges.push({level:'warn',icon:'⚠️',text:`Spread ${spread.toFixed(2)}% — moderately wide. Consider LIMIT order`});
+          score-=15;
+        } else {
+          nudges.push({level:'ok',icon:'✓',text:`Spread tight: ${spread.toFixed(2)}%`});
+        }
+        // Check buy/sell depth quantity
+        const bidQty=(quoteData.depth.buy||[]).reduce((s,l)=>s+(l.quantity||0),0);
+        const askQty=(quoteData.depth.sell||[]).reduce((s,l)=>s+(l.quantity||0),0);
+        if(qty>0 && (bidQty+askQty)>0 && qty>(bidQty+askQty)*0.3){
+          nudges.push({level:'warn',icon:'⚠️',text:`Your qty (${qty}) is >${Math.round(qty/(bidQty+askQty)*100)}% of visible depth (${bidQty+askQty}) — may cause slippage`});
+          score-=10;
+        }
+      }
+    }
+
+    // ── CHECK 2: Circuit Limits ──
+    if(quoteData?.lower_circuit_limit && quoteData?.upper_circuit_limit){
+      const lc=quoteData.lower_circuit_limit, uc=quoteData.upper_circuit_limit;
+      const lcDist=cmp>0?((cmp-lc)/cmp*100):0;
+      const ucDist=cmp>0?((uc-cmp)/cmp*100):0;
+      const circuitRange=cmp>0?((uc-lc)/cmp*100):0;
+
+      if(circuitRange<=10){
+        nudges.push({level:'danger',icon:'🚫',text:`Circuit limit ±${(circuitRange/2).toFixed(1)}% — stock is likely ASM/GSM/SME with tight circuit. Extreme risk!`});
+        score-=25;
+      } else if(circuitRange<=20){
+        nudges.push({level:'warn',icon:'⚡',text:`Circuit band ±${(circuitRange/2).toFixed(0)}% — narrower than normal (LC: ₹${lc.toFixed(2)} / UC: ₹${uc.toFixed(2)})`});
+        score-=10;
+      }
+
+      if(lcDist<2&&lcDist>0){
+        nudges.push({level:'danger',icon:'🔻',text:`Near lower circuit! CMP ₹${cmp.toFixed(2)} is only ${lcDist.toFixed(1)}% from LC ₹${lc.toFixed(2)} — selling may not execute`});
+        score-=20;
+      }
+      if(ucDist<2&&ucDist>0){
+        nudges.push({level:'warn',icon:'🔺',text:`Near upper circuit! CMP ₹${cmp.toFixed(2)} is ${ucDist.toFixed(1)}% from UC ₹${uc.toFixed(2)} — buying at premium`});
+        score-=10;
+      }
+    }
+
+    // ── CHECK 3: Volume vs Average (Unusual Activity) ──
+    if(yahooData?.indicators?.quote?.[0]?.volume){
+      const vols=yahooData.indicators.quote[0].volume.filter(v=>v&&v>0);
+      if(vols.length>=5){
+        const todayVol=vols[vols.length-1];
+        const avgVol=vols.slice(0,-1).reduce((s,v)=>s+v,0)/(vols.length-1);
+        if(avgVol>0){
+          const volRatio=todayVol/avgVol;
+          if(volRatio>3){
+            nudges.push({level:'warn',icon:'📊',text:`Volume spike: ${volRatio.toFixed(1)}x avg (${(todayVol/100000).toFixed(1)}L vs avg ${(avgVol/100000).toFixed(1)}L) — possible news/event`});
+            score-=5;
+          } else if(volRatio<0.3){
+            nudges.push({level:'warn',icon:'📉',text:`Very low volume: ${(volRatio*100).toFixed(0)}% of avg — poor liquidity today`});
+            score-=15;
+          } else {
+            nudges.push({level:'ok',icon:'✓',text:`Volume normal: ${(volRatio*100).toFixed(0)}% of 20d avg`});
+          }
+        }
+        // Absolute volume check for penny/illiquid
+        if(vols[vols.length-1]<5000){
+          nudges.push({level:'danger',icon:'🔴',text:`Extremely thin volume (${vols[vols.length-1].toLocaleString()}) — nearly untradeable`});
+          score-=25;
+        }
+      }
+    }
+
+    // ── CHECK 4: Price < ₹10 (Penny Stock) ──
+    if(cmp>0 && cmp<10){
+      nudges.push({level:'danger',icon:'💀',text:`Penny stock (₹${cmp.toFixed(2)}) — high risk, wide spreads, possible operator-driven`});
+      score-=20;
+    } else if(cmp>0 && cmp<50){
+      nudges.push({level:'warn',icon:'⚠️',text:`Low-price stock (₹${cmp.toFixed(2)}) — higher % impact from spreads`});
+      score-=5;
+    }
+
+    // ── CHECK 5: Order Value vs Capital ──
+    if(orderVal>0){
+      const cap=+(localStorage.getItem('te_cfg')?JSON.parse(localStorage.getItem('te_cfg')).capital:0)||+(document.getElementById('s-cap')?.value)||0;
+      if(cap>0){
+        const pct=(orderVal/cap*100);
+        if(pct>20){
+          nudges.push({level:'danger',icon:'⚖️',text:`Order is ${pct.toFixed(1)}% of capital (₹${(orderVal/1000).toFixed(0)}K / ₹${(cap/1000).toFixed(0)}K) — excessive concentration!`});
+          score-=20;
+        } else if(pct>10){
+          nudges.push({level:'warn',icon:'⚖️',text:`Order is ${pct.toFixed(1)}% of capital — above 10% threshold`});
+          score-=5;
+        }
+      }
+    }
+
+    // ── CHECK 6: Market Order warning on illiquid/wide spread ──
+    const otype=document.getElementById('exec-otype')?.value;
+    if(otype==='MARKET'){
+      nudges.push({level:'info',icon:'ℹ️',text:'MARKET order — price not guaranteed. Use LIMIT or SL-M fallback for better control.'});
+    }
+
+    // ── CHECK 7: ETF detection ──
+    const dbEntry=getSymbolDB().find(([s])=>s===sym);
+    if(dbEntry && dbEntry[2]==='ETF'){
+      nudges.push({level:'info',icon:'📦',text:`ETF detected — check NAV vs CMP for premium/discount before buying.`});
+    }
+
+    // ── CHECK 8: Day change momentum ──
+    if(quoteData?.net_change!=null && cmp>0){
+      const dayPct=(quoteData.net_change/cmp*100);
+      if(dayPct<-5){
+        nudges.push({level:'warn',icon:'📉',text:`Down ${Math.abs(dayPct).toFixed(1)}% today — catching falling knife?`});
+        score-=5;
+      } else if(dayPct>8){
+        nudges.push({level:'warn',icon:'🚀',text:`Up ${dayPct.toFixed(1)}% today — chasing momentum, watch for reversal`});
+        score-=5;
+      }
+    }
+
+  }catch(e){
+    nudges.push({level:'warn',icon:'⚠️',text:'Could not run all checks: '+e.message});
+  }
+
+  // No issues found
+  if(!nudges.length){
+    nudges.push({level:'ok',icon:'✅',text:'All clear — no red flags detected'});
+  }
+
+  // Render
+  score=Math.max(0,Math.min(100,score));
+  const scoreColor=score>=80?'var(--g)':score>=50?'var(--y)':'var(--r)';
+  const scoreBg=score>=80?'rgba(0,229,160,.12)':score>=50?'rgba(245,197,66,.12)':'rgba(255,69,96,.12)';
+  scoreEl.textContent=score+'/100';
+  scoreEl.style.background=scoreBg;
+  scoreEl.style.color=scoreColor;
+
+  listEl.innerHTML=nudges.map(n=>
+    `<div class="nudge-item nudge-${n.level}"><span class="nudge-icon">${n.icon}</span><span class="nudge-text">${n.text}</span></div>`
+  ).join('');
 }
 
 async function execPlaceOrder(){
@@ -10147,6 +10690,619 @@ function execFromPosSize(){
     execFetchPrice(sym);
   },200);
 }
+// ══════════════════════════════════════════════════
+// GTT ORDERS SYSTEM
+// ══════════════════════════════════════════════════
+let gttOrders = JSON.parse(localStorage.getItem('te_gtt') || '[]');
+let _gttMode = 'single';  // single | oco
+let _gttSource = 'broker'; // broker | local
+let _gttEditId = null;
+let _gttTab = 'active';
+let gttSymFocusIdx = -1;
+
+function saveGTTs(){
+  localStorage.setItem('te_gtt', JSON.stringify(gttOrders));
+}
+
+function mapDhanProductGTT(p){ const m={CNC:'CNC',MIS:'INTRADAY',NRML:'MARGIN'}; return m[(p||'CNC').toUpperCase()]||p; }
+
+// ── GTT Modal Controls ──
+function openGTTModal(editId){
+  _gttEditId = editId || null;
+  document.getElementById('gtt-modal-title').textContent = editId ? '✏️ Edit GTT Order' : '🎯 Place GTT Order';
+  document.getElementById('gtt-place-btn').innerHTML = editId
+    ? '<svg viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg> Update GTT'
+    : '<svg viewBox="0 0 24 24" style="width:13px;height:13px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Place GTT';
+
+  if(editId){
+    const g = gttOrders.find(x=>x.id===editId);
+    if(!g) return;
+    setGTTMode(g.type);
+    setGTTSource(g.source);
+    document.getElementById('gtt-sym').value = g.symbol;
+    document.getElementById('gtt-exchange').value = g.exchange || 'NSE';
+    document.getElementById('gtt-product').value = g.product || 'CNC';
+    document.getElementById('gtt-note').value = g.note || '';
+    if(g.type==='single'){
+      document.getElementById('gtt-trigger1').value = g.trigger1 || '';
+      document.getElementById('gtt-limit1').value = g.limit1 || '';
+      document.getElementById('gtt-side1').value = g.side || 'SELL';
+      document.getElementById('gtt-qty1').value = g.qty || '';
+    } else {
+      document.getElementById('gtt-oco-side').value = g.side || 'SELL';
+      document.getElementById('gtt-oco-qty').value = g.qty || '';
+      document.getElementById('gtt-oco-sl-trigger').value = g.slTrigger || '';
+      document.getElementById('gtt-oco-sl-limit').value = g.slLimit || '';
+      document.getElementById('gtt-oco-tgt-trigger').value = g.tgtTrigger || '';
+      document.getElementById('gtt-oco-tgt-limit').value = g.tgtLimit || '';
+    }
+  } else {
+    // Reset form
+    setGTTMode('single');
+    setGTTSource('broker');
+    ['gtt-sym','gtt-trigger1','gtt-limit1','gtt-qty1','gtt-note',
+     'gtt-oco-qty','gtt-oco-sl-trigger','gtt-oco-sl-limit','gtt-oco-tgt-trigger','gtt-oco-tgt-limit'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.value='';
+    });
+    document.getElementById('gtt-cmp-status').textContent='';
+  }
+  openM('m-gtt');
+}
+
+function setGTTMode(mode){
+  _gttMode = mode;
+  const sBtn=document.getElementById('gtt-mode-single'), oBtn=document.getElementById('gtt-mode-oco');
+  if(sBtn){ sBtn.style.background=mode==='single'?'var(--yd)':'var(--bg3)'; sBtn.style.color=mode==='single'?'var(--y)':'var(--t3)'; }
+  if(oBtn){ oBtn.style.background=mode==='oco'?'var(--yd)':'var(--bg3)'; oBtn.style.color=mode==='oco'?'var(--y)':'var(--t3)'; }
+  document.getElementById('gtt-single-fields').style.display = mode==='single'?'':'none';
+  document.getElementById('gtt-oco-fields').style.display = mode==='oco'?'':'none';
+}
+
+function setGTTSource(src){
+  _gttSource = src;
+  const bBtn=document.getElementById('gtt-src-broker'), lBtn=document.getElementById('gtt-src-local');
+  if(bBtn){ bBtn.style.background=src==='broker'?'var(--yd)':'var(--bg3)'; bBtn.style.color=src==='broker'?'var(--y)':'var(--t3)'; }
+  if(lBtn){ lBtn.style.background=src==='local'?'var(--yd)':'var(--bg3)'; lBtn.style.color=src==='local'?'var(--y)':'var(--t3)'; }
+  document.getElementById('gtt-src-hint').textContent = src==='broker'
+    ? 'Order placed via broker API — executes automatically when price hits trigger.'
+    : 'Tracked locally only — no broker execution. Use as a manual reminder/tracker.';
+}
+
+// ── GTT Symbol autocomplete (same pattern as exec) ──
+function onGttSymInput(val){
+  const q=val.trim().toUpperCase(); const drop=document.getElementById('gtt-sym-drop');
+  if(!q||q.length<1){drop.classList.remove('open');return;}
+  const scored=getSymbolDB().map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  if(!scored.length){drop.classList.remove('open');return;}
+  gttSymFocusIdx=-1;
+  let html='<div class="sym-dropdown-header">NSE Stocks</div>';
+  scored.forEach(s=>{ html+=`<div class="sym-opt" data-sym="${s.sym}" onclick="selectGttSym('${s.sym}')"><div class="sym-opt-icon">${s.sym.slice(0,2)}</div><div class="sym-opt-info"><div class="sym-opt-sym">${s.sym}</div><div class="sym-opt-name">${s.name}</div></div>${s.sector?`<div class="sym-opt-sector">${s.sector}</div>`:''}</div>`; });
+  drop.innerHTML=html;drop.classList.add('open');
+}
+function closeGttSymDrop(){const d=document.getElementById('gtt-sym-drop');if(d)d.classList.remove('open');}
+function selectGttSym(sym){
+  document.getElementById('gtt-sym').value=sym; closeGttSymDrop();
+  gttFetchCMP(sym);
+}
+function onGttSymKey(e){
+  const drop=document.getElementById('gtt-sym-drop'); const opts=drop?.querySelectorAll('.sym-opt'); if(!opts?.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();gttSymFocusIdx=Math.min(gttSymFocusIdx+1,opts.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();gttSymFocusIdx=Math.max(gttSymFocusIdx-1,0);}
+  else if(e.key==='Enter'&&gttSymFocusIdx>=0){e.preventDefault();const s=opts[gttSymFocusIdx]?.dataset?.sym;if(s)selectGttSym(s);return;}
+  else if(e.key==='Escape'){closeGttSymDrop();return;}
+  opts.forEach((o,i)=>o.classList.toggle('focused',i===gttSymFocusIdx));
+}
+
+async function gttFetchCMP(sym){
+  if(!sym)return;
+  const st=document.getElementById('gtt-cmp-status');if(st) st.textContent='⏳ Fetching CMP…';
+  try{
+    const ticker=sym.includes('.')?sym:sym+'.NS';
+    const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
+    let price=0;
+    if(workerUrl){
+      try{
+        const r=await fetch(workerUrl,{headers:{'X-Kite-Action':'quote','X-Kite-Symbol':'NSE:'+sym,...getExecHeaders()}});
+        const d=await r.json();
+        if(d?.data) price=d.data['NSE:'+sym]?.last_price||0;
+      }catch(e2){}
+    }
+    if(!price){
+      const r2=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=1d`);
+      const j=await r2.json(); price=j?.chart?.result?.[0]?.meta?.regularMarketPrice||0;
+    }
+    if(price>0&&st) st.innerHTML=`CMP: <b style="color:var(--c)">₹${price.toFixed(2)}</b>`;
+    else if(st) st.textContent='Could not fetch price';
+  }catch(e){if(st) st.textContent='Price fetch failed';}
+}
+
+// ── Place / Update GTT ──
+async function gttPlaceOrder(){
+  const sym=(document.getElementById('gtt-sym').value||'').trim().toUpperCase();
+  if(!sym){toast('Enter a symbol','⚠️');return;}
+  const exchange=document.getElementById('gtt-exchange').value;
+  const product=document.getElementById('gtt-product').value;
+  const note=(document.getElementById('gtt-note').value||'').trim();
+
+  let gttObj;
+  if(_gttMode==='single'){
+    const trigger=+(document.getElementById('gtt-trigger1').value||0);
+    const limit=+(document.getElementById('gtt-limit1').value||0);
+    const side=document.getElementById('gtt-side1').value;
+    const qty=parseInt(document.getElementById('gtt-qty1').value)||0;
+    if(!trigger){toast('Set trigger price','⚠️');return;}
+    if(!qty){toast('Set quantity','⚠️');return;}
+    gttObj={
+      type:'single', symbol:sym, exchange, product, side, qty,
+      trigger1:trigger, limit1:limit||trigger, note,
+      source:_gttSource, status:'active', brokerId:null,
+      createdAt:Date.now(), updatedAt:Date.now()
+    };
+  } else {
+    const side=document.getElementById('gtt-oco-side').value;
+    const qty=parseInt(document.getElementById('gtt-oco-qty').value)||0;
+    const slTrigger=+(document.getElementById('gtt-oco-sl-trigger').value||0);
+    const slLimit=+(document.getElementById('gtt-oco-sl-limit').value||0);
+    const tgtTrigger=+(document.getElementById('gtt-oco-tgt-trigger').value||0);
+    const tgtLimit=+(document.getElementById('gtt-oco-tgt-limit').value||0);
+    if(!qty){toast('Set quantity','⚠️');return;}
+    if(!slTrigger&&!tgtTrigger){toast('Set at least one trigger','⚠️');return;}
+    gttObj={
+      type:'oco', symbol:sym, exchange, product, side, qty,
+      slTrigger, slLimit:slLimit||slTrigger, tgtTrigger, tgtLimit:tgtLimit||tgtTrigger,
+      note, source:_gttSource, status:'active', brokerId:null,
+      createdAt:Date.now(), updatedAt:Date.now()
+    };
+  }
+
+  // If broker mode, try placing via API
+  if(_gttSource==='broker'){
+    const placed = await gttPlaceViaBroker(gttObj);
+    if(placed) gttObj.brokerId = placed;
+    else gttObj.source = 'local'; // fallback to local if broker fails
+  }
+
+  if(_gttEditId){
+    const idx=gttOrders.findIndex(x=>x.id===_gttEditId);
+    if(idx>=0){ gttObj.id=_gttEditId; gttObj.createdAt=gttOrders[idx].createdAt; gttOrders[idx]=gttObj; }
+  } else {
+    gttObj.id = 'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    gttOrders.push(gttObj);
+  }
+
+  saveGTTs();
+  closeM('m-gtt');
+  renderGTTList();
+  renderGTTAlerts();
+  const label=_gttMode==='oco'?'OCO':'Single';
+  toast(`🎯 GTT ${_gttEditId?'updated':'placed'}: ${sym} (${label})`, '🎯');
+}
+
+async function gttPlaceViaBroker(g){
+  const workerUrl=getExecWorkerUrl();
+  if(!workerUrl){toast('Set Worker URL in Settings','⚠️');return null;}
+  const headers=getExecHeaders();
+
+  try{
+    if(_execBroker==='zerodha'){
+      // Zerodha GTT API via worker
+      const body={
+        type: g.type==='oco'?'two-leg':'single',
+        tradingsymbol: g.symbol,
+        exchange: g.exchange||'NSE',
+        condition:{
+          exchange: g.exchange||'NSE',
+          tradingsymbol: g.symbol,
+        },
+        orders:[]
+      };
+      if(g.type==='single'){
+        body.condition.trigger_values=[g.trigger1];
+        body.condition.last_price=0;
+        body.orders=[{
+          transaction_type:g.side,
+          quantity:g.qty,
+          price:g.limit1||g.trigger1,
+          order_type:g.limit1?'LIMIT':'MARKET',
+          product:g.product||'CNC'
+        }];
+      } else {
+        body.condition.trigger_values=[g.slTrigger, g.tgtTrigger];
+        body.condition.last_price=0;
+        body.orders=[
+          {transaction_type:g.side,quantity:g.qty,price:g.slLimit||g.slTrigger,order_type:'LIMIT',product:g.product||'CNC'},
+          {transaction_type:g.side,quantity:g.qty,price:g.tgtLimit||g.tgtTrigger,order_type:'LIMIT',product:g.product||'CNC'}
+        ];
+      }
+      const r=await fetch(workerUrl,{
+        method:'POST',
+        headers:{...headers,'X-Kite-Action':'gtt-place'},
+        body:JSON.stringify(body)
+      });
+      const d=await r.json();
+      if(d?.data?.trigger_id){
+        toast(`✅ GTT placed on Zerodha #${d.data.trigger_id}`,'✅');
+        return String(d.data.trigger_id);
+      } else {
+        toast('Broker GTT failed: '+(d?.message||'Unknown error'),'❌');
+        return null;
+      }
+    } else if(_execBroker==='dhan'){
+      // Dhan Forever Order API
+      const body={
+        orderFlag: g.type==='oco'?'OCO':'SINGLE',
+        side: g.side,
+        exchange: 'NSE_EQ',
+        product: mapDhanProductGTT(g.product||'CNC'),
+        order_type: 'LIMIT',
+        security_id: '', // Would need security_id — user can set or we skip
+        quantity: g.qty,
+        validity: 'DAY',
+      };
+      if(g.type==='single'){
+        body.price = g.limit1||g.trigger1;
+        body.triggerPrice = g.trigger1;
+      } else {
+        // OCO: price/trigger = target leg, price1/trigger1 = SL leg
+        body.price = g.tgtLimit||g.tgtTrigger;
+        body.triggerPrice = g.tgtTrigger;
+        body.price1 = g.slLimit||g.slTrigger;
+        body.triggerPrice1 = g.slTrigger;
+      }
+      const r=await fetch(workerUrl,{
+        method:'POST',
+        headers:{...headers,'X-Kite-Action':'dhan-forever-place'},
+        body:JSON.stringify(body)
+      });
+      const d=await r.json();
+      if(d?.orderId){
+        toast(`✅ Forever Order placed on Dhan #${d.orderId}`,'✅');
+        return String(d.orderId);
+      } else {
+        toast('Dhan Forever Order failed: '+(d?.message||d?.remarks||'Unknown error'),'❌');
+        return null;
+      }
+    } else {
+      toast(`GTT API not supported for ${_execBroker} — saving locally`,'ℹ️');
+      return null;
+    }
+  }catch(e){
+    toast('GTT broker error: '+e.message,'❌');
+    return null;
+  }
+}
+
+// ── Fetch GTTs from Broker ──
+async function gttFetchFromBroker(){
+  const workerUrl=getExecWorkerUrl();
+  if(!workerUrl){toast('Set Worker URL in Settings','⚠️');return;}
+  const st=document.getElementById('gtt-status-msg');
+  if(st) st.textContent='⏳ Fetching GTTs from broker…';
+
+  try{
+    if(_execBroker==='zerodha'){
+      const r=await fetch(workerUrl,{
+        headers:{...getExecHeaders(),'X-Kite-Action':'gtt-list'}
+      });
+      const d=await r.json();
+      if(!d?.data){throw new Error(d?.message||'No data');}
+      let imported=0;
+      d.data.forEach(bg=>{
+        const existsLocal=gttOrders.find(g=>g.brokerId===String(bg.id));
+        if(existsLocal){
+          // Update status
+          existsLocal.status=bg.status==='active'?'active':bg.status==='triggered'?'triggered':bg.status==='cancelled'?'cancelled':'expired';
+          existsLocal.updatedAt=Date.now();
+        } else {
+          // Import new
+          const sym=bg.condition?.tradingsymbol||'';
+          const isOCO=bg.type==='two-leg';
+          const newG={
+            id:'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+            type:isOCO?'oco':'single',
+            symbol:sym,
+            exchange:bg.condition?.exchange||'NSE',
+            product:bg.orders?.[0]?.product||'CNC',
+            side:bg.orders?.[0]?.transaction_type||'SELL',
+            qty:bg.orders?.[0]?.quantity||0,
+            source:'broker', brokerId:String(bg.id), status:bg.status||'active',
+            note:'Imported from Zerodha',
+            createdAt:new Date(bg.created_at||Date.now()).getTime(),
+            updatedAt:Date.now()
+          };
+          if(!isOCO){
+            newG.trigger1=bg.condition?.trigger_values?.[0]||0;
+            newG.limit1=bg.orders?.[0]?.price||newG.trigger1;
+          } else {
+            newG.slTrigger=bg.condition?.trigger_values?.[0]||0;
+            newG.tgtTrigger=bg.condition?.trigger_values?.[1]||0;
+            newG.slLimit=bg.orders?.[0]?.price||newG.slTrigger;
+            newG.tgtLimit=bg.orders?.[1]?.price||newG.tgtTrigger;
+          }
+          gttOrders.push(newG);
+          imported++;
+        }
+      });
+      saveGTTs(); renderGTTList(); renderGTTAlerts();
+      if(st) st.textContent=`✅ ${d.data.length} broker GTTs synced · ${imported} new imported`;
+      toast(`🎯 ${d.data.length} GTTs synced from Zerodha`,'🎯');
+    } else if(_execBroker==='dhan'){
+      const r=await fetch(workerUrl,{
+        headers:{...getExecHeaders(),'X-Kite-Action':'dhan-forever-list'}
+      });
+      const d=await r.json();
+      if(!Array.isArray(d)&&!d?.length){throw new Error(d?.message||d?.remarks||'No data');}
+      const orders=Array.isArray(d)?d:(d.data||d.orders||[]);
+      let imported=0;
+      orders.forEach(fo=>{
+        const existsLocal=gttOrders.find(g=>g.brokerId===String(fo.orderId||fo.order_id));
+        if(existsLocal){
+          const st=fo.orderStatus||fo.status||'';
+          existsLocal.status=st.toLowerCase().includes('active')?'active':st.toLowerCase().includes('trigger')?'triggered':st.toLowerCase().includes('cancel')?'cancelled':'expired';
+          existsLocal.updatedAt=Date.now();
+        } else {
+          const isOCO=(fo.orderFlag||'').toUpperCase()==='OCO';
+          const newG={
+            id:'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+            type:isOCO?'oco':'single',
+            symbol:fo.tradingSymbol||fo.trading_symbol||'',
+            exchange:'NSE', product:'CNC',
+            side:(fo.transactionType||fo.transaction_type||'SELL').toUpperCase(),
+            qty:fo.quantity||0,
+            source:'broker', brokerId:String(fo.orderId||fo.order_id),
+            status:'active', note:'Imported from Dhan',
+            createdAt:Date.now(), updatedAt:Date.now()
+          };
+          if(!isOCO){
+            newG.trigger1=fo.triggerPrice||0;
+            newG.limit1=fo.price||newG.trigger1;
+          } else {
+            newG.tgtTrigger=fo.triggerPrice||0; newG.tgtLimit=fo.price||0;
+            newG.slTrigger=fo.triggerPrice1||0; newG.slLimit=fo.price1||0;
+          }
+          gttOrders.push(newG);
+          imported++;
+        }
+      });
+      saveGTTs(); renderGTTList(); renderGTTAlerts();
+      if(st) st.textContent=`✅ ${orders.length} Dhan Forever Orders synced · ${imported} new imported`;
+      toast(`🎯 ${orders.length} Forever Orders synced from Dhan`,'🎯');
+    } else {
+      toast(`GTT/Forever Orders not supported for ${_execBroker}`,'ℹ️');
+    }
+  }catch(e){
+    if(st) st.textContent='❌ '+e.message;
+    toast('GTT fetch failed: '+e.message,'❌');
+  }
+}
+
+// ── Cancel GTT ──
+async function gttCancel(id){
+  const g=gttOrders.find(x=>x.id===id);
+  if(!g) return;
+  if(g.source==='broker'&&g.brokerId){
+    try{
+      const workerUrl=getExecWorkerUrl();
+      if(workerUrl&&_execBroker==='zerodha'){
+        const r=await fetch(workerUrl,{
+          method:'DELETE',
+          headers:{...getExecHeaders(),'X-Kite-Action':'gtt-delete','X-GTT-ID':g.brokerId}
+        });
+        const d=await r.json();
+        if(d?.data?.trigger_id) toast(`GTT #${g.brokerId} cancelled on Zerodha`,'✅');
+      } else if(workerUrl&&_execBroker==='dhan'){
+        const r=await fetch(workerUrl,{
+          method:'DELETE',
+          headers:{...getExecHeaders(),'X-Kite-Action':'dhan-forever-delete','X-Forever-ID':g.brokerId}
+        });
+        const d=await r.json();
+        toast(`Forever Order #${g.brokerId} cancelled on Dhan`,'✅');
+      }
+    }catch(e){toast('Broker cancel failed: '+e.message,'⚠️');}
+  }
+  g.status='cancelled'; g.updatedAt=Date.now();
+  saveGTTs(); renderGTTList(); renderGTTAlerts();
+  toast(`GTT cancelled: ${g.symbol}`,'🗑');
+}
+
+// ── Delete GTT (remove from local list) ──
+function gttDelete(id){
+  const g=gttOrders.find(x=>x.id===id);
+  if(g && g.status==='active' && g.source==='broker' && g.brokerId){
+    if(!confirm(`This GTT is active on broker. Cancel on broker too?`)) return;
+    gttCancel(id);
+    return;
+  }
+  gttOrders=gttOrders.filter(x=>x.id!==id);
+  saveGTTs(); renderGTTList(); renderGTTAlerts();
+  toast('GTT removed','🗑');
+}
+
+// ── Auto-create GTTs from Journal ──
+function gttAutoFromJournal(){
+  const openTrades=trades.filter(t=>(t.status==='Open'||t.status==='Partial')&&t.symbol);
+  if(!openTrades.length){toast('No open trades with SL/Target set','ℹ️');return;}
+  let created=0;
+  openTrades.forEach(t=>{
+    const sym=t.symbol.toUpperCase();
+    const sl=+(t.sl||0), tgt=+(t.target||0), qty=parseInt(t.qty||t.shares||0);
+    if(!sl&&!tgt) return;
+    if(!qty) return;
+    // Check if GTT already exists for this symbol
+    const exists=gttOrders.find(g=>g.symbol===sym&&g.status==='active'&&g.source==='local');
+    if(exists) return;
+    const side=t.side==='Sell'||t.side==='Short'?'BUY':'SELL';
+    if(sl&&tgt){
+      // Create OCO
+      gttOrders.push({
+        id:'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+(created),
+        type:'oco', symbol:sym, exchange:'NSE', product:'CNC',
+        side, qty, slTrigger:sl, slLimit:sl, tgtTrigger:tgt, tgtLimit:tgt,
+        note:'Auto from journal: '+t.symbol,
+        source:'local', status:'active', brokerId:null,
+        createdAt:Date.now(), updatedAt:Date.now()
+      });
+      created++;
+    } else if(sl){
+      gttOrders.push({
+        id:'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+(created),
+        type:'single', symbol:sym, exchange:'NSE', product:'CNC',
+        side, qty, trigger1:sl, limit1:sl,
+        note:'SL from journal: '+t.symbol,
+        source:'local', status:'active', brokerId:null,
+        createdAt:Date.now(), updatedAt:Date.now()
+      });
+      created++;
+    } else if(tgt){
+      gttOrders.push({
+        id:'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+(created),
+        type:'single', symbol:sym, exchange:'NSE', product:'CNC',
+        side, qty, trigger1:tgt, limit1:tgt,
+        note:'Target from journal: '+t.symbol,
+        source:'local', status:'active', brokerId:null,
+        createdAt:Date.now(), updatedAt:Date.now()
+      });
+      created++;
+    }
+  });
+  saveGTTs(); renderGTTList(); renderGTTAlerts();
+  toast(created?`🎯 ${created} GTTs created from journal trades`:'No new GTTs to create — all open trades already covered','🎯');
+}
+
+// ── Tab switching ──
+function gttSwitchTab(tab){
+  _gttTab=tab;
+  ['active','triggered','local','all'].forEach(t=>{
+    const btn=document.getElementById('gtt-tab-'+t);
+    if(btn) btn.classList.toggle('active',t===tab);
+  });
+  renderGTTList();
+}
+
+// ── Render GTT list (Execute page) ──
+function renderGTTList(){
+  const container=document.getElementById('gtt-list-container');
+  if(!container) return;
+
+  let filtered=gttOrders;
+  if(_gttTab==='active') filtered=gttOrders.filter(g=>g.status==='active');
+  else if(_gttTab==='triggered') filtered=gttOrders.filter(g=>g.status==='triggered');
+  else if(_gttTab==='local') filtered=gttOrders.filter(g=>g.source==='local');
+  // 'all' shows everything
+
+  // Sort: active first, then by date desc
+  filtered.sort((a,b)=>{
+    const so={'active':0,'triggered':1,'cancelled':2,'expired':3};
+    if((so[a.status]||9)!==(so[b.status]||9)) return (so[a.status]||9)-(so[b.status]||9);
+    return b.createdAt-a.createdAt;
+  });
+
+  // Update badge
+  const activeCount=gttOrders.filter(g=>g.status==='active').length;
+  const badge=document.getElementById('gtt-count-badge');
+  if(badge) badge.textContent=activeCount+' active';
+
+  if(!filtered.length){
+    container.innerHTML=`<div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">
+      <div style="font-size:20px;margin-bottom:6px">${_gttTab==='triggered'?'🔔':'🎯'}</div>
+      ${_gttTab==='triggered'?'No triggered GTTs yet':'No GTT orders in this tab'}
+    </div>`;
+    return;
+  }
+
+  container.innerHTML=filtered.map(g=>{
+    const isOCO=g.type==='oco';
+    const typeClass=isOCO?'gtt-type-oco':'gtt-type-single';
+    const stClass='gtt-st-'+g.status;
+    const stLabel={active:'Active',triggered:'Triggered',cancelled:'Cancelled',expired:'Expired'}[g.status]||g.status;
+    const srcIcon=g.source==='broker'?'⚡':'📌';
+    const date=new Date(g.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+
+    let levels='';
+    if(isOCO){
+      levels=`<span style="color:var(--r)">SL ₹${(+g.slTrigger).toFixed(2)}</span>
+        <span style="color:var(--t4);margin:0 4px">|</span>
+        <span style="color:var(--g)">Tgt ₹${(+g.tgtTrigger).toFixed(2)}</span>`;
+    } else {
+      levels=`<span>Trigger ₹${(+g.trigger1).toFixed(2)}</span>
+        ${g.limit1&&g.limit1!==g.trigger1?` → Limit ₹${(+g.limit1).toFixed(2)}`:''}`;
+    }
+
+    return `<div class="gtt-card" style="display:flex;align-items:center;gap:12px;${g.status==='cancelled'||g.status==='expired'?'opacity:.5':''}">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+          <span class="gtt-sym">${g.symbol}</span>
+          <span class="gtt-type ${typeClass}">${isOCO?'OCO':'Single'}</span>
+          <span class="gtt-status ${stClass}">${srcIcon} ${stLabel}</span>
+          <span style="font-size:10px;color:var(--t4)">${g.side} × ${g.qty}</span>
+          ${g.brokerId?`<span style="font-size:9px;color:var(--t4);font-family:'IBM Plex Mono',monospace">#${g.brokerId}</span>`:''}
+        </div>
+        <div class="gtt-level">${levels}</div>
+        ${g.note?`<div style="font-size:10px;color:var(--t4);margin-top:3px">${g.note}</div>`:''}
+        <div style="font-size:9px;color:var(--t4);margin-top:2px">${date} · ${g.exchange} · ${g.product}</div>
+      </div>
+      <div class="gtt-actions">
+        ${g.status==='active'?`
+          <button class="btn btn-ghost btn-xs" onclick="openGTTModal('${g.id}')" title="Edit">✏️</button>
+          <button class="btn btn-ghost btn-xs" onclick="gttCancel('${g.id}')" title="Cancel" style="color:var(--r)">✕</button>
+        `:`
+          <button class="btn btn-ghost btn-xs" onclick="gttDelete('${g.id}')" title="Remove" style="color:var(--r)">🗑</button>
+        `}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render GTT summary on Alerts page ──
+function renderGTTAlerts(){
+  const container=document.getElementById('gtt-alerts-list');
+  const countEl=document.getElementById('gtt-alert-count');
+  if(!container) return;
+
+  const active=gttOrders.filter(g=>g.status==='active');
+  if(countEl) countEl.textContent=active.length?active.length+' active':'';
+
+  if(!active.length){
+    container.innerHTML='<div style="color:var(--t4);font-size:12px;padding:10px 0">No active GTT orders.</div>';
+    return;
+  }
+
+  container.innerHTML=active.map(g=>{
+    const isOCO=g.type==='oco';
+    const srcIcon=g.source==='broker'?'⚡':'📌';
+    let levels='';
+    if(isOCO){
+      levels=`SL ₹${(+g.slTrigger).toFixed(2)} | Tgt ₹${(+g.tgtTrigger).toFixed(2)}`;
+    } else {
+      levels=`Trigger ₹${(+g.trigger1).toFixed(2)}`;
+    }
+    const color=isOCO?'var(--p)':'var(--b)';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${color};border-radius:8px">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:700;color:var(--t1)">${g.symbol}</span>
+          <span style="font-size:10px;background:${color}1a;color:${color};padding:2px 7px;border-radius:20px;font-weight:700">${srcIcon} ${isOCO?'OCO':'Single'} GTT</span>
+          <span style="font-size:11px;color:var(--t3)">${g.side} × ${g.qty}</span>
+          <span style="font-size:11px;color:var(--t2);font-family:'IBM Plex Mono',monospace">${levels}</span>
+        </div>
+        ${g.note?`<div style="font-size:10px;color:var(--t4);margin-top:3px">${g.note}</div>`:''}
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="gttCancel('${g.id}')" title="Cancel" style="color:var(--r)">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Hook GTT rendering into page navigation ──
+const _origNav = nav;
+nav = function(p){
+  _origNav(p);
+  if(p==='execute'){ renderGTTList(); }
+  if(p==='alerts'){ renderGTTAlerts(); }
+};
+
+// ── Init on load ──
+setTimeout(()=>{ renderGTTList(); renderGTTAlerts(); }, 500);
+
 // ══════════════════════════════════════════════════
 // ALL POSITIONS RRG CHART
 // ══════════════════════════════════════════════════
