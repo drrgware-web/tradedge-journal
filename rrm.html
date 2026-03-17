@@ -615,6 +615,184 @@ function isItemSelected(symbol) { return SELECT_ALL_MODE || SELECTED_ITEMS.has(s
 function setMTFConviction(v) { MTF_MIN_CONVICTION = v; render(); }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// v6: BLOOMBERG-STYLE MARKET ANALYSIS ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function computeMarketAnalysis() {
+  const items = getAllItems();
+  if (!items.length) return null;
+  
+  // 1. Market Regime
+  const leading = items.filter(i => i.quadrant === 'Leading').length;
+  const improving = items.filter(i => i.quadrant === 'Improving').length;
+  const weakening = items.filter(i => i.quadrant === 'Weakening').length;
+  const lagging = items.filter(i => i.quadrant === 'Lagging').length;
+  const total = items.length;
+  
+  const bullishPct = ((leading + improving) / total * 100).toFixed(0);
+  const bearishPct = ((weakening + lagging) / total * 100).toFixed(0);
+  
+  let regime, regimeColor, regimeIcon;
+  if (leading >= total * 0.4) { regime = 'RISK-ON'; regimeColor = '#22c55e'; regimeIcon = '🚀'; }
+  else if (leading + improving >= total * 0.5) { regime = 'BULLISH ROTATION'; regimeColor = '#4ade80'; regimeIcon = '📈'; }
+  else if (lagging >= total * 0.4) { regime = 'RISK-OFF'; regimeColor = '#ef4444'; regimeIcon = '🛡️'; }
+  else if (weakening + lagging >= total * 0.5) { regime = 'BEARISH ROTATION'; regimeColor = '#f87171'; regimeIcon = '📉'; }
+  else { regime = 'NEUTRAL / MIXED'; regimeColor = '#eab308'; regimeIcon = '⚖️'; }
+  
+  // 2. Rotation Momentum
+  const avgVelocity = items.reduce((s, i) => s + (i.velocity || 0), 0) / total;
+  const hookCount = items.filter(i => i.hasHook).length;
+  const neHeadingCount = items.filter(i => (i.heading || 0) >= 0 && (i.heading || 0) <= 90).length;
+  
+  let momentum, momentumColor;
+  if (avgVelocity > 1.5) { momentum = 'ACCELERATING'; momentumColor = '#22c55e'; }
+  else if (avgVelocity > 0.8) { momentum = 'STEADY'; momentumColor = '#3b82f6'; }
+  else { momentum = 'DECELERATING'; momentumColor = '#eab308'; }
+  
+  // 3. Top Movers (highest score + NE heading)
+  const topMovers = [...items]
+    .filter(i => i.rotationScore >= 50)
+    .sort((a, b) => b.rotationScore - a.rotationScore)
+    .slice(0, 3);
+  
+  // 4. Alerts
+  const alerts = [];
+  items.forEach(i => {
+    if (i.hasHook) alerts.push({ type: 'hook', symbol: i.symbol, name: i.name, color: '#22d3ee', icon: '↺', text: 'V-Hook reversal detected' });
+    if (i.velocity > 2) alerts.push({ type: 'spike', symbol: i.symbol, name: i.name, color: '#f59e0b', icon: '⚡', text: 'Velocity spike (2x avg)' });
+    if (i.distance > 5) alerts.push({ type: 'overextend', symbol: i.symbol, name: i.name, color: '#ef4444', icon: '⚠️', text: 'Overextended from center' });
+  });
+  
+  // 5. Auto-generated narrative
+  const narrativeParts = [];
+  if (topMovers.length) {
+    const topNames = topMovers.map(m => m.name.replace('Nifty ', '')).join(' and ');
+    narrativeParts.push(topNames + ' lead' + (topMovers.length === 1 ? 's' : '') + ' the rotation with strong momentum');
+  }
+  if (hookCount > 0) {
+    const hookSectors = items.filter(i => i.hasHook).map(i => i.name.replace('Nifty ', '')).join(', ');
+    narrativeParts.push(hookSectors + ' showing early V-hook reversal signal' + (hookCount > 1 ? 's' : ''));
+  }
+  narrativeParts.push(regime.toLowerCase() + ' regime with ' + bullishPct + '% sectors in bullish quadrants');
+  
+  const narrative = narrativeParts.join('. ') + '.';
+  
+  // 6. Trade Ideas from MTF
+  const alignments = computeEnhancedAlignments();
+  const tradeIdeas = [];
+  if (alignments.power.length) {
+    const top = alignments.power[0];
+    tradeIdeas.push({ type: 'POWER', name: top.name, conviction: top.conviction, action: 'Long', reason: 'Full MTF alignment' });
+  }
+  if (alignments.pullback.length) {
+    const top = alignments.pullback[0];
+    tradeIdeas.push({ type: 'PULLBACK', name: top.name, conviction: top.conviction, action: 'Dip-buy', reason: 'Weekly weak, daily improving' });
+  }
+  if (alignments.early.length) {
+    const top = alignments.early[0];
+    tradeIdeas.push({ type: 'EARLY', name: top.name, conviction: top.conviction, action: 'Speculative long', reason: 'Bottom reversal signal' });
+  }
+  if (alignments.exhaustion.length) {
+    const top = alignments.exhaustion[0];
+    tradeIdeas.push({ type: 'AVOID', name: top.name, conviction: top.conviction, action: 'Exit/Avoid', reason: 'Distribution phase' });
+  }
+  
+  return {
+    regime, regimeColor, regimeIcon,
+    bullishPct, bearishPct,
+    leading, improving, weakening, lagging, total,
+    momentum, momentumColor, avgVelocity: avgVelocity.toFixed(2),
+    hookCount, neHeadingCount,
+    topMovers, alerts, narrative, tradeIdeas
+  };
+}
+
+function renderMarketPulsePanel() {
+  const a = computeMarketAnalysis();
+  if (!a) return '';
+  
+  const topMoversHtml = a.topMovers.length 
+    ? a.topMovers.map(m => {
+        const hi = m.headingInfo || getHeadingInfo(m.heading || 0);
+        return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:var(--bg3);border-radius:4px;margin-right:6px;cursor:pointer" onclick="hl('${m.symbol}')">${m.name.replace('Nifty ','')} <span style="color:${getScoreClass(m.rotationScore)==='high'?'#4ade80':getScoreClass(m.rotationScore)==='med'?'#facc15':'#f87171'}">${m.rotationScore}</span> <span style="color:${hi.color}">${hi.emoji}</span></span>`;
+      }).join('')
+    : '<span style="color:var(--t3)">No strong movers</span>';
+  
+  const alertsHtml = a.alerts.length 
+    ? a.alerts.slice(0, 4).map(al => 
+        `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer" onclick="hl('${al.symbol}')"><span style="color:${al.color}">${al.icon}</span><span style="color:var(--t2)">${al.name.replace('Nifty ','')}</span><span style="color:var(--t3);font-size:9px">${al.text}</span></div>`
+      ).join('')
+    : '<div style="color:var(--t3);padding:4px 0">No active alerts</div>';
+  
+  const tradeIdeasHtml = a.tradeIdeas.length
+    ? a.tradeIdeas.map(t => {
+        const colors = { POWER: '#22c55e', PULLBACK: '#3b82f6', EARLY: '#f59e0b', AVOID: '#ef4444' };
+        return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="color:${colors[t.type]};font-weight:600;font-size:9px;min-width:60px">${t.type}</span><span style="color:var(--t1)">${t.name.replace('Nifty ','')}</span><span style="padding:2px 6px;background:${colors[t.type]}20;color:${colors[t.type]};border-radius:8px;font-size:9px">${t.conviction}</span><span style="color:var(--t3);font-size:9px">${t.action} — ${t.reason}</span></div>`;
+      }).join('')
+    : '<div style="color:var(--t3);padding:4px 0">No setups detected</div>';
+  
+  return `<div class="pulse-panel" style="background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:3px;color:var(--t3);text-transform:uppercase">📊 MARKET PULSE</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--t4)">${TF.toUpperCase()} · ${a.total} SECTORS</div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">
+      <!-- Regime Card -->
+      <div style="padding:12px;background:var(--bg3);border-radius:8px;border-left:3px solid ${a.regimeColor}">
+        <div style="font-family:var(--fm);font-size:9px;color:var(--t3);margin-bottom:4px">MARKET REGIME</div>
+        <div style="font-family:var(--fd);font-size:14px;font-weight:700;color:${a.regimeColor}">${a.regimeIcon} ${a.regime}</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--t2);margin-top:4px">Bullish ${a.bullishPct}% · Bearish ${a.bearishPct}%</div>
+      </div>
+      
+      <!-- Momentum Card -->
+      <div style="padding:12px;background:var(--bg3);border-radius:8px;border-left:3px solid ${a.momentumColor}">
+        <div style="font-family:var(--fm);font-size:9px;color:var(--t3);margin-bottom:4px">ROTATION MOMENTUM</div>
+        <div style="font-family:var(--fd);font-size:14px;font-weight:700;color:${a.momentumColor}">${a.momentum}</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--t2);margin-top:4px">Avg velocity ${a.avgVelocity} · ${a.hookCount} hooks · ${a.neHeadingCount} NE</div>
+      </div>
+      
+      <!-- Quadrant Distribution -->
+      <div style="padding:12px;background:var(--bg3);border-radius:8px">
+        <div style="font-family:var(--fm);font-size:9px;color:var(--t3);margin-bottom:6px">QUADRANT DISTRIBUTION</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="font-family:var(--fm);font-size:10px"><span style="color:#22c55e">●</span> Lead ${a.leading}</span>
+          <span style="font-family:var(--fm);font-size:10px"><span style="color:#3b82f6">●</span> Imp ${a.improving}</span>
+          <span style="font-family:var(--fm);font-size:10px"><span style="color:#eab308">●</span> Weak ${a.weakening}</span>
+          <span style="font-family:var(--fm);font-size:10px"><span style="color:#ef4444">●</span> Lag ${a.lagging}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <!-- Top Movers -->
+      <div style="padding:10px;background:var(--bg3);border-radius:8px">
+        <div style="font-family:var(--fm);font-size:9px;color:var(--t3);margin-bottom:6px">🔥 TOP MOVERS</div>
+        <div style="font-family:var(--fm);font-size:10px">${topMoversHtml}</div>
+      </div>
+      
+      <!-- Alerts -->
+      <div style="padding:10px;background:var(--bg3);border-radius:8px">
+        <div style="font-family:var(--fm);font-size:9px;color:var(--t3);margin-bottom:4px">🔔 ALERTS (${a.alerts.length})</div>
+        <div style="font-family:var(--fm);font-size:10px">${alertsHtml}</div>
+      </div>
+    </div>
+    
+    <!-- Narrative -->
+    <div style="padding:10px;background:linear-gradient(90deg,rgba(34,211,238,.05),transparent);border-left:3px solid var(--cyan);border-radius:0 8px 8px 0;margin-bottom:12px">
+      <div style="font-family:var(--fm);font-size:9px;color:var(--cyan);margin-bottom:4px">📝 MARKET NARRATIVE</div>
+      <div style="font-family:var(--fm);font-size:11px;color:var(--t1);line-height:1.5">"${a.narrative}"</div>
+    </div>
+    
+    <!-- Trade Ideas -->
+    <div style="padding:10px;background:var(--bg3);border-radius:8px">
+      <div style="font-family:var(--fm);font-size:9px;color:var(--t3);margin-bottom:6px">💡 TRADE IDEAS</div>
+      <div style="font-family:var(--fm);font-size:10px">${tradeIdeasHtml}</div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -682,6 +860,7 @@ function render(){
       </div>
       <span class="badge ${IS_LIVE?'live':'sample'}"><span class="dot"></span>${IS_LIVE?'LIVE':'SAMPLE'}</span>
     </div>
+    ${renderMarketPulsePanel()}
     ${renderEnhancedAlignmentPanel()}
     ${breadcrumb}
     <div class="toolbar">
