@@ -116,9 +116,7 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 </style>
 </head>
 <body>
-<div class="d" id="app">
-  <div class="ld"><div class="sp"></div><div style="font-family:var(--fm);font-size:11px;color:var(--t3);letter-spacing:2px">LOADING RRM DATA...</div></div>
-</div>
+<div class="d" id="app"></div>
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
 // RRM v6.0 — CORE STATE
@@ -324,6 +322,11 @@ const SAMPLE={
   config:{window:10,center:100},
   metadata:{generated_at:"2026-03-17T10:30:00",date:"2026-03-17",benchmarks_calculated:["^NSEI"],total_sectors:6,total_etfs:0,total_drilldown_sectors:0,timeframes:["daily","weekly","monthly"]}
 };
+
+// Initialize immediately with sample data (no async waiting)
+DATA = SAMPLE;
+BENCH = SAMPLE.default_benchmark;
+IS_LIVE = false;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATA HELPERS
@@ -548,26 +551,36 @@ function renderEnhancedAlignmentPanel(){
         <select class="cs" onchange="setMTFConviction(+this.value)">${convictionFilterOpts}</select>
       </div>
     </div>
-    <div class="mtf-grid">${cardData.map(c=>`
-      <div class="mtf-card" style="border-color:${c.border};background:${c.bg}">
-        <div class="mtf-card-header">
-          <div class="mtf-card-name" style="color:${c.color}">${c.emoji} ${c.name}</div>
-          <div class="mtf-card-count">${c.items.length} match${c.items.length!==1?'es':''}</div>
-        </div>
-        <div class="mtf-card-desc">${c.desc}</div>
-        <div class="mtf-card-cond">${c.cond}</div>
-        <div class="mtf-card-list">${c.items.length?c.items.map(i=>{
-          const convClass = getScoreClass(i.conviction);
-          return `<div class="mtf-item" onclick="hl('${i.symbol}')">
-            <div class="mtf-item-dot" style="background:${i.color}"></div>
-            <div class="mtf-item-name">${i.name}</div>
-            ${i.hasHook?'<span class="mtf-item-hook" title="V-Hook detected">↺</span>':''}
-            <span class="mtf-item-heading" style="color:${i.headingInfo.color}" title="Heading: ${Math.round(i.heading)}°">${i.headingInfo.emoji}</span>
-            <div class="mtf-item-conviction ${convClass}">${i.conviction}</div>
-          </div>`;
-        }).join(''):'<div class="mtf-empty">No matches${MTF_MIN_CONVICTION>0?' above '+MTF_MIN_CONVICTION+' conviction':''}</div>'}</div>
-      </div>`).join('')}
+    <div class="mtf-grid">${cardData.map(c => renderMTFCard(c)).join('')}
     </div>
+  </div>`;
+}
+
+function renderMTFCard(c) {
+  const itemsHtml = c.items.length 
+    ? c.items.map(i => renderMTFItem(i)).join('') 
+    : '<div class="mtf-empty">No matches' + (MTF_MIN_CONVICTION > 0 ? ' above ' + MTF_MIN_CONVICTION + ' conviction' : '') + '</div>';
+  
+  return `<div class="mtf-card" style="border-color:${c.border};background:${c.bg}">
+    <div class="mtf-card-header">
+      <div class="mtf-card-name" style="color:${c.color}">${c.emoji} ${c.name}</div>
+      <div class="mtf-card-count">${c.items.length} match${c.items.length !== 1 ? 'es' : ''}</div>
+    </div>
+    <div class="mtf-card-desc">${c.desc}</div>
+    <div class="mtf-card-cond">${c.cond}</div>
+    <div class="mtf-card-list">${itemsHtml}</div>
+  </div>`;
+}
+
+function renderMTFItem(i) {
+  const convClass = getScoreClass(i.conviction);
+  const hookHtml = i.hasHook ? '<span class="mtf-item-hook" title="V-Hook detected">↺</span>' : '';
+  return `<div class="mtf-item" onclick="hl('${i.symbol}')">
+    <div class="mtf-item-dot" style="background:${i.color}"></div>
+    <div class="mtf-item-name">${i.name}</div>
+    ${hookHtml}
+    <span class="mtf-item-heading" style="color:${i.headingInfo.color}" title="Heading: ${Math.round(i.heading)}°">${i.headingInfo.emoji}</span>
+    <div class="mtf-item-conviction ${convClass}">${i.conviction}</div>
   </div>`;
 }
 
@@ -994,26 +1007,80 @@ function exportChart(format){
 // INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function init(){
-  let d=null;
-  try{const r=await fetch('./data/rrm_data.json',{cache:'no-store'});if(r.ok){d=await r.json();if(d?.benchmarks_data&&Object.keys(d.benchmarks_data).length>0)IS_LIVE=true;else d=null}}catch(e){console.warn('RRM fetch:',e)}
-  if(!d){try{const r=await fetch('./data/rrg_data.json',{cache:'no-store'});if(r.ok){d=await r.json();if(d?.benchmarks_data&&Object.keys(d.benchmarks_data).length>0)IS_LIVE=true;else d=null}}catch(e){console.warn('RRG fallback fetch:',e)}}
-  if(!d){d=SAMPLE;IS_LIVE=false}
-  DATA=d;BENCH=d.default_benchmark||Object.keys(d.available_benchmarks||{})[0]||'^NSEI';
-  await new Promise(r=>setTimeout(r,300));
-  render();
-  
-  let _lastPulse=0;
-  (function pulseLoop(t){
-    requestAnimationFrame(pulseLoop);
-    if(DATA&&t-_lastPulse>50){
-      _lastPulse=t;
-      drawChart(getCurrentItems());
-    }
-  })(0);
-  window.addEventListener('resize',()=>{if(DATA)render()});
+function init(){
+  try {
+    // Render immediately with sample data
+    render();
+    
+    // Start pulse animation
+    let _lastPulse=0;
+    (function pulseLoop(t){
+      requestAnimationFrame(pulseLoop);
+      if(DATA&&t-_lastPulse>50){
+        _lastPulse=t;
+        drawChart(getCurrentItems());
+      }
+    })(0);
+    window.addEventListener('resize',()=>{if(DATA)render()});
+    
+    // Try to fetch real data in background (non-blocking)
+    tryFetchData();
+  } catch(e) {
+    console.error('Init error:', e);
+    document.getElementById('app').innerHTML = '<div style="color:#ef4444;padding:40px;font-family:monospace">Error: '+e.message+'</div>';
+  }
 }
-init();
+
+async function tryFetchData(){
+  // Skip fetch in sandboxed environments
+  if (location.protocol === 'file:') return;
+  if (location.hostname === 'null' || !location.hostname) return;
+  
+  try {
+    let d = null;
+    
+    // Try rrm_data.json first
+    try {
+      const r = await fetch('./data/rrm_data.json', {cache:'no-store'});
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.benchmarks_data && Object.keys(data.benchmarks_data).length > 0) {
+          d = data;
+        }
+      }
+    } catch(e) {}
+    
+    // Fallback to rrg_data.json
+    if (!d) {
+      try {
+        const r = await fetch('./data/rrg_data.json', {cache:'no-store'});
+        if (r.ok) {
+          const data = await r.json();
+          if (data?.benchmarks_data && Object.keys(data.benchmarks_data).length > 0) {
+            d = data;
+          }
+        }
+      } catch(e) {}
+    }
+    
+    // If we got real data, update and re-render
+    if (d) {
+      DATA = d;
+      BENCH = d.default_benchmark || Object.keys(d.available_benchmarks || {})[0] || '^NSEI';
+      IS_LIVE = true;
+      render();
+    }
+  } catch(e) {
+    console.warn('Data fetch failed, using sample data');
+  }
+}
+
+// Run immediately when script loads
+try {
+  init();
+} catch(e) {
+  console.error('Startup error:', e);
+}
 </script>
 </body>
 </html>
