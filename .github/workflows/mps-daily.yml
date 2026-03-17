@@ -32,6 +32,7 @@ on:
     - cron: '15 4,5,6,7,8,9 * * 1-5'    # 9:45 AM to 2:45 PM IST (hourly)
     - cron: '15 10 * * 1-5'               # 3:45 PM IST (post-close)
     - cron: '45 10 * * 1-5'               # 4:15 PM IST (EOD final)
+    - cron: '45 14 * * 1-5'               # 8:15 PM IST (FII data capture)
 
   workflow_dispatch:
     inputs:
@@ -78,10 +79,13 @@ jobs:
           MINUTE=$(date -u +%M)
           FORCE_EOD="${{ github.event.inputs.force_eod }}"
           
-          # EOD = 10:45 UTC (4:15 PM IST) or forced
+          # EOD = 10:45 UTC (4:15 PM IST) or 14:45 UTC (8:15 PM IST FII capture) or forced
           if [ "$HOUR" = "10" ] && [ "$MINUTE" -ge "40" ]; then
             echo "mode=eod" >> $GITHUB_OUTPUT
             echo "📊 Mode: EOD (final daily update + history)"
+          elif [ "$HOUR" = "14" ] && [ "$MINUTE" -ge "40" ]; then
+            echo "mode=eod" >> $GITHUB_OUTPUT
+            echo "📊 Mode: EOD (FII data capture — 8:15 PM IST)"
           elif [ "$FORCE_EOD" = "true" ]; then
             echo "mode=eod" >> $GITHUB_OUTPUT
             echo "📊 Mode: EOD (forced)"
