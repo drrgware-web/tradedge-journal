@@ -924,19 +924,21 @@ async function fetchTradesFromSupabase() {
   if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.anonKey) return null;
   
   try {
-    // Try multiple possible device ID keys used by Trade Journal
-    const deviceId = SUPABASE_CONFIG.deviceId || 
-                     localStorage.getItem('te_device_id') ||
-                     localStorage.getItem('tradedge_device_id') ||
-                     localStorage.getItem('device_id') ||
-                     localStorage.getItem('dhan_id');
+    // Try to get device ID from various localStorage keys
+    let deviceId = SUPABASE_CONFIG.deviceId || 
+                   localStorage.getItem('te_device_id') ||
+                   localStorage.getItem('tradedge_device_id') ||
+                   localStorage.getItem('device_id');
     
-    if (!deviceId) {
-      console.log('No device ID found for Supabase sync');
-      return null;
+    let url;
+    if (deviceId) {
+      // Fetch for specific device
+      url = `${SUPABASE_CONFIG.url}/rest/v1/tradedge_trades?device_id=eq.${encodeURIComponent(deviceId)}&select=trades_json`;
+    } else {
+      // Fetch all records (single user project) - get the most recent one
+      url = `${SUPABASE_CONFIG.url}/rest/v1/tradedge_trades?select=trades_json,updated_at&order=updated_at.desc&limit=1`;
     }
     
-    const url = `${SUPABASE_CONFIG.url}/rest/v1/tradedge_trades?device_id=eq.${encodeURIComponent(deviceId)}&select=trades_json`;
     const resp = await fetch(url, {
       headers: {
         'apikey': SUPABASE_CONFIG.anonKey,
@@ -952,6 +954,7 @@ async function fetchTradesFromSupabase() {
     const rows = await resp.json();
     if (rows.length > 0 && rows[0].trades_json) {
       const trades = typeof rows[0].trades_json === 'string' ? JSON.parse(rows[0].trades_json) : rows[0].trades_json;
+      console.log('Loaded', trades.length, 'trades from Supabase');
       return Array.isArray(trades) ? trades : null;
     }
     
@@ -1022,15 +1025,51 @@ function computePositionAnalytics() {
   const enrichedPositions = [];
   
   positions.forEach(pos => {
-    // Parse values (handle string formats like "₹1690.90")
-    const avgEntry = parseFloat(String(pos.avgEntry || pos.avg_entry || pos.entry || 0).replace(/[₹,]/g, ''));
-    const qty = parseInt(pos.qty || pos.quantity || 0);
-    const unrealPnL = parseFloat(String(pos.unrealPnL || pos.unreal_pnl || pos.unrealisedPnL || 0).replace(/[₹,]/g, '')) || 0;
-    const realisedPnL = parseFloat(String(pos.realisedPnL || pos.realised_pnl || pos.realisedPnL || 0).replace(/[₹,−-]/g, '')) || 0;
-    const days = parseInt(pos.days || pos.holdingDays || 0);
+    // Calculate avg entry from entries array
+    let avgEntry = 0;
+    let totalQty = 0;
+    let totalCost = 0;
+    
+    if (pos.entries && Array.isArray(pos.entries)) {
+      pos.entries.forEach(e => {
+        const price = parseFloat(e.price) || 0;
+        const qty = parseInt(e.qty) || 0;
+        totalCost += price * qty;
+        totalQty += qty;
+      });
+      avgEntry = totalQty > 0 ? totalCost / totalQty : 0;
+    } else {
+      // Fallback to flat fields
+      avgEntry = parseFloat(String(pos.avgEntry || pos.avg_entry || pos.entry || 0).replace(/[₹,]/g, ''));
+      totalQty = parseInt(pos.qty || pos.quantity || 0);
+      totalCost = avgEntry * totalQty;
+    }
+    
+    // Calculate exited qty
+    let exitedQty = 0;
+    if (pos.exits && Array.isArray(pos.exits)) {
+      pos.exits.forEach(e => {
+        exitedQty += parseInt(e.qty) || 0;
+      });
+    }
+    
+    const remainingQty = totalQty - exitedQty;
+    const invested = avgEntry * remainingQty;
+    
+    // Get CMP and calculate unrealized P&L
+    const cmp = parseFloat(pos.cmp) || 0;
+    const unrealPnL = cmp > 0 ? (cmp - avgEntry) * remainingQty : 0;
+    
+    // Calculate holding days from first entry
+    let days = 0;
+    if (pos.entries && pos.entries.length > 0 && pos.entries[0].date) {
+      const entryDate = new Date(pos.entries[0].date);
+      const today = new Date();
+      days = Math.floor((today - entryDate) / (1000 * 60 * 60 * 24));
+    }
+    
     const side = (pos.side || 'buy').toLowerCase();
     
-    const invested = avgEntry * qty;
     totalInvested += invested;
     totalUnrealPnL += unrealPnL;
     
@@ -1061,9 +1100,8 @@ function computePositionAnalytics() {
     enrichedPositions.push({
       ...pos,
       avgEntry,
-      qty,
+      qty: remainingQty,
       unrealPnL,
-      realisedPnL,
       days,
       side,
       invested,
