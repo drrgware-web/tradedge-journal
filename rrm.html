@@ -38,17 +38,14 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .bc span:hover{color:var(--cyan)}
 .bc .arr{color:var(--t4);cursor:default}
 .bc .cur{color:var(--cyan);font-weight:700;cursor:default}
-/* Toolbar row */
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .tb-btn{padding:4px 10px;border-radius:5px;border:1px solid var(--bd);background:var(--bg3);color:var(--t2);font-family:var(--fm);font-size:9px;font-weight:600;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:4px}
 .tb-btn:hover{border-color:var(--cyan);color:var(--cyan)}
 .tb-btn.playing{border-color:var(--green);color:var(--green);background:rgba(74,222,128,.08)}
 .tb-spacer{flex:1}
-/* Slider */
 .slider-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;max-width:400px}
 .slider-wrap input[type=range]{flex:1;accent-color:var(--cyan);height:4px;cursor:pointer}
 .slider-label{font-family:var(--fm);font-size:9px;color:var(--t3);white-space:nowrap}
-/* Main layout */
 .ml{display:grid;grid-template-columns:1fr 280px;gap:12px}
 @media(max-width:900px){.ml{grid-template-columns:1fr}}
 .rp{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;position:relative}
@@ -56,7 +53,6 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .rc canvas{position:absolute;inset:0;width:100%;height:100%}
 .tt{position:absolute;display:none;background:var(--bg3);border:1px solid var(--bd2);border-radius:6px;padding:8px 10px;font-family:var(--fm);font-size:10px;pointer-events:none;z-index:100;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 .tt b{display:block;margin-bottom:3px}
-/* Sidebar */
 .sb{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 200px);overflow-y:auto}
 .sb::-webkit-scrollbar{width:4px}
 .sb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
@@ -71,7 +67,6 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .si:hover{color:var(--t1)}
 .si .sd{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .si .sv{margin-left:auto;color:var(--t4);font-size:9px}
-/* Multi-TF Alignment Panel */
 .mtf-panel{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:14px}
 .mtf-title{font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:3px;color:var(--t3);margin-bottom:10px;text-transform:uppercase}
 .mtf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px}
@@ -88,7 +83,6 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:16px}
 .sp{width:40px;height:40px;border:3px solid var(--bd);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulseGlow{0%,100%{filter:drop-shadow(0 0 4px currentColor) drop-shadow(0 0 8px currentColor);transform:scale(1)}50%{filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor);transform:scale(1.15)}}
 </style>
 </head>
 <body>
@@ -99,20 +93,14 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 let DATA=null,IS_LIVE=false,MODE='sectors',TF='daily',HIGHLIGHT=null,DRILLDOWN=null,STOCK_LIMIT=10,BENCH=null;
 let ANIM_PLAYING=false,ANIM_FRAME=0,ANIM_TIMER=null,TAIL_SLICE=null,FULLSCREEN=false,SIDEBAR_FILTER='';
 
-// ═══ SAMPLE DATA ═══
 const SAMPLE_BENCH_DATA={
   daily:{sectors:[
     {symbol:"^CNXIT",name:"Nifty IT",quadrant:"Improving",color:"#06b6d4",current:{rs_ratio:97.5,rs_momentum:103.2},tail:[{rs_ratio:95.8,rs_momentum:101.5},{rs_ratio:96.2,rs_momentum:102},{rs_ratio:96.8,rs_momentum:102.5},{rs_ratio:97.1,rs_momentum:103},{rs_ratio:97.5,rs_momentum:103.2}]},
     {symbol:"^CNXPHARMA",name:"Nifty Pharma",quadrant:"Leading",color:"#f59e0b",current:{rs_ratio:102.8,rs_momentum:101.5},tail:[{rs_ratio:101.2,rs_momentum:100.5},{rs_ratio:101.8,rs_momentum:100.8},{rs_ratio:102.2,rs_momentum:101},{rs_ratio:102.5,rs_momentum:101.2},{rs_ratio:102.8,rs_momentum:101.5}]},
     {symbol:"^NSEBANK",name:"Nifty Bank",quadrant:"Weakening",color:"#3b82f6",current:{rs_ratio:101.2,rs_momentum:98.8},tail:[{rs_ratio:102.5,rs_momentum:99.8},{rs_ratio:102.1,rs_momentum:99.5},{rs_ratio:101.8,rs_momentum:99.2},{rs_ratio:101.5,rs_momentum:99},{rs_ratio:101.2,rs_momentum:98.8}]},
     {symbol:"^CNXAUTO",name:"Nifty Auto",quadrant:"Lagging",color:"#ef4444",current:{rs_ratio:98.2,rs_momentum:98.5},tail:[{rs_ratio:99.5,rs_momentum:99.2},{rs_ratio:99.1,rs_momentum:99},{rs_ratio:98.8,rs_momentum:98.8},{rs_ratio:98.5,rs_momentum:98.6},{rs_ratio:98.2,rs_momentum:98.5}]},
-    {symbol:"^CNXFMCG",name:"Nifty FMCG",quadrant:"Leading",color:"#22c55e",current:{rs_ratio:103.5,rs_momentum:101.8},tail:[{rs_ratio:102,rs_momentum:100.5},{rs_ratio:102.5,rs_momentum:101},{rs_ratio:103,rs_momentum:101.2},{rs_ratio:103.2,rs_momentum:101.5},{rs_ratio:103.5,rs_momentum:101.8}]},
-    {symbol:"^CNXMETAL",name:"Nifty Metal",quadrant:"Improving",color:"#8b5cf6",current:{rs_ratio:98.8,rs_momentum:102.2},tail:[{rs_ratio:97.2,rs_momentum:100.8},{rs_ratio:97.6,rs_momentum:101.2},{rs_ratio:98,rs_momentum:101.6},{rs_ratio:98.4,rs_momentum:102},{rs_ratio:98.8,rs_momentum:102.2}]},
-    {symbol:"^CNXREALTY",name:"Nifty Realty",quadrant:"Lagging",color:"#ec4899",current:{rs_ratio:97,rs_momentum:98.2},tail:[{rs_ratio:98.5,rs_momentum:99},{rs_ratio:98,rs_momentum:98.8},{rs_ratio:97.6,rs_momentum:98.5},{rs_ratio:97.3,rs_momentum:98.3},{rs_ratio:97,rs_momentum:98.2}]},
-    {symbol:"^CNXENERGY",name:"Nifty Energy",quadrant:"Leading",color:"#f97316",current:{rs_ratio:101.5,rs_momentum:100.8},tail:[{rs_ratio:100.5,rs_momentum:100.2},{rs_ratio:100.8,rs_momentum:100.4},{rs_ratio:101,rs_momentum:100.5},{rs_ratio:101.2,rs_momentum:100.7},{rs_ratio:101.5,rs_momentum:100.8}]},
-    {symbol:"^CNXPSUBANK",name:"Nifty PSU Bank",quadrant:"Weakening",color:"#0ea5e9",current:{rs_ratio:100.5,rs_momentum:97.5},tail:[{rs_ratio:102,rs_momentum:99},{rs_ratio:101.5,rs_momentum:98.5},{rs_ratio:101,rs_momentum:98},{rs_ratio:100.8,rs_momentum:97.8},{rs_ratio:100.5,rs_momentum:97.5}]},
-    {symbol:"^CNXINFRA",name:"Nifty Infra",quadrant:"Weakening",color:"#14b8a6",current:{rs_ratio:100.2,rs_momentum:99.2},tail:[{rs_ratio:100.8,rs_momentum:100},{rs_ratio:100.6,rs_momentum:99.8},{rs_ratio:100.5,rs_momentum:99.5},{rs_ratio:100.3,rs_momentum:99.3},{rs_ratio:100.2,rs_momentum:99.2}]}
-  ],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:["Nifty Pharma","Nifty FMCG","Nifty Energy"],Improving:["Nifty IT","Nifty Metal"],Lagging:["Nifty Auto","Nifty Realty"],Weakening:["Nifty Bank","Nifty PSU Bank","Nifty Infra"]},tail_length:5},
+    {symbol:"^CNXFMCG",name:"Nifty FMCG",quadrant:"Leading",color:"#22c55e",current:{rs_ratio:103.5,rs_momentum:101.8},tail:[{rs_ratio:102,rs_momentum:100.5},{rs_ratio:102.5,rs_momentum:101},{rs_ratio:103,rs_momentum:101.2},{rs_ratio:103.2,rs_momentum:101.5},{rs_ratio:103.5,rs_momentum:101.8}]}
+  ],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:["Nifty Pharma","Nifty FMCG"],Improving:["Nifty IT"],Lagging:["Nifty Auto"],Weakening:["Nifty Bank"]},tail_length:5},
   weekly:{sectors:[],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:[],Improving:[],Lagging:[],Weakening:[]},tail_length:5},
   monthly:{sectors:[],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:[],Improving:[],Lagging:[],Weakening:[]},tail_length:5},
   drilldown:{}
@@ -122,7 +110,7 @@ const SAMPLE={
   available_benchmarks:{"^NSEI":"Nifty 50","^NSEBANK":"Nifty Bank","^CRSLDX":"Nifty 500"},
   default_benchmark:"^NSEI",
   config:{window:10,center:100},
-  metadata:{generated_at:"2026-03-16T16:30:00",date:"2026-03-16",benchmarks_calculated:["^NSEI"],total_sectors:10,total_etfs:0,total_drilldown_sectors:0,timeframes:["daily","weekly"]}
+  metadata:{generated_at:"2026-03-16T16:30:00",date:"2026-03-16",benchmarks_calculated:["^NSEI"],total_sectors:5,total_etfs:0,total_drilldown_sectors:0,timeframes:["daily","weekly"]}
 };
 
 function getBD(){
@@ -131,24 +119,28 @@ function getBD(){
   return bd[BENCH]||bd[DATA.default_benchmark]||Object.values(bd)[0]||SAMPLE_BENCH_DATA;
 }
 
-// ═══ MULTI-TIMEFRAME ALIGNMENT ═══
+function getCurrentItems(){
+  const bd=getBD(),tf=bd[TF]||bd.daily;
+  if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
+    const dd=bd.drilldown[DRILLDOWN];
+    let items=TF==='weekly'?(dd.weekly||[]):TF==='monthly'?(dd.monthly||dd.weekly||[]):(dd.daily||[]);
+    if(STOCK_LIMIT!=='all')items=items.slice(0,parseInt(STOCK_LIMIT));
+    return items;
+  }
+  return MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[]);
+}
+
 function computeAlignments(){
   const bd=getBD();
   let daily=[],weekly=[],monthly=[];
-
   if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
-    // Drill-down: individual stocks within a sector
     const dd=bd.drilldown[DRILLDOWN];
-    daily=dd.daily||[];
-    weekly=dd.weekly||[];
-    monthly=dd.monthly||[];
+    daily=dd.daily||[];weekly=dd.weekly||[];monthly=dd.monthly||[];
   } else {
-    // Normal mode: sectors/etfs/assets/segments
     const modeKey=MODE==='etfs'?'etfs':MODE==='assets'?'asset_classes':MODE==='segments'?'market_segments':'sectors';
     const getTfItems=(tf)=>{const d=bd[tf];if(!d)return[];return d[modeKey]||[]};
     daily=getTfItems('daily');weekly=getTfItems('weekly');monthly=getTfItems('monthly');
   }
-
   if(!daily.length&&!weekly.length)return{power:[],pullback:[],early:[],exhaustion:[]};
   const qMap=(items)=>{const m={};items.forEach(s=>{m[s.symbol]=s.quadrant});return m};
   const dQ=qMap(daily),wQ=qMap(weekly),mQ=qMap(monthly);
@@ -164,15 +156,10 @@ function computeAlignments(){
     const d=dQ[sym],w=wQ[sym],m=mQ[sym];
     if(!d&&!w)return;
     const info={symbol:sym,name:nameMap[sym]||sym,color:colorMap[sym]||'#94a3b8',d,w,m};
-    // Power: Monthly Leading, Weekly Leading, Daily Improving/Leading
     if(m==='Leading'&&w==='Leading'&&(d==='Improving'||d==='Leading'))power.push(info);
-    // Pullback: Monthly Leading, Weekly Weakening, Daily Lagging/Improving
     else if(m==='Leading'&&w==='Weakening'&&(d==='Lagging'||d==='Improving'))pullback.push(info);
-    // Early Reversal: Monthly Lagging, Weekly Improving, Daily Leading
     else if(m==='Lagging'&&w==='Improving'&&d==='Leading')early.push(info);
-    // Exhaustion: Monthly Weakening, Weekly Lagging, Daily Lagging
     else if(m==='Weakening'&&w==='Lagging'&&d==='Lagging')exhaustion.push(info);
-    // 2-TF fallback (when monthly not available)
     else if(!m&&w==='Leading'&&(d==='Improving'||d==='Leading'))power.push(info);
     else if(!m&&w==='Weakening'&&d==='Lagging')exhaustion.push(info);
   });
@@ -183,17 +170,15 @@ function renderAlignmentPanel(){
   const a=computeAlignments();
   const bd=getBD();
   let modeLabel,hasMonthly;
-
   if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
     const dd=bd.drilldown[DRILLDOWN];
     modeLabel=dd.sector_name+' Stocks';
     hasMonthly=!!dd.monthly?.length;
   } else {
-    const modeKey=MODE==='etfs'?'etfs':MODE==='assets'?'asset_classes':MODE==='segments'?'market_segments':'sectors';
     modeLabel=MODE==='etfs'?'ETFs':MODE==='assets'?'Asset Classes':MODE==='segments'?'Segments':'Sectors';
+    const modeKey=MODE==='etfs'?'etfs':MODE==='assets'?'asset_classes':MODE==='segments'?'market_segments':'sectors';
     hasMonthly=!!bd.monthly?.[modeKey]?.length;
   }
-
   const tfNote=hasMonthly?'Monthly + Weekly + Daily':'Weekly + Daily (Monthly not yet available)';
   const cardData=[
     {key:'power',name:'POWER SETUP',emoji:'⚡',color:'#22c55e',border:'rgba(34,197,94,.3)',bg:'rgba(34,197,94,.05)',desc:'Full convergence — highest conviction buy signal',cond:'M:Leading · W:Leading · D:Improving→Leading',items:a.power},
@@ -214,7 +199,6 @@ function renderAlignmentPanel(){
   </div>`;
 }
 
-// ═══ RENDER ═══
 function render(){
   const d=DATA,app=document.getElementById('app');
   const bd=getBD();
@@ -308,7 +292,6 @@ function qPanel(n,c,items){
     filtered.map(s=>`<li class="si" onmouseenter="hl('${s.symbol}')" onmouseleave="hl(null)" ${!DRILLDOWN&&MODE==='sectors'?`ondblclick="drill('${s.symbol}')"`:''}><span class="sd" style="background:${s.color}"></span><span>${s.name}</span><span class="sv">${s.current.rs_ratio.toFixed(1)}/${s.current.rs_momentum.toFixed(1)}</span></li>`).join('')}</ul></div>`;
 }
 
-// ═══ CANVAS CHART (replaces SVG for better performance + PNG export) ═══
 function drawChart(items){
   const el=document.getElementById('rc');if(!el)return;
   const canvas=document.getElementById('rrm-canvas');if(!canvas)return;
@@ -331,7 +314,6 @@ function drawChart(items){
   const mg=1.5,xn=Math.min(Math.min(...ax)-mg,C-4),xx=Math.max(Math.max(...ax)+mg,C+4),yn=Math.min(Math.min(...ay)-mg,C-4),yx=Math.max(Math.max(...ay)+mg,C+4);
   const tX=v=>P.l+((v-xn)/(xx-xn))*iw,tY=v=>P.t+ih-((v-yn)/(yx-yn))*ih,cx=tX(C),cy=tY(C);
 
-  // Quadrant fills
   const qFills=[
     [P.l,P.t,cx-P.l,cy-P.t,'rgba(59,130,246,.05)'],
     [cx,P.t,W-P.r-cx,cy-P.t,'rgba(34,197,94,.05)'],
@@ -340,7 +322,6 @@ function drawChart(items){
   ];
   qFills.forEach(([x,y,w,h,f])=>{ctx.fillStyle=f;ctx.fillRect(x,y,w,h)});
 
-  // Quadrant labels
   ctx.textAlign='center';ctx.font='600 11px Orbitron';
   const qLabels=[
     [(P.l+cx)/2,P.t+18,'IMPROVING','rgba(59,130,246,.35)'],
@@ -350,7 +331,6 @@ function drawChart(items){
   ];
   qLabels.forEach(([x,y,t,c])=>{ctx.fillStyle=c;ctx.fillText(t,x,y)});
 
-  // Grid lines
   for(let v=Math.ceil(xn);v<=Math.floor(xx);v++){
     const x=tX(v),ic=v===C;
     ctx.beginPath();ctx.moveTo(x,P.t);ctx.lineTo(x,H-P.b);
@@ -368,12 +348,10 @@ function drawChart(items){
     if(v%2===0){ctx.fillStyle='#475569';ctx.font='9px JetBrains Mono';ctx.textAlign='end';ctx.fillText(v,P.l-6,y+3)}
   }
 
-  // Axis labels
   ctx.fillStyle='#64748b';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
   ctx.fillText('JdK RS-RATIO →',W/2,H-4);
   ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('JdK RS-MOMENTUM →',0,0);ctx.restore();
 
-  // Label collision avoidance
   const labelPositions=[];
   function findLabelPos(idealX,idealY,text){
     ctx.font='500 9px JetBrains Mono';
@@ -387,26 +365,20 @@ function drawChart(items){
     const pos={x:idealX+8,y:idealY-8};labelPositions.push({x:pos.x,y:pos.y,w:tw,h:th});return pos;
   }
 
-  // Draw trails
   items.forEach(sec=>{
     const isH=HIGHLIGHT===sec.symbol,op=HIGHLIGHT&&!isH?.12:1;
     let tail=TAIL_SLICE?sec.tail.slice(-TAIL_SLICE):sec.tail;
-    // Animation: show only up to ANIM_FRAME
     if(ANIM_PLAYING&&ANIM_FRAME<tail.length)tail=tail.slice(0,ANIM_FRAME+1);
     if(tail.length<2)return;
 
     ctx.save();ctx.globalAlpha=op;
 
-    // Neon glow trail
-    if(isH||!HIGHLIGHT){
-      ctx.shadowColor=sec.color;ctx.shadowBlur=isH?12:6;
-    }
+    if(isH||!HIGHLIGHT){ctx.shadowColor=sec.color;ctx.shadowBlur=isH?12:6}
     ctx.beginPath();
     tail.forEach((t,i)=>{const x=tX(t.rs_ratio),y=tY(t.rs_momentum);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
     ctx.strokeStyle=sec.color;ctx.lineWidth=isH?3:1.8;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
     ctx.shadowBlur=0;
 
-    // Trail dots with gradient opacity
     tail.forEach((t,i)=>{
       const x=tX(t.rs_ratio),y=tY(t.rs_momentum),last=i===tail.length-1;
       const dotOp=0.3+0.7*(i/(tail.length-1));
@@ -417,20 +389,16 @@ function drawChart(items){
       ctx.fillStyle=sec.color;ctx.fill();
       if(last){
         ctx.strokeStyle='#0c1018';ctx.lineWidth=2;ctx.stroke();
-        // Animated pulsing glow on current position
-        const pulse=Math.sin(Date.now()/300)*0.5+0.5; // 0→1 oscillation
+        const pulse=Math.sin(Date.now()/300)*0.5+0.5;
         const pulse2=Math.sin(Date.now()/500)*0.5+0.5;
-        // Inner glow ring
         ctx.globalAlpha=op*(0.15+0.35*pulse);
         ctx.shadowColor=sec.color;ctx.shadowBlur=isH?20*pulse:10*pulse;
         ctx.beginPath();ctx.arc(x,y,r+3+3*pulse,0,Math.PI*2);
         ctx.strokeStyle=sec.color;ctx.lineWidth=2;ctx.stroke();
         ctx.shadowBlur=0;
-        // Outer glow ring
         ctx.globalAlpha=op*(0.08+0.18*pulse2);
         ctx.beginPath();ctx.arc(x,y,r+8+5*pulse2,0,Math.PI*2);
         ctx.strokeStyle=sec.color;ctx.lineWidth=1;ctx.stroke();
-        // Core bright flash
         ctx.globalAlpha=op*(0.5+0.5*pulse);
         ctx.beginPath();ctx.arc(x,y,r*0.4,0,Math.PI*2);
         ctx.fillStyle='#fff';ctx.fill();
@@ -438,7 +406,6 @@ function drawChart(items){
     });
     ctx.globalAlpha=op;
 
-    // Direction arrow
     const l=tail[tail.length-1],p=tail[tail.length-2];
     const lx=tX(l.rs_ratio),ly=tY(l.rs_momentum),px=tX(p.rs_ratio),py=tY(p.rs_momentum);
     const a=Math.atan2(ly-py,lx-px),al=9;
@@ -448,7 +415,6 @@ function drawChart(items){
     ctx.lineTo(lx+al*Math.cos(a-2.6),ly+al*Math.sin(a-2.6));
     ctx.closePath();ctx.fillStyle=sec.color;ctx.fill();
 
-    // Label with collision avoidance
     if(op>.5){
       const nm=sec.name.replace('Nifty ','');
       const pos=findLabelPos(lx,ly,nm);
@@ -459,7 +425,6 @@ function drawChart(items){
     ctx.restore();
   });
 
-  // Mouse interaction
   canvas.onmousemove=e=>{
     const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
     let cl=null,cd=20;
@@ -489,32 +454,19 @@ function drawChart(items){
   }
 }
 
-// ═══ ACTIONS ═══
 function setMode(m){DRILLDOWN=null;MODE=m;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
 function setTF(t){TF=t;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
 function setLimit(v){STOCK_LIMIT=v;render()}
 function setBench(b){BENCH=b;DRILLDOWN=null;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
 function filterSidebar(v){SIDEBAR_FILTER=v;render()}
-function hl(sym){
-  HIGHLIGHT=sym;
-  const bd=getBD(),tf=bd[TF]||bd.daily;
-  let items;
-  if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
-    const dd=bd.drilldown[DRILLDOWN];
-    items=TF==='weekly'?(dd.weekly||[]):TF==='monthly'?(dd.monthly||dd.weekly||[]):(dd.daily||[]);
-    if(STOCK_LIMIT!=='all')items=items.slice(0,parseInt(STOCK_LIMIT));
-  }else{items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[])}
-  drawChart(items);
-}
+function hl(sym){HIGHLIGHT=sym;drawChart(getCurrentItems())}
 function drill(sym){const bd=getBD();if(bd.drilldown&&bd.drilldown[sym]){DRILLDOWN=sym;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}else{alert('No drill-down data for this sector yet.\nRun the RRM GitHub Action to generate stock-level data.')}}
 function exitDrill(){DRILLDOWN=null;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
 
-// Animation
 function toggleAnim(){ANIM_PLAYING?stopAnim():startAnim()}
 function startAnim(){
   ANIM_PLAYING=true;ANIM_FRAME=1;
-  const bd=getBD(),tf=bd[TF]||bd.daily;
-  let items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[]);
+  const items=getCurrentItems();
   const maxTail=Math.max(...items.map(s=>s.tail?.length||0),2);
   ANIM_TIMER=setInterval(()=>{
     ANIM_FRAME++;
@@ -525,30 +477,20 @@ function startAnim(){
 }
 function stopAnim(){ANIM_PLAYING=false;if(ANIM_TIMER){clearInterval(ANIM_TIMER);ANIM_TIMER=null}ANIM_FRAME=0}
 
-// Tail slider
 function setTailSlice(v){
   TAIL_SLICE=v;
   const lbl=document.getElementById('tail-count');if(lbl)lbl.textContent=v+' pts';
-  const bd=getBD(),tf=bd[TF]||bd.daily;
-  let items;
-  if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
-    const dd=bd.drilldown[DRILLDOWN];items=TF==='weekly'?(dd.weekly||[]):(dd.daily||[]);
-    if(STOCK_LIMIT!=='all')items=items.slice(0,parseInt(STOCK_LIMIT));
-  }else{items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[])}
-  drawChart(items);
+  drawChart(getCurrentItems());
 }
 
-// Fullscreen
 function toggleFS(){FULLSCREEN=!FULLSCREEN;document.querySelector('.d').classList.toggle('fs',FULLSCREEN);render()}
 
-// Export
 function exportChart(format){
   const canvas=document.getElementById('rrm-canvas');if(!canvas)return;
   if(format==='png'){
     const link=document.createElement('a');link.download=`RRM_${TF}_${DATA?.metadata?.date||'export'}.png`;
     link.href=canvas.toDataURL('image/png');link.click();
   }else{
-    // SVG export: create an SVG from canvas (simplified)
     const svgData=`<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><img src="${canvas.toDataURL('image/png')}" width="${canvas.width}" height="${canvas.height}"/></div></foreignObject></svg>`;
     const blob=new Blob([svgData],{type:'image/svg+xml'});
     const link=document.createElement('a');link.download=`RRM_${TF}_${DATA?.metadata?.date||'export'}.svg`;
@@ -556,18 +498,24 @@ function exportChart(format){
   }
 }
 
-// ═══ INIT ═══
 async function init(){
   let d=null;
   try{const r=await fetch('./data/rrm_data.json',{cache:'no-store'});if(r.ok){d=await r.json();if(d?.benchmarks_data&&Object.keys(d.benchmarks_data).length>0)IS_LIVE=true;else d=null}}catch(e){console.warn('RRM fetch:',e)}
   if(!d){try{const r=await fetch('./data/rrg_data.json',{cache:'no-store'});if(r.ok){d=await r.json();if(d?.benchmarks_data&&Object.keys(d.benchmarks_data).length>0)IS_LIVE=true;else d=null}}catch(e){console.warn('RRG fallback fetch:',e)}}
   if(!d){d=SAMPLE;IS_LIVE=false}
   DATA=d;BENCH=d.default_benchmark||Object.keys(d.available_benchmarks||{})[0]||'^NSEI';
-  await new Promise(r=>setTimeout(r,300));render();
-  // Continuous animation loop for pulsating glow on tips (~20fps)
+  await new Promise(r=>setTimeout(r,300));
+  render();
+  // FIXED: Pulse animation only redraws canvas, does NOT rebuild DOM
+  // This fixes the frozen/unclickable buttons issue
   let _lastPulse=0;
-  (function pulseLoop(t){requestAnimationFrame(pulseLoop);if(DATA&&t-_lastPulse>50){_lastPulse=t;render()}})(0);
-  // Resize handler
+  (function pulseLoop(t){
+    requestAnimationFrame(pulseLoop);
+    if(DATA&&t-_lastPulse>50){
+      _lastPulse=t;
+      drawChart(getCurrentItems());
+    }
+  })(0);
   window.addEventListener('resize',()=>{if(DATA)render()});
 }
 init();
