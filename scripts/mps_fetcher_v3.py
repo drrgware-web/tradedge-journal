@@ -41,6 +41,7 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
+import numpy as np
 
 # Import the MPS v3.1 engine (must be in same directory or PYTHONPATH)
 from mps_engine_v3 import RawMarketData, calculate_mps, format_mps_report, to_json
@@ -109,7 +110,185 @@ STATE_FILE = "mps_state.json"
 
 
 # =============================================================================
-# CHARTINK FETCHER (unchanged)
+# YAHOO FINANCE BREADTH — PRIMARY (replaces Chartink)
+# =============================================================================
+
+# Representative Nifty 500 sample: 249 stocks (Nifty 50 + Next 50 + Midcap 150 + SmallCap)
+# Downloaded in batches of ~50 for speed. Scaled to 500.
+SAMPLE_TICKERS = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "BHARTIARTL.NS", "ICICIBANK.NS", "INFY.NS", "SBIN.NS", "ITC.NS", "HINDUNILVR.NS", "LT.NS",
+    "BAJFINANCE.NS", "MARUTI.NS", "KOTAKBANK.NS", "NTPC.NS", "HCLTECH.NS", "TITAN.NS", "SUNPHARMA.NS", "AXISBANK.NS", "ADANIENT.NS", "ONGC.NS",
+    "TATAMOTORS.NS", "ULTRACEMCO.NS", "ASIANPAINT.NS", "BAJAJFINSV.NS", "WIPRO.NS", "COALINDIA.NS", "POWERGRID.NS", "NESTLEIND.NS", "JSWSTEEL.NS", "TATASTEEL.NS",
+    "M&M.NS", "ADANIPORTS.NS", "GRASIM.NS", "TECHM.NS", "INDUSINDBK.NS", "CIPLA.NS", "BPCL.NS", "DRREDDY.NS", "BRITANNIA.NS", "EICHERMOT.NS",
+    "DIVISLAB.NS", "APOLLOHOSP.NS", "HEROMOTOCO.NS", "HINDALCO.NS", "TATACONSUM.NS", "SBILIFE.NS", "BAJAJ-AUTO.NS", "HDFCLIFE.NS", "SHRIRAMFIN.NS", "BEL.NS",
+    "TRENT.NS", "GODREJCP.NS", "DABUR.NS", "HAVELLS.NS", "PIDILITIND.NS", "DLF.NS", "SIEMENS.NS", "ABB.NS", "AMBUJACEM.NS", "BANKBARODA.NS",
+    "VEDL.NS", "ICICIPRULI.NS", "INDIGO.NS", "TORNTPHARM.NS", "PNB.NS", "CANBK.NS", "IDFCFIRSTB.NS", "TATAPOWER.NS", "ADANIGREEN.NS", "IOC.NS",
+    "GAIL.NS", "LUPIN.NS", "ZOMATO.NS", "IRFC.NS", "RECLTD.NS", "PFC.NS", "NHPC.NS", "SAIL.NS", "CHOLAFIN.NS", "MUTHOOTFIN.NS",
+    "VOLTAS.NS", "PAGEIND.NS", "COLPAL.NS", "MARICO.NS", "BERGEPAINT.NS", "TVSMOTOR.NS", "PERSISTENT.NS", "COFORGE.NS", "LTIM.NS", "MPHASIS.NS",
+    "POLYCAB.NS", "PIIND.NS", "ASTRAL.NS", "DIXON.NS", "MAXHEALTH.NS", "AUROPHARMA.NS", "BIOCON.NS", "FEDERALBNK.NS", "IDEA.NS", "HAL.NS",
+    "ABCAPITAL.NS", "ACC.NS", "ALKEM.NS", "ATUL.NS", "AUBANK.NS", "BALKRISIND.NS", "BATAINDIA.NS", "BHARATFORG.NS", "BHEL.NS", "BSE.NS",
+    "CANFINHOME.NS", "CENTRALBK.NS", "CGPOWER.NS", "CHAMBLFERT.NS", "CLEAN.NS", "CONCOR.NS", "CROMPTON.NS", "CUMMINSIND.NS", "DEEPAKNTR.NS", "DELHIVERY.NS",
+    "EMAMILTD.NS", "ESCORTS.NS", "EXIDEIND.NS", "GLENMARK.NS", "GMRAIRPORT.NS", "GODREJPROP.NS", "GRINDWELL.NS", "GSPL.NS", "HINDPETRO.NS", "HUDCO.NS",
+    "IBREALEST.NS", "IDBI.NS", "IEX.NS", "INDHOTEL.NS", "INDUSTOWER.NS", "IRCTC.NS", "ISEC.NS", "JIOFIN.NS", "JKCEMENT.NS", "JSL.NS",
+    "JUBLFOOD.NS", "KALYANKJIL.NS", "KEI.NS", "KPITTECH.NS", "LAURUSLABS.NS", "LICHSGFIN.NS", "LODHA.NS", "LTF.NS", "MANAPPURAM.NS", "MANKIND.NS",
+    "MAZDOCK.NS", "MCX.NS", "METROBRAND.NS", "MGL.NS", "MOTHERSON.NS", "MFSL.NS", "NAM-INDIA.NS", "NATIONALUM.NS", "NAUKRI.NS", "NAVINFLUOR.NS",
+    "NBCC.NS", "NCC.NS", "NIACL.NS", "NMDC.NS", "NYKAA.NS", "OBEROIRLTY.NS", "OFSS.NS", "OIL.NS", "PAYTM.NS", "PETRONET.NS",
+    "PHOENIXLTD.NS", "POLICYBZR.NS", "POONAWALLA.NS", "PRESTIGE.NS", "PVRINOX.NS", "RAJESHEXPO.NS", "RAMCOCEM.NS", "RATNAMANI.NS", "RBLBANK.NS", "RELAXO.NS",
+    "RVNL.NS", "SBICARD.NS", "SCHAEFFLER.NS", "SJVN.NS", "SONACOMS.NS", "STARHEALTH.NS", "SUNTV.NS", "SUPREMEIND.NS", "SYNGENE.NS", "TATACHEM.NS",
+    "TATACOMM.NS", "TATAELXSI.NS", "TIINDIA.NS", "TIMKEN.NS", "TORNTPOWER.NS", "TTML.NS", "UCOBANK.NS", "UNIONBANK.NS", "UPL.NS", "VBL.NS",
+    "ZYDUSLIFE.NS", "AARTIIND.NS", "AFFLE.NS", "APTUS.NS", "BSOFT.NS", "CAMPUS.NS", "CDSL.NS", "CESC.NS", "CYIENT.NS", "DATAPATTNS.NS",
+    "DEVYANI.NS", "DOMS.NS", "ELGIEQUIP.NS", "FINEORG.NS", "FIVESTAR.NS", "FORTIS.NS", "GESHIP.NS", "HAPPSTMNDS.NS", "IIFL.NS", "INOXWIND.NS",
+    "JBCHEPHARM.NS", "JSWINFRA.NS", "JTEKTINDIA.NS", "KARURVYSYA.NS", "KEC.NS", "KFINTECH.NS", "LICI.NS", "MEDANTA.NS", "MOTILALOFS.NS", "NATCOPHARM.NS",
+    "OLECTRA.NS", "PNBHOUSING.NS", "RADICO.NS", "RAILTEL.NS", "RAINBOW.NS", "REDINGTON.NS", "ROUTE.NS", "SAPPHIRE.NS", "SBFC.NS", "SIGNATURE.NS",
+    "SUMICHEM.NS", "SUNDARMFIN.NS", "TANLA.NS", "TATAINVEST.NS", "TRIDENT.NS", "TRIVENI.NS", "UTIAMC.NS", "WHIRLPOOL.NS", "ZEEL.NS",
+]
+
+UNIVERSE_SIZE = 500
+
+
+def _compute_sma(closes, period):
+    if len(closes) < period:
+        return None
+    return float(np.mean(closes[-period:]))
+
+
+def _compute_rsi(closes, period=14):
+    if len(closes) < period + 1:
+        return None
+    deltas = np.diff(closes[-(period + 1):])
+    gains = np.where(deltas > 0, deltas, 0)
+    losses = np.where(deltas < 0, -deltas, 0)
+    avg_gain = np.mean(gains)
+    avg_loss = np.mean(losses)
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return float(100 - (100 / (1 + rs)))
+
+
+def _compute_atr(highs, lows, closes, period=14):
+    if len(closes) < period + 1:
+        return None
+    trs = []
+    for i in range(1, len(closes)):
+        tr = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
+        trs.append(tr)
+    if len(trs) < period:
+        return None
+    return float(np.mean(trs[-period:]))
+
+
+def fetch_yahoo_breadth():
+    """
+    Download ~100 Nifty stocks from Yahoo Finance and compute
+    all 8 MPS scanner values. Scales results to 500.
+    """
+    import yfinance as yf
+
+    log.info("═══ BREADTH DATA (Yahoo Finance — 249 stock sample) ═══")
+
+    results = {k: 0 for k in [
+        "above_200sma", "above_50sma", "spark_4pct", "rsi_above_70",
+        "rsi_above_50", "burst_4_5pct_gainers", "burst_4_5pct_losers", "atr_pct_above_4",
+    ]}
+
+    try:
+        log.info(f"  Downloading {len(SAMPLE_TICKERS)} stocks (1y history)...")
+        data = yf.download(
+            SAMPLE_TICKERS, period="1y", group_by="ticker",
+            progress=False, threads=True,
+        )
+
+        if data.empty:
+            log.error("  ✗ Yahoo Finance returned no data")
+            return results
+
+        counts = {k: 0 for k in results}
+        valid = 0
+
+        for ticker in SAMPLE_TICKERS:
+            try:
+                if ticker not in data.columns.get_level_values(0):
+                    continue
+                df = data[ticker].dropna()
+                if df.empty or len(df) < 210:
+                    continue
+
+                closes = df["Close"].values.astype(float)
+                highs = df["High"].values.astype(float)
+                lows = df["Low"].values.astype(float)
+                volumes = df["Volume"].values.astype(float)
+
+                cur = closes[-1]
+                prev = closes[-2] if len(closes) >= 2 else cur
+                if cur <= 0 or prev <= 0:
+                    continue
+
+                valid += 1
+                change = (cur / prev) - 1
+
+                # 1. Close > 200 SMA
+                sma200 = _compute_sma(closes, 200)
+                if sma200 and cur > sma200:
+                    counts["above_200sma"] += 1
+
+                # 2. Close > 50 SMA
+                sma50 = _compute_sma(closes, 50)
+                if sma50 and cur > sma50:
+                    counts["above_50sma"] += 1
+
+                # 3. 4%+ breakout with 1.5x volume
+                sma_vol = float(np.mean(volumes[-20:])) if len(volumes) >= 20 else 0
+                if change > 0.04 and sma_vol > 0 and volumes[-1] > sma_vol * 1.5:
+                    counts["spark_4pct"] += 1
+
+                # 4-5. RSI
+                rsi = _compute_rsi(closes)
+                if rsi is not None:
+                    if rsi > 70:
+                        counts["rsi_above_70"] += 1
+                    if rsi > 50:
+                        counts["rsi_above_50"] += 1
+
+                # 6-7. Burst
+                if change > 0.045:
+                    counts["burst_4_5pct_gainers"] += 1
+                if change < -0.045:
+                    counts["burst_4_5pct_losers"] += 1
+
+                # 8. ATR% > 4%
+                atr = _compute_atr(highs, lows, closes)
+                if atr and cur > 0 and (atr / cur * 100) > 4:
+                    counts["atr_pct_above_4"] += 1
+
+            except Exception:
+                continue
+
+        if valid == 0:
+            log.warning("  ✗ No valid stocks processed")
+            return results
+
+        scale = UNIVERSE_SIZE / valid
+        for k in counts:
+            results[k] = int(round(counts[k] * scale))
+
+        log.info(f"  ✓ Processed {valid} stocks, scaled to {UNIVERSE_SIZE}:")
+        log.info(f"    above_200sma: {counts['above_200sma']} → {results['above_200sma']}")
+        log.info(f"    above_50sma:  {counts['above_50sma']} → {results['above_50sma']}")
+        log.info(f"    spark_4pct:   {counts['spark_4pct']} → {results['spark_4pct']}")
+        log.info(f"    rsi>70/50:    {counts['rsi_above_70']}/{counts['rsi_above_50']} → {results['rsi_above_70']}/{results['rsi_above_50']}")
+        log.info(f"    burst +/-:    {counts['burst_4_5pct_gainers']}/{counts['burst_4_5pct_losers']} → {results['burst_4_5pct_gainers']}/{results['burst_4_5pct_losers']}")
+        log.info(f"    atr_pct>4:    {counts['atr_pct_above_4']} → {results['atr_pct_above_4']}")
+
+        return results
+
+    except Exception as e:
+        log.error(f"  ✗ Yahoo breadth failed: {e}")
+        return results
+
+
+# =============================================================================
+# CHARTINK FETCHER — FALLBACK (blocked from GitHub Actions datacenter IPs)
 # =============================================================================
 
 def get_chartink_session():
@@ -587,11 +766,21 @@ def fetch_and_calculate(dry_run=False):
             "usd_inr": 85.50, "usd_inr_20d_ago": 85.20,
         }
     else:
-        # ── Step 1: Chartink ──
-        chartink = fetch_all_chartink()
-        if any(v is None for v in chartink.values()):
-            log.error("Some Chartink data failed to fetch. Aborting.")
-            return None, None
+        # ── Step 1: Yahoo Finance Breadth (replaces Chartink) ──
+        chartink = fetch_yahoo_breadth()
+        
+        # Check if Yahoo breadth returned all zeros (fallback to Chartink)
+        if all(v == 0 for v in chartink.values()):
+            log.warning("Yahoo breadth returned all zeros, trying Chartink fallback...")
+            chartink_fallback = fetch_all_chartink()
+            if not any(v is None for v in chartink_fallback.values()):
+                if any(v > 0 for v in chartink_fallback.values()):
+                    chartink = chartink_fallback
+                    log.info("  ✓ Using Chartink data as fallback")
+                else:
+                    log.warning("  Chartink also returned zeros — using Yahoo zeros")
+            else:
+                log.warning("  Chartink fallback failed — using Yahoo zeros")
 
         # ── Step 2: Yahoo Finance for market data ──
         market = fetch_yahoo_market_data()
@@ -701,6 +890,7 @@ def fetch_and_calculate(dry_run=False):
                 "usd_inr_20d_ago": macro["usd_inr_20d_ago"],
             },
             "data_sources": {
+                "breadth": "yahoo_finance_249_sample_scaled",
                 "vix": "yahoo_finance",
                 "ad_ratio": "yahoo_finance_estimated",
                 "52w_highs_lows": "yahoo_finance_estimated",
