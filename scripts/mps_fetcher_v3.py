@@ -888,6 +888,7 @@ def fetch_and_calculate(dry_run=False):
         prev_pct_above_50sma=state.get("prev_pct_above_50sma", 50.0),
         fii_net_consecutive_sell_days=state.get("fii_consecutive_sell_days", 0),
         fii_5day_net_crores=fii_5day_net,
+        fii_5day_history=fii_5day,
         usd_inr_20d_ago=macro["usd_inr_20d_ago"],
     )
 
