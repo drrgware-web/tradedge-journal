@@ -407,8 +407,14 @@ function getCurrentItems(){
     items = items.filter(item => item.quadrant === QUADRANT_FILTER);
   }
   
-  if (!SELECT_ALL_MODE && SELECTED_ITEMS.size > 0) {
-    items = items.filter(item => SELECTED_ITEMS.has(item.symbol));
+  // Filter by selection - if SELECT_ALL_MODE is false, only show selected items
+  if (!SELECT_ALL_MODE) {
+    if (SELECTED_ITEMS.size > 0) {
+      items = items.filter(item => SELECTED_ITEMS.has(item.symbol));
+    } else {
+      // Clear All was clicked - show no sector items (positions will still show)
+      items = [];
+    }
   }
   
   return items;
@@ -1365,7 +1371,7 @@ function render(){
         ${qPanel('Lagging','#ef4444',grp.Lagging)}
       </div>
     </div>
-    <div class="ft">TradEdge RRM v6.1 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
+    <div class="ft">TradEdge RRM v6.2 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
   drawChart(items);
 }
 
@@ -1410,6 +1416,29 @@ function drawChart(items){
     const tail=TAIL_SLICE?s.tail.slice(-TAIL_SLICE):s.tail;
     tail.forEach(t=>{ax.push(t.rs_ratio);ay.push(t.rs_momentum)});
   });
+  
+  // Also include position data for scaling when sectors are hidden
+  if (SHOW_POSITIONS_OVERLAY && TRADE_JOURNAL_DATA?.trades) {
+    try {
+      const cacheStr = localStorage.getItem('te_rrm_cache');
+      if (cacheStr) {
+        const cache = JSON.parse(cacheStr);
+        const positions = getOpenPositions();
+        positions.forEach(pos => {
+          const stockData = cache[pos.symbol];
+          if (stockData) {
+            const ratio = TF === 'weekly' ? stockData.weeklyRatio : stockData.dailyRatio;
+            const mom = TF === 'weekly' ? stockData.weeklyMom : stockData.dailyMom;
+            if (ratio && mom) {
+              ax.push(ratio);
+              ay.push(mom);
+            }
+          }
+        });
+      }
+    } catch(e) {}
+  }
+  
   if(!ax.length){ax=[96,104];ay=[96,104]}
   const mg=1.5,xn=Math.min(Math.min(...ax)-mg,C-4),xx=Math.max(Math.max(...ax)+mg,C+4),yn=Math.min(Math.min(...ay)-mg,C-4),yx=Math.max(Math.max(...ay)+mg,C+4);
   const tX=v=>P.l+((v-xn)/(xx-xn))*iw,tY=v=>P.t+ih-((v-yn)/(yx-yn))*ih,cx=tX(C),cy=tY(C);
