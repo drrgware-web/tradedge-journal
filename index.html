@@ -6315,7 +6315,25 @@ const NSE_SYMBOLS = [
 let NSE_EXTENDED_SYMBOLS = null; // will hold fetched symbols
 
 function getSymbolDB(){
-  return NSE_EXTENDED_SYMBOLS || NSE_SYMBOLS;
+  if(!NSE_EXTENDED_SYMBOLS) return NSE_SYMBOLS;
+  // Merge: extended list + any symbols from NSE_SYMBOLS that are missing
+  // (ETFs, sector-tagged stocks not in EQUITY_L.csv)
+  if(!NSE_EXTENDED_SYMBOLS._merged){
+    const extSet = new Set(NSE_EXTENDED_SYMBOLS.map(s=>s[0]));
+    const extras = NSE_SYMBOLS.filter(([sym,name,sec]) => !extSet.has(sym) || sec);
+    // For sector-tagged built-ins, update the extended entry's sector if blank
+    const extMap = {};
+    NSE_EXTENDED_SYMBOLS.forEach((e,i)=> extMap[e[0]]=i);
+    extras.forEach(([sym,name,sec])=>{
+      if(extMap[sym]!=null && sec && !NSE_EXTENDED_SYMBOLS[extMap[sym]][2]){
+        NSE_EXTENDED_SYMBOLS[extMap[sym]][2]=sec;
+      } else if(!extSet.has(sym)){
+        NSE_EXTENDED_SYMBOLS.push([sym,name,sec]);
+      }
+    });
+    NSE_EXTENDED_SYMBOLS._merged=true;
+  }
+  return NSE_EXTENDED_SYMBOLS;
 }
 
 async function fetchNSESymbolList(){
