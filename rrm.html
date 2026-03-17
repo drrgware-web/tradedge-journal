@@ -1073,8 +1073,39 @@ function computePositionAnalytics() {
     totalInvested += invested;
     totalUnrealPnL += unrealPnL;
     
-    // Find matching RRM item
-    const rrmItem = findRRMItemForTrade(pos);
+    // Find matching RRM item - try te_rrm_cache first for stock-level data
+    let rrmItem = null;
+    let stockRrmData = null;
+    
+    try {
+      const cacheStr = localStorage.getItem('te_rrm_cache');
+      if (cacheStr) {
+        const cache = JSON.parse(cacheStr);
+        if (cache[pos.symbol]) {
+          stockRrmData = cache[pos.symbol];
+          // Create a pseudo rrmItem from cache
+          rrmItem = {
+            symbol: pos.symbol,
+            name: pos.symbol,
+            quadrant: stockRrmData.daily || 'Unknown',
+            weeklyQuadrant: stockRrmData.weekly || 'Unknown',
+            current: {
+              rs_ratio: stockRrmData.dailyRatio,
+              rs_momentum: stockRrmData.dailyMom
+            },
+            rotationScore: Math.round((stockRrmData.dailyRatio - 95) * 10 + (stockRrmData.dailyMom - 95) * 10),
+            color: stockRrmData.daily === 'Leading' ? '#22c55e' : 
+                   stockRrmData.daily === 'Improving' ? '#3b82f6' :
+                   stockRrmData.daily === 'Weakening' ? '#eab308' : '#ef4444'
+          };
+        }
+      }
+    } catch(e) {}
+    
+    // Fallback to RRM items if no cache data
+    if (!rrmItem) {
+      rrmItem = findRRMItemForTrade(pos);
+    }
     
     // Generate alerts
     const posAlerts = [];
@@ -1082,14 +1113,12 @@ function computePositionAnalytics() {
       if (rrmItem.quadrant === 'Lagging') {
         posAlerts.push({ type: 'danger', msg: 'In Lagging quadrant — consider exit' });
       }
-      if (rrmItem.quadrant === 'Weakening' && rrmItem.headingInfo?.label === 'SW') {
-        posAlerts.push({ type: 'warning', msg: 'Weakening + SW heading — watch closely' });
+      if (rrmItem.quadrant === 'Weakening') {
+        posAlerts.push({ type: 'warning', msg: 'Weakening quadrant — watch closely' });
       }
-      if (rrmItem.distance > 5) {
-        posAlerts.push({ type: 'info', msg: 'Overextended — profit booking zone' });
-      }
-      if (rrmItem.hasHook) {
-        posAlerts.push({ type: 'bullish', msg: 'V-Hook detected — momentum turning' });
+      // Check weekly vs daily divergence
+      if (stockRrmData && stockRrmData.weekly === 'Leading' && stockRrmData.daily === 'Lagging') {
+        posAlerts.push({ type: 'info', msg: 'Weekly strong, daily weak — pullback opportunity?' });
       }
     }
     
@@ -1529,23 +1558,64 @@ function drawChart(items){
   });
 
   // v6.1: Draw position overlay markers (stars for open positions)
+  // Uses te_rrm_cache from localStorage for stock-level RS data
   if (SHOW_POSITIONS_OVERLAY && TRADE_JOURNAL_DATA?.trades) {
     const positions = getOpenPositions();
+    
+    // Try to get stock-level RRM cache from localStorage
+    let rrmCache = null;
+    try {
+      const cacheStr = localStorage.getItem('te_rrm_cache');
+      if (cacheStr) rrmCache = JSON.parse(cacheStr);
+    } catch(e) {}
+    
     positions.forEach(pos => {
-      const rrmItem = findRRMItemForTrade(pos);
-      if (!rrmItem || !rrmItem.current) return;
+      let x, y, hasAlert, quadrant, symbol = pos.symbol;
       
-      const x = tX(rrmItem.current.rs_ratio);
-      const y = tY(rrmItem.current.rs_momentum);
-      const hasAlert = rrmItem.quadrant === 'Lagging' || 
-                      (rrmItem.quadrant === 'Weakening' && rrmItem.headingInfo?.label === 'SW');
+      // First try: use te_rrm_cache for stock-level data
+      if (rrmCache && rrmCache[symbol]) {
+        const stockData = rrmCache[symbol];
+        const ratio = TF === 'weekly' ? stockData.weeklyRatio : stockData.dailyRatio;
+        const mom = TF === 'weekly' ? stockData.weeklyMom : stockData.dailyMom;
+        quadrant = TF === 'weekly' ? stockData.weekly : stockData.daily;
+        
+        if (ratio && mom) {
+          x = tX(ratio);
+          y = tY(mom);
+          hasAlert = quadrant === 'Lagging' || quadrant === 'Weakening';
+        } else {
+          return; // No valid data
+        }
+      } else {
+        // Fallback: try to find in current RRM items
+        const rrmItem = findRRMItemForTrade(pos);
+        if (!rrmItem || !rrmItem.current) return;
+        
+        x = tX(rrmItem.current.rs_ratio);
+        y = tY(rrmItem.current.rs_momentum);
+        quadrant = rrmItem.quadrant;
+        hasAlert = quadrant === 'Lagging' || 
+                  (quadrant === 'Weakening' && rrmItem.headingInfo?.label === 'SW');
+      }
       
       // Draw star marker
       ctx.save();
       ctx.globalAlpha = 0.95;
       
+      // Color based on quadrant
+      let starColor, glowColor, innerColor;
+      if (quadrant === 'Leading') {
+        starColor = '#22c55e'; glowColor = '#22c55e'; innerColor = '#86efac';
+      } else if (quadrant === 'Improving') {
+        starColor = '#3b82f6'; glowColor = '#3b82f6'; innerColor = '#93c5fd';
+      } else if (quadrant === 'Weakening') {
+        starColor = '#eab308'; glowColor = '#eab308'; innerColor = '#fde047';
+      } else {
+        starColor = '#ef4444'; glowColor = '#ef4444'; innerColor = '#fca5a5';
+      }
+      
       // Outer glow
-      ctx.shadowColor = hasAlert ? '#ef4444' : '#f59e0b';
+      ctx.shadowColor = glowColor;
       ctx.shadowBlur = 15;
       
       // Star shape
@@ -1569,7 +1639,7 @@ function drawChart(items){
       };
       
       drawStar(x, y, 5, 12, 6);
-      ctx.fillStyle = hasAlert ? '#ef4444' : '#f59e0b';
+      ctx.fillStyle = starColor;
       ctx.fill();
       ctx.strokeStyle = '#0c1018';
       ctx.lineWidth = 2;
@@ -1578,14 +1648,16 @@ function drawChart(items){
       // Inner highlight
       ctx.shadowBlur = 0;
       drawStar(x, y, 5, 6, 3);
-      ctx.fillStyle = hasAlert ? '#fca5a5' : '#fcd34d';
+      ctx.fillStyle = innerColor;
       ctx.fill();
       
-      // "MY" label below star
-      ctx.fillStyle = hasAlert ? '#ef4444' : '#f59e0b';
-      ctx.font = '700 8px JetBrains Mono';
+      // Symbol label below star
+      ctx.fillStyle = starColor;
+      ctx.font = '700 7px JetBrains Mono';
       ctx.textAlign = 'center';
-      ctx.fillText('MY', x, y + 20);
+      ctx.fillText(symbol.slice(0, 6), x, y + 20);
+      
+      ctx.restore();
       
       ctx.restore();
     });
