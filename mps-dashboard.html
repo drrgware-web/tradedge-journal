@@ -681,6 +681,23 @@ body::after {
   .zone-block { min-width: 48%; }
   .modifiers-grid { grid-template-columns: 1fr; }
 }
+/* PARADOX ALERTS */
+.paradox-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:10px; margin-bottom:24px; }
+.paradox-card { padding:14px 16px; border-radius:var(--radius); border:1px solid; position:relative; overflow:hidden; transition:transform 0.2s; }
+.paradox-card:hover { transform:translateY(-2px); }
+.paradox-card.danger { border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.06); }
+.paradox-card.caution { border-color:rgba(234,179,8,0.4); background:rgba(234,179,8,0.06); }
+.paradox-card.opportunity { border-color:rgba(34,197,94,0.4); background:rgba(34,197,94,0.06); }
+.paradox-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.paradox-emoji { font-size:18px; }
+.paradox-name { font-family:var(--font-display); font-size:11px; font-weight:700; letter-spacing:1px; }
+.paradox-severity { font-family:var(--font-mono); font-size:8px; font-weight:600; letter-spacing:2px; text-transform:uppercase; padding:2px 8px; border-radius:3px; margin-left:auto; }
+.paradox-severity.danger { color:#ef4444; background:rgba(239,68,68,0.15); }
+.paradox-severity.caution { color:#eab308; background:rgba(234,179,8,0.15); }
+.paradox-severity.opportunity { color:#22c55e; background:rgba(34,197,94,0.15); }
+.paradox-desc { font-family:var(--font-mono); font-size:9.5px; color:var(--text-secondary); line-height:1.5; margin-bottom:8px; }
+.paradox-action { font-family:var(--font-mono); font-size:9px; color:var(--text-muted); line-height:1.4; padding-top:8px; border-top:1px solid var(--border-dim); }
+.paradox-action strong { color:var(--neon-cyan); font-weight:600; }
 </style>
 </head>
 <body>
@@ -1051,6 +1068,26 @@ function render(data, isLive) {
       }).join('')}
     </div>
 
+<!-- PARADOX ALERTS -->
+    ${(c.paradox_alerts && c.paradox_alerts.length > 0) ? `
+    <div class="section-title">⚡ PARADOX ALERTS (${c.paradox_alerts.length})</div>
+    <div class="paradox-grid">
+      ${c.paradox_alerts.map(p => {
+        const sevColors = {danger: '#ef4444', caution: '#eab308', opportunity: '#22c55e'};
+        const nameColor = sevColors[p.severity] || '#94a3b8';
+        return `
+        <div class="paradox-card ${p.severity}">
+          <div class="paradox-header">
+            <span class="paradox-emoji">${p.emoji}</span>
+            <span class="paradox-name" style="color:${nameColor}">${p.name}</span>
+            <span class="paradox-severity ${p.severity}">${p.severity.toUpperCase()}</span>
+          </div>
+          <div class="paradox-desc">${p.description}</div>
+          <div class="paradox-action"><strong>→ ACTION:</strong> ${p.action}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    ` : ''}
     <!-- ZONE THRESHOLDS -->
     <div class="section-title">ZONE THRESHOLDS</div>
     <div class="zones-bar">
