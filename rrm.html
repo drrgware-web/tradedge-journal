@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RRM v4 — Relative Momentum Matrix | TradEdge</title>
+<title>RRM v5 — Relative Momentum Matrix | TradEdge</title>
 <link rel="icon" type="image/jpeg" href="./assets/logo.jpeg">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -51,22 +51,40 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .rp{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;position:relative}
 .rc{position:relative;width:100%;aspect-ratio:1.2/1;min-height:480px}
 .rc canvas{position:absolute;inset:0;width:100%;height:100%}
-.tt{position:absolute;display:none;background:var(--bg3);border:1px solid var(--bd2);border-radius:6px;padding:8px 10px;font-family:var(--fm);font-size:10px;pointer-events:none;z-index:100;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.tt{position:absolute;display:none;background:var(--bg3);border:1px solid var(--bd2);border-radius:6px;padding:10px 12px;font-family:var(--fm);font-size:10px;pointer-events:none;z-index:100;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:180px}
 .tt b{display:block;margin-bottom:3px}
+.tt-metrics{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bd)}
+.tt-metric{display:flex;justify-content:space-between;gap:8px}
+.tt-metric-label{color:var(--t3)}
+.tt-metric-value{font-weight:600}
 .sb{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 200px);overflow-y:auto}
 .sb::-webkit-scrollbar{width:4px}
 .sb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
 .sb-search{width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--bd);background:var(--bg3);color:var(--t1);font-family:var(--fm);font-size:10px;outline:none;margin-bottom:4px}
 .sb-search:focus{border-color:var(--cyan)}
 .sb-search::placeholder{color:var(--t4)}
+/* NEW: Sidebar controls row */
+.sb-controls{display:flex;gap:6px;margin-bottom:8px;align-items:center}
+.sb-controls .sel-all{font-family:var(--fm);font-size:9px;color:var(--cyan);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.sb-controls .sel-all:hover{color:var(--t1)}
 .qp{background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);padding:10px}
 .qt{font-family:var(--fd);font-size:10px;font-weight:600;letter-spacing:2px;margin-bottom:6px;display:flex;align-items:center;gap:5px}
 .qd{width:8px;height:8px;border-radius:50%}
 .sl{list-style:none}
-.si{display:flex;align-items:center;gap:5px;padding:3px 0;font-family:var(--fm);font-size:10px;color:var(--t2);cursor:pointer;transition:.15s}
+/* UPDATED: Sidebar item with checkbox */
+.si{display:flex;align-items:center;gap:6px;padding:4px 0;font-family:var(--fm);font-size:10px;color:var(--t2);cursor:pointer;transition:.15s}
 .si:hover{color:var(--t1)}
+.si input[type=checkbox]{width:12px;height:12px;accent-color:var(--cyan);cursor:pointer;flex-shrink:0}
 .si .sd{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.si .sv{margin-left:auto;color:var(--t4);font-size:9px}
+.si .sn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si .sv{color:var(--t4);font-size:9px;margin-left:auto}
+/* NEW: Rotation score badge */
+.si .score-badge{padding:2px 6px;border-radius:10px;font-size:8px;font-weight:700;margin-left:4px}
+.si .score-badge.high{background:rgba(34,197,94,.2);color:#4ade80}
+.si .score-badge.med{background:rgba(234,179,8,.2);color:#facc15}
+.si .score-badge.low{background:rgba(239,68,68,.2);color:#f87171}
+/* NEW: Heading arrow indicator */
+.si .heading-arrow{font-size:10px;margin-left:2px}
 .mtf-panel{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:14px}
 .mtf-title{font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:3px;color:var(--t3);margin-bottom:10px;text-transform:uppercase}
 .mtf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px}
@@ -90,8 +108,139 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
   <div class="ld"><div class="sp"></div><div style="font-family:var(--fm);font-size:11px;color:var(--t3);letter-spacing:2px">LOADING RRM DATA...</div></div>
 </div>
 <script>
+// ═══════════════════════════════════════════════════════════════════════════
+// RRM v5.0 — CORE STATE
+// ═══════════════════════════════════════════════════════════════════════════
 let DATA=null,IS_LIVE=false,MODE='sectors',TF='daily',HIGHLIGHT=null,DRILLDOWN=null,STOCK_LIMIT=10,BENCH=null;
 let ANIM_PLAYING=false,ANIM_FRAME=0,ANIM_TIMER=null,TAIL_SLICE=null,FULLSCREEN=false,SIDEBAR_FILTER='';
+
+// NEW v5.0: Quadrant filter and selection state
+let QUADRANT_FILTER='all';  // 'all', 'Leading', 'Improving', 'Weakening', 'Lagging'
+let SELECTED_ITEMS=new Set(); // Set of selected symbol strings
+let SELECT_ALL_MODE=true;    // true = all selected by default
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v5.0 FEATURE 1: ADVANCED METRICS ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Calculate tail velocity (speed of movement between last 2 points)
+ * @param {Array} tail - Array of {rs_ratio, rs_momentum} objects
+ * @returns {number} - Velocity in points per period
+ */
+function calcVelocity(tail) {
+  if (!tail || tail.length < 2) return 0;
+  const prev = tail[tail.length - 2];
+  const curr = tail[tail.length - 1];
+  return Math.hypot(curr.rs_ratio - prev.rs_ratio, curr.rs_momentum - prev.rs_momentum);
+}
+
+/**
+ * Calculate heading angle (direction of movement, 0-360°)
+ * 0° = East (increasing ratio), 90° = North (increasing momentum)
+ * @param {Array} tail - Array of {rs_ratio, rs_momentum} objects
+ * @returns {number} - Heading angle in degrees (0-360)
+ */
+function calcHeading(tail) {
+  if (!tail || tail.length < 2) return 0;
+  const prev = tail[tail.length - 2];
+  const curr = tail[tail.length - 1];
+  const deltaRatio = curr.rs_ratio - prev.rs_ratio;
+  const deltaMomentum = curr.rs_momentum - prev.rs_momentum;
+  let angle = Math.atan2(deltaMomentum, deltaRatio) * (180 / Math.PI);
+  return (angle + 360) % 360; // Normalize to 0-360
+}
+
+/**
+ * Calculate distance from center (100, 100)
+ * @param {Object} current - {rs_ratio, rs_momentum}
+ * @returns {number} - Distance from center point
+ */
+function calcDistance(current) {
+  if (!current) return 0;
+  return Math.hypot(current.rs_ratio - 100, current.rs_momentum - 100);
+}
+
+/**
+ * Calculate rotation score (composite metric 0-100)
+ * Weights: 40% velocity, 30% heading quality, 30% distance
+ * @param {Array} tail - Tail data
+ * @param {Object} current - Current position
+ * @returns {number} - Score from 0-100
+ */
+function calcRotationScore(tail, current) {
+  const velocity = calcVelocity(tail);
+  const heading = calcHeading(tail);
+  const distance = calcDistance(current);
+  
+  // Heading score: 0-90° (NE, bullish) = 100, degrades as heading moves away
+  let headingScore;
+  if (heading >= 0 && heading <= 90) {
+    headingScore = 100; // Best: moving toward Leading
+  } else if (heading > 90 && heading <= 180) {
+    headingScore = 50;  // OK: moving toward Weakening
+  } else if (heading > 180 && heading <= 270) {
+    headingScore = 25;  // Poor: moving toward Lagging
+  } else {
+    headingScore = 60;  // Decent: moving toward Improving
+  }
+  
+  // Velocity score: normalize (typical range 0-5, cap at 100)
+  const velocityScore = Math.min(velocity * 20, 100);
+  
+  // Distance score: further from center = stronger signal (cap at 100)
+  const distanceScore = Math.min(distance * 15, 100);
+  
+  // Weighted composite
+  return Math.round(0.4 * velocityScore + 0.3 * headingScore + 0.3 * distanceScore);
+}
+
+/**
+ * Get heading direction label and emoji
+ * @param {number} heading - Angle in degrees
+ * @returns {Object} - {label, emoji, color}
+ */
+function getHeadingInfo(heading) {
+  if (heading >= 337.5 || heading < 22.5) return { label: 'E', emoji: '→', color: '#3b82f6' };
+  if (heading >= 22.5 && heading < 67.5) return { label: 'NE', emoji: '↗', color: '#22c55e' };
+  if (heading >= 67.5 && heading < 112.5) return { label: 'N', emoji: '↑', color: '#22c55e' };
+  if (heading >= 112.5 && heading < 157.5) return { label: 'NW', emoji: '↖', color: '#eab308' };
+  if (heading >= 157.5 && heading < 202.5) return { label: 'W', emoji: '←', color: '#eab308' };
+  if (heading >= 202.5 && heading < 247.5) return { label: 'SW', emoji: '↙', color: '#ef4444' };
+  if (heading >= 247.5 && heading < 292.5) return { label: 'S', emoji: '↓', color: '#ef4444' };
+  return { label: 'SE', emoji: '↘', color: '#3b82f6' };
+}
+
+/**
+ * Get score badge class based on score value
+ * @param {number} score - Rotation score 0-100
+ * @returns {string} - CSS class: 'high', 'med', or 'low'
+ */
+function getScoreClass(score) {
+  if (score >= 65) return 'high';
+  if (score >= 40) return 'med';
+  return 'low';
+}
+
+/**
+ * Enrich item with computed metrics
+ * @param {Object} item - Sector/ETF item with tail and current
+ * @returns {Object} - Item with added metrics
+ */
+function enrichWithMetrics(item) {
+  return {
+    ...item,
+    velocity: calcVelocity(item.tail),
+    heading: calcHeading(item.tail),
+    headingInfo: getHeadingInfo(calcHeading(item.tail)),
+    distance: calcDistance(item.current),
+    rotationScore: calcRotationScore(item.tail, item.current)
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAMPLE DATA (unchanged from v4)
+// ═══════════════════════════════════════════════════════════════════════════
 
 const SAMPLE_BENCH_DATA={
   daily:{sectors:[
@@ -113,6 +262,10 @@ const SAMPLE={
   metadata:{generated_at:"2026-03-16T16:30:00",date:"2026-03-16",benchmarks_calculated:["^NSEI"],total_sectors:5,total_etfs:0,total_drilldown_sectors:0,timeframes:["daily","weekly"]}
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
 function getBD(){
   if(!DATA)return SAMPLE_BENCH_DATA;
   const bd=DATA.benchmarks_data||{};
@@ -121,13 +274,47 @@ function getBD(){
 
 function getCurrentItems(){
   const bd=getBD(),tf=bd[TF]||bd.daily;
+  let items;
+  
   if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
     const dd=bd.drilldown[DRILLDOWN];
-    let items=TF==='weekly'?(dd.weekly||[]):TF==='monthly'?(dd.monthly||dd.weekly||[]):(dd.daily||[]);
+    items=TF==='weekly'?(dd.weekly||[]):TF==='monthly'?(dd.monthly||dd.weekly||[]):(dd.daily||[]);
     if(STOCK_LIMIT!=='all')items=items.slice(0,parseInt(STOCK_LIMIT));
-    return items;
+  } else {
+    items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[]);
   }
-  return MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[]);
+  
+  // Enrich all items with metrics
+  items = items.map(enrichWithMetrics);
+  
+  // v5.0: Apply quadrant filter
+  if (QUADRANT_FILTER !== 'all') {
+    items = items.filter(item => item.quadrant === QUADRANT_FILTER);
+  }
+  
+  // v5.0: Apply selection filter (only show selected items on chart)
+  if (!SELECT_ALL_MODE && SELECTED_ITEMS.size > 0) {
+    items = items.filter(item => SELECTED_ITEMS.has(item.symbol));
+  }
+  
+  return items;
+}
+
+// Get all items before filtering (for sidebar display)
+function getAllItems(){
+  const bd=getBD(),tf=bd[TF]||bd.daily;
+  let items;
+  
+  if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
+    const dd=bd.drilldown[DRILLDOWN];
+    items=TF==='weekly'?(dd.weekly||[]):TF==='monthly'?(dd.monthly||dd.weekly||[]):(dd.daily||[]);
+    if(STOCK_LIMIT!=='all')items=items.slice(0,parseInt(STOCK_LIMIT));
+  } else {
+    items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[]);
+  }
+  
+  // Enrich all items with metrics
+  return items.map(enrichWithMetrics);
 }
 
 function computeAlignments(){
@@ -199,29 +386,85 @@ function renderAlignmentPanel(){
   </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v5.0: SELECTION MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function toggleItemSelection(symbol) {
+  if (SELECT_ALL_MODE) {
+    // First toggle: switch to manual mode and deselect this item
+    SELECT_ALL_MODE = false;
+    const allItems = getAllItems();
+    SELECTED_ITEMS = new Set(allItems.map(i => i.symbol));
+    SELECTED_ITEMS.delete(symbol);
+  } else {
+    if (SELECTED_ITEMS.has(symbol)) {
+      SELECTED_ITEMS.delete(symbol);
+    } else {
+      SELECTED_ITEMS.add(symbol);
+    }
+    // If all items are selected, switch back to SELECT_ALL_MODE
+    const allItems = getAllItems();
+    if (SELECTED_ITEMS.size === allItems.length) {
+      SELECT_ALL_MODE = true;
+      SELECTED_ITEMS.clear();
+    }
+  }
+  render();
+}
+
+function selectAll() {
+  SELECT_ALL_MODE = true;
+  SELECTED_ITEMS.clear();
+  render();
+}
+
+function selectNone() {
+  SELECT_ALL_MODE = false;
+  SELECTED_ITEMS.clear();
+  render();
+}
+
+function isItemSelected(symbol) {
+  if (SELECT_ALL_MODE) return true;
+  return SELECTED_ITEMS.has(symbol);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════════════
+
 function render(){
   const d=DATA,app=document.getElementById('app');
   const bd=getBD();
   const tf_data=bd[TF]||bd.daily;
   const benchName=(d.available_benchmarks||{})[BENCH]||BENCH;
-  let items,displayBench=benchName,breadcrumb='';
+  let items=getCurrentItems(),displayBench=benchName,breadcrumb='';
+  const allItems=getAllItems(); // For sidebar (unfiltered by selection)
 
   if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
     const dd=bd.drilldown[DRILLDOWN];
-    const ddTF=TF==='weekly'?(dd.weekly||[]):TF==='monthly'?(dd.monthly||dd.weekly||[]):(dd.daily||[]);
-    items=STOCK_LIMIT==='all'?ddTF:ddTF.slice(0,parseInt(STOCK_LIMIT));
     displayBench=dd.sector_name;
     breadcrumb=`<div class="bc"><span onclick="exitDrill()">Sectors</span><span class="arr">›</span><span class="cur">${dd.sector_name} — Stocks vs ${dd.sector_name}</span></div>`;
-  } else {
-    items=MODE==='etfs'?(tf_data.etfs||[]):MODE==='assets'?(tf_data.asset_classes||[]):MODE==='segments'?(tf_data.market_segments||[]):(tf_data.sectors||[]);
   }
 
+  // Group items for sidebar (use allItems, apply quadrant filter only)
+  let sidebarItems = allItems;
+  if (QUADRANT_FILTER !== 'all') {
+    sidebarItems = allItems.filter(item => item.quadrant === QUADRANT_FILTER);
+  }
+  
   const grp={Leading:[],Improving:[],Weakening:[],Lagging:[]};
-  items.forEach(s=>{if(grp[s.quadrant])grp[s.quadrant].push(s)});
+  sidebarItems.forEach(s=>{if(grp[s.quadrant])grp[s.quadrant].push(s)});
 
   const benchOpts=Object.entries(d.available_benchmarks||{}).map(([k,v])=>`<option value="${k}" ${k===BENCH?'selected':''}>${v}</option>`).join('');
   const hasBenchData=Object.keys(d.benchmarks_data||{}).length>1;
   const hasMontly=!!bd.monthly?.sectors?.length;
+
+  // v5.0: Quadrant filter options
+  const quadrantOpts = ['all','Leading','Improving','Weakening','Lagging'].map(q => 
+    `<option value="${q}" ${QUADRANT_FILTER===q?'selected':''}>${q==='all'?'All Quadrants':q}</option>`
+  ).join('');
 
   app.innerHTML=`
     <div class="hd">
@@ -229,7 +472,7 @@ function render(){
         <img class="logo-img" src="./assets/logo.jpeg" alt="TradEdge" onerror="this.style.display='none'">
         <div class="logo-tagline">Define Your Edge with TradEdge</div>
       </div>
-      <p class="sub">RELATIVE MOMENTUM MATRIX · SECTOR ROTATION · ${d.metadata?.date||''}</p>
+      <p class="sub">RELATIVE MOMENTUM MATRIX v5.0 · SECTOR ROTATION · ${d.metadata?.date||''}</p>
     </div>
     <div class="ctrl">
       <div class="cg"><span class="cl">Mode:</span>
@@ -242,6 +485,10 @@ function render(){
         <button class="cb ${TF==='daily'?'a':''}" onclick="setTF('daily')">Daily</button>
         <button class="cb ${TF==='weekly'?'a':''}" onclick="setTF('weekly')">Weekly</button>
         <button class="cb ${TF==='monthly'?'a':''}" onclick="setTF('monthly')" ${!hasMontly?'style="opacity:.4"':''}>Monthly</button>
+      </div>
+      <!-- v5.0: Quadrant Filter Dropdown -->
+      <div class="cg"><span class="cl">Quadrant:</span>
+        <select class="cs" onchange="setQuadrantFilter(this.value)">${quadrantOpts}</select>
       </div>
       ${DRILLDOWN?`<div class="cg"><span class="cl">Stocks:</span>
         <select class="cs" onchange="setLimit(this.value)">
@@ -263,8 +510,8 @@ function render(){
       </button>
       <div class="slider-wrap">
         <span class="slider-label">Tail:</span>
-        <input type="range" min="2" max="${items.length?Math.max(...items.map(s=>s.tail?.length||5)):5}" value="${TAIL_SLICE||items[0]?.tail?.length||5}" oninput="setTailSlice(+this.value)" title="Scrub through history">
-        <span class="slider-label" id="tail-count">${TAIL_SLICE||items[0]?.tail?.length||5} pts</span>
+        <input type="range" min="2" max="${allItems.length?Math.max(...allItems.map(s=>s.tail?.length||5)):5}" value="${TAIL_SLICE||allItems[0]?.tail?.length||5}" oninput="setTailSlice(+this.value)" title="Scrub through history">
+        <span class="slider-label" id="tail-count">${TAIL_SLICE||allItems[0]?.tail?.length||5} pts</span>
       </div>
       <div class="tb-spacer"></div>
       <button class="tb-btn" onclick="exportChart('svg')" title="Export as SVG">📐 SVG</button>
@@ -274,23 +521,46 @@ function render(){
     <div class="ml">
       <div class="rp"><div class="rc" id="rc"><canvas id="rrm-canvas"></canvas></div><div class="tt" id="tt"></div></div>
       <div class="sb">
-        <input class="sb-search" type="text" placeholder="🔍 Filter sectors..." value="${SIDEBAR_FILTER}" oninput="filterSidebar(this.value)">
+        <input class="sb-search" type="text" placeholder="🔍 Filter..." value="${SIDEBAR_FILTER}" oninput="filterSidebar(this.value)">
+        <!-- v5.0: Selection controls -->
+        <div class="sb-controls">
+          <span class="sel-all" onclick="selectAll()">Select All</span>
+          <span class="sel-all" onclick="selectNone()">Clear All</span>
+          <span style="flex:1"></span>
+          <span style="font-family:var(--fm);font-size:9px;color:var(--t4)">${items.length}/${sidebarItems.length} shown</span>
+        </div>
         ${qPanel('Leading','#22c55e',grp.Leading)}
         ${qPanel('Improving','#3b82f6',grp.Improving)}
         ${qPanel('Weakening','#eab308',grp.Weakening)}
         ${qPanel('Lagging','#ef4444',grp.Lagging)}
       </div>
     </div>
-    <div class="ft">TradEdge RRM v4.0 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
+    <div class="ft">TradEdge RRM v5.0 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
   drawChart(items);
 }
 
+// v5.0: Updated sidebar panel with checkboxes and metrics
 function qPanel(n,c,items){
   const filtered=SIDEBAR_FILTER?items.filter(s=>s.name.toLowerCase().includes(SIDEBAR_FILTER.toLowerCase())):items;
   return`<div class="qp"><div class="qt"><div class="qd" style="background:${c}"></div><span style="color:${c}">${n}</span><span style="font-family:var(--fm);font-size:9px;color:var(--t4);margin-left:auto">${filtered.length}${filtered.length!==items.length?'/'+items.length:''}</span></div>
   <ul class="sl">${filtered.length===0?'<li style="font-family:var(--fm);font-size:9px;color:var(--t4);padding:3px 0">—</li>':
-    filtered.map(s=>`<li class="si" onmouseenter="hl('${s.symbol}')" onmouseleave="hl(null)" ${!DRILLDOWN&&MODE==='sectors'?`ondblclick="drill('${s.symbol}')"`:''}><span class="sd" style="background:${s.color}"></span><span>${s.name}</span><span class="sv">${s.current.rs_ratio.toFixed(1)}/${s.current.rs_momentum.toFixed(1)}</span></li>`).join('')}</ul></div>`;
+    filtered.map(s=>{
+      const checked = isItemSelected(s.symbol);
+      const scoreClass = getScoreClass(s.rotationScore);
+      const headingInfo = s.headingInfo || getHeadingInfo(s.heading || 0);
+      return `<li class="si" onmouseenter="hl('${s.symbol}')" onmouseleave="hl(null)" ${!DRILLDOWN&&MODE==='sectors'?`ondblclick="drill('${s.symbol}')"`:''}>
+        <input type="checkbox" ${checked?'checked':''} onclick="event.stopPropagation();toggleItemSelection('${s.symbol}')">
+        <span class="sd" style="background:${s.color}"></span>
+        <span class="sn">${s.name}</span>
+        <span class="score-badge ${scoreClass}">${s.rotationScore}</span>
+        <span class="heading-arrow" style="color:${headingInfo.color}">${headingInfo.emoji}</span>
+      </li>`;
+    }).join('')}</ul></div>`;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v5.0: ENHANCED CHART DRAWING WITH VISUAL INDICATORS
+// ═══════════════════════════════════════════════════════════════════════════
 
 function drawChart(items){
   const el=document.getElementById('rc');if(!el)return;
@@ -402,6 +672,30 @@ function drawChart(items){
         ctx.globalAlpha=op*(0.5+0.5*pulse);
         ctx.beginPath();ctx.arc(x,y,r*0.4,0,Math.PI*2);
         ctx.fillStyle='#fff';ctx.fill();
+        
+        // v5.0: Draw rotation score badge near the current position
+        if (sec.rotationScore !== undefined && (isH || !HIGHLIGHT)) {
+          ctx.globalAlpha = op * 0.9;
+          const scoreClass = getScoreClass(sec.rotationScore);
+          const badgeColor = scoreClass === 'high' ? '#22c55e' : scoreClass === 'med' ? '#eab308' : '#ef4444';
+          const badgeX = x + 12;
+          const badgeY = y - 12;
+          
+          // Badge background
+          ctx.beginPath();
+          ctx.roundRect(badgeX - 12, badgeY - 8, 24, 16, 8);
+          ctx.fillStyle = badgeColor + '40';
+          ctx.fill();
+          ctx.strokeStyle = badgeColor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          
+          // Badge text
+          ctx.fillStyle = badgeColor;
+          ctx.font = '700 8px JetBrains Mono';
+          ctx.textAlign = 'center';
+          ctx.fillText(sec.rotationScore, badgeX, badgeY + 3);
+        }
       }
     });
     ctx.globalAlpha=op;
@@ -409,11 +703,16 @@ function drawChart(items){
     const l=tail[tail.length-1],p=tail[tail.length-2];
     const lx=tX(l.rs_ratio),ly=tY(l.rs_momentum),px=tX(p.rs_ratio),py=tY(p.rs_momentum);
     const a=Math.atan2(ly-py,lx-px),al=9;
+    
+    // v5.0: Color-coded heading arrow
+    const headingInfo = sec.headingInfo || getHeadingInfo(sec.heading || 0);
     ctx.beginPath();
     ctx.moveTo(lx,ly);
     ctx.lineTo(lx+al*Math.cos(a+2.6),ly+al*Math.sin(a+2.6));
     ctx.lineTo(lx+al*Math.cos(a-2.6),ly+al*Math.sin(a-2.6));
-    ctx.closePath();ctx.fillStyle=sec.color;ctx.fill();
+    ctx.closePath();
+    ctx.fillStyle=headingInfo.color;
+    ctx.fill();
 
     if(op>.5){
       const nm=sec.name.replace('Nifty ','');
@@ -425,6 +724,7 @@ function drawChart(items){
     ctx.restore();
   });
 
+  // v5.0: Enhanced tooltip with metrics
   canvas.onmousemove=e=>{
     const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
     let cl=null,cd=20;
@@ -439,7 +739,26 @@ function drawChart(items){
       tt.style.display='block';
       tt.style.left=(e.clientX-el.closest('.rp').getBoundingClientRect().left+14)+'px';
       tt.style.top=(e.clientY-el.closest('.rp').getBoundingClientRect().top-10)+'px';
-      tt.innerHTML=`<b style="color:${cl.color}">${cl.name}</b><span style="font-size:9px;color:var(--t3)">${cl.quadrant}</span><div style="margin-top:4px">RS-Ratio: <b>${cl.current.rs_ratio.toFixed(2)}</b><br>RS-Mom: <b>${cl.current.rs_momentum.toFixed(2)}</b></div>${!DRILLDOWN&&MODE==='sectors'?'<div style="margin-top:4px;font-size:9px;color:var(--cyan)">Double-click → drill-down</div>':''}`;
+      
+      const headingInfo = cl.headingInfo || getHeadingInfo(cl.heading || 0);
+      const scoreClass = getScoreClass(cl.rotationScore || 0);
+      const scoreColor = scoreClass === 'high' ? '#4ade80' : scoreClass === 'med' ? '#facc15' : '#f87171';
+      
+      // v5.0: Enhanced tooltip content with metrics
+      tt.innerHTML=`
+        <b style="color:${cl.color}">${cl.name}</b>
+        <span style="font-size:9px;color:var(--t3)">${cl.quadrant} · ${Math.round(cl.heading || 0)}° ${headingInfo.label}</span>
+        <div style="margin-top:4px">
+          RS-Ratio: <b>${cl.current.rs_ratio.toFixed(2)}</b><br>
+          RS-Mom: <b>${cl.current.rs_momentum.toFixed(2)}</b>
+        </div>
+        <div class="tt-metrics">
+          <div class="tt-metric"><span class="tt-metric-label">Velocity</span><span class="tt-metric-value">${(cl.velocity || 0).toFixed(2)}</span></div>
+          <div class="tt-metric"><span class="tt-metric-label">Distance</span><span class="tt-metric-value">${(cl.distance || 0).toFixed(2)}</span></div>
+          <div class="tt-metric"><span class="tt-metric-label">Heading</span><span class="tt-metric-value" style="color:${headingInfo.color}">${headingInfo.emoji} ${headingInfo.label}</span></div>
+          <div class="tt-metric"><span class="tt-metric-label">Score</span><span class="tt-metric-value" style="color:${scoreColor}">${cl.rotationScore || 0}/100</span></div>
+        </div>
+        ${!DRILLDOWN&&MODE==='sectors'?'<div style="margin-top:6px;font-size:9px;color:var(--cyan)">Double-click → drill-down</div>':''}`;
       if(HIGHLIGHT!==cl.symbol){HIGHLIGHT=cl.symbol;drawChart(items)}
     }else{tt.style.display='none';if(HIGHLIGHT){HIGHLIGHT=null;drawChart(items)}}
   };
@@ -454,14 +773,21 @@ function drawChart(items){
   }
 }
 
-function setMode(m){DRILLDOWN=null;MODE=m;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROL FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function setMode(m){DRILLDOWN=null;MODE=m;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();SELECT_ALL_MODE=true;SELECTED_ITEMS.clear();render()}
 function setTF(t){TF=t;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
 function setLimit(v){STOCK_LIMIT=v;render()}
-function setBench(b){BENCH=b;DRILLDOWN=null;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
+function setBench(b){BENCH=b;DRILLDOWN=null;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();SELECT_ALL_MODE=true;SELECTED_ITEMS.clear();render()}
 function filterSidebar(v){SIDEBAR_FILTER=v;render()}
 function hl(sym){HIGHLIGHT=sym;drawChart(getCurrentItems())}
-function drill(sym){const bd=getBD();if(bd.drilldown&&bd.drilldown[sym]){DRILLDOWN=sym;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}else{alert('No drill-down data for this sector yet.\nRun the RRM GitHub Action to generate stock-level data.')}}
-function exitDrill(){DRILLDOWN=null;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();render()}
+function drill(sym){const bd=getBD();if(bd.drilldown&&bd.drilldown[sym]){DRILLDOWN=sym;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();SELECT_ALL_MODE=true;SELECTED_ITEMS.clear();render()}else{alert('No drill-down data for this sector yet.\nRun the RRM GitHub Action to generate stock-level data.')}}
+function exitDrill(){DRILLDOWN=null;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();SELECT_ALL_MODE=true;SELECTED_ITEMS.clear();render()}
+
+// v5.0: Quadrant filter function
+function setQuadrantFilter(q){QUADRANT_FILTER=q;render()}
 
 function toggleAnim(){ANIM_PLAYING?stopAnim():startAnim()}
 function startAnim(){
@@ -498,6 +824,10 @@ function exportChart(format){
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
 async function init(){
   let d=null;
   try{const r=await fetch('./data/rrm_data.json',{cache:'no-store'});if(r.ok){d=await r.json();if(d?.benchmarks_data&&Object.keys(d.benchmarks_data).length>0)IS_LIVE=true;else d=null}}catch(e){console.warn('RRM fetch:',e)}
@@ -506,8 +836,8 @@ async function init(){
   DATA=d;BENCH=d.default_benchmark||Object.keys(d.available_benchmarks||{})[0]||'^NSEI';
   await new Promise(r=>setTimeout(r,300));
   render();
-  // FIXED: Pulse animation only redraws canvas, does NOT rebuild DOM
-  // This fixes the frozen/unclickable buttons issue
+  
+  // Pulse animation - only redraws canvas, does NOT rebuild DOM
   let _lastPulse=0;
   (function pulseLoop(t){
     requestAnimationFrame(pulseLoop);
