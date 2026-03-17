@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RRM v5 — Relative Momentum Matrix | TradEdge</title>
+<title>RRM v6 — Relative Momentum Matrix | TradEdge</title>
 <link rel="icon" type="image/jpeg" href="./assets/logo.jpeg">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -63,7 +63,6 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .sb-search{width:100%;padding:5px 8px;border-radius:5px;border:1px solid var(--bd);background:var(--bg3);color:var(--t1);font-family:var(--fm);font-size:10px;outline:none;margin-bottom:4px}
 .sb-search:focus{border-color:var(--cyan)}
 .sb-search::placeholder{color:var(--t4)}
-/* NEW: Sidebar controls row */
 .sb-controls{display:flex;gap:6px;margin-bottom:8px;align-items:center}
 .sb-controls .sel-all{font-family:var(--fm);font-size:9px;color:var(--cyan);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .sb-controls .sel-all:hover{color:var(--t1)}
@@ -71,32 +70,45 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .qt{font-family:var(--fd);font-size:10px;font-weight:600;letter-spacing:2px;margin-bottom:6px;display:flex;align-items:center;gap:5px}
 .qd{width:8px;height:8px;border-radius:50%}
 .sl{list-style:none}
-/* UPDATED: Sidebar item with checkbox */
 .si{display:flex;align-items:center;gap:6px;padding:4px 0;font-family:var(--fm);font-size:10px;color:var(--t2);cursor:pointer;transition:.15s}
 .si:hover{color:var(--t1)}
 .si input[type=checkbox]{width:12px;height:12px;accent-color:var(--cyan);cursor:pointer;flex-shrink:0}
 .si .sd{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .si .sn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .si .sv{color:var(--t4);font-size:9px;margin-left:auto}
-/* NEW: Rotation score badge */
 .si .score-badge{padding:2px 6px;border-radius:10px;font-size:8px;font-weight:700;margin-left:4px}
 .si .score-badge.high{background:rgba(34,197,94,.2);color:#4ade80}
 .si .score-badge.med{background:rgba(234,179,8,.2);color:#facc15}
 .si .score-badge.low{background:rgba(239,68,68,.2);color:#f87171}
-/* NEW: Heading arrow indicator */
 .si .heading-arrow{font-size:10px;margin-left:2px}
+/* v6: Enhanced MTF Panel Styles */
 .mtf-panel{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:14px}
-.mtf-title{font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:3px;color:var(--t3);margin-bottom:10px;text-transform:uppercase}
-.mtf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px}
-.mtf-card{padding:10px 12px;border-radius:var(--r);border:1px solid;background:var(--bg3);transition:.2s}
+.mtf-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.mtf-title{font-family:var(--fd);font-size:11px;font-weight:600;letter-spacing:3px;color:var(--t3);text-transform:uppercase}
+.mtf-filter{display:flex;align-items:center;gap:6px}
+.mtf-filter-label{font-family:var(--fm);font-size:9px;color:var(--t4)}
+.mtf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.mtf-card{padding:12px 14px;border-radius:var(--r);border:1px solid;background:var(--bg3);transition:.2s}
 .mtf-card:hover{transform:translateY(-1px)}
-.mtf-card-name{font-family:var(--fd);font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:4px}
-.mtf-card-desc{font-family:var(--fm);font-size:9px;color:var(--t3);line-height:1.4;margin-bottom:6px}
-.mtf-card-cond{font-family:var(--fm);font-size:9px;color:var(--t4);margin-bottom:6px}
-.mtf-card-list{font-family:var(--fm);font-size:10px;color:var(--t1);line-height:1.6}
-.mtf-card-list .mtf-item{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;margin:2px;border-radius:3px;background:rgba(255,255,255,.04);border:1px solid var(--bd)}
-.mtf-card-list .mtf-item .mtf-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.mtf-empty{color:var(--t4);font-family:var(--fm);font-size:9px;font-style:italic}
+.mtf-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mtf-card-name{font-family:var(--fd);font-size:11px;font-weight:700;letter-spacing:1px}
+.mtf-card-count{font-family:var(--fm);font-size:9px;color:var(--t4);padding:2px 6px;background:var(--bg2);border-radius:4px}
+.mtf-card-desc{font-family:var(--fm);font-size:9px;color:var(--t3);line-height:1.4;margin-bottom:8px}
+.mtf-card-cond{font-family:var(--fm);font-size:9px;color:var(--t4);margin-bottom:10px;padding:4px 8px;background:var(--bg2);border-radius:4px;display:inline-block}
+.mtf-card-list{display:flex;flex-direction:column;gap:6px}
+.mtf-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;background:var(--bg2);border:1px solid var(--bd);transition:.2s}
+.mtf-item:hover{border-color:var(--bd2)}
+.mtf-item-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mtf-item-name{flex:1;font-family:var(--fm);font-size:10px;font-weight:500}
+.mtf-item-conviction{padding:2px 8px;border-radius:10px;font-family:var(--fm);font-size:9px;font-weight:700}
+.mtf-item-conviction.high{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3)}
+.mtf-item-conviction.med{background:rgba(234,179,8,.15);color:#facc15;border:1px solid rgba(234,179,8,.3)}
+.mtf-item-conviction.low{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+.mtf-item-hook{font-size:10px;margin-left:4px;color:#22d3ee;animation:hookPulse 1.5s ease-in-out infinite}
+@keyframes hookPulse{0%,100%{opacity:1}50%{opacity:.5}}
+.mtf-item-heading{font-size:9px;color:var(--t3);margin-left:4px}
+.mtf-item-metrics{display:flex;gap:8px;font-family:var(--fm);font-size:8px;color:var(--t4);margin-left:auto}
+.mtf-empty{color:var(--t4);font-family:var(--fm);font-size:10px;font-style:italic;padding:8px 0}
 .ft{text-align:center;padding:14px 0;font-family:var(--fm);font-size:9px;color:var(--t4);letter-spacing:1px;border-top:1px solid var(--bd);margin-top:16px}
 .ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:16px}
 .sp{width:40px;height:40px;border:3px solid var(--bd);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
@@ -109,25 +121,21 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 </div>
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
-// RRM v5.0 — CORE STATE
+// RRM v6.0 — CORE STATE
 // ═══════════════════════════════════════════════════════════════════════════
 let DATA=null,IS_LIVE=false,MODE='sectors',TF='daily',HIGHLIGHT=null,DRILLDOWN=null,STOCK_LIMIT=10,BENCH=null;
 let ANIM_PLAYING=false,ANIM_FRAME=0,ANIM_TIMER=null,TAIL_SLICE=null,FULLSCREEN=false,SIDEBAR_FILTER='';
+let QUADRANT_FILTER='all';
+let SELECTED_ITEMS=new Set();
+let SELECT_ALL_MODE=true;
 
-// NEW v5.0: Quadrant filter and selection state
-let QUADRANT_FILTER='all';  // 'all', 'Leading', 'Improving', 'Weakening', 'Lagging'
-let SELECTED_ITEMS=new Set(); // Set of selected symbol strings
-let SELECT_ALL_MODE=true;    // true = all selected by default
+// v6: MTF conviction filter threshold
+let MTF_MIN_CONVICTION=0; // 0 = show all, 50 = show only conviction >= 50
 
 // ═══════════════════════════════════════════════════════════════════════════
-// v5.0 FEATURE 1: ADVANCED METRICS ENGINE
+// v6.0 ADVANCED METRICS ENGINE
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * Calculate tail velocity (speed of movement between last 2 points)
- * @param {Array} tail - Array of {rs_ratio, rs_momentum} objects
- * @returns {number} - Velocity in points per period
- */
 function calcVelocity(tail) {
   if (!tail || tail.length < 2) return 0;
   const prev = tail[tail.length - 2];
@@ -135,12 +143,6 @@ function calcVelocity(tail) {
   return Math.hypot(curr.rs_ratio - prev.rs_ratio, curr.rs_momentum - prev.rs_momentum);
 }
 
-/**
- * Calculate heading angle (direction of movement, 0-360°)
- * 0° = East (increasing ratio), 90° = North (increasing momentum)
- * @param {Array} tail - Array of {rs_ratio, rs_momentum} objects
- * @returns {number} - Heading angle in degrees (0-360)
- */
 function calcHeading(tail) {
   if (!tail || tail.length < 2) return 0;
   const prev = tail[tail.length - 2];
@@ -148,58 +150,31 @@ function calcHeading(tail) {
   const deltaRatio = curr.rs_ratio - prev.rs_ratio;
   const deltaMomentum = curr.rs_momentum - prev.rs_momentum;
   let angle = Math.atan2(deltaMomentum, deltaRatio) * (180 / Math.PI);
-  return (angle + 360) % 360; // Normalize to 0-360
+  return (angle + 360) % 360;
 }
 
-/**
- * Calculate distance from center (100, 100)
- * @param {Object} current - {rs_ratio, rs_momentum}
- * @returns {number} - Distance from center point
- */
 function calcDistance(current) {
   if (!current) return 0;
   return Math.hypot(current.rs_ratio - 100, current.rs_momentum - 100);
 }
 
-/**
- * Calculate rotation score (composite metric 0-100)
- * Weights: 40% velocity, 30% heading quality, 30% distance
- * @param {Array} tail - Tail data
- * @param {Object} current - Current position
- * @returns {number} - Score from 0-100
- */
 function calcRotationScore(tail, current) {
   const velocity = calcVelocity(tail);
   const heading = calcHeading(tail);
   const distance = calcDistance(current);
   
-  // Heading score: 0-90° (NE, bullish) = 100, degrades as heading moves away
   let headingScore;
-  if (heading >= 0 && heading <= 90) {
-    headingScore = 100; // Best: moving toward Leading
-  } else if (heading > 90 && heading <= 180) {
-    headingScore = 50;  // OK: moving toward Weakening
-  } else if (heading > 180 && heading <= 270) {
-    headingScore = 25;  // Poor: moving toward Lagging
-  } else {
-    headingScore = 60;  // Decent: moving toward Improving
-  }
+  if (heading >= 0 && heading <= 90) headingScore = 100;
+  else if (heading > 90 && heading <= 180) headingScore = 50;
+  else if (heading > 180 && heading <= 270) headingScore = 25;
+  else headingScore = 60;
   
-  // Velocity score: normalize (typical range 0-5, cap at 100)
   const velocityScore = Math.min(velocity * 20, 100);
-  
-  // Distance score: further from center = stronger signal (cap at 100)
   const distanceScore = Math.min(distance * 15, 100);
   
-  // Weighted composite
   return Math.round(0.4 * velocityScore + 0.3 * headingScore + 0.3 * distanceScore);
 }
 
-/**
- * Get heading direction label and emoji
- * @param {number} heading - Angle in degrees
- * @returns {Object} - {label, emoji, color}
- */
 function getHeadingInfo(heading) {
   if (heading >= 337.5 || heading < 22.5) return { label: 'E', emoji: '→', color: '#3b82f6' };
   if (heading >= 22.5 && heading < 67.5) return { label: 'NE', emoji: '↗', color: '#22c55e' };
@@ -211,35 +186,111 @@ function getHeadingInfo(heading) {
   return { label: 'SE', emoji: '↘', color: '#3b82f6' };
 }
 
-/**
- * Get score badge class based on score value
- * @param {number} score - Rotation score 0-100
- * @returns {string} - CSS class: 'high', 'med', or 'low'
- */
 function getScoreClass(score) {
   if (score >= 65) return 'high';
   if (score >= 40) return 'med';
   return 'low';
 }
 
-/**
- * Enrich item with computed metrics
- * @param {Object} item - Sector/ETF item with tail and current
- * @returns {Object} - Item with added metrics
- */
+// v6: Hook detection - V-shaped reversal
+function detectHook(tail) {
+  if (!tail || tail.length < 4) return false;
+  
+  // Calculate heading for previous segment and current segment
+  const prevTail = tail.slice(-4, -2);
+  const currTail = tail.slice(-2);
+  
+  if (prevTail.length < 2 || currTail.length < 2) return false;
+  
+  const prevHeading = calcHeading([...tail.slice(-4, -2), tail[tail.length - 3]]);
+  const currHeading = calcHeading(tail);
+  
+  // Hook pattern: was heading SW (180-270°), now heading NE (0-90°)
+  // Or: was heading S (247-292°), now heading N (67-112°)
+  const wasDownward = (prevHeading > 180 && prevHeading < 300);
+  const nowUpward = (currHeading >= 0 && currHeading < 120);
+  
+  return wasDownward && nowUpward;
+}
+
+// v6: Tail curvature - acceleration detection
+function calcTailCurvature(tail) {
+  if (!tail || tail.length < 5) return 0;
+  
+  // Compare angle of last 2 segments vs previous segments
+  const recentAngle = calcHeading(tail.slice(-2));
+  const olderAngle = calcHeading(tail.slice(-4, -2));
+  
+  // Positive curvature = accelerating clockwise (bullish)
+  let diff = recentAngle - olderAngle;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  
+  return diff;
+}
+
 function enrichWithMetrics(item) {
+  const velocity = calcVelocity(item.tail);
+  const heading = calcHeading(item.tail);
+  const distance = calcDistance(item.current);
+  const rotationScore = calcRotationScore(item.tail, item.current);
+  const hasHook = detectHook(item.tail);
+  const curvature = calcTailCurvature(item.tail);
+  
   return {
     ...item,
-    velocity: calcVelocity(item.tail),
-    heading: calcHeading(item.tail),
-    headingInfo: getHeadingInfo(calcHeading(item.tail)),
-    distance: calcDistance(item.current),
-    rotationScore: calcRotationScore(item.tail, item.current)
+    velocity,
+    heading,
+    headingInfo: getHeadingInfo(heading),
+    distance,
+    rotationScore,
+    hasHook,
+    curvature
   };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SAMPLE DATA (unchanged from v4)
+// v6: MTF CONVICTION SCORING
+// ═══════════════════════════════════════════════════════════════════════════
+
+function calcMTFConviction(dailyItem, weeklyItem, monthlyItem) {
+  // Base: average rotation scores across available timeframes
+  const dScore = dailyItem?.rotationScore || 0;
+  const wScore = weeklyItem?.rotationScore || 0;
+  const mScore = monthlyItem?.rotationScore || 50; // default neutral if no monthly
+  
+  let conviction = (dScore + wScore + (monthlyItem ? mScore : 50)) / 3;
+  
+  // Bonus: Daily heading is bullish (0-90° NE)
+  const dHeading = dailyItem?.heading || 0;
+  if (dHeading >= 0 && dHeading <= 90) conviction += 10;
+  
+  // Bonus: Strong daily velocity (> 1.5)
+  if ((dailyItem?.velocity || 0) > 1.5) conviction += 5;
+  
+  // Bonus: Weekly confirms daily direction (within 45°)
+  const wHeading = weeklyItem?.heading || 0;
+  let headingDiff = Math.abs(dHeading - wHeading);
+  if (headingDiff > 180) headingDiff = 360 - headingDiff;
+  if (headingDiff < 45) conviction += 5;
+  
+  // Bonus: V-hook detected (strong reversal signal)
+  if (dailyItem?.hasHook) conviction += 8;
+  
+  // Bonus: Positive curvature (accelerating)
+  if ((dailyItem?.curvature || 0) > 15) conviction += 3;
+  
+  // Penalty: Overextended (far from center)
+  if ((dailyItem?.distance || 0) > 5) conviction -= 10;
+  
+  // Penalty: Very low velocity (stalling)
+  if ((dailyItem?.velocity || 0) < 0.3) conviction -= 5;
+  
+  return Math.min(100, Math.max(0, Math.round(conviction)));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAMPLE DATA
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SAMPLE_BENCH_DATA={
@@ -248,10 +299,22 @@ const SAMPLE_BENCH_DATA={
     {symbol:"^CNXPHARMA",name:"Nifty Pharma",quadrant:"Leading",color:"#f59e0b",current:{rs_ratio:102.8,rs_momentum:101.5},tail:[{rs_ratio:101.2,rs_momentum:100.5},{rs_ratio:101.8,rs_momentum:100.8},{rs_ratio:102.2,rs_momentum:101},{rs_ratio:102.5,rs_momentum:101.2},{rs_ratio:102.8,rs_momentum:101.5}]},
     {symbol:"^NSEBANK",name:"Nifty Bank",quadrant:"Weakening",color:"#3b82f6",current:{rs_ratio:101.2,rs_momentum:98.8},tail:[{rs_ratio:102.5,rs_momentum:99.8},{rs_ratio:102.1,rs_momentum:99.5},{rs_ratio:101.8,rs_momentum:99.2},{rs_ratio:101.5,rs_momentum:99},{rs_ratio:101.2,rs_momentum:98.8}]},
     {symbol:"^CNXAUTO",name:"Nifty Auto",quadrant:"Lagging",color:"#ef4444",current:{rs_ratio:98.2,rs_momentum:98.5},tail:[{rs_ratio:99.5,rs_momentum:99.2},{rs_ratio:99.1,rs_momentum:99},{rs_ratio:98.8,rs_momentum:98.8},{rs_ratio:98.5,rs_momentum:98.6},{rs_ratio:98.2,rs_momentum:98.5}]},
-    {symbol:"^CNXFMCG",name:"Nifty FMCG",quadrant:"Leading",color:"#22c55e",current:{rs_ratio:103.5,rs_momentum:101.8},tail:[{rs_ratio:102,rs_momentum:100.5},{rs_ratio:102.5,rs_momentum:101},{rs_ratio:103,rs_momentum:101.2},{rs_ratio:103.2,rs_momentum:101.5},{rs_ratio:103.5,rs_momentum:101.8}]}
-  ],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:["Nifty Pharma","Nifty FMCG"],Improving:["Nifty IT"],Lagging:["Nifty Auto"],Weakening:["Nifty Bank"]},tail_length:5},
-  weekly:{sectors:[],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:[],Improving:[],Lagging:[],Weakening:[]},tail_length:5},
-  monthly:{sectors:[],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:[],Improving:[],Lagging:[],Weakening:[]},tail_length:5},
+    {symbol:"^CNXFMCG",name:"Nifty FMCG",quadrant:"Leading",color:"#22c55e",current:{rs_ratio:103.5,rs_momentum:101.8},tail:[{rs_ratio:102,rs_momentum:100.5},{rs_ratio:102.5,rs_momentum:101},{rs_ratio:103,rs_momentum:101.2},{rs_ratio:103.2,rs_momentum:101.5},{rs_ratio:103.5,rs_momentum:101.8}]},
+    {symbol:"^CNXMETAL",name:"Nifty Metal",quadrant:"Improving",color:"#8b5cf6",current:{rs_ratio:99.2,rs_momentum:102.1},tail:[{rs_ratio:97.5,rs_momentum:98.2},{rs_ratio:97.8,rs_momentum:99.1},{rs_ratio:98.2,rs_momentum:100.2},{rs_ratio:98.7,rs_momentum:101.2},{rs_ratio:99.2,rs_momentum:102.1}]}
+  ],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:["Nifty Pharma","Nifty FMCG"],Improving:["Nifty IT","Nifty Metal"],Lagging:["Nifty Auto"],Weakening:["Nifty Bank"]},tail_length:5},
+  weekly:{sectors:[
+    {symbol:"^CNXIT",name:"Nifty IT",quadrant:"Improving",color:"#06b6d4",current:{rs_ratio:96.8,rs_momentum:101.5},tail:[{rs_ratio:95.2,rs_momentum:99.8},{rs_ratio:95.8,rs_momentum:100.2},{rs_ratio:96.2,rs_momentum:100.8},{rs_ratio:96.5,rs_momentum:101.2},{rs_ratio:96.8,rs_momentum:101.5}]},
+    {symbol:"^CNXPHARMA",name:"Nifty Pharma",quadrant:"Leading",color:"#f59e0b",current:{rs_ratio:102.2,rs_momentum:100.8},tail:[{rs_ratio:100.5,rs_momentum:99.5},{rs_ratio:101,rs_momentum:99.8},{rs_ratio:101.5,rs_momentum:100.2},{rs_ratio:101.8,rs_momentum:100.5},{rs_ratio:102.2,rs_momentum:100.8}]},
+    {symbol:"^NSEBANK",name:"Nifty Bank",quadrant:"Weakening",color:"#3b82f6",current:{rs_ratio:100.8,rs_momentum:99.2},tail:[{rs_ratio:101.8,rs_momentum:100.5},{rs_ratio:101.5,rs_momentum:100.2},{rs_ratio:101.2,rs_momentum:99.8},{rs_ratio:101,rs_momentum:99.5},{rs_ratio:100.8,rs_momentum:99.2}]},
+    {symbol:"^CNXAUTO",name:"Nifty Auto",quadrant:"Lagging",color:"#ef4444",current:{rs_ratio:97.8,rs_momentum:98.2},tail:[{rs_ratio:99.2,rs_momentum:99.8},{rs_ratio:98.8,rs_momentum:99.2},{rs_ratio:98.5,rs_momentum:98.8},{rs_ratio:98.2,rs_momentum:98.5},{rs_ratio:97.8,rs_momentum:98.2}]},
+    {symbol:"^CNXFMCG",name:"Nifty FMCG",quadrant:"Leading",color:"#22c55e",current:{rs_ratio:103.2,rs_momentum:101.2},tail:[{rs_ratio:101.5,rs_momentum:100.2},{rs_ratio:102,rs_momentum:100.5},{rs_ratio:102.5,rs_momentum:100.8},{rs_ratio:102.8,rs_momentum:101},{rs_ratio:103.2,rs_momentum:101.2}]},
+    {symbol:"^CNXMETAL",name:"Nifty Metal",quadrant:"Lagging",color:"#8b5cf6",current:{rs_ratio:98.5,rs_momentum:99.2},tail:[{rs_ratio:99.8,rs_momentum:100.5},{rs_ratio:99.5,rs_momentum:100.2},{rs_ratio:99.2,rs_momentum:99.8},{rs_ratio:98.8,rs_momentum:99.5},{rs_ratio:98.5,rs_momentum:99.2}]}
+  ],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:["Nifty Pharma","Nifty FMCG"],Improving:["Nifty IT"],Lagging:["Nifty Auto","Nifty Metal"],Weakening:["Nifty Bank"]},tail_length:5},
+  monthly:{sectors:[
+    {symbol:"^CNXPHARMA",name:"Nifty Pharma",quadrant:"Leading",color:"#f59e0b",current:{rs_ratio:101.5,rs_momentum:100.5},tail:[{rs_ratio:100.2,rs_momentum:99.8},{rs_ratio:100.5,rs_momentum:100},{rs_ratio:100.8,rs_momentum:100.2},{rs_ratio:101.2,rs_momentum:100.3},{rs_ratio:101.5,rs_momentum:100.5}]},
+    {symbol:"^CNXFMCG",name:"Nifty FMCG",quadrant:"Leading",color:"#22c55e",current:{rs_ratio:102.8,rs_momentum:100.8},tail:[{rs_ratio:101.2,rs_momentum:100.2},{rs_ratio:101.5,rs_momentum:100.3},{rs_ratio:102,rs_momentum:100.5},{rs_ratio:102.4,rs_momentum:100.6},{rs_ratio:102.8,rs_momentum:100.8}]},
+    {symbol:"^NSEBANK",name:"Nifty Bank",quadrant:"Weakening",color:"#3b82f6",current:{rs_ratio:100.5,rs_momentum:99.5},tail:[{rs_ratio:101.2,rs_momentum:100.5},{rs_ratio:101,rs_momentum:100.2},{rs_ratio:100.8,rs_momentum:100},{rs_ratio:100.6,rs_momentum:99.8},{rs_ratio:100.5,rs_momentum:99.5}]}
+  ],etfs:[],asset_classes:[],market_segments:[],quadrant_summary:{Leading:["Nifty Pharma","Nifty FMCG"],Improving:[],Lagging:[],Weakening:["Nifty Bank"]},tail_length:5},
   drilldown:{}
 };
 const SAMPLE={
@@ -259,7 +322,7 @@ const SAMPLE={
   available_benchmarks:{"^NSEI":"Nifty 50","^NSEBANK":"Nifty Bank","^CRSLDX":"Nifty 500"},
   default_benchmark:"^NSEI",
   config:{window:10,center:100},
-  metadata:{generated_at:"2026-03-16T16:30:00",date:"2026-03-16",benchmarks_calculated:["^NSEI"],total_sectors:5,total_etfs:0,total_drilldown_sectors:0,timeframes:["daily","weekly"]}
+  metadata:{generated_at:"2026-03-17T10:30:00",date:"2026-03-17",benchmarks_calculated:["^NSEI"],total_sectors:6,total_etfs:0,total_drilldown_sectors:0,timeframes:["daily","weekly","monthly"]}
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -284,15 +347,12 @@ function getCurrentItems(){
     items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[]);
   }
   
-  // Enrich all items with metrics
   items = items.map(enrichWithMetrics);
   
-  // v5.0: Apply quadrant filter
   if (QUADRANT_FILTER !== 'all') {
     items = items.filter(item => item.quadrant === QUADRANT_FILTER);
   }
   
-  // v5.0: Apply selection filter (only show selected items on chart)
   if (!SELECT_ALL_MODE && SELECTED_ITEMS.size > 0) {
     items = items.filter(item => SELECTED_ITEMS.has(item.symbol));
   }
@@ -300,7 +360,6 @@ function getCurrentItems(){
   return items;
 }
 
-// Get all items before filtering (for sidebar display)
 function getAllItems(){
   const bd=getBD(),tf=bd[TF]||bd.daily;
   let items;
@@ -313,50 +372,111 @@ function getAllItems(){
     items=MODE==='etfs'?(tf.etfs||[]):MODE==='assets'?(tf.asset_classes||[]):MODE==='segments'?(tf.market_segments||[]):(tf.sectors||[]);
   }
   
-  // Enrich all items with metrics
   return items.map(enrichWithMetrics);
 }
 
-function computeAlignments(){
+// ═══════════════════════════════════════════════════════════════════════════
+// v6: ENHANCED MTF ALIGNMENT COMPUTATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function computeEnhancedAlignments(){
   const bd=getBD();
   let daily=[],weekly=[],monthly=[];
+  
   if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
     const dd=bd.drilldown[DRILLDOWN];
-    daily=dd.daily||[];weekly=dd.weekly||[];monthly=dd.monthly||[];
+    daily=(dd.daily||[]).map(enrichWithMetrics);
+    weekly=(dd.weekly||[]).map(enrichWithMetrics);
+    monthly=(dd.monthly||[]).map(enrichWithMetrics);
   } else {
     const modeKey=MODE==='etfs'?'etfs':MODE==='assets'?'asset_classes':MODE==='segments'?'market_segments':'sectors';
-    const getTfItems=(tf)=>{const d=bd[tf];if(!d)return[];return d[modeKey]||[]};
-    daily=getTfItems('daily');weekly=getTfItems('weekly');monthly=getTfItems('monthly');
+    const getTfItems=(tf)=>{const d=bd[tf];if(!d)return[];return (d[modeKey]||[]).map(enrichWithMetrics)};
+    daily=getTfItems('daily');
+    weekly=getTfItems('weekly');
+    monthly=getTfItems('monthly');
   }
+  
   if(!daily.length&&!weekly.length)return{power:[],pullback:[],early:[],exhaustion:[]};
-  const qMap=(items)=>{const m={};items.forEach(s=>{m[s.symbol]=s.quadrant});return m};
-  const dQ=qMap(daily),wQ=qMap(weekly),mQ=qMap(monthly);
-  const colorMap={};daily.forEach(s=>{colorMap[s.symbol]=s.color});
-  weekly.forEach(s=>{if(!colorMap[s.symbol])colorMap[s.symbol]=s.color});
-  monthly.forEach(s=>{if(!colorMap[s.symbol])colorMap[s.symbol]=s.color});
-  const nameMap={};daily.forEach(s=>{nameMap[s.symbol]=s.name});
-  weekly.forEach(s=>{if(!nameMap[s.symbol])nameMap[s.symbol]=s.name});
-  monthly.forEach(s=>{if(!nameMap[s.symbol])nameMap[s.symbol]=s.name});
-  const allSymbols=[...new Set([...Object.keys(dQ),...Object.keys(wQ),...Object.keys(mQ)])];
+  
+  // Build lookup maps
+  const dMap={},wMap={},mMap={};
+  daily.forEach(s=>{dMap[s.symbol]=s});
+  weekly.forEach(s=>{wMap[s.symbol]=s});
+  monthly.forEach(s=>{mMap[s.symbol]=s});
+  
+  const allSymbols=[...new Set([...Object.keys(dMap),...Object.keys(wMap),...Object.keys(mMap)])];
+  
   const power=[],pullback=[],early=[],exhaustion=[];
+  
   allSymbols.forEach(sym=>{
-    const d=dQ[sym],w=wQ[sym],m=mQ[sym];
+    const d=dMap[sym],w=wMap[sym],m=mMap[sym];
     if(!d&&!w)return;
-    const info={symbol:sym,name:nameMap[sym]||sym,color:colorMap[sym]||'#94a3b8',d,w,m};
-    if(m==='Leading'&&w==='Leading'&&(d==='Improving'||d==='Leading'))power.push(info);
-    else if(m==='Leading'&&w==='Weakening'&&(d==='Lagging'||d==='Improving'))pullback.push(info);
-    else if(m==='Lagging'&&w==='Improving'&&d==='Leading')early.push(info);
-    else if(m==='Weakening'&&w==='Lagging'&&d==='Lagging')exhaustion.push(info);
-    else if(!m&&w==='Leading'&&(d==='Improving'||d==='Leading'))power.push(info);
-    else if(!m&&w==='Weakening'&&d==='Lagging')exhaustion.push(info);
+    
+    const dQ=d?.quadrant,wQ=w?.quadrant,mQ=m?.quadrant;
+    
+    // Calculate conviction score
+    const conviction = calcMTFConviction(d, w, m);
+    
+    // Skip if below minimum conviction threshold
+    if(conviction < MTF_MIN_CONVICTION) return;
+    
+    const info={
+      symbol:sym,
+      name:d?.name||w?.name||m?.name||sym,
+      color:d?.color||w?.color||m?.color||'#94a3b8',
+      conviction,
+      dQ, wQ, mQ,
+      hasHook: d?.hasHook || false,
+      velocity: d?.velocity || 0,
+      heading: d?.heading || 0,
+      headingInfo: d?.headingInfo || getHeadingInfo(0),
+      distance: d?.distance || 0,
+      curvature: d?.curvature || 0
+    };
+    
+    // Pattern matching with MTF rules
+    // Power Setup: M=Leading + W=Leading + D=Improving/Leading
+    if(mQ==='Leading'&&wQ==='Leading'&&(dQ==='Improving'||dQ==='Leading')){
+      power.push(info);
+    }
+    // Pullback Play: M=Leading + W=Weakening + D=Lagging/Improving
+    else if(mQ==='Leading'&&wQ==='Weakening'&&(dQ==='Lagging'||dQ==='Improving')){
+      pullback.push(info);
+    }
+    // Early Reversal: M=Lagging + W=Improving + D=Leading
+    else if(mQ==='Lagging'&&wQ==='Improving'&&dQ==='Leading'){
+      early.push(info);
+    }
+    // Exhaustion: M=Weakening + W=Lagging + D=Lagging
+    else if(mQ==='Weakening'&&wQ==='Lagging'&&dQ==='Lagging'){
+      exhaustion.push(info);
+    }
+    // Fallback patterns (no monthly data)
+    else if(!mQ&&wQ==='Leading'&&(dQ==='Improving'||dQ==='Leading')){
+      power.push(info);
+    }
+    else if(!mQ&&wQ==='Improving'&&dQ==='Leading'){
+      early.push(info);
+    }
+    else if(!mQ&&wQ==='Weakening'&&dQ==='Lagging'){
+      exhaustion.push(info);
+    }
   });
+  
+  // Sort each array by conviction (descending)
+  power.sort((a,b)=>b.conviction-a.conviction);
+  pullback.sort((a,b)=>b.conviction-a.conviction);
+  early.sort((a,b)=>b.conviction-a.conviction);
+  exhaustion.sort((a,b)=>b.conviction-a.conviction);
+  
   return{power,pullback,early,exhaustion};
 }
 
-function renderAlignmentPanel(){
-  const a=computeAlignments();
+function renderEnhancedAlignmentPanel(){
+  const a=computeEnhancedAlignments();
   const bd=getBD();
   let modeLabel,hasMonthly;
+  
   if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
     const dd=bd.drilldown[DRILLDOWN];
     modeLabel=dd.sector_name+' Stocks';
@@ -366,33 +486,97 @@ function renderAlignmentPanel(){
     const modeKey=MODE==='etfs'?'etfs':MODE==='assets'?'asset_classes':MODE==='segments'?'market_segments':'sectors';
     hasMonthly=!!bd.monthly?.[modeKey]?.length;
   }
-  const tfNote=hasMonthly?'Monthly + Weekly + Daily':'Weekly + Daily (Monthly not yet available)';
+  
+  const tfNote=hasMonthly?'M + W + D aligned':'W + D aligned (no monthly)';
+  
   const cardData=[
-    {key:'power',name:'POWER SETUP',emoji:'⚡',color:'#22c55e',border:'rgba(34,197,94,.3)',bg:'rgba(34,197,94,.05)',desc:'Full convergence — highest conviction buy signal',cond:'M:Leading · W:Leading · D:Improving→Leading',items:a.power},
-    {key:'pullback',name:'PULLBACK PLAY',emoji:'🔄',color:'#3b82f6',border:'rgba(59,130,246,.3)',bg:'rgba(59,130,246,.05)',desc:'Buy the dip — long-term strong, short-term cooling',cond:'M:Leading · W:Weakening · D:Lagging→Improving',items:a.pullback},
-    {key:'early',name:'EARLY REVERSAL',emoji:'🌱',color:'#f59e0b',border:'rgba(245,158,11,.3)',bg:'rgba(245,158,11,.05)',desc:'Potential bottom — speculative with high reward',cond:'M:Lagging · W:Improving · D:Leading',items:a.early},
-    {key:'exhaustion',name:'EXHAUSTION',emoji:'💀',color:'#ef4444',border:'rgba(239,68,68,.3)',bg:'rgba(239,68,68,.05)',desc:'Distribution phase — exit or avoid',cond:'M:Weakening · W:Lagging · D:Lagging',items:a.exhaustion}
+    {
+      key:'power',
+      name:'POWER SETUP',
+      emoji:'⚡',
+      color:'#22c55e',
+      border:'rgba(34,197,94,.4)',
+      bg:'rgba(34,197,94,.06)',
+      desc:'Full convergence — highest conviction buy',
+      cond:'M:Lead · W:Lead · D:Imp/Lead',
+      items:a.power
+    },
+    {
+      key:'pullback',
+      name:'PULLBACK PLAY',
+      emoji:'🔄',
+      color:'#3b82f6',
+      border:'rgba(59,130,246,.4)',
+      bg:'rgba(59,130,246,.06)',
+      desc:'Buy the dip — long-term strong',
+      cond:'M:Lead · W:Weak · D:Lag/Imp',
+      items:a.pullback
+    },
+    {
+      key:'early',
+      name:'EARLY REVERSAL',
+      emoji:'🌱',
+      color:'#f59e0b',
+      border:'rgba(245,158,11,.4)',
+      bg:'rgba(245,158,11,.06)',
+      desc:'Bottom fish — speculative',
+      cond:'M:Lag · W:Imp · D:Lead',
+      items:a.early
+    },
+    {
+      key:'exhaustion',
+      name:'EXHAUSTION',
+      emoji:'💀',
+      color:'#ef4444',
+      border:'rgba(239,68,68,.4)',
+      bg:'rgba(239,68,68,.06)',
+      desc:'Distribution — exit or avoid',
+      cond:'M:Weak · W:Lag · D:Lag',
+      items:a.exhaustion
+    }
   ];
+  
+  const convictionFilterOpts = [0,30,50,65,80].map(v => 
+    `<option value="${v}" ${MTF_MIN_CONVICTION===v?'selected':''}>${v===0?'All':v+'+'}</option>`
+  ).join('');
+  
   return `<div class="mtf-panel">
-    <div class="mtf-title">⚙ MULTI-TIMEFRAME ALIGNMENT · ${modeLabel.toUpperCase()} <span style="font-family:var(--fm);font-size:9px;color:var(--t4);font-weight:400;letter-spacing:1px;margin-left:8px">${tfNote}</span></div>
+    <div class="mtf-header">
+      <div class="mtf-title">⚙ MTF ALIGNMENT v2 · ${modeLabel.toUpperCase()} <span style="font-family:var(--fm);font-size:9px;color:var(--t4);font-weight:400;letter-spacing:1px;margin-left:6px">${tfNote}</span></div>
+      <div class="mtf-filter">
+        <span class="mtf-filter-label">Min conviction:</span>
+        <select class="cs" onchange="setMTFConviction(+this.value)">${convictionFilterOpts}</select>
+      </div>
+    </div>
     <div class="mtf-grid">${cardData.map(c=>`
       <div class="mtf-card" style="border-color:${c.border};background:${c.bg}">
-        <div class="mtf-card-name" style="color:${c.color}">${c.emoji} ${c.name} <span style="font-weight:400;color:var(--t4);font-size:9px">(${c.items.length})</span></div>
+        <div class="mtf-card-header">
+          <div class="mtf-card-name" style="color:${c.color}">${c.emoji} ${c.name}</div>
+          <div class="mtf-card-count">${c.items.length} match${c.items.length!==1?'es':''}</div>
+        </div>
         <div class="mtf-card-desc">${c.desc}</div>
         <div class="mtf-card-cond">${c.cond}</div>
-        <div class="mtf-card-list">${c.items.length?c.items.map(i=>`<span class="mtf-item"><span class="mtf-dot" style="background:${i.color}"></span>${i.name}</span>`).join(''):'<span class="mtf-empty">No matches currently</span>'}</div>
+        <div class="mtf-card-list">${c.items.length?c.items.map(i=>{
+          const convClass = getScoreClass(i.conviction);
+          return `<div class="mtf-item" onclick="hl('${i.symbol}')">
+            <div class="mtf-item-dot" style="background:${i.color}"></div>
+            <div class="mtf-item-name">${i.name}</div>
+            ${i.hasHook?'<span class="mtf-item-hook" title="V-Hook detected">↺</span>':''}
+            <span class="mtf-item-heading" style="color:${i.headingInfo.color}" title="Heading: ${Math.round(i.heading)}°">${i.headingInfo.emoji}</span>
+            <div class="mtf-item-conviction ${convClass}">${i.conviction}</div>
+          </div>`;
+        }).join(''):'<div class="mtf-empty">No matches${MTF_MIN_CONVICTION>0?' above '+MTF_MIN_CONVICTION+' conviction':''}</div>'}</div>
       </div>`).join('')}
     </div>
   </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// v5.0: SELECTION MANAGEMENT
+// SELECTION & FILTER MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
 
 function toggleItemSelection(symbol) {
   if (SELECT_ALL_MODE) {
-    // First toggle: switch to manual mode and deselect this item
     SELECT_ALL_MODE = false;
     const allItems = getAllItems();
     SELECTED_ITEMS = new Set(allItems.map(i => i.symbol));
@@ -403,7 +587,6 @@ function toggleItemSelection(symbol) {
     } else {
       SELECTED_ITEMS.add(symbol);
     }
-    // If all items are selected, switch back to SELECT_ALL_MODE
     const allItems = getAllItems();
     if (SELECTED_ITEMS.size === allItems.length) {
       SELECT_ALL_MODE = true;
@@ -413,22 +596,10 @@ function toggleItemSelection(symbol) {
   render();
 }
 
-function selectAll() {
-  SELECT_ALL_MODE = true;
-  SELECTED_ITEMS.clear();
-  render();
-}
-
-function selectNone() {
-  SELECT_ALL_MODE = false;
-  SELECTED_ITEMS.clear();
-  render();
-}
-
-function isItemSelected(symbol) {
-  if (SELECT_ALL_MODE) return true;
-  return SELECTED_ITEMS.has(symbol);
-}
+function selectAll() { SELECT_ALL_MODE = true; SELECTED_ITEMS.clear(); render(); }
+function selectNone() { SELECT_ALL_MODE = false; SELECTED_ITEMS.clear(); render(); }
+function isItemSelected(symbol) { return SELECT_ALL_MODE || SELECTED_ITEMS.has(symbol); }
+function setMTFConviction(v) { MTF_MIN_CONVICTION = v; render(); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RENDER
@@ -440,7 +611,7 @@ function render(){
   const tf_data=bd[TF]||bd.daily;
   const benchName=(d.available_benchmarks||{})[BENCH]||BENCH;
   let items=getCurrentItems(),displayBench=benchName,breadcrumb='';
-  const allItems=getAllItems(); // For sidebar (unfiltered by selection)
+  const allItems=getAllItems();
 
   if(DRILLDOWN&&bd.drilldown&&bd.drilldown[DRILLDOWN]){
     const dd=bd.drilldown[DRILLDOWN];
@@ -448,7 +619,6 @@ function render(){
     breadcrumb=`<div class="bc"><span onclick="exitDrill()">Sectors</span><span class="arr">›</span><span class="cur">${dd.sector_name} — Stocks vs ${dd.sector_name}</span></div>`;
   }
 
-  // Group items for sidebar (use allItems, apply quadrant filter only)
   let sidebarItems = allItems;
   if (QUADRANT_FILTER !== 'all') {
     sidebarItems = allItems.filter(item => item.quadrant === QUADRANT_FILTER);
@@ -459,9 +629,7 @@ function render(){
 
   const benchOpts=Object.entries(d.available_benchmarks||{}).map(([k,v])=>`<option value="${k}" ${k===BENCH?'selected':''}>${v}</option>`).join('');
   const hasBenchData=Object.keys(d.benchmarks_data||{}).length>1;
-  const hasMontly=!!bd.monthly?.sectors?.length;
-
-  // v5.0: Quadrant filter options
+  const hasMonthly=!!bd.monthly?.sectors?.length;
   const quadrantOpts = ['all','Leading','Improving','Weakening','Lagging'].map(q => 
     `<option value="${q}" ${QUADRANT_FILTER===q?'selected':''}>${q==='all'?'All Quadrants':q}</option>`
   ).join('');
@@ -472,7 +640,7 @@ function render(){
         <img class="logo-img" src="./assets/logo.jpeg" alt="TradEdge" onerror="this.style.display='none'">
         <div class="logo-tagline">Define Your Edge with TradEdge</div>
       </div>
-      <p class="sub">RELATIVE MOMENTUM MATRIX v5.0 · SECTOR ROTATION · ${d.metadata?.date||''}</p>
+      <p class="sub">RELATIVE MOMENTUM MATRIX v6.0 · SECTOR ROTATION · ${d.metadata?.date||''}</p>
     </div>
     <div class="ctrl">
       <div class="cg"><span class="cl">Mode:</span>
@@ -484,9 +652,8 @@ function render(){
       <div class="cg"><span class="cl">Period:</span>
         <button class="cb ${TF==='daily'?'a':''}" onclick="setTF('daily')">Daily</button>
         <button class="cb ${TF==='weekly'?'a':''}" onclick="setTF('weekly')">Weekly</button>
-        <button class="cb ${TF==='monthly'?'a':''}" onclick="setTF('monthly')" ${!hasMontly?'style="opacity:.4"':''}>Monthly</button>
+        <button class="cb ${TF==='monthly'?'a':''}" onclick="setTF('monthly')" ${!hasMonthly?'style="opacity:.4"':''}>Monthly</button>
       </div>
-      <!-- v5.0: Quadrant Filter Dropdown -->
       <div class="cg"><span class="cl">Quadrant:</span>
         <select class="cs" onchange="setQuadrantFilter(this.value)">${quadrantOpts}</select>
       </div>
@@ -502,7 +669,7 @@ function render(){
       </div>
       <span class="badge ${IS_LIVE?'live':'sample'}"><span class="dot"></span>${IS_LIVE?'LIVE':'SAMPLE'}</span>
     </div>
-    ${renderAlignmentPanel()}
+    ${renderEnhancedAlignmentPanel()}
     ${breadcrumb}
     <div class="toolbar">
       <button class="tb-btn ${ANIM_PLAYING?'playing':''}" onclick="toggleAnim()" title="Animate trail movement">
@@ -522,7 +689,6 @@ function render(){
       <div class="rp"><div class="rc" id="rc"><canvas id="rrm-canvas"></canvas></div><div class="tt" id="tt"></div></div>
       <div class="sb">
         <input class="sb-search" type="text" placeholder="🔍 Filter..." value="${SIDEBAR_FILTER}" oninput="filterSidebar(this.value)">
-        <!-- v5.0: Selection controls -->
         <div class="sb-controls">
           <span class="sel-all" onclick="selectAll()">Select All</span>
           <span class="sel-all" onclick="selectNone()">Clear All</span>
@@ -535,11 +701,10 @@ function render(){
         ${qPanel('Lagging','#ef4444',grp.Lagging)}
       </div>
     </div>
-    <div class="ft">TradEdge RRM v5.0 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
+    <div class="ft">TradEdge RRM v6.0 · ${items.length} instruments · ${TF} · Bench: ${displayBench} · ✦ Trade the Pulse ✦</div>`;
   drawChart(items);
 }
 
-// v5.0: Updated sidebar panel with checkboxes and metrics
 function qPanel(n,c,items){
   const filtered=SIDEBAR_FILTER?items.filter(s=>s.name.toLowerCase().includes(SIDEBAR_FILTER.toLowerCase())):items;
   return`<div class="qp"><div class="qt"><div class="qd" style="background:${c}"></div><span style="color:${c}">${n}</span><span style="font-family:var(--fm);font-size:9px;color:var(--t4);margin-left:auto">${filtered.length}${filtered.length!==items.length?'/'+items.length:''}</span></div>
@@ -552,6 +717,7 @@ function qPanel(n,c,items){
         <input type="checkbox" ${checked?'checked':''} onclick="event.stopPropagation();toggleItemSelection('${s.symbol}')">
         <span class="sd" style="background:${s.color}"></span>
         <span class="sn">${s.name}</span>
+        ${s.hasHook?'<span style="color:#22d3ee;font-size:10px" title="V-Hook detected">↺</span>':''}
         <span class="score-badge ${scoreClass}">${s.rotationScore}</span>
         <span class="heading-arrow" style="color:${headingInfo.color}">${headingInfo.emoji}</span>
       </li>`;
@@ -559,7 +725,7 @@ function qPanel(n,c,items){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// v5.0: ENHANCED CHART DRAWING WITH VISUAL INDICATORS
+// CHART DRAWING
 // ═══════════════════════════════════════════════════════════════════════════
 
 function drawChart(items){
@@ -673,15 +839,13 @@ function drawChart(items){
         ctx.beginPath();ctx.arc(x,y,r*0.4,0,Math.PI*2);
         ctx.fillStyle='#fff';ctx.fill();
         
-        // v5.0: Draw rotation score badge near the current position
+        // Score badge
         if (sec.rotationScore !== undefined && (isH || !HIGHLIGHT)) {
           ctx.globalAlpha = op * 0.9;
           const scoreClass = getScoreClass(sec.rotationScore);
           const badgeColor = scoreClass === 'high' ? '#22c55e' : scoreClass === 'med' ? '#eab308' : '#ef4444';
           const badgeX = x + 12;
           const badgeY = y - 12;
-          
-          // Badge background
           ctx.beginPath();
           ctx.roundRect(badgeX - 12, badgeY - 8, 24, 16, 8);
           ctx.fillStyle = badgeColor + '40';
@@ -689,12 +853,18 @@ function drawChart(items){
           ctx.strokeStyle = badgeColor;
           ctx.lineWidth = 1;
           ctx.stroke();
-          
-          // Badge text
           ctx.fillStyle = badgeColor;
           ctx.font = '700 8px JetBrains Mono';
           ctx.textAlign = 'center';
           ctx.fillText(sec.rotationScore, badgeX, badgeY + 3);
+        }
+        
+        // Hook indicator
+        if (sec.hasHook && (isH || !HIGHLIGHT)) {
+          ctx.globalAlpha = op;
+          ctx.fillStyle = '#22d3ee';
+          ctx.font = '12px sans-serif';
+          ctx.fillText('↺', x - 18, y - 8);
         }
       }
     });
@@ -704,7 +874,6 @@ function drawChart(items){
     const lx=tX(l.rs_ratio),ly=tY(l.rs_momentum),px=tX(p.rs_ratio),py=tY(p.rs_momentum);
     const a=Math.atan2(ly-py,lx-px),al=9;
     
-    // v5.0: Color-coded heading arrow
     const headingInfo = sec.headingInfo || getHeadingInfo(sec.heading || 0);
     ctx.beginPath();
     ctx.moveTo(lx,ly);
@@ -724,7 +893,6 @@ function drawChart(items){
     ctx.restore();
   });
 
-  // v5.0: Enhanced tooltip with metrics
   canvas.onmousemove=e=>{
     const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
     let cl=null,cd=20;
@@ -744,10 +912,10 @@ function drawChart(items){
       const scoreClass = getScoreClass(cl.rotationScore || 0);
       const scoreColor = scoreClass === 'high' ? '#4ade80' : scoreClass === 'med' ? '#facc15' : '#f87171';
       
-      // v5.0: Enhanced tooltip content with metrics
       tt.innerHTML=`
         <b style="color:${cl.color}">${cl.name}</b>
         <span style="font-size:9px;color:var(--t3)">${cl.quadrant} · ${Math.round(cl.heading || 0)}° ${headingInfo.label}</span>
+        ${cl.hasHook?'<span style="color:#22d3ee;margin-left:6px" title="V-Hook detected">↺ Hook</span>':''}
         <div style="margin-top:4px">
           RS-Ratio: <b>${cl.current.rs_ratio.toFixed(2)}</b><br>
           RS-Mom: <b>${cl.current.rs_momentum.toFixed(2)}</b>
@@ -785,8 +953,6 @@ function filterSidebar(v){SIDEBAR_FILTER=v;render()}
 function hl(sym){HIGHLIGHT=sym;drawChart(getCurrentItems())}
 function drill(sym){const bd=getBD();if(bd.drilldown&&bd.drilldown[sym]){DRILLDOWN=sym;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();SELECT_ALL_MODE=true;SELECTED_ITEMS.clear();render()}else{alert('No drill-down data for this sector yet.\nRun the RRM GitHub Action to generate stock-level data.')}}
 function exitDrill(){DRILLDOWN=null;HIGHLIGHT=null;TAIL_SLICE=null;stopAnim();SELECT_ALL_MODE=true;SELECTED_ITEMS.clear();render()}
-
-// v5.0: Quadrant filter function
 function setQuadrantFilter(q){QUADRANT_FILTER=q;render()}
 
 function toggleAnim(){ANIM_PLAYING?stopAnim():startAnim()}
@@ -837,7 +1003,6 @@ async function init(){
   await new Promise(r=>setTimeout(r,300));
   render();
   
-  // Pulse animation - only redraws canvas, does NOT rebuild DOM
   let _lastPulse=0;
   (function pulseLoop(t){
     requestAnimationFrame(pulseLoop);
