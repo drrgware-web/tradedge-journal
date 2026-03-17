@@ -10149,13 +10149,25 @@ function scoreMatch(sym, name, q){
   if(name.startsWith(q)) return 60;
   if(sym.includes(q)) return 40;
   if(name.includes(q)) return 20;
-  return -1;
+  // Fuzzy: check if all typed chars appear in order in symbol
+  let si=0;
+  for(let ci=0;ci<q.length&&si<sym.length;ci++){
+    while(si<sym.length&&sym[si]!==q[ci]) si++;
+    if(si>=sym.length) return -1;
+    si++;
+  }
+  return 10;
 }
 
 function onExecSymInput(val){
   const q=val.trim().toUpperCase(); const drop=document.getElementById('exec-sym-drop');
   if(!q||q.length<1){drop.classList.remove('open');return;}
-  const scored=getSymbolDB().map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  const scored=getSymbolDB().map(([sym,name,sector])=>{
+    let s=scoreMatch(sym,name.toUpperCase(),q);
+    // Boost sector matches (typing "etf", "pharma", "bank", "auto" etc)
+    if(sector&&sector.toUpperCase().includes(q)) s=Math.max(s,35);
+    return {sym,name,sector,score:s};
+  }).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,12);
   if(!scored.length){drop.classList.remove('open');return;}
   execSymFocusIdx=-1;
   let html='<div class="sym-dropdown-header">NSE Stocks</div>';
@@ -10772,7 +10784,11 @@ function setGTTSource(src){
 function onGttSymInput(val){
   const q=val.trim().toUpperCase(); const drop=document.getElementById('gtt-sym-drop');
   if(!q||q.length<1){drop.classList.remove('open');return;}
-  const scored=getSymbolDB().map(([sym,name,sector])=>({sym,name,sector,score:scoreMatch(sym,name.toUpperCase(),q)})).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,8);
+  const scored=getSymbolDB().map(([sym,name,sector])=>{
+    let s=scoreMatch(sym,name.toUpperCase(),q);
+    if(sector&&sector.toUpperCase().includes(q)) s=Math.max(s,35);
+    return {sym,name,sector,score:s};
+  }).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,12);
   if(!scored.length){drop.classList.remove('open');return;}
   gttSymFocusIdx=-1;
   let html='<div class="sym-dropdown-header">NSE Stocks</div>';
