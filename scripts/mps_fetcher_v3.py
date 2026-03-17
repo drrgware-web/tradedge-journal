@@ -59,35 +59,35 @@ CHARTINK_BASE = "https://chartink.com/screener/"
 SCANNERS = {
     "above_200sma": {
         "name": "Stocks above 200 SMA",
-        "scan_clause": '( {cash} ( [0] 5 minute close > [0] 5 minute sma( close,200 ) and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest close > latest sma( close,200 ) and latest "nifty 500" = 1 ) )',
     },
     "above_50sma": {
         "name": "Stocks above 50 SMA",
-        "scan_clause": '( {cash} ( [0] 5 minute close > [0] 5 minute sma( close,50 ) and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest close > latest sma( close,50 ) and latest "nifty 500" = 1 ) )',
     },
     "spark_4pct": {
         "name": "4% Breakout Stocks (Stockbee)",
-        "scan_clause": '( {cash} ( [0] 5 minute close / [-1] 1 day close > 1.04 and [0] 5 minute volume > [0] 5 minute sma( volume,20 ) * 1.5 and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest close / [-1] 1 day close > 1.04 and latest volume > latest sma( volume,20 ) * 1.5 and latest "nifty 500" = 1 ) )',
     },
     "rsi_above_70": {
         "name": "RSI > 70 Stocks",
-        "scan_clause": '( {cash} ( [0] 5 minute rsi( close,14 ) > 70 and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest rsi( close,14 ) > 70 and latest "nifty 500" = 1 ) )',
     },
     "rsi_above_50": {
         "name": "RSI > 50 Stocks (Momentum Breadth)",
-        "scan_clause": '( {cash} ( [0] 5 minute rsi( close,14 ) > 50 and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest rsi( close,14 ) > 50 and latest "nifty 500" = 1 ) )',
     },
     "burst_4_5pct_gainers": {
         "name": "4.5%+ Gainers (Burst Ratio)",
-        "scan_clause": '( {cash} ( [0] 5 minute close / [-1] 1 day close > 1.045 and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest close / [-1] 1 day close > 1.045 and latest "nifty 500" = 1 ) )',
     },
     "burst_4_5pct_losers": {
         "name": "4.5%+ Losers (Burst Ratio)",
-        "scan_clause": '( {cash} ( [0] 5 minute close / [-1] 1 day close < 0.955 and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest close / [-1] 1 day close < 0.955 and latest "nifty 500" = 1 ) )',
     },
     "atr_pct_above_4": {
         "name": "ATR% > 4% Stocks (Volatility Breadth)",
-        "scan_clause": '( {cash} ( [0] 5 minute atr( 14 ) / [0] 5 minute close * 100 > 4 and latest "nifty 500" = 1 ) )',
+        "scan_clause": '( {cash} ( latest atr( 14 ) / latest close * 100 > 4 and latest "nifty 500" = 1 ) )',
     },
 }
 
