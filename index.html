@@ -11075,19 +11075,24 @@ function setGTTSource(src){
     ? 'Order placed via broker API — executes automatically when price hits trigger.'
     : 'Tracked locally only — no broker execution. Use as a manual reminder/tracker.';
 }
-// ── Exec Symbol Autocomplete ──
+
+  // ── Exec Symbol Autocomplete ──
 function onExecSymInput(val){
-  // Reuse GTT autocomplete logic with exec dropdown
   const q=val.trim().toUpperCase(); const drop=document.getElementById('exec-sym-drop');
   if(!q||q.length<1){drop.classList.remove('open');return;}
-  // Borrow GTT dropdown, render into exec dropdown
-  onGttSymInput(val);
-  const gttDrop=document.getElementById('gtt-sym-drop');
-  if(gttDrop){
-    drop.innerHTML=gttDrop.innerHTML.replace(/selectGttSym/g,'selectExecSym');
-    drop.classList.add('open');
-    gttDrop.classList.remove('open');
-  }
+  const results=[];
+  NSE_SYMBOLS.forEach(([sym,name])=>{
+    if(sym===q) results.push({sym,name,score:100});
+    else if(sym.startsWith(q)) results.push({sym,name,score:90-sym.length});
+    else if(sym.includes(q)) results.push({sym,name,score:70});
+    else if(name.toUpperCase().includes(q)) results.push({sym,name,score:50});
+  });
+  results.sort((a,b)=>b.score-a.score);
+  const top=results.slice(0,12);
+  if(!top.length){drop.classList.remove('open');return;}
+  let html='<div class="sym-dropdown-header">NSE Stocks</div>';
+  top.forEach(s=>{ html+=`<div class="sym-opt" data-sym="${s.sym}" onclick="selectExecSym('${s.sym}')">${s.sym} — ${s.name}</div>`; });
+  drop.innerHTML=html;drop.classList.add('open');
 }
 let execSymFocusIdx=-1;
 function onExecSymKey(e){
