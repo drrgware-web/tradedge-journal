@@ -46,6 +46,12 @@ jobs:
       - name: Install dependencies
         run: pip install yfinance numpy
 
+      - name: Sync positions → custom_stocks.json
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python scripts/rrm_pos_sync.py
+
       - name: Run RRM Fetcher v4.1
         run: |
           python scripts/rrm_fetcher.py \
@@ -85,6 +91,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/rrm_data.json data/rrm_signals_prev.json
+          git add data/rrm_data.json data/rrm_signals_prev.json data/custom_stocks.json
           git diff --cached --quiet || git commit -m "MATRIX data update — $(date -u +%Y-%m-%d)"
           git push
