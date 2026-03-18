@@ -203,8 +203,8 @@
       return (
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }} className="fade-in" >
           <div onClick={onToggle} style={{
-            display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
-            alignItems: 'center', gap: 6, padding: '8px 12px', cursor: 'pointer',
+            display: 'grid', gridTemplateColumns: '200px 85px 80px 50px 75px 100px',
+            alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer',
             background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
             transition: 'background 0.2s',
           }}>
@@ -436,7 +436,8 @@
       if (loading) return null; // HTML loading spinner shows
 
       return (
-        <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '14px 10px 40px' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '14px 10px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 920 }}>
 
           {/* ── Header ── */}
           <div style={{ marginBottom: 12 }}>
@@ -518,8 +519,8 @@
 
           {/* ── Column headers ── */}
           <div style={{
-            display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
-            gap: 6, padding: '4px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 1,
+            display: 'grid', gridTemplateColumns: '200px 85px 80px 50px 75px 100px',
+            gap: 8, padding: '4px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 1,
           }}>
             {['ASSET', 'SIGNAL', 'SCORE', 'RSI', 'WEEKLY', 'ACTION'].map(h => (
               <span key={h} style={{
@@ -560,7 +561,10 @@
             </div>
           </div>
 
+          </div>
+
           {showAddModal && <AddStockModal onClose={() => setShowAddModal(false)} onAdd={handleAddStock} />}
+          </div>
         </div>
       );
     }
