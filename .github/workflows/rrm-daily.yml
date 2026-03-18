@@ -1,21 +1,17 @@
 # ═══════════════════════════════════════════════════════════════
-# TradEdge RRM v4.1 — Daily Data Fetcher
+# TradEdge MATRIX — Daily Data Fetcher + Telegram Alerts
 # Runs Mon–Fri at 5:30 PM IST (12:00 UTC) after market close
-# Fetches: 16 sectors, 54 ETFs, 12 asset classes, 4 segments,
-#          25 global indices, custom stocks → rrm_data.json
 # ═══════════════════════════════════════════════════════════════
 
 name: RRM Daily Fetch
 
 on:
   schedule:
-    # 5:30 PM IST = 12:00 UTC (Mon–Fri)
     - cron: '0 12 * * 1-5'
   workflow_dispatch:
-    # Manual trigger from GitHub Actions tab
     inputs:
       daily_tail:
-        description: 'Daily tail length (data points for RRG trail)'
+        description: 'Daily tail length'
         required: false
         default: '10'
       weekly_tail:
@@ -26,6 +22,10 @@ on:
         description: 'Monthly tail length'
         required: false
         default: '5'
+      skip_alerts:
+        description: 'Skip Telegram alerts (true/false)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ permissions:
 jobs:
   fetch-rrm:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -56,7 +56,6 @@ jobs:
 
       - name: Verify output
         run: |
-          echo "=== RRM Data Verification ==="
           python -c "
           import json
           d = json.load(open('data/rrm_data.json'))
@@ -67,14 +66,23 @@ jobs:
           print(f'ETFs:     {m[\"total_etfs\"]}')
           print(f'Globals:  {m[\"total_global_indices\"]}')
           print(f'Custom:   {m[\"total_custom_stocks\"]}')
-          print(f'Drills:   {m[\"total_drilldown_sectors\"]}')
-          print(f'Benchmarks: {\", \".join(m[\"benchmarks_calculated\"])}')
           "
+
+      - name: Run MATRIX Alerts
+        if: ${{ github.event.inputs.skip_alerts != 'true' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scripts/rrm_alerts.py \
+            --data data/rrm_data.json \
+            --prev data/rrm_signals_prev.json \
+            --benchmark "^NSEI"
 
       - name: Commit & push data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/rrm_data.json
-          git diff --cached --quiet || git commit -m "RRM v4.1 data update — $(date -u +%Y-%m-%d)"
+          git add data/rrm_data.json data/rrm_signals_prev.json
+          git diff --cached --quiet || git commit -m "MATRIX data update — $(date -u +%Y-%m-%d)"
           git push
