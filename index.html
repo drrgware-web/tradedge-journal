@@ -73,7 +73,80 @@ body.light{
 .rrg-side-actions a:hover{color:var(--y)}
 .rrg-shown-count{color:var(--t4);margin-left:auto;font-size:10px}
 .rrg-arrow-up{color:#4ade80}.rrg-arrow-down{color:#fca5a5}.rrg-arrow-flat{color:#fbbf24}
-
+/* ── TRADE EXECUTION v2.0 ── */
+.exec-grid{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}
+@media(max-width:1000px){.exec-grid{grid-template-columns:1fr}}
+.exec-order-panel{background:var(--bg2);border:1px solid var(--b1);border-radius:14px;overflow:hidden;position:sticky;top:70px}
+.exec-order-head{padding:12px 16px;border-bottom:1px solid var(--b1);font-size:13px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:8px}
+.exec-order-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.exec-section-label{font-size:9.5px;font-weight:800;color:var(--t4);text-transform:uppercase;letter-spacing:.1em;padding-bottom:6px;border-bottom:1px solid var(--b1);margin-top:4px}
+.exec-broker-row{display:flex;gap:0;border:1px solid var(--b1);border-radius:10px;overflow:hidden}
+.exec-broker-pill{flex:1;padding:9px 8px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;border:none;background:var(--bg3);color:var(--t3);transition:all .15s;font-family:'Outfit',sans-serif}
+.exec-broker-pill.active{background:var(--yd);color:var(--y)}
+.exec-broker-pill:not(:last-child){border-right:1px solid var(--b1)}
+.exec-otype-row{display:flex;gap:4px;flex-wrap:wrap}
+.exec-otype-chip{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--b2);background:var(--bg3);color:var(--t3);transition:all .12s;font-family:'Outfit',sans-serif}
+.exec-otype-chip:hover{border-color:var(--b3);color:var(--t2)}
+.exec-otype-chip.active{background:var(--yd);border-color:var(--y);color:var(--y)}
+.exec-iceberg-box{background:var(--bg3);border:1px solid rgba(34,211,238,.2);border-radius:10px;padding:10px 12px;display:none}
+.exec-iceberg-box.show{display:block}
+.exec-bracket-box{background:var(--bg3);border:1px solid rgba(168,85,247,.2);border-radius:10px;padding:10px 12px;display:none}
+.exec-bracket-box.show{display:block}
+.exec-place-btn{width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:800;border:none;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.exec-place-btn.buy{background:linear-gradient(135deg,#00E5A0,#00C882);color:#05080D}
+.exec-place-btn.sell{background:linear-gradient(135deg,#FF4560,#E03250);color:#fff}
+.exec-place-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.exec-place-btn:disabled{opacity:.5;transform:none;cursor:not-allowed}
+.exec-pnl-bar{display:flex;gap:10px;margin-bottom:14px;overflow-x:auto;padding:2px 0}
+.exec-pnl-card{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:10px 14px;min-width:130px;flex-shrink:0;text-align:center}
+.exec-pnl-card .pnl-label{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.08em}
+.exec-pnl-card .pnl-value{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;margin-top:3px}
+.exec-pos-grid{display:flex;flex-direction:column;gap:6px}
+.exec-pos-card{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:10px 14px;transition:all .15s;cursor:pointer;position:relative;overflow:hidden}
+.exec-pos-card:hover{border-color:var(--b3);background:var(--bg3)}
+.exec-pos-card.dragging{opacity:.5;border-style:dashed}
+.exec-pos-card .pos-pnl-bar{position:absolute;bottom:0;left:0;height:2px;border-radius:0 0 10px 10px;transition:width .3s}
+.exec-pos-top{display:flex;align-items:center;gap:10px}
+.exec-pos-sym{font-size:14px;font-weight:800;color:var(--t1);flex:1}
+.exec-pos-side{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px}
+.exec-pos-side.long{background:var(--gd);color:var(--g)}
+.exec-pos-side.short{background:var(--rd);color:var(--r)}
+.exec-pos-metrics{display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--t3)}
+.exec-pos-metrics .pm-val{font-family:'IBM Plex Mono',monospace;color:var(--t2);font-weight:600}
+.exec-pos-actions{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.exec-pos-actions .pa-btn{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--b2);background:var(--bg3);color:var(--t3);transition:all .12s;font-family:'Outfit',sans-serif}
+.exec-pos-actions .pa-btn:hover{background:var(--bg4);color:var(--t1)}
+.exec-pos-actions .pa-btn.pa-close{border-color:rgba(255,69,96,.3);color:var(--r)}
+.exec-pos-actions .pa-btn.pa-close:hover{background:var(--rd)}
+.exec-pos-actions .pa-btn.pa-trail{border-color:rgba(245,197,66,.3);color:var(--y)}
+.exec-pos-actions .pa-btn.pa-trail:hover{background:var(--yd)}
+.exec-heatmap{display:flex;flex-wrap:wrap;gap:3px;min-height:60px;border-radius:10px;overflow:hidden}
+.exec-hm-block{border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;min-height:50px}
+.exec-hm-block:hover{filter:brightness(1.2);transform:scale(1.02)}
+.exec-hm-block .hm-sym{font-size:10px;font-weight:800;color:rgba(255,255,255,.9)}
+.exec-hm-block .hm-pnl{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:rgba(255,255,255,.7)}
+.exec-hm-block .hm-pct{font-size:8px;color:rgba(255,255,255,.5)}
+.exec-sqoff-bar{background:linear-gradient(135deg,rgba(255,69,96,.08),rgba(255,69,96,.02));border:1px solid rgba(255,69,96,.25);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.exec-sqoff-bar .sq-btn{background:#FF4560;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer;font-family:'Outfit',sans-serif;transition:all .15s}
+.exec-sqoff-bar .sq-btn:hover{background:#E03250;box-shadow:0 4px 16px rgba(255,69,96,.3)}
+.exec-nudge-v2{border:1px solid var(--b2);border-radius:10px;overflow:hidden;background:var(--bg3);margin-top:4px}
+.exec-nudge-v2 .nv2-head{padding:6px 10px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em}
+.exec-nudge-v2 .nv2-body{padding:6px 10px;display:flex;flex-direction:column;gap:3px}
+.exec-nudge-v2 .nv2-item{display:flex;align-items:flex-start;gap:5px;font-size:10.5px;line-height:1.4;padding:2px 0}
+.exec-nudge-v2 .nv2-icon{flex-shrink:0;width:14px;text-align:center;font-size:11px}
+.exec-nudge-v2 .nv2-pass .nv2-icon{color:var(--g)}.exec-nudge-v2 .nv2-pass .nv2-text{color:var(--t3)}
+.exec-nudge-v2 .nv2-warn .nv2-icon{color:var(--y)}.exec-nudge-v2 .nv2-warn .nv2-text{color:var(--y)}
+.exec-nudge-v2 .nv2-fail .nv2-icon{color:var(--r)}.exec-nudge-v2 .nv2-fail .nv2-text{color:var(--r);font-weight:600}
+.exec-nudge-v2 .nv2-info .nv2-icon{color:var(--b)}.exec-nudge-v2 .nv2-info .nv2-text{color:var(--t2)}
+.exec-nudge-v2 .nv2-score{font-size:10px;font-weight:800;margin-left:auto;padding:2px 8px;border-radius:10px;flex-shrink:0}
+.exec-nudge-v2 .nv2-blocked{background:var(--rd);border:1px solid rgba(255,69,96,.4);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:11px;color:var(--r);font-weight:700;text-align:center}
+.exec-autotrail-box{background:var(--bg3);border:1px solid rgba(245,197,66,.2);border-radius:10px;padding:10px 12px}
+.exec-sort-row{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.exec-sort-pill{padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--b2);background:transparent;color:var(--t4);transition:all .12s;font-family:'Outfit',sans-serif}
+.exec-sort-pill.active{background:var(--bd);border-color:var(--b);color:var(--b)}
+@keyframes execPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.exec-status-pulse{animation:execPulse 1.5s infinite}
+.exec-live-dot{width:6px;height:6px;border-radius:50%;background:var(--g);display:inline-block;animation:blink 2s infinite;margin-right:4px}
 
 /* ── INFO TOOLTIP ── */
 .info-btn{
@@ -1741,39 +1814,90 @@ select.fi{cursor:pointer}
       </div>
     </div>
 
-    <!-- ══ TRADE EXECUTION & MANAGEMENT ══ -->
-    <div class="page" id="page-execute">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+ <div class="page" id="page-execute">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
         <div>
-          <div style="font-size:18px;font-weight:700;color:var(--t1)">⚡ Trade Execution & Management</div>
-          <div style="font-size:12px;color:var(--t3);margin-top:3px">Place orders, manage open positions, modify SL/Target, trail stops, pyramid entries</div>
+          <div style="font-size:18px;font-weight:800;color:var(--t1)">⚡ Trade Execution & Management</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">Place orders · manage positions · auto-trail · iceberg · bracket · live P&L</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div id="exec-broker-status" style="font-size:11px;color:var(--t3)"></div>
-          <button class="btn btn-ghost btn-sm" onclick="execRefreshPositions()">
+          <div id="exec2-broker-status" style="font-size:11px;color:var(--t3)"></div>
+          <div id="exec2-live-indicator" style="font-size:10px;color:var(--t4);display:none">
+            <span class="exec-live-dot"></span>Live · <span id="exec2-live-timer">0s</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="exec2RefreshAll()" id="exec2-refresh-btn">
             <svg viewBox="0 0 24 24" style="width:12px;height:12px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
             Refresh
           </button>
         </div>
       </div>
-
+ 
       <!-- Broker Selector -->
-      <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:16px">
-        <button id="exec-br-zd" class="sl-mode-btn active" onclick="setExecBroker('zerodha')" style="flex:1;padding:8px;font-size:12px;font-weight:700;background:var(--yd);color:var(--y)">🟢 Zerodha</button>
-        <button id="exec-br-dhan" class="sl-mode-btn" onclick="setExecBroker('dhan')" style="flex:1;padding:8px;font-size:12px;font-weight:700">🔵 Dhan</button>
-        <button id="exec-br-de" class="sl-mode-btn" onclick="setExecBroker('definedge')" style="flex:1;padding:8px;font-size:12px;font-weight:700">🟣 Definedge</button>
+      <div class="exec-broker-row" style="margin-bottom:14px">
+        <button class="exec-broker-pill active" id="exec2-br-zerodha" onclick="exec2SetBroker('zerodha')">🟢 Zerodha</button>
+        <button class="exec-broker-pill" id="exec2-br-dhan" onclick="exec2SetBroker('dhan')">🔵 Dhan</button>
+        <button class="exec-broker-pill" id="exec2-br-definedge" onclick="exec2SetBroker('definedge')">🟣 Definedge</button>
       </div>
-
-      <div style="display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start">
-
-        <!-- ── LEFT: Place New Order ── -->
-        <div class="card">
-          <div class="card-head"><span class="card-title">📤 Place Order</span></div>
-          <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+ 
+      <!-- Live P&L Ticker Bar -->
+      <div class="exec-pnl-bar" id="exec2-pnl-bar">
+        <div class="exec-pnl-card">
+          <div class="pnl-label">Total P&L</div>
+          <div class="pnl-value" id="exec2-total-pnl" style="color:var(--t3)">—</div>
+        </div>
+        <div class="exec-pnl-card">
+          <div class="pnl-label">Open Positions</div>
+          <div class="pnl-value" id="exec2-pos-count" style="color:var(--c)">0</div>
+        </div>
+        <div class="exec-pnl-card">
+          <div class="pnl-label">Day P&L</div>
+          <div class="pnl-value" id="exec2-day-pnl" style="color:var(--t3)">—</div>
+        </div>
+        <div class="exec-pnl-card">
+          <div class="pnl-label">Margin Used</div>
+          <div class="pnl-value" id="exec2-margin" style="color:var(--y)">—</div>
+        </div>
+        <div class="exec-pnl-card">
+          <div class="pnl-label">Capital Risk %</div>
+          <div class="pnl-value" id="exec2-risk-pct" style="color:var(--t3)">—</div>
+        </div>
+      </div>
+ 
+      <!-- Position Exposure Heatmap -->
+      <div class="card" style="padding:0;margin-bottom:14px;overflow:hidden">
+        <div style="padding:8px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em">📊 Position Exposure Heatmap</div>
+          <div style="display:flex;gap:4px">
+            <button class="exec-sort-pill active" onclick="exec2HeatmapMode('value',this)">By Value</button>
+            <button class="exec-sort-pill" onclick="exec2HeatmapMode('pnl',this)">By P&L</button>
+          </div>
+        </div>
+        <div style="padding:8px" id="exec2-heatmap">
+          <div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">Load positions to see heatmap</div>
+        </div>
+      </div>
+ 
+      <!-- Square Off All bar -->
+      <div class="exec-sqoff-bar" id="exec2-sqoff-bar" style="display:none">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--r)">⚠ Square Off All Positions</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px"><span id="exec2-sqoff-count">0</span> positions · <span id="exec2-sqoff-value">₹0</span> total value</div>
+        </div>
+        <button class="sq-btn" onclick="exec2SquareOffAll()">🔴 SQUARE OFF ALL</button>
+      </div>
+ 
+      <!-- Main 2-col layout -->
+      <div class="exec-grid">
+        <!-- ═══ LEFT: Place Order Panel ═══ -->
+        <div class="exec-order-panel">
+          <div class="exec-order-head">📤 Place Order</div>
+          <div class="exec-order-body">
+            <!-- Symbol -->
             <div class="fg">
               <label class="fl">Symbol</label>
               <div class="sym-wrap" style="position:relative">
-                <input class="fi" id="exec-sym" placeholder="Type symbol e.g. RELIANCE, INFY…"
+                <input class="fi" id="exec2-sym" placeholder="Type symbol e.g. RELIANCE, INFY…"
                   autocomplete="off" style="text-transform:uppercase"
                   oninput="onExecSymInput(this.value)"
                   onkeydown="onExecSymKey(event)"
@@ -1781,48 +1905,55 @@ select.fi{cursor:pointer}
                   onblur="setTimeout(closeExecSymDrop,200)">
                 <div class="sym-dropdown" id="exec-sym-drop"></div>
               </div>
-              <div id="exec-price-status" style="font-size:10px;color:var(--t3);margin-top:4px;min-height:14px"></div>
+              <div id="exec2-price-status" style="font-size:10px;color:var(--t3);margin-top:3px;min-height:14px"></div>
             </div>
-
-            <div class="fg2">
-              <div class="fg">
-                <label class="fl">Side</label>
-                <select class="fi" id="exec-side">
-                  <option value="BUY">BUY</option>
-                  <option value="SELL">SELL</option>
-                </select>
-              </div>
-              <div class="fg">
-                <label class="fl">Order Type</label>
-                <select class="fi" id="exec-otype" onchange="execOtypeChange()">
-                  <option value="MARKET">Market</option>
-                  <option value="LIMIT">Limit</option>
-                  <option value="SL">SL (Stop Loss)</option>
-                  <option value="SL-M">SL-M (SL Market)</option>
-                </select>
+ 
+            <!-- Side toggle (BUY / SELL) -->
+            <div style="display:flex;gap:0;border:1.5px solid var(--b1);border-radius:10px;overflow:hidden">
+              <button id="exec2-side-buy" onclick="exec2SetSide('BUY')"
+                style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--gd);color:var(--g);font-family:'Outfit',sans-serif;transition:all .15s">
+                BUY
+              </button>
+              <button id="exec2-side-sell" onclick="exec2SetSide('SELL')"
+                style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t4);font-family:'Outfit',sans-serif;transition:all .15s">
+                SELL
+              </button>
+            </div>
+ 
+            <!-- Order Type chips -->
+            <div>
+              <label class="fl">Order Type</label>
+              <div class="exec-otype-row">
+                <button class="exec-otype-chip active" onclick="exec2SetOtype('MARKET',this)">Market</button>
+                <button class="exec-otype-chip" onclick="exec2SetOtype('LIMIT',this)">Limit</button>
+                <button class="exec-otype-chip" onclick="exec2SetOtype('SL',this)">SL</button>
+                <button class="exec-otype-chip" onclick="exec2SetOtype('SL-M',this)">SL-M</button>
               </div>
             </div>
-
+ 
+            <!-- Qty + Price -->
             <div class="fg2">
               <div class="fg">
                 <label class="fl">Quantity</label>
-                <input type="number" class="fi" id="exec-qty" placeholder="1" min="1" value="" onchange="execRerunNudges()">
+                <input type="number" class="fi" id="exec2-qty" placeholder="0" min="1" oninput="exec2OnQtyChange()">
               </div>
-              <div class="fg" id="exec-limit-wrap">
+              <div class="fg" id="exec2-price-wrap">
                 <label class="fl">Price (₹)</label>
-                <input type="number" class="fi" id="exec-price" placeholder="0.00" step="0.05">
+                <input type="number" class="fi" id="exec2-price" placeholder="0.00" step="0.05">
               </div>
             </div>
-
-            <div class="fg" id="exec-trigger-wrap" style="display:none">
+ 
+            <!-- Trigger price (shown for SL/SL-M) -->
+            <div class="fg" id="exec2-trigger-wrap" style="display:none">
               <label class="fl">Trigger Price (₹)</label>
-              <input type="number" class="fi" id="exec-trigger" placeholder="0.00" step="0.05">
+              <input type="number" class="fi" id="exec2-trigger" placeholder="0.00" step="0.05">
             </div>
-
+ 
+            <!-- Product + Validity -->
             <div class="fg2">
               <div class="fg">
                 <label class="fl">Product</label>
-                <select class="fi" id="exec-product">
+                <select class="fi" id="exec2-product">
                   <option value="CNC">CNC (Delivery)</option>
                   <option value="MIS">MIS (Intraday)</option>
                   <option value="NRML">NRML</option>
@@ -1830,251 +1961,150 @@ select.fi{cursor:pointer}
               </div>
               <div class="fg">
                 <label class="fl">Validity</label>
-                <select class="fi" id="exec-validity">
+                <select class="fi" id="exec2-validity">
                   <option value="DAY">Day</option>
                   <option value="IOC">IOC</option>
                 </select>
               </div>
             </div>
-
-            <!-- Bracket/Cover extras -->
-            <div style="border-top:1px solid var(--b1);padding-top:12px">
-              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">SL & Target (optional — creates separate orders)</div>
+ 
+            <!-- ── Iceberg Order ── -->
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="exec2ToggleIceberg()">
+                <input type="checkbox" id="exec2-iceberg-cb" style="accent-color:var(--c)" onclick="event.stopPropagation();exec2ToggleIceberg()">
+                <span style="font-size:11px;font-weight:700;color:var(--c)">🧊 Iceberg / Slice Order</span>
+                <i class="info-btn" onmouseenter="showInfoTip(this,'Iceberg Order','Splits your large order into smaller visible slices. Only the disclosed qty shows in the order book. NSE requires min 10% of total qty.','Useful for large orders to avoid market impact.')" onmouseleave="hideInfoTip()">i</i>
+              </div>
+              <div class="exec-iceberg-box" id="exec2-iceberg-box">
+                <div class="fg2" style="margin-top:6px">
+                  <div class="fg">
+                    <label class="fl">Slice Size (qty per chunk)</label>
+                    <input type="number" class="fi" id="exec2-ice-slice" placeholder="e.g. 100" min="1">
+                  </div>
+                  <div class="fg">
+                    <label class="fl">Delay between slices (sec)</label>
+                    <input type="number" class="fi" id="exec2-ice-delay" placeholder="2" min="0" max="30" value="2">
+                  </div>
+                </div>
+                <div id="exec2-ice-preview" style="font-size:10px;color:var(--t4);margin-top:6px"></div>
+              </div>
+            </div>
+ 
+            <!-- ── Bracket Order ── -->
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="exec2ToggleBracket()">
+                <input type="checkbox" id="exec2-bracket-cb" style="accent-color:var(--p)" onclick="event.stopPropagation();exec2ToggleBracket()">
+                <span style="font-size:11px;font-weight:700;color:var(--p)">🔲 Bracket Order (Entry + SL + Target)</span>
+              </div>
+              <div class="exec-bracket-box" id="exec2-bracket-box">
+                <div class="fg2" style="margin-top:6px">
+                  <div class="fg">
+                    <label class="fl">Stop Loss ₹</label>
+                    <input type="number" class="fi" id="exec2-bkt-sl" placeholder="0.00" step="0.05">
+                  </div>
+                  <div class="fg">
+                    <label class="fl">Target ₹</label>
+                    <input type="number" class="fi" id="exec2-bkt-tgt" placeholder="0.00" step="0.05">
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+                  <input type="checkbox" id="exec2-bkt-autojournal" checked style="accent-color:var(--g)">
+                  <label for="exec2-bkt-autojournal" style="font-size:10px;color:var(--t3);cursor:pointer">Auto-log to Trade Journal</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                  <input type="checkbox" id="exec2-bkt-autogtt" checked style="accent-color:var(--y)">
+                  <label for="exec2-bkt-autogtt" style="font-size:10px;color:var(--t3);cursor:pointer">Auto-create GTT (SL + Target) after fill</label>
+                </div>
+              </div>
+            </div>
+ 
+            <!-- ── Auto-Trail SL ── -->
+            <div class="exec-autotrail-box">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <input type="checkbox" id="exec2-autotrail-cb" style="accent-color:var(--y)">
+                <label for="exec2-autotrail-cb" style="font-size:11px;font-weight:700;color:var(--y);cursor:pointer">⚡ Auto-Trail SL</label>
+                <i class="info-btn" onmouseenter="showInfoTip(this,'Auto-Trail SL','When enabled, SL automatically moves up as price rises. Trails by fixed % or points from the highest price reached.','Set it and forget it — locks in profits automatically.')" onmouseleave="hideInfoTip()">i</i>
+              </div>
               <div class="fg2">
                 <div class="fg">
-                  <label class="fl">Stop Loss ₹</label>
-                  <input type="number" class="fi" id="exec-sl" placeholder="Optional" step="0.05">
+                  <label class="fl">Trail Method</label>
+                  <select class="fi" id="exec2-trail-method" style="font-size:11px;padding:5px 8px">
+                    <option value="pct">% from high</option>
+                    <option value="points">₹ points from high</option>
+                    <option value="atr">ATR-based (2x ATR)</option>
+                  </select>
                 </div>
                 <div class="fg">
-                  <label class="fl">Target ₹</label>
-                  <input type="number" class="fi" id="exec-tgt" placeholder="Optional" step="0.05">
+                  <label class="fl">Trail Value</label>
+                  <input type="number" class="fi" id="exec2-trail-val" placeholder="2.0" step="0.5" value="2" style="font-size:11px;padding:5px 8px">
                 </div>
               </div>
             </div>
-
-            <!-- Market Protection + Zerodha SL-M fallback -->
-            <div style="border-top:1px solid var(--b1);padding-top:12px">
-              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">
-                Advanced
-                <span id="exec-mktprot-info" style="font-size:9px;color:var(--t4);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px">Definedge: % slippage allowed on market orders</span>
+ 
+            <!-- Pre-Trade Risk Nudges -->
+            <div class="exec-nudge-v2" id="exec2-nudge-panel" style="display:none">
+              <div class="nv2-head">
+                <span>🛡️</span> Pre-Trade Checks
+                <span class="nv2-score" id="exec2-nudge-score"></span>
               </div>
-              <div class="fg2">
-                <div class="fg">
-                  <label class="fl" style="display:flex;align-items:center;gap:4px">
-                    Mkt Protection %
-                    <span title="Definedge: max slippage % allowed on market orders. 0 = no protection. Zerodha: switches MARKET → SL-M with this % buffer automatically." style="cursor:help;font-size:10px;color:var(--t4)">ⓘ</span>
-                  </label>
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <input type="number" class="fi" id="exec-mkt-protect" placeholder="0" min="0" max="5" step="0.25" value="0" style="flex:1" oninput="execMktProtectChange()">
-                    <span style="font-size:11px;color:var(--t3);white-space:nowrap">%</span>
-                  </div>
-                  <div id="exec-mktprot-preview" style="font-size:10px;color:var(--t4);margin-top:3px;min-height:14px"></div>
-                </div>
-                <div class="fg" id="exec-zd-slm-wrap" style="display:none">
-                  <label class="fl" style="display:flex;align-items:center;gap:4px">
-                    Zerodha SL-M fallback
-                    <span title="When ON, MARKET orders are automatically converted to SL-M orders using the mkt protection % as the trigger buffer. Reduces slippage risk." style="cursor:help;font-size:10px;color:var(--t4)">ⓘ</span>
-                  </label>
-                  <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
-                    <input type="checkbox" id="exec-zd-slm-toggle" style="accent-color:var(--y);width:14px;height:14px" onchange="execMktProtectChange()">
-                    <label for="exec-zd-slm-toggle" style="font-size:11px;color:var(--t2);cursor:pointer">Auto SL-M for MARKET orders</label>
-                  </div>
-                  <div id="exec-zd-slm-preview" style="font-size:10px;color:var(--y);margin-top:2px;min-height:14px"></div>
-                </div>
-              </div>
+              <div class="nv2-body" id="exec2-nudge-list"></div>
             </div>
-
-            <!-- Pre-trade Risk Nudges -->
-            <div id="exec-nudge-panel" style="display:none;border:1px solid var(--b2);border-radius:8px;overflow:hidden;background:var(--bg3)">
-              <div style="padding:6px 10px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:6px">
-                <span style="font-size:12px">🛡️</span>
-                <span style="font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em">Pre-Trade Checks</span>
-                <span id="exec-nudge-score" style="font-size:10px;font-weight:800;margin-left:auto;padding:2px 8px;border-radius:10px"></span>
-              </div>
-              <div id="exec-nudge-list" style="padding:6px 10px;display:flex;flex-direction:column;gap:3px"></div>
-            </div>
-
-            <button class="btn btn-y" style="width:100%;justify-content:center;padding:10px;font-size:13px" onclick="execPlaceOrder()" id="exec-place-btn">
-              <svg viewBox="0 0 24 24" style="width:14px;height:14px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              Place Order
+ 
+            <!-- PLACE ORDER button -->
+            <button class="exec-place-btn buy" id="exec2-place-btn" onclick="exec2PlaceOrder()">
+              ⚡ Place BUY Order
             </button>
-            <div id="exec-order-status" style="font-size:11px;color:var(--t3);min-height:16px;text-align:center"></div>
-
-            <!-- Quick from journal -->
-            <div style="border-top:1px solid var(--b1);padding-top:10px;margin-top:4px">
-              <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700">Quick Fill from Journal</div>
-              <select class="fi" id="exec-from-journal" onchange="execFillFromJournal()" style="font-size:12px">
+ 
+            <!-- Order status -->
+            <div id="exec2-order-status" style="font-size:11px;color:var(--t3);min-height:16px;text-align:center"></div>
+ 
+            <!-- Quick fill from journal -->
+            <div style="border-top:1px solid var(--b1);padding-top:10px">
+              <label class="fl">Quick Fill from Journal</label>
+              <select class="fi" id="exec2-from-journal" onchange="exec2FillFromJournal()" style="font-size:11px">
                 <option value="">— Select open trade —</option>
               </select>
             </div>
           </div>
         </div>
-
-        <!-- ── RIGHT: Live Positions & Management ── -->
+ 
+        <!-- ═══ RIGHT: Positions + Orders ═══ -->
         <div style="display:flex;flex-direction:column;gap:12px">
-
-          <!-- Open Positions from broker -->
-          <div class="card">
-            <div class="card-head">
-              <span class="card-title">📊 Broker Positions</span>
-              <span id="exec-pos-count" style="font-size:11px;color:var(--t3)">0 positions</span>
-            </div>
-            <div class="card-body" style="padding:0">
-              <div id="exec-positions-tbl" style="overflow-x:auto">
-                <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Select a broker and click Refresh to load positions</div>
+ 
+          <!-- Positions Panel -->
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="padding:10px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:12px;font-weight:700;color:var(--t2)">📊 Positions</span>
+                <span id="exec2-pos-badge" style="font-size:10px;background:var(--bd);color:var(--b);padding:1px 8px;border-radius:10px;font-weight:700">0</span>
+              </div>
+              <div class="exec-sort-row">
+                <span style="font-size:9px;color:var(--t4)">Sort:</span>
+                <button class="exec-sort-pill active" onclick="exec2SortPos('pnl',this)">P&L</button>
+                <button class="exec-sort-pill" onclick="exec2SortPos('value',this)">Value</button>
+                <button class="exec-sort-pill" onclick="exec2SortPos('symbol',this)">A→Z</button>
               </div>
             </div>
-          </div>
-
-          <!-- Position Management Panel (shown when position selected) -->
-          <div class="card" id="exec-manage-card" style="display:none;border:1px solid var(--yd)">
-            <div class="card-head" style="background:rgba(245,197,66,.06)">
-              <span class="card-title" style="color:var(--y)">🎯 Manage: <span id="exec-manage-sym">—</span></span>
-              <button class="btn btn-ghost btn-xs" onclick="document.getElementById('exec-manage-card').style.display='none'">✕</button>
-            </div>
-            <div class="card-body">
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
-                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
-                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">Qty</div>
-                  <div id="exec-m-qty" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--t1);font-weight:700">–</div>
-                </div>
-                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
-                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">Avg Price</div>
-                  <div id="exec-m-avg" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--t1);font-weight:700">–</div>
-                </div>
-                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
-                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">P&L</div>
-                  <div id="exec-m-pnl" style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700">–</div>
-                </div>
-                <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;flex:1;min-width:100px">
-                  <div style="font-size:10px;color:var(--t4);text-transform:uppercase">CMP</div>
-                  <div id="exec-m-cmp" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--c);font-weight:700">–</div>
-                </div>
-              </div>
-
-              <!-- Action tabs -->
-              <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:14px">
-                <button class="sl-mode-btn active" id="exec-act-sl" onclick="setExecAction('sl')" style="flex:1;padding:6px;font-size:11px;font-weight:700;background:var(--yd);color:var(--y)">Modify SL/Tgt</button>
-                <button class="sl-mode-btn" id="exec-act-trail" onclick="setExecAction('trail')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Trail SL</button>
-                <button class="sl-mode-btn" id="exec-act-partial" onclick="setExecAction('partial')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Partial Exit</button>
-                <button class="sl-mode-btn" id="exec-act-pyramid" onclick="setExecAction('pyramid')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Pyramid</button>
-                <button class="sl-mode-btn" id="exec-act-close" onclick="setExecAction('close')" style="flex:1;padding:6px;font-size:11px;font-weight:700">Close All</button>
-              </div>
-
-              <!-- Modify SL/Target -->
-              <div id="exec-panel-sl">
-                <div class="fg2" style="margin-bottom:10px">
-                  <div class="fg">
-                    <label class="fl">New Stop Loss ₹</label>
-                    <input type="number" class="fi" id="exec-new-sl" placeholder="0.00" step="0.05">
-                  </div>
-                  <div class="fg">
-                    <label class="fl">New Target ₹</label>
-                    <input type="number" class="fi" id="exec-new-tgt" placeholder="0.00" step="0.05">
-                  </div>
-                </div>
-                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execModifySLTgt()">Update SL & Target</button>
-              </div>
-
-              <!-- Trail SL -->
-              <div id="exec-panel-trail" style="display:none">
-                <div class="fg2" style="margin-bottom:10px">
-                  <div class="fg">
-                    <label class="fl">Trail Method</label>
-                    <select class="fi" id="exec-trail-method">
-                      <option value="fixed">Fixed points (₹)</option>
-                      <option value="pct">Percentage (%)</option>
-                      <option value="cost">Move SL to cost</option>
-                    </select>
-                  </div>
-                  <div class="fg">
-                    <label class="fl">Trail Value</label>
-                    <input type="number" class="fi" id="exec-trail-val" placeholder="e.g. 5.00" step="0.5">
-                  </div>
-                </div>
-                <div style="font-size:11px;color:var(--t3);margin-bottom:10px" id="exec-trail-preview">New SL will be: –</div>
-                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execTrailSL()">Trail Stop Loss</button>
-              </div>
-
-              <!-- Partial Exit -->
-              <div id="exec-panel-partial" style="display:none">
-                <div class="fg2" style="margin-bottom:10px">
-                  <div class="fg">
-                    <label class="fl">Exit Quantity</label>
-                    <input type="number" class="fi" id="exec-partial-qty" placeholder="e.g. 50" min="1">
-                  </div>
-                  <div class="fg">
-                    <label class="fl">Order Type</label>
-                    <select class="fi" id="exec-partial-type">
-                      <option value="MARKET">Market</option>
-                      <option value="LIMIT">Limit</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="fg" id="exec-partial-price-wrap" style="display:none;margin-bottom:10px">
-                  <label class="fl">Limit Price ₹</label>
-                  <input type="number" class="fi" id="exec-partial-price" placeholder="0.00" step="0.05">
-                </div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-                  <button class="btn btn-ghost btn-xs" onclick="setPartialPct(25)">25%</button>
-                  <button class="btn btn-ghost btn-xs" onclick="setPartialPct(50)">50%</button>
-                  <button class="btn btn-ghost btn-xs" onclick="setPartialPct(75)">75%</button>
-                </div>
-                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execPartialExit()">Execute Partial Exit</button>
-              </div>
-
-              <!-- Pyramid -->
-              <div id="exec-panel-pyramid" style="display:none">
-                <div class="fg2" style="margin-bottom:10px">
-                  <div class="fg">
-                    <label class="fl">Add Quantity</label>
-                    <input type="number" class="fi" id="exec-pyr-qty" placeholder="e.g. 50" min="1">
-                  </div>
-                  <div class="fg">
-                    <label class="fl">Order Type</label>
-                    <select class="fi" id="exec-pyr-type">
-                      <option value="MARKET">Market</option>
-                      <option value="LIMIT">Limit</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="fg" id="exec-pyr-price-wrap" style="display:none;margin-bottom:10px">
-                  <label class="fl">Limit Price ₹</label>
-                  <input type="number" class="fi" id="exec-pyr-price" placeholder="0.00" step="0.05">
-                </div>
-                <button class="btn btn-y btn-sm" style="width:100%;justify-content:center" onclick="execPyramidAdd()">Add Pyramid Entry</button>
-              </div>
-
-              <!-- Close All -->
-              <div id="exec-panel-close" style="display:none">
-                <div style="background:var(--rd);border:1px solid rgba(255,69,96,.3);border-radius:10px;padding:14px;text-align:center">
-                  <div style="font-size:13px;font-weight:700;color:var(--r);margin-bottom:6px">⚠ Close Entire Position</div>
-                  <div style="font-size:11px;color:var(--t2);margin-bottom:12px">This will place a market order to square off all <span id="exec-close-qty">—</span> shares</div>
-                  <button class="btn btn-red" style="width:100%;justify-content:center" onclick="execCloseAll()">Close Position at Market</button>
-                </div>
-              </div>
-
-              <div id="exec-manage-status" style="font-size:11px;color:var(--t3);min-height:16px;text-align:center;margin-top:8px"></div>
+            <div id="exec2-positions" style="max-height:500px;overflow-y:auto;padding:8px">
+              <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Select broker → Refresh to load</div>
             </div>
           </div>
-
-          <!-- Order History -->
-          <div class="card">
-            <div class="card-head">
-              <span class="card-title">📋 Today's Orders</span>
-              <button class="btn btn-ghost btn-xs" onclick="execRefreshOrders()">↻</button>
+ 
+          <!-- Today's Orders -->
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="padding:10px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:12px;font-weight:700;color:var(--t2)">📋 Today's Orders</span>
+              <button class="btn btn-ghost btn-xs" onclick="exec2RefreshOrders()">↻</button>
             </div>
-            <div class="card-body" style="padding:0">
-              <div id="exec-orders-tbl" style="overflow-x:auto">
-                <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">No orders loaded</div>
-              </div>
+            <div id="exec2-orders" style="max-height:300px;overflow-y:auto">
+              <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">No orders loaded</div>
             </div>
           </div>
-
+ 
         </div>
       </div>
-
-      <!-- ── GTT Orders Manager ── -->
+ 
+      <!-- GTT Orders Section (keep existing) -->
       <div style="margin-top:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:10px">
@@ -2082,7 +2112,7 @@ select.fi{cursor:pointer}
             <span id="gtt-count-badge" style="font-size:10px;background:rgba(59,139,255,.12);color:var(--b);padding:2px 8px;border-radius:20px;font-weight:700">0 active</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <button class="btn btn-ghost btn-sm" onclick="gttAutoFromJournal()" title="Auto-create GTTs from open trades with SL/Target set">
+            <button class="btn btn-ghost btn-sm" onclick="gttAutoFromJournal()">
               <svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Auto from Journal
             </button>
@@ -2096,8 +2126,6 @@ select.fi{cursor:pointer}
             </button>
           </div>
         </div>
-
-        <!-- GTT Tabs: Active | Triggered | All -->
         <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px 8px 0 0;overflow:hidden;background:var(--bg3)">
           <button class="gtt-tab active" id="gtt-tab-active" onclick="gttSwitchTab('active')">🟢 Active</button>
           <button class="gtt-tab" id="gtt-tab-triggered" onclick="gttSwitchTab('triggered')">🔔 Triggered</button>
@@ -2108,15 +2136,14 @@ select.fi{cursor:pointer}
           <div id="gtt-list-container" style="min-height:60px;max-height:450px;overflow-y:auto">
             <div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">
               <div style="font-size:20px;margin-bottom:6px">🎯</div>
-              No GTT orders yet — Place one or Auto-create from journal
+              No GTT orders yet
             </div>
           </div>
         </div>
         <div id="gtt-status-msg" style="font-size:10px;color:var(--t3);margin-top:6px;text-align:center;min-height:14px"></div>
       </div>
-
+ 
     </div>
-
     <!-- ══ GTT MODAL — Place / Edit ══ -->
     <div class="overlay" id="m-gtt" onclick="if(event.target===this)closeM('m-gtt')">
       <div class="modal" style="max-width:480px">
@@ -10205,618 +10232,771 @@ function newsTimeAgo(date){
 }
 
 // ══════════════════════════════════════════════════
-// TRADE EXECUTION & MANAGEMENT ENGINE
+// TRADE EXECUTION v2.0 — COMPLETE ENGINE
 // ══════════════════════════════════════════════════
-let _execBroker = 'zerodha';
-let _execPositions = [];
-let _execOrders = [];
-let _execManageSym = null;
-let _execManagePos = null;
-let execSymFocusIdx = -1;
-
+let _exec2 = {
+  broker: 'zerodha',
+  side: 'BUY',
+  otype: 'MARKET',
+  positions: [],
+  orders: [],
+  sortBy: 'pnl',
+  hmMode: 'value',
+  liveTimer: null,
+  liveInterval: 5000,
+  lastRefresh: 0,
+  icebergActive: false,
+  bracketActive: false,
+  autoTrailActive: false,
+  autoTrailHighs: {}, // sym → highest price seen
+};
+ 
+// ── Sound Engine ──
+const _execSounds = {
+  fill: { freq:[523,659,784], dur:0.12, gap:0.15, vol:0.2, type:'sine' },
+  slHit: { freq:[880,660,440], dur:0.15, gap:0.18, vol:0.25, type:'sawtooth' },
+  targetHit: { freq:[523,659,784,1047], dur:0.1, gap:0.12, vol:0.2, type:'sine' },
+  error: { freq:[220,180], dur:0.2, gap:0.25, vol:0.15, type:'square' },
+  squareOff: { freq:[440,350,260], dur:0.18, gap:0.2, vol:0.2, type:'sawtooth' },
+};
+ 
+function exec2PlaySound(name){
+  const s = _execSounds[name]; if(!s) return;
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    s.freq.forEach((freq,i)=>{
+      const osc=ctx.createOscillator(), gain=ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value=freq; osc.type=s.type;
+      const t=ctx.currentTime+i*s.gap;
+      gain.gain.setValueAtTime(0,t);
+      gain.gain.linearRampToValueAtTime(s.vol,t+0.02);
+      gain.gain.linearRampToValueAtTime(0,t+s.dur);
+      osc.start(t); osc.stop(t+s.dur+0.05);
+    });
+  }catch(e){}
+}
+ 
+// ── Init ──
 function initExecPage(){
-  execPopulateJournalDropdown();
-  execCheckBrokerStatus();
-  renderGTTList();
+  exec2PopulateJournal();
+  exec2CheckBrokerStatus();
+  exec2UpdatePlaceBtn();
+  // Start live refresh during market hours
+  exec2StartLive();
 }
-
-function setExecBroker(b){
-  _execBroker = b;
-  ['zd','dhan','de'].forEach(k=>{
-    const btn = document.getElementById('exec-br-'+k);
-    if(!btn) return;
-    const isActive = (k==='zd'&&b==='zerodha') || (k==='dhan'&&b==='dhan') || (k==='de'&&b==='definedge');
-    btn.style.background = isActive ? 'var(--yd)' : 'var(--bg3)';
-    btn.style.color = isActive ? 'var(--y)' : 'var(--t3)';
-  });
-  execCheckBrokerStatus();
+ 
+// ── Broker Selection ──
+function exec2SetBroker(b){
+  _exec2.broker = b;
+  document.querySelectorAll('.exec-broker-pill').forEach(p=>p.classList.remove('active'));
+  document.getElementById('exec2-br-'+b)?.classList.add('active');
+  exec2CheckBrokerStatus();
 }
-
-function execCheckBrokerStatus(){
-  const st = document.getElementById('exec-broker-status');
-  if(!st) return;
+ 
+function exec2CheckBrokerStatus(){
+  const st = document.getElementById('exec2-broker-status'); if(!st) return;
+  const w = (localStorage.getItem('zd_worker_url')||'').trim();
+  if(!w){ st.innerHTML='<span style="color:var(--r)">⚠ Set Worker URL in Settings</span>'; return; }
   let connected = false;
-  if(_execBroker==='zerodha'){
-    const tk = localStorage.getItem('zd_access_token') || localStorage.getItem('zd_tk');
-    connected = !!tk;
-  } else if(_execBroker==='dhan'){
-    connected = !!localStorage.getItem('dhan_tk');
-  } else if(_execBroker==='definedge'){
-    connected = !!localStorage.getItem('de_session');
-  }
-  const workerUrl = (localStorage.getItem('zd_worker_url')||'').trim();
-  if(!workerUrl){ st.innerHTML = '<span style="color:var(--r)">⚠ Set Worker URL in Settings first</span>'; return; }
-  st.innerHTML = connected ? '<span style="color:var(--g)">● Connected</span>' : '<span style="color:var(--r)">● Not authenticated — configure in Settings</span>';
+  if(_exec2.broker==='zerodha') connected=!!(localStorage.getItem('zd_key')&&localStorage.getItem('zd_tk'));
+  else if(_exec2.broker==='dhan') connected=!!localStorage.getItem('dhan_tk');
+  else connected=!!localStorage.getItem('de_session');
+  st.innerHTML = connected?'<span style="color:var(--g)">● Connected</span>':'<span style="color:var(--r)">● Not authenticated</span>';
 }
-
-function getExecWorkerUrl(){ return (localStorage.getItem('zd_worker_url')||'').trim(); }
-
-function getExecHeaders(){
-  const h = {'Content-Type':'application/json'};
-  if(_execBroker==='zerodha'){ h['Authorization']=`token ${localStorage.getItem('zd_key')||''}:${localStorage.getItem('zd_access_token')||localStorage.getItem('zd_tk')||''}`; }
-  else if(_execBroker==='dhan'){ h['X-Dhan-Token']=localStorage.getItem('dhan_tk')||''; h['X-Dhan-ID']=localStorage.getItem('dhan_id')||''; }
-  else if(_execBroker==='definedge'){ h['X-DE-Session']=localStorage.getItem('de_session')||''; }
+ 
+// ── Side Toggle ──
+function exec2SetSide(side){
+  _exec2.side = side;
+  const buyBtn=document.getElementById('exec2-side-buy'), sellBtn=document.getElementById('exec2-side-sell');
+  if(side==='BUY'){
+    buyBtn.style.cssText='flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--gd);color:var(--g);font-family:Outfit,sans-serif;transition:all .15s';
+    sellBtn.style.cssText='flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t4);font-family:Outfit,sans-serif;transition:all .15s';
+  } else {
+    sellBtn.style.cssText='flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--rd);color:var(--r);font-family:Outfit,sans-serif;transition:all .15s';
+    buyBtn.style.cssText='flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t4);font-family:Outfit,sans-serif;transition:all .15s';
+  }
+  exec2UpdatePlaceBtn();
+}
+ 
+function exec2UpdatePlaceBtn(){
+  const btn=document.getElementById('exec2-place-btn'); if(!btn) return;
+  btn.className='exec-place-btn '+(_exec2.side==='BUY'?'buy':'sell');
+  btn.innerHTML=`⚡ Place ${_exec2.side} Order`;
+}
+ 
+// ── Order Type ──
+function exec2SetOtype(ot, el){
+  _exec2.otype = ot;
+  document.querySelectorAll('.exec-otype-chip').forEach(c=>c.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.getElementById('exec2-trigger-wrap').style.display=(ot==='SL'||ot==='SL-M')?'':'none';
+}
+ 
+// ── Iceberg Toggle ──
+function exec2ToggleIceberg(){
+  const cb=document.getElementById('exec2-iceberg-cb');
+  cb.checked=!cb.checked;
+  _exec2.icebergActive=cb.checked;
+  document.getElementById('exec2-iceberg-box').classList.toggle('show',cb.checked);
+  exec2UpdateIcePreview();
+}
+ 
+function exec2UpdateIcePreview(){
+  const totalQty=+document.getElementById('exec2-qty').value||0;
+  const slice=+document.getElementById('exec2-ice-slice').value||0;
+  const delay=+document.getElementById('exec2-ice-delay').value||2;
+  const el=document.getElementById('exec2-ice-preview');
+  if(!totalQty||!slice){el.textContent='';return;}
+  const chunks=Math.ceil(totalQty/slice);
+  const lastChunk=totalQty%slice||slice;
+  const totalTime=chunks*delay;
+  el.textContent=`${chunks} slices: ${chunks-1}×${slice} + 1×${lastChunk} · ~${totalTime}s total`;
+}
+ 
+// ── Bracket Toggle ──
+function exec2ToggleBracket(){
+  const cb=document.getElementById('exec2-bracket-cb');
+  cb.checked=!cb.checked;
+  _exec2.bracketActive=cb.checked;
+  document.getElementById('exec2-bracket-box').classList.toggle('show',cb.checked);
+}
+ 
+// ── Qty change handler ──
+function exec2OnQtyChange(){
+  exec2UpdateIcePreview();
+  exec2RunNudges();
+}
+ 
+// ── Worker helpers (reuse existing) ──
+function exec2GetWorkerUrl(){ return (localStorage.getItem('zd_worker_url')||'').trim(); }
+ 
+function exec2GetHeaders(){
+  const h={'Content-Type':'application/json'};
+  if(_exec2.broker==='zerodha'){ h['Authorization']=`token ${localStorage.getItem('zd_key')||''}:${localStorage.getItem('zd_tk')||''}`; }
+  else if(_exec2.broker==='dhan'){ h['X-Dhan-Token']=localStorage.getItem('dhan_tk')||''; h['X-Dhan-ID']=localStorage.getItem('dhan_id')||''; }
+  else { h['X-DE-Session']=localStorage.getItem('de_session')||''; }
   return h;
 }
-
-function scoreMatch(sym, name, q){
-  if(sym===q) return 100;
-  if(sym.startsWith(q)) return 80+Math.min(q.length,10);
-  if(name.startsWith(q)) return 60;
-  if(sym.includes(q)) return 40;
-  if(name.includes(q)) return 20;
-  // Fuzzy: check if all typed chars appear in order in symbol
-  let si=0;
-  for(let ci=0;ci<q.length&&si<sym.length;ci++){
-    while(si<sym.length&&sym[si]!==q[ci]) si++;
-    if(si>=sym.length) return -1;
-    si++;
+ 
+// ══════════════════════════════════════════════════
+// PLACE ORDER — with Iceberg + Bracket + Auto-Journal + Auto-GTT
+// ══════════════════════════════════════════════════
+async function exec2PlaceOrder(){
+  const workerUrl=exec2GetWorkerUrl();
+  if(!workerUrl){toast('Set Worker URL in Settings','⚠️');return;}
+  const sym=(document.getElementById('exec2-sym').value||'').trim().toUpperCase();
+  const qty=+document.getElementById('exec2-qty').value||0;
+  const price=+document.getElementById('exec2-price').value||0;
+  const trigger=+document.getElementById('exec2-trigger').value||0;
+  const product=document.getElementById('exec2-product').value;
+  const validity=document.getElementById('exec2-validity').value;
+  if(!sym){toast('Enter symbol','⚠️');return;}
+  if(!qty){toast('Enter quantity','⚠️');return;}
+ 
+  // Risk check — block if score < 30
+  const nudgeScore = await exec2RunNudges();
+  if(nudgeScore !== null && nudgeScore < 30){
+    toast('🛡️ Order BLOCKED — risk score too low ('+nudgeScore+'/100)','🔴');
+    exec2PlaySound('error');
+    return;
   }
-  return 10;
-}
-
-function onExecSymInput(val){
-  const q=val.trim().toUpperCase(); const drop=document.getElementById('exec-sym-drop');
-  if(!q||q.length<1){drop.classList.remove('open');return;}
-  const scored=getSymbolDB().map(([sym,name,sector])=>{
-    let s=scoreMatch(sym,name.toUpperCase(),q);
-    // Boost sector matches (typing "etf", "pharma", "bank", "auto" etc)
-    if(sector&&sector.toUpperCase().includes(q)) s=Math.max(s,35);
-    return {sym,name,sector,score:s};
-  }).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,12);
-  if(!scored.length){drop.classList.remove('open');return;}
-  execSymFocusIdx=-1;
-  let html='<div class="sym-dropdown-header">NSE Stocks</div>';
-  scored.forEach(s=>{ html+=`<div class="sym-opt" data-sym="${s.sym}" onclick="selectExecSym('${s.sym}')"><div class="sym-opt-icon">${s.sym.slice(0,2)}</div><div class="sym-opt-info"><div class="sym-opt-sym">${s.sym}</div><div class="sym-opt-name">${s.name}</div></div>${s.sector?`<div class="sym-opt-sector">${s.sector}</div>`:''}</div>`; });
-  drop.innerHTML=html;drop.classList.add('open');
-}
-function closeExecSymDrop(){const d=document.getElementById('exec-sym-drop');if(d)d.classList.remove('open');}
-function selectExecSym(sym){ document.getElementById('exec-sym').value=sym; closeExecSymDrop(); execFetchPrice(sym); }
-function onExecSymKey(e){
-  const drop=document.getElementById('exec-sym-drop'); const opts=drop?.querySelectorAll('.sym-opt'); if(!opts?.length)return;
-  if(e.key==='ArrowDown'){e.preventDefault();execSymFocusIdx=Math.min(execSymFocusIdx+1,opts.length-1);}
-  else if(e.key==='ArrowUp'){e.preventDefault();execSymFocusIdx=Math.max(execSymFocusIdx-1,0);}
-  else if(e.key==='Enter'&&execSymFocusIdx>=0){e.preventDefault();const s=opts[execSymFocusIdx]?.dataset?.sym;if(s)selectExecSym(s);return;}
-  else if(e.key==='Escape'){closeExecSymDrop();return;}
-  opts.forEach((o,i)=>o.classList.toggle('focused',i===execSymFocusIdx));
-}
-
-async function execFetchPrice(sym){
-  if(!sym)return; const st=document.getElementById('exec-price-status'); if(st) st.textContent='⏳ Fetching CMP…';
-  const workerUrl=(localStorage.getItem('zd_worker_url')||'').trim();
+ 
+  const btn=document.getElementById('exec2-place-btn');
+  const statusEl=document.getElementById('exec2-order-status');
+  btn.disabled=true; statusEl.innerHTML='<span class="exec-status-pulse" style="color:var(--y)">⏳ Placing order…</span>';
+ 
   try{
-    let d;
-    const ticker=sym.includes('.')?sym:sym+'.NS';
-    if(workerUrl){
-      const r=await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker,range:'2d',interval:'1d'})});
-      d=await r.json();
-    } else {
-      const r=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`)}`);
-      d=await r.json();
-    }
-    const price=d?.chart?.result?.[0]?.meta?.regularMarketPrice||d?.chart?.result?.[0]?.meta?.previousClose;
-    if(price){ document.getElementById('exec-price').value=price.toFixed(2); if(st) st.innerHTML=`<span style="color:var(--g)">✓ CMP: ₹${price.toFixed(2)}</span>`; }
-    else { if(st) st.innerHTML=`<span style="color:var(--y)">⚠ Price unavailable</span>`; }
-    // Run pre-trade risk nudges
-    try{ await execRunNudges(sym); }catch(e2){}
-  }catch(e){ if(st) st.innerHTML=`<span style="color:var(--t3)">Fetch failed</span>`; }
-}
-
-function execOtypeChange(){
-  const otype=document.getElementById('exec-otype').value;
-  document.getElementById('exec-trigger-wrap').style.display=(otype==='SL'||otype==='SL-M')?'':'none';
-  execMktProtectChange();
-}
-
-function execMktProtectChange(){
-  const otype=document.getElementById('exec-otype')?.value||'MARKET';
-  const pct=+document.getElementById('exec-mkt-protect')?.value||0;
-  const isMarket=(otype==='MARKET');
-  const isZerodha=(_execBroker==='zerodha');
-  const isDE=(_execBroker==='definedge');
-
-  // Show SL-M fallback toggle only for Zerodha + MARKET orders
-  const zdWrap=document.getElementById('exec-zd-slm-wrap');
-  if(zdWrap) zdWrap.style.display=(isZerodha&&isMarket)?'':'none';
-
-  // Info text
-  const info=document.getElementById('exec-mktprot-info');
-  if(info){
-    if(isDE) info.textContent='Definedge: max slippage % on market orders';
-    else if(isZerodha&&isMarket) info.textContent='Used as SL-M trigger buffer when fallback is ON';
-    else info.textContent='Definedge only — no effect on other brokers';
-  }
-
-  // Preview for Definedge
-  const preview=document.getElementById('exec-mktprot-preview');
-  if(preview&&isDE&&pct>0){
-    const price=+document.getElementById('exec-price')?.value||0;
-    const side=document.getElementById('exec-side')?.value||'BUY';
-    if(price>0){
-      const limit=side==='BUY'?price*(1+pct/100):price*(1-pct/100);
-      preview.textContent=`Max execution price: ₹${limit.toFixed(2)}`;
-    } else { preview.textContent=`${pct}% slippage buffer will be applied`; }
-  } else if(preview) { preview.textContent=''; }
-
-  // Preview for Zerodha SL-M
-  const zdPreview=document.getElementById('exec-zd-slm-preview');
-  const zdToggle=document.getElementById('exec-zd-slm-toggle');
-  if(zdPreview&&isZerodha&&isMarket&&zdToggle?.checked&&pct>0){
-    const price=+document.getElementById('exec-price')?.value||0;
-    const side=document.getElementById('exec-side')?.value||'BUY';
-    if(price>0){
-      const trigger=side==='BUY'?price*(1+pct/100):price*(1-pct/100);
-      zdPreview.textContent=`→ Will send SL-M with trigger ₹${trigger.toFixed(2)}`;
-    } else { zdPreview.textContent=`→ MARKET will be sent as SL-M (+${pct}%)`; }
-  } else if(zdPreview) { zdPreview.textContent=''; }
-}
-
-// ── ASM/GSM/Surveillance Lists (known symbols, updated periodically) ──
-const _ASM_KEYWORDS=['ASM','SURVEILLANCE','ADDITIONAL'];
-const _GSM_KEYWORDS=['GSM','GRADED'];
-
-function execRerunNudges(){
-  const sym=(document.getElementById('exec-sym').value||'').trim().toUpperCase();
-  if(sym) execRunNudges(sym);
-}
-
-// ── Pre-Trade Risk Nudge Engine ──
-let _lastNudgeData = null;
-
-async function execRunNudges(sym){
-  const panel=document.getElementById('exec-nudge-panel');
-  const listEl=document.getElementById('exec-nudge-list');
-  const scoreEl=document.getElementById('exec-nudge-score');
-  if(!panel||!listEl) return;
-
-  if(!sym){panel.style.display='none';return;}
-  panel.style.display='';
-  listEl.innerHTML='<div class="nudge-item nudge-info"><span class="nudge-icon">⏳</span><span class="nudge-text">Scanning risks…</span></div>';
-  scoreEl.textContent='';
-
-  const nudges=[];
-  let score=100; // Start at 100, deduct for issues
-
-  try{
-    // 1. Fetch detailed quote via worker (Kite quote has depth, circuit limits)
-    const workerUrl=getExecWorkerUrl();
-    let quoteData=null, yahooData=null;
-
-    if(workerUrl){
-      try{
-        const r=await fetch(workerUrl,{headers:{...getExecHeaders(),'X-Kite-Action':'quote','X-Kite-Symbol':'NSE:'+sym}});
-        const d=await r.json();
-        quoteData=d?.data?.['NSE:'+sym]||null;
-      }catch(e){}
-    }
-
-    // 2. Also fetch Yahoo for volume/avg data
-    const ticker=sym.includes('.')?sym:sym+'.NS';
-    try{
-      const yUrl=workerUrl
-        ?await fetch(workerUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker,range:'1mo',interval:'1d'})}).then(r=>r.json())
-        :await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1mo`)}`).then(r=>r.json());
-      yahooData=yUrl?.chart?.result?.[0]||null;
-    }catch(e){}
-
-    _lastNudgeData={quote:quoteData,yahoo:yahooData};
-
-    const cmp=quoteData?.last_price||yahooData?.meta?.regularMarketPrice||0;
-    const qty=parseInt(document.getElementById('exec-qty').value)||0;
-    const orderVal=cmp*qty;
-
-    // ── CHECK 1: Bid-Ask Spread (Illiquidity) ──
-    if(quoteData?.depth){
-      const bestBid=quoteData.depth.buy?.[0]?.price||0;
-      const bestAsk=quoteData.depth.sell?.[0]?.price||0;
-      if(bestBid>0&&bestAsk>0&&cmp>0){
-        const spread=((bestAsk-bestBid)/cmp*100);
-        if(spread>2){
-          nudges.push({level:'danger',icon:'🔴',text:`Wide bid-ask spread: ${spread.toFixed(2)}% — highly illiquid, MARKET order will get bad fill`});
-          score-=30;
-        } else if(spread>0.8){
-          nudges.push({level:'warn',icon:'⚠️',text:`Spread ${spread.toFixed(2)}% — moderately wide. Consider LIMIT order`});
-          score-=15;
-        } else {
-          nudges.push({level:'ok',icon:'✓',text:`Spread tight: ${spread.toFixed(2)}%`});
-        }
-        // Check buy/sell depth quantity
-        const bidQty=(quoteData.depth.buy||[]).reduce((s,l)=>s+(l.quantity||0),0);
-        const askQty=(quoteData.depth.sell||[]).reduce((s,l)=>s+(l.quantity||0),0);
-        if(qty>0 && (bidQty+askQty)>0 && qty>(bidQty+askQty)*0.3){
-          nudges.push({level:'warn',icon:'⚠️',text:`Your qty (${qty}) is >${Math.round(qty/(bidQty+askQty)*100)}% of visible depth (${bidQty+askQty}) — may cause slippage`});
-          score-=10;
-        }
+    // ── ICEBERG MODE ──
+    if(_exec2.icebergActive){
+      const slice=+document.getElementById('exec2-ice-slice').value||qty;
+      const delay=(+document.getElementById('exec2-ice-delay').value||2)*1000;
+      const chunks=[];
+      let remaining=qty;
+      while(remaining>0){
+        const sz=Math.min(slice,remaining);
+        chunks.push(sz);
+        remaining-=sz;
       }
+      statusEl.innerHTML=`<span style="color:var(--c)">🧊 Iceberg: 0/${chunks.length} slices placed…</span>`;
+      let filled=0;
+      for(let i=0;i<chunks.length;i++){
+        const result=await exec2SendOrder(sym,_exec2.side,_exec2.otype,chunks[i],price,trigger,product,validity);
+        if(result.ok) filled++;
+        statusEl.innerHTML=`<span style="color:var(--c)">🧊 Iceberg: ${i+1}/${chunks.length} slices (${filled} filled)</span>`;
+        if(i<chunks.length-1) await new Promise(r=>setTimeout(r,delay));
+      }
+      statusEl.innerHTML=`<span style="color:var(--g)">✅ Iceberg complete: ${filled}/${chunks.length} slices</span>`;
+      exec2PlaySound('fill');
     }
-
-    // ── CHECK 2: Circuit Limits ──
-    if(quoteData?.lower_circuit_limit && quoteData?.upper_circuit_limit){
-      const lc=quoteData.lower_circuit_limit, uc=quoteData.upper_circuit_limit;
-      const lcDist=cmp>0?((cmp-lc)/cmp*100):0;
-      const ucDist=cmp>0?((uc-cmp)/cmp*100):0;
-      const circuitRange=cmp>0?((uc-lc)/cmp*100):0;
-
-      if(circuitRange<=10){
-        nudges.push({level:'danger',icon:'🚫',text:`Circuit limit ±${(circuitRange/2).toFixed(1)}% — stock is likely ASM/GSM/SME with tight circuit. Extreme risk!`});
-        score-=25;
-      } else if(circuitRange<=20){
-        nudges.push({level:'warn',icon:'⚡',text:`Circuit band ±${(circuitRange/2).toFixed(0)}% — narrower than normal (LC: ₹${lc.toFixed(2)} / UC: ₹${uc.toFixed(2)})`});
-        score-=10;
-      }
-
-      if(lcDist<2&&lcDist>0){
-        nudges.push({level:'danger',icon:'🔻',text:`Near lower circuit! CMP ₹${cmp.toFixed(2)} is only ${lcDist.toFixed(1)}% from LC ₹${lc.toFixed(2)} — selling may not execute`});
-        score-=20;
-      }
-      if(ucDist<2&&ucDist>0){
-        nudges.push({level:'warn',icon:'🔺',text:`Near upper circuit! CMP ₹${cmp.toFixed(2)} is ${ucDist.toFixed(1)}% from UC ₹${uc.toFixed(2)} — buying at premium`});
-        score-=10;
-      }
-    }
-
-    // ── CHECK 3: Volume vs Average (Unusual Activity) ──
-    if(yahooData?.indicators?.quote?.[0]?.volume){
-      const vols=yahooData.indicators.quote[0].volume.filter(v=>v&&v>0);
-      if(vols.length>=5){
-        const todayVol=vols[vols.length-1];
-        const avgVol=vols.slice(0,-1).reduce((s,v)=>s+v,0)/(vols.length-1);
-        if(avgVol>0){
-          const volRatio=todayVol/avgVol;
-          if(volRatio>3){
-            nudges.push({level:'warn',icon:'📊',text:`Volume spike: ${volRatio.toFixed(1)}x avg (${(todayVol/100000).toFixed(1)}L vs avg ${(avgVol/100000).toFixed(1)}L) — possible news/event`});
-            score-=5;
-          } else if(volRatio<0.3){
-            nudges.push({level:'warn',icon:'📉',text:`Very low volume: ${(volRatio*100).toFixed(0)}% of avg — poor liquidity today`});
-            score-=15;
-          } else {
-            nudges.push({level:'ok',icon:'✓',text:`Volume normal: ${(volRatio*100).toFixed(0)}% of 20d avg`});
+    // ── NORMAL ORDER ──
+    else {
+      const result = await exec2SendOrder(sym,_exec2.side,_exec2.otype,qty,price,trigger,product,validity);
+      if(result.ok){
+        statusEl.innerHTML=`<span style="color:var(--g)">✅ Order placed — ID: ${result.orderId}</span>`;
+        exec2PlaySound('fill');
+ 
+        // ── BRACKET: place SL + Target orders ──
+        if(_exec2.bracketActive){
+          const bktSL=+document.getElementById('exec2-bkt-sl').value||0;
+          const bktTgt=+document.getElementById('exec2-bkt-tgt').value||0;
+          const exitSide=_exec2.side==='BUY'?'SELL':'BUY';
+          if(bktSL>0){
+            await exec2SendOrder(sym,exitSide,'SL-M',qty,0,bktSL,product,'DAY');
+            statusEl.innerHTML+=' · SL placed';
+          }
+          if(bktTgt>0){
+            await exec2SendOrder(sym,exitSide,'LIMIT',qty,bktTgt,0,product,'DAY');
+            statusEl.innerHTML+=' · Target placed';
+          }
+          // Auto-GTT
+          if(document.getElementById('exec2-bkt-autogtt')?.checked && (bktSL>0||bktTgt>0)){
+            exec2AutoCreateGTT(sym,exitSide,qty,bktSL,bktTgt,product);
           }
         }
-        // Absolute volume check for penny/illiquid
-        if(vols[vols.length-1]<5000){
-          nudges.push({level:'danger',icon:'🔴',text:`Extremely thin volume (${vols[vols.length-1].toLocaleString()}) — nearly untradeable`});
-          score-=25;
+ 
+        // ── AUTO-JOURNAL ──
+        if(document.getElementById('exec2-bkt-autojournal')?.checked || _exec2.bracketActive){
+          exec2AutoJournal(sym,_exec2.side,qty,price||0,
+            +document.getElementById('exec2-bkt-sl').value||0,
+            +document.getElementById('exec2-bkt-tgt').value||0);
         }
-      }
-    }
-
-    // ── CHECK 4: Price < ₹10 (Penny Stock) ──
-    if(cmp>0 && cmp<10){
-      nudges.push({level:'danger',icon:'💀',text:`Penny stock (₹${cmp.toFixed(2)}) — high risk, wide spreads, possible operator-driven`});
-      score-=20;
-    } else if(cmp>0 && cmp<50){
-      nudges.push({level:'warn',icon:'⚠️',text:`Low-price stock (₹${cmp.toFixed(2)}) — higher % impact from spreads`});
-      score-=5;
-    }
-
-    // ── CHECK 5: Order Value vs Capital ──
-    if(orderVal>0){
-      const cap=+(localStorage.getItem('te_cfg')?JSON.parse(localStorage.getItem('te_cfg')).capital:0)||+(document.getElementById('s-cap')?.value)||0;
-      if(cap>0){
-        const pct=(orderVal/cap*100);
-        if(pct>20){
-          nudges.push({level:'danger',icon:'⚖️',text:`Order is ${pct.toFixed(1)}% of capital (₹${(orderVal/1000).toFixed(0)}K / ₹${(cap/1000).toFixed(0)}K) — excessive concentration!`});
-          score-=20;
-        } else if(pct>10){
-          nudges.push({level:'warn',icon:'⚖️',text:`Order is ${pct.toFixed(1)}% of capital — above 10% threshold`});
-          score-=5;
+ 
+        // ── AUTO-TRAIL SL setup ──
+        if(document.getElementById('exec2-autotrail-cb')?.checked){
+          _exec2.autoTrailHighs[sym] = price || 0;
         }
+      } else {
+        statusEl.innerHTML=`<span style="color:var(--r)">❌ ${result.error}</span>`;
+        exec2PlaySound('error');
       }
     }
-
-    // ── CHECK 6: Market Order warning on illiquid/wide spread ──
-    const otype=document.getElementById('exec-otype')?.value;
-    if(otype==='MARKET'){
-      nudges.push({level:'info',icon:'ℹ️',text:'MARKET order — price not guaranteed. Use LIMIT or SL-M fallback for better control.'});
-    }
-
-    // ── CHECK 7: ETF detection ──
-    const dbEntry=getSymbolDB().find(([s])=>s===sym);
-    if(dbEntry && dbEntry[2]==='ETF'){
-      nudges.push({level:'info',icon:'📦',text:`ETF detected — check NAV vs CMP for premium/discount before buying.`});
-    }
-
-    // ── CHECK 8: Day change momentum ──
-    if(quoteData?.net_change!=null && cmp>0){
-      const dayPct=(quoteData.net_change/cmp*100);
-      if(dayPct<-5){
-        nudges.push({level:'warn',icon:'📉',text:`Down ${Math.abs(dayPct).toFixed(1)}% today — catching falling knife?`});
-        score-=5;
-      } else if(dayPct>8){
-        nudges.push({level:'warn',icon:'🚀',text:`Up ${dayPct.toFixed(1)}% today — chasing momentum, watch for reversal`});
-        score-=5;
-      }
-    }
-
   }catch(e){
-    nudges.push({level:'warn',icon:'⚠️',text:'Could not run all checks: '+e.message});
+    statusEl.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`;
+    exec2PlaySound('error');
   }
-
-  // No issues found
-  if(!nudges.length){
-    nudges.push({level:'ok',icon:'✅',text:'All clear — no red flags detected'});
-  }
-
-  // Render
-  score=Math.max(0,Math.min(100,score));
-  const scoreColor=score>=80?'var(--g)':score>=50?'var(--y)':'var(--r)';
-  const scoreBg=score>=80?'rgba(0,229,160,.12)':score>=50?'rgba(245,197,66,.12)':'rgba(255,69,96,.12)';
-  scoreEl.textContent=score+'/100';
-  scoreEl.style.background=scoreBg;
-  scoreEl.style.color=scoreColor;
-
-  listEl.innerHTML=nudges.map(n=>
-    `<div class="nudge-item nudge-${n.level}"><span class="nudge-icon">${n.icon}</span><span class="nudge-text">${n.text}</span></div>`
-  ).join('');
-}
-
-async function execPlaceOrder(){
-  const workerUrl=getExecWorkerUrl(); if(!workerUrl){toast('Set Worker URL in Settings','⚠️');return;}
-  const sym=(document.getElementById('exec-sym').value||'').trim().toUpperCase();
-  const side=document.getElementById('exec-side').value;
-  let otype=document.getElementById('exec-otype').value;
-  const qty=+document.getElementById('exec-qty').value||0;
-  let price=+document.getElementById('exec-price').value||0;
-  let trigger=+document.getElementById('exec-trigger').value||0;
-  const product=document.getElementById('exec-product').value;
-  const validity=document.getElementById('exec-validity').value;
-  const sl=+document.getElementById('exec-sl').value||0;
-  const tgt=+document.getElementById('exec-tgt').value||0;
-  const mktPct=+document.getElementById('exec-mkt-protect')?.value||0;
-  const zdSLMEnabled=document.getElementById('exec-zd-slm-toggle')?.checked&&_execBroker==='zerodha';
-
-  if(!sym){toast('Enter symbol','⚠️');return;}
-  if(!qty||qty<=0){toast('Enter quantity','⚠️');return;}
-
-  // ── Zerodha: SL-M fallback for MARKET orders ──
-  // If protection % is set and toggle is ON, convert MARKET → SL-M with trigger = CMP ± %
-  if(_execBroker==='zerodha' && otype==='MARKET' && zdSLMEnabled && mktPct>0){
-    const cmp=+document.getElementById('exec-price')?.value||0;
-    if(cmp>0){
-      trigger=side==='BUY'?+(cmp*(1+mktPct/100)).toFixed(2):+(cmp*(1-mktPct/100)).toFixed(2);
-      otype='SL-M';
-      price=0;
-      toast(`MARKET → SL-M, trigger ₹${trigger}`,'ℹ️');
-    }
-  }
-
-  const statusEl=document.getElementById('exec-order-status');
-  const btn=document.getElementById('exec-place-btn');
-  btn.disabled=true; statusEl.innerHTML='<span style="color:var(--y)">⏳ Placing order…</span>';
-
-  try{
-    const headers=getExecHeaders(); let action='',body={};
-    if(_execBroker==='zerodha'){
-      action='zd-place-order';
-      body={tradingsymbol:sym,exchange:'NSE',transaction_type:side,order_type:otype,
-            quantity:qty,product,validity,price:price||0,trigger_price:trigger||0};
-    } else if(_execBroker==='dhan'){
-      action='dhan-place-order';
-      body={symbol:sym,side,order_type:otype,qty,price:price||0,trigger_price:trigger||0,product,validity};
-    } else {
-      // Definedge: include mktProtection
-      action='de-place-order';
-      body={symbol:sym,side,order_type:otype,qty,price:price||0,trigger_price:trigger||0,
-            product,validity,mktProtection:mktPct||0};
-    }
-    headers['X-Kite-Action']=action;
-
-    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)});
-    const data=await res.json();
-    if(data?.order_id||data?.orderId||data?.data?.order_id){
-      const oid=data.order_id||data.orderId||data.data?.order_id;
-      statusEl.innerHTML=`<span style="color:var(--g)">✅ Order placed — ID: ${oid}</span>`;
-      toast(`Order placed: ${side} ${qty} ${sym}${otype!=='MARKET'&&otype!=='LIMIT'?' ('+otype+')':''}`,'✅');
-      if(sl>0) await execPlaceSLTgtOrder(sym,side==='BUY'?'SELL':'BUY',qty,sl,product,'SL-M','trigger_price');
-      if(tgt>0) await execPlaceSLTgtOrder(sym,side==='BUY'?'SELL':'BUY',qty,tgt,product,'LIMIT','price');
-    } else {
-      statusEl.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||data?.error||JSON.stringify(data).slice(0,200)}</span>`;
-    }
-  }catch(e){ statusEl.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
   btn.disabled=false;
+  setTimeout(()=>exec2RefreshAll(),2000);
 }
-
-async function execPlaceSLTgtOrder(sym,side,qty,val,product,otype,field){
-  try{
-    const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
-    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
-    const body=_execBroker==='zerodha'
-      ?{tradingsymbol:sym,exchange:'NSE',transaction_type:side,order_type:otype,
-        quantity:qty,product,validity:'DAY',[field]:val}
-      :_execBroker==='dhan'
-      ?{symbol:sym,side,order_type:otype,qty,[field]:val,product,validity:'DAY'}
-      :{symbol:sym,side,order_type:otype,qty,[field]:val,product,validity:'DAY',mktProtection:0};
-    await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)});
-  }catch(e){console.error('SL/Target order error:',e);}
+ 
+// ── Send single order to broker ──
+async function exec2SendOrder(sym,side,otype,qty,price,trigger,product,validity){
+  const workerUrl=exec2GetWorkerUrl();
+  const headers=exec2GetHeaders();
+  let action='',body={};
+  if(_exec2.broker==='zerodha'){
+    action='zd-place-order';
+    body={tradingsymbol:sym,exchange:'NSE',transaction_type:side,order_type:otype,quantity:qty,product,validity,price:price||0,trigger_price:trigger||0};
+  } else if(_exec2.broker==='dhan'){
+    action='dhan-place-order';
+    body={symbol:sym,side,order_type:otype,qty,price:price||0,trigger_price:trigger||0,product,validity};
+  } else {
+    action='de-place-order';
+    body={symbol:sym,side,order_type:otype,qty,price:price||0,trigger_price:trigger||0,product,validity,mktProtection:0};
+  }
+  headers['X-Kite-Action']=action;
+  const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)});
+  const data=await res.json();
+  const oid=data?.order_id||data?.orderId||data?.data?.order_id;
+  if(oid) return {ok:true,orderId:oid};
+  return {ok:false,error:data?.message||data?.error||JSON.stringify(data).slice(0,150)};
 }
-
-async function execRefreshPositions(){
-  const workerUrl=getExecWorkerUrl(); if(!workerUrl){toast('Set Worker URL','⚠️');return;}
-  const tbl=document.getElementById('exec-positions-tbl'); tbl.innerHTML='<div style="padding:20px;text-align:center;color:var(--t4)">⏳ Loading…</div>';
-  try{
-    const headers=getExecHeaders();
-    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-positions':_execBroker==='dhan'?'dhan-positions':'de-positions';
-    const res=await fetch(workerUrl,{method:'GET',headers}); const data=await res.json();
-    let positions=(_execBroker==='zerodha'?(data?.data?.net||data?.net||[]):(data?.data||data||[])).filter(p=>(p.quantity||p.netQty||0)!==0);
-    _execPositions=positions; document.getElementById('exec-pos-count').textContent=positions.length+' positions';
-    if(!positions.length){tbl.innerHTML='<div style="padding:30px;text-align:center;color:var(--t4)">No open positions</div>';return;}
-    let html='<table style="width:100%;font-size:12px"><thead><tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&L</th><th></th></tr></thead><tbody>';
-    positions.forEach((p,i)=>{
-      const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||''; const qty=p.quantity||p.netQty||0;
-      const avg=p.average_price||p.averagePrice||p.buyAvg||0; const ltp=p.last_price||p.lastPrice||p.ltp||0;
-      const pnl=p.pnl||((ltp-avg)*qty)||0; const col=pnl>=0?'var(--g)':'var(--r)';
-      html+=`<tr><td style="font-weight:700;color:var(--t1)">${sym}</td><td class="mono">${qty}</td><td class="mono">₹${(+avg).toFixed(2)}</td><td class="mono" style="color:var(--c)">₹${(+ltp).toFixed(2)}</td><td class="mono" style="color:${col};font-weight:700">₹${(+pnl).toFixed(2)}</td><td><button class="btn btn-ghost btn-xs" onclick="execManagePosition(${i})">Manage</button></td></tr>`;
+ 
+// ── Auto-Journal: add trade to journal ──
+function exec2AutoJournal(sym,side,qty,price,sl,tgt){
+  const today=new Date().toISOString().slice(0,10);
+  // Check if already exists
+  const existing=trades.find(t=>t.symbol===sym&&t.side===(side==='BUY'?'Buy':'Sell')&&t.status==='Open');
+  if(existing){
+    // Pyramid into existing
+    existing.entries.push({date:today,price:price||0,qty});
+    if(sl>0) existing.sl=sl;
+    if(tgt>0) existing.target=tgt;
+  } else {
+    trades.push({
+      id:Date.now()+''+Math.random(),symbol:sym,setup:'',
+      side:side==='BUY'?'Buy':'Sell',status:'Open',
+      sl:sl||0,target:tgt||0,plan:'',exitTrigger:'',growth:'',
+      notes:'Auto-logged from Execution v2',
+      source:_exec2.broker,
+      entries:[{date:today,price:price||0,qty}],exits:[],cmp:0
     });
-    tbl.innerHTML=html+'</tbody></table>';
-  }catch(e){ tbl.innerHTML=`<div style="padding:20px;text-align:center;color:var(--r)">❌ ${e.message}</div>`; }
-  execRefreshOrders();
+  }
+  save(); toast('📝 Auto-logged to journal: '+sym,'📝');
 }
-
-function execManagePosition(idx){
-  const p=_execPositions[idx]; if(!p)return; _execManagePos=p;
-  const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||''; _execManageSym=sym;
-  const qty=p.quantity||p.netQty||0; const avg=p.average_price||p.averagePrice||p.buyAvg||0;
-  const ltp=p.last_price||p.lastPrice||p.ltp||0; const pnl=p.pnl||((ltp-avg)*qty)||0;
-  document.getElementById('exec-manage-sym').textContent=sym; document.getElementById('exec-m-qty').textContent=qty;
-  document.getElementById('exec-m-avg').textContent='₹'+(+avg).toFixed(2); document.getElementById('exec-m-cmp').textContent='₹'+(+ltp).toFixed(2);
-  const pe=document.getElementById('exec-m-pnl'); pe.textContent='₹'+(+pnl).toFixed(2); pe.style.color=pnl>=0?'var(--g)':'var(--r)';
-  document.getElementById('exec-close-qty').textContent=Math.abs(qty);
-  document.getElementById('exec-manage-card').style.display=''; setExecAction('sl');
+ 
+// ── Auto-GTT creation ──
+function exec2AutoCreateGTT(sym,exitSide,qty,sl,tgt,product){
+  if(sl>0&&tgt>0){
+    gttOrders.push({
+      id:'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      type:'oco',symbol:sym,exchange:'NSE',product,side:exitSide,qty,
+      slTrigger:sl,slLimit:sl,tgtTrigger:tgt,tgtLimit:tgt,
+      note:'Auto-created from Bracket Order',
+      source:'local',status:'active',brokerId:null,
+      createdAt:Date.now(),updatedAt:Date.now()
+    });
+  } else if(sl>0){
+    gttOrders.push({
+      id:'gtt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      type:'single',symbol:sym,exchange:'NSE',product,side:exitSide,qty,
+      trigger1:sl,limit1:sl,
+      note:'Auto SL from Bracket',
+      source:'local',status:'active',brokerId:null,
+      createdAt:Date.now(),updatedAt:Date.now()
+    });
+  }
+  saveGTTs();
+  toast('🎯 Auto-GTT created for '+sym,'🎯');
 }
-
-function setExecAction(act){
-  ['sl','trail','partial','pyramid','close'].forEach(a=>{
-    const btn=document.getElementById('exec-act-'+a); const panel=document.getElementById('exec-panel-'+a);
-    if(btn){btn.style.background=a===act?'var(--yd)':'var(--bg3)';btn.style.color=a===act?'var(--y)':'var(--t3)';}
-    if(panel)panel.style.display=a===act?'':'none';
+ 
+// ══════════════════════════════════════════════════
+// LIVE P&L + POSITIONS
+// ══════════════════════════════════════════════════
+async function exec2RefreshAll(){
+  await exec2RefreshPositions();
+  await exec2RefreshOrders();
+  exec2RenderPnlBar();
+  exec2RenderHeatmap();
+  exec2RenderSquareOffBar();
+  exec2PopulateJournal();
+  // Auto-trail check
+  if(document.getElementById('exec2-autotrail-cb')?.checked) exec2RunAutoTrail();
+}
+ 
+async function exec2RefreshPositions(){
+  const workerUrl=exec2GetWorkerUrl();if(!workerUrl)return;
+  const container=document.getElementById('exec2-positions');
+  container.innerHTML='<div style="padding:20px;text-align:center;color:var(--t4)">⏳ Loading…</div>';
+  try{
+    const headers=exec2GetHeaders();
+    headers['X-Kite-Action']=_exec2.broker==='zerodha'?'zd-positions':_exec2.broker==='dhan'?'dhan-positions':'de-positions';
+    const res=await fetch(workerUrl,{method:'GET',headers});
+    const data=await res.json();
+    _exec2.positions=(_exec2.broker==='zerodha'?(data?.data?.net||data?.net||[]):(data?.data||data||[])).filter(p=>(p.quantity||p.netQty||0)!==0);
+    exec2RenderPositions();
+  }catch(e){
+    container.innerHTML=`<div style="padding:20px;text-align:center;color:var(--r)">❌ ${e.message}</div>`;
+  }
+}
+ 
+function exec2RenderPositions(){
+  const container=document.getElementById('exec2-positions');
+  const positions=[..._exec2.positions];
+  document.getElementById('exec2-pos-badge').textContent=positions.length;
+ 
+  if(!positions.length){
+    container.innerHTML='<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">No open positions</div>';
+    return;
+  }
+ 
+  // Sort
+  positions.sort((a,b)=>{
+    if(_exec2.sortBy==='pnl') return Math.abs(b.pnl||0)-Math.abs(a.pnl||0);
+    if(_exec2.sortBy==='value') return Math.abs((b.quantity||b.netQty||0)*(b.last_price||b.lastPrice||0))-Math.abs((a.quantity||a.netQty||0)*(a.last_price||a.lastPrice||0));
+    return (a.tradingsymbol||a.symbol||'').localeCompare(b.tradingsymbol||b.symbol||'');
   });
+ 
+  container.innerHTML='<div class="exec-pos-grid">'+positions.map((p,i)=>{
+    const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||'';
+    const qty=p.quantity||p.netQty||0;
+    const avg=p.average_price||p.averagePrice||p.buyAvg||0;
+    const ltp=p.last_price||p.lastPrice||p.ltp||0;
+    const pnl=p.pnl||((ltp-avg)*qty)||0;
+    const pnlPct=avg>0?((ltp-avg)/avg*100):0;
+    const value=Math.abs(qty*ltp);
+    const isLong=qty>0;
+    const pnlColor=pnl>=0?'var(--g)':'var(--r)';
+    const barColor=pnl>=0?'#22c55e':'#ff4560';
+    const barWidth=Math.min(Math.abs(pnlPct)*5,100);
+ 
+    return `<div class="exec-pos-card" draggable="true" ondragstart="exec2DragStart(event,${i})" ondragover="event.preventDefault()" ondrop="exec2Drop(event,${i})">
+      <div class="pos-pnl-bar" style="width:${barWidth}%;background:${barColor}"></div>
+      <div class="exec-pos-top">
+        <div class="exec-pos-sym">${sym}</div>
+        <div class="exec-pos-side ${isLong?'long':'short'}">${isLong?'LONG':'SHORT'}</div>
+        <div style="text-align:right">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pnlColor}">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div>
+          <div style="font-size:10px;color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="exec-pos-metrics">
+        <div>Qty: <span class="pm-val">${Math.abs(qty)}</span></div>
+        <div>Avg: <span class="pm-val">₹${(+avg).toFixed(2)}</span></div>
+        <div>CMP: <span class="pm-val" style="color:var(--c)">₹${(+ltp).toFixed(2)}</span></div>
+        <div>Val: <span class="pm-val">₹${(value/1000).toFixed(1)}K</span></div>
+      </div>
+      <div class="exec-pos-actions">
+        <button class="pa-btn pa-trail" onclick="event.stopPropagation();exec2QuickTrail('${sym}',${i})">⚡ Trail SL</button>
+        <button class="pa-btn" onclick="event.stopPropagation();exec2QuickPartial('${sym}',${i},25)">25%</button>
+        <button class="pa-btn" onclick="event.stopPropagation();exec2QuickPartial('${sym}',${i},50)">50%</button>
+        <button class="pa-btn" onclick="event.stopPropagation();exec2QuickPartial('${sym}',${i},75)">75%</button>
+        <button class="pa-btn pa-close" onclick="event.stopPropagation();exec2QuickClose('${sym}',${i})">✕ Close</button>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
 }
-
-function setPartialPct(pct){ const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0)); document.getElementById('exec-partial-qty').value=Math.floor(qty*pct/100); }
-
-async function execModifySLTgt(){
-  const newSL=+document.getElementById('exec-new-sl').value||0; const newTgt=+document.getElementById('exec-new-tgt').value||0;
-  if(!newSL&&!newTgt){toast('Enter SL or Target','⚠️');return;}
-  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Updating…</span>';
-  const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0));
-  const side=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0?'SELL':'BUY'; const product=_execManagePos?.product||'CNC';
+ 
+function exec2SortPos(by,el){
+  _exec2.sortBy=by;
+  document.querySelectorAll('.exec-sort-pill').forEach(p=>p.classList.remove('active'));
+  if(el) el.classList.add('active');
+  exec2RenderPositions();
+}
+ 
+// ── Drag & Reorder ──
+let _exec2DragIdx=null;
+function exec2DragStart(e,idx){_exec2DragIdx=idx;e.dataTransfer.effectAllowed='move';}
+function exec2Drop(e,idx){
+  e.preventDefault();
+  if(_exec2DragIdx===null||_exec2DragIdx===idx) return;
+  const item=_exec2.positions.splice(_exec2DragIdx,1)[0];
+  _exec2.positions.splice(idx,0,item);
+  _exec2DragIdx=null;
+  _exec2.sortBy='custom';
+  exec2RenderPositions();
+}
+ 
+// ── Quick Actions ──
+async function exec2QuickClose(sym,idx){
+  const p=_exec2.positions[idx];if(!p)return;
+  const qty=Math.abs(p.quantity||p.netQty||0);
+  const isLong=(p.quantity||p.netQty||0)>0;
+  const side=isLong?'SELL':'BUY';
+  if(!confirm(`Close ${sym}: ${side} ${qty} shares at MARKET?`)) return;
+  const result=await exec2SendOrder(sym,side,'MARKET',qty,0,0,p.product||'CNC','DAY');
+  if(result.ok){
+    toast(`✅ Closed ${sym}: ${qty} shares`,'✅');
+    exec2PlaySound('fill');
+    setTimeout(exec2RefreshAll,2000);
+  } else { toast('❌ '+result.error,'❌'); exec2PlaySound('error'); }
+}
+ 
+async function exec2QuickPartial(sym,idx,pct){
+  const p=_exec2.positions[idx];if(!p)return;
+  const totalQty=Math.abs(p.quantity||p.netQty||0);
+  const exitQty=Math.max(1,Math.floor(totalQty*pct/100));
+  const isLong=(p.quantity||p.netQty||0)>0;
+  const side=isLong?'SELL':'BUY';
+  const result=await exec2SendOrder(sym,side,'MARKET',exitQty,0,0,p.product||'CNC','DAY');
+  if(result.ok){
+    toast(`✅ Partial ${pct}%: ${side} ${exitQty} ${sym}`,'✅');
+    exec2PlaySound('fill');
+    setTimeout(exec2RefreshAll,2000);
+  } else { toast('❌ '+result.error,'❌'); }
+}
+ 
+async function exec2QuickTrail(sym,idx){
+  const p=_exec2.positions[idx];if(!p)return;
+  const ltp=p.last_price||p.lastPrice||p.ltp||0;
+  const isLong=(p.quantity||p.netQty||0)>0;
+  const method=document.getElementById('exec2-trail-method')?.value||'pct';
+  const val=+document.getElementById('exec2-trail-val')?.value||2;
+  let newSL;
+  if(method==='pct') newSL=isLong?ltp*(1-val/100):ltp*(1+val/100);
+  else if(method==='points') newSL=isLong?ltp-val:ltp+val;
+  else newSL=isLong?ltp*0.97:ltp*1.03; // ATR fallback
+  const qty=Math.abs(p.quantity||p.netQty||0);
+  const side=isLong?'SELL':'BUY';
+  const result=await exec2SendOrder(sym,side,'SL-M',qty,0,+newSL.toFixed(2),p.product||'CNC','DAY');
+  if(result.ok){
+    toast(`⚡ SL trailed: ${sym} @ ₹${newSL.toFixed(2)}`,'⚡');
+  } else { toast('❌ Trail failed: '+result.error,'❌'); }
+}
+ 
+// ══════════════════════════════════════════════════
+// SQUARE OFF ALL
+// ══════════════════════════════════════════════════
+function exec2RenderSquareOffBar(){
+  const bar=document.getElementById('exec2-sqoff-bar');
+  if(!_exec2.positions.length){bar.style.display='none';return;}
+  bar.style.display='flex';
+  const totalVal=_exec2.positions.reduce((s,p)=>{
+    const qty=Math.abs(p.quantity||p.netQty||0);
+    const ltp=p.last_price||p.lastPrice||p.ltp||0;
+    return s+qty*ltp;
+  },0);
+  document.getElementById('exec2-sqoff-count').textContent=_exec2.positions.length;
+  document.getElementById('exec2-sqoff-value').textContent='₹'+(totalVal/1000).toFixed(1)+'K';
+}
+ 
+async function exec2SquareOffAll(){
+  if(!confirm(`⚠️ SQUARE OFF ALL ${_exec2.positions.length} positions at MARKET?\n\nThis cannot be undone.`)) return;
+  exec2PlaySound('squareOff');
+  const statusEl=document.getElementById('exec2-order-status');
+  statusEl.innerHTML='<span class="exec-status-pulse" style="color:var(--r)">🔴 Squaring off all positions…</span>';
+  let success=0,fail=0;
+  for(const p of _exec2.positions){
+    const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||'';
+    const qty=Math.abs(p.quantity||p.netQty||0);
+    const isLong=(p.quantity||p.netQty||0)>0;
+    const side=isLong?'SELL':'BUY';
+    const result=await exec2SendOrder(sym,side,'MARKET',qty,0,0,p.product||'CNC','DAY');
+    if(result.ok) success++; else fail++;
+  }
+  statusEl.innerHTML=`<span style="color:${fail?'var(--y)':'var(--g)'}">Square off: ${success} closed · ${fail} failed</span>`;
+  toast(`🔴 Square off complete: ${success}/${_exec2.positions.length}`,'🔴');
+  setTimeout(exec2RefreshAll,3000);
+}
+ 
+// ══════════════════════════════════════════════════
+// P&L BAR
+// ══════════════════════════════════════════════════
+function exec2RenderPnlBar(){
+  let totalPnl=0, dayPnl=0, totalValue=0;
+  _exec2.positions.forEach(p=>{
+    const pnl=p.pnl||((p.last_price||p.lastPrice||0)-(p.average_price||p.averagePrice||0))*(p.quantity||p.netQty||0);
+    totalPnl+=pnl;
+    dayPnl+=(p.day_m2m||p.dayPnl||pnl);
+    totalValue+=Math.abs((p.quantity||p.netQty||0)*(p.last_price||p.lastPrice||0));
+  });
+  const cap=cfg.cap||874000;
+  const riskPct=totalValue>0?(totalValue/cap*100):0;
+  const f=n=>(n>=0?'+':'-')+'₹'+Math.abs(n).toFixed(0);
+  const el1=document.getElementById('exec2-total-pnl');
+  el1.textContent=f(totalPnl); el1.style.color=totalPnl>=0?'var(--g)':'var(--r)';
+  document.getElementById('exec2-pos-count').textContent=_exec2.positions.length;
+  const el3=document.getElementById('exec2-day-pnl');
+  el3.textContent=f(dayPnl); el3.style.color=dayPnl>=0?'var(--g)':'var(--r)';
+  document.getElementById('exec2-margin').textContent='₹'+(totalValue/1000).toFixed(1)+'K';
+  const rEl=document.getElementById('exec2-risk-pct');
+  rEl.textContent=riskPct.toFixed(1)+'%';
+  rEl.style.color=riskPct>20?'var(--r)':riskPct>10?'var(--y)':'var(--g)';
+}
+ 
+// ══════════════════════════════════════════════════
+// HEATMAP
+// ══════════════════════════════════════════════════
+function exec2RenderHeatmap(){
+  const container=document.getElementById('exec2-heatmap');
+  if(!_exec2.positions.length){
+    container.innerHTML='<div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">No positions</div>';
+    return;
+  }
+  const total=_exec2.positions.reduce((s,p)=>{
+    const v=Math.abs((p.quantity||p.netQty||0)*(p.last_price||p.lastPrice||0));
+    return s+v;
+  },0);
+  container.innerHTML='<div class="exec-heatmap">'+_exec2.positions.map(p=>{
+    const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||'';
+    const qty=Math.abs(p.quantity||p.netQty||0);
+    const ltp=p.last_price||p.lastPrice||p.ltp||0;
+    const avg=p.average_price||p.averagePrice||0;
+    const value=qty*ltp;
+    const pnl=(ltp-avg)*qty;
+    const pnlPct=avg>0?((ltp-avg)/avg*100):0;
+    const pctOfTotal=total>0?(value/total*100):0;
+    const width=Math.max(pctOfTotal,8);
+    const bg=pnl>=0
+      ?`hsl(${145+Math.min(pnlPct*3,30)},70%,${25+Math.min(pnlPct*2,20)}%)`
+      :`hsl(${0},${60+Math.min(Math.abs(pnlPct)*3,30)}%,${25+Math.min(Math.abs(pnlPct)*1.5,15)}%)`;
+    return `<div class="exec-hm-block" style="flex:${width};background:${bg}" title="${sym}: ₹${value.toFixed(0)} · P&L ${pnl>=0?'+':''}₹${pnl.toFixed(0)} (${pnlPct.toFixed(1)}%)">
+      <div class="hm-sym">${sym}</div>
+      <div class="hm-pnl">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div>
+      <div class="hm-pct">${pnlPct.toFixed(1)}%</div>
+    </div>`;
+  }).join('')+'</div>';
+}
+ 
+function exec2HeatmapMode(mode,el){
+  _exec2.hmMode=mode;
+  document.querySelectorAll('#exec2-heatmap').closest('.card')?.querySelectorAll('.exec-sort-pill').forEach(p=>p.classList.remove('active'));
+  if(el) el.classList.add('active');
+  exec2RenderHeatmap();
+}
+ 
+// ══════════════════════════════════════════════════
+// AUTO-TRAIL SL ENGINE
+// ══════════════════════════════════════════════════
+async function exec2RunAutoTrail(){
+  if(!document.getElementById('exec2-autotrail-cb')?.checked) return;
+  const method=document.getElementById('exec2-trail-method')?.value||'pct';
+  const val=+document.getElementById('exec2-trail-val')?.value||2;
+ 
+  for(const p of _exec2.positions){
+    const sym=p.tradingsymbol||p.tradingSymbol||p.symbol||'';
+    const ltp=p.last_price||p.lastPrice||p.ltp||0;
+    const isLong=(p.quantity||p.netQty||0)>0;
+    if(!ltp||!isLong) continue; // Only auto-trail longs for now
+ 
+    const prevHigh=_exec2.autoTrailHighs[sym]||0;
+    if(ltp>prevHigh) _exec2.autoTrailHighs[sym]=ltp;
+    const high=_exec2.autoTrailHighs[sym];
+ 
+    let newSL;
+    if(method==='pct') newSL=high*(1-val/100);
+    else if(method==='points') newSL=high-val;
+    else newSL=high*0.97;
+ 
+    // Only trail UP, never down
+    const existingSL=p._trailedSL||0;
+    if(newSL>existingSL){
+      p._trailedSL=newSL;
+      // Note: actual SL order update would go here via broker API
+      // For now just track it
+    }
+  }
+}
+ 
+// ══════════════════════════════════════════════════
+// LIVE REFRESH (every 5s during market hours)
+// ══════════════════════════════════════════════════
+function exec2StartLive(){
+  if(_exec2.liveTimer) clearInterval(_exec2.liveTimer);
+  const indicator=document.getElementById('exec2-live-indicator');
+  let elapsed=0;
+ 
+  _exec2.liveTimer=setInterval(()=>{
+    const ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+    const h=ist.getHours(),mi=ist.getMinutes(),day=ist.getDay();
+    const mktOpen=day>=1&&day<=5&&(h>9||(h===9&&mi>=15))&&(h<15||(h===15&&mi<=30));
+ 
+    if(mktOpen && _exec2.positions.length>0){
+      if(indicator) indicator.style.display='';
+      elapsed+=5;
+      document.getElementById('exec2-live-timer').textContent=elapsed+'s';
+      // Auto-refresh positions every 30s
+      if(elapsed%30===0) exec2RefreshAll();
+    } else {
+      if(indicator) indicator.style.display='none';
+    }
+  },5000);
+}
+ 
+// ══════════════════════════════════════════════════
+// PRE-TRADE RISK NUDGES v2
+// ══════════════════════════════════════════════════
+async function exec2RunNudges(){
+  const panel=document.getElementById('exec2-nudge-panel');
+  const listEl=document.getElementById('exec2-nudge-list');
+  const scoreEl=document.getElementById('exec2-nudge-score');
+  const sym=(document.getElementById('exec2-sym').value||'').trim().toUpperCase();
+  if(!sym||!panel){panel.style.display='none';return null;}
+  panel.style.display='';
+  listEl.innerHTML='<div class="nv2-item nv2-info"><span class="nv2-icon">⏳</span><span class="nv2-text">Scanning…</span></div>';
+ 
+  const nudges=[];
+  let score=100;
+  const qty=+document.getElementById('exec2-qty').value||0;
+  const price=+document.getElementById('exec2-price').value||0;
+  const cap=cfg.cap||874000;
+  const orderVal=qty*price;
+ 
+  // Capital concentration check
+  if(orderVal>0&&cap>0){
+    const pct=orderVal/cap*100;
+    if(pct>25){ nudges.push({level:'fail',icon:'🔴',text:`Order is ${pct.toFixed(1)}% of capital — BLOCKED (max 25%)`}); score-=40; }
+    else if(pct>15){ nudges.push({level:'warn',icon:'⚠️',text:`Order is ${pct.toFixed(1)}% of capital — high concentration`}); score-=15; }
+    else if(pct>5){ nudges.push({level:'pass',icon:'✓',text:`Capital usage: ${pct.toFixed(1)}%`}); }
+  }
+ 
+  // Existing position check
+  const existingPos=_exec2.positions.find(p=>(p.tradingsymbol||p.symbol)==sym);
+  if(existingPos){
+    const existQty=Math.abs(existingPos.quantity||existingPos.netQty||0);
+    nudges.push({level:'info',icon:'ℹ️',text:`Already holding ${existQty} shares of ${sym}`});
+    if(_exec2.side==='BUY'&&existingPos.quantity<0){
+      nudges.push({level:'warn',icon:'⚠️',text:'You have a SHORT position — this BUY will reduce/reverse it'});
+    }
+  }
+ 
+  // Bracket order check
+  if(_exec2.bracketActive){
+    const bktSL=+document.getElementById('exec2-bkt-sl').value||0;
+    const bktTgt=+document.getElementById('exec2-bkt-tgt').value||0;
+    if(!bktSL) nudges.push({level:'warn',icon:'⚠️',text:'Bracket enabled but no SL set'});
+    if(!bktTgt) nudges.push({level:'info',icon:'ℹ️',text:'Bracket enabled but no target set'});
+    if(bktSL&&bktTgt&&price){
+      const rr=Math.abs(bktTgt-price)/Math.abs(price-bktSL);
+      if(rr<1) nudges.push({level:'warn',icon:'⚠️',text:`R:R is ${rr.toFixed(2)} — below 1:1, unfavorable`}); score-=10;
+      else nudges.push({level:'pass',icon:'✓',text:`R:R is 1:${rr.toFixed(2)}`});
+    }
+  }
+ 
+  // Market order warning
+  if(_exec2.otype==='MARKET'){
+    nudges.push({level:'info',icon:'ℹ️',text:'MARKET order — price not guaranteed'});
+  }
+ 
+  // No nudges = all clear
+  if(!nudges.length) nudges.push({level:'pass',icon:'✅',text:'All clear — no red flags'});
+ 
+  score=Math.max(0,Math.min(100,score));
+  const sc=score>=70?'var(--g)':score>=40?'var(--y)':'var(--r)';
+  const sbg=score>=70?'rgba(0,229,160,.12)':score>=40?'rgba(245,197,66,.12)':'rgba(255,69,96,.12)';
+  scoreEl.textContent=score+'/100';scoreEl.style.background=sbg;scoreEl.style.color=sc;
+ 
+  listEl.innerHTML=nudges.map(n=>
+    `<div class="nv2-item nv2-${n.level}"><span class="nv2-icon">${n.icon}</span><span class="nv2-text">${n.text}</span></div>`
+  ).join('');
+ 
+  // Block if score too low
+  if(score<30){
+    listEl.innerHTML+=`<div class="nv2-blocked">🛡️ ORDER BLOCKED — Risk score ${score}/100 is below threshold</div>`;
+    document.getElementById('exec2-place-btn').disabled=true;
+  } else {
+    document.getElementById('exec2-place-btn').disabled=false;
+  }
+ 
+  return score;
+}
+ 
+// ══════════════════════════════════════════════════
+// ORDERS TABLE
+// ══════════════════════════════════════════════════
+async function exec2RefreshOrders(){
+  const workerUrl=exec2GetWorkerUrl();if(!workerUrl)return;
+  const container=document.getElementById('exec2-orders');
   try{
-    if(newSL>0) await execPlaceSLTgtOrder(_execManageSym,side,qty,newSL,product,'SL-M','trigger');
-    if(newTgt>0) await execPlaceSLTgtOrder(_execManageSym,side,qty,newTgt,product,'LIMIT','price');
-    st.innerHTML=`<span style="color:var(--g)">✅ Orders updated</span>`;
-  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
-}
-
-async function execTrailSL(){
-  const method=document.getElementById('exec-trail-method').value; const val=+document.getElementById('exec-trail-val').value||0;
-  const avg=+(_execManagePos?.average_price||_execManagePos?.averagePrice||0); const ltp=+(_execManagePos?.last_price||_execManagePos?.lastPrice||0);
-  const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0)); const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0;
-  let newSL=0;
-  if(method==='cost')newSL=avg; else if(method==='fixed')newSL=isLong?(ltp-val):(ltp+val); else if(method==='pct')newSL=isLong?(ltp*(1-val/100)):(ltp*(1+val/100));
-  if(newSL<=0){toast('Invalid trail value','⚠️');return;}
-  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Trailing…</span>';
-  try{ await execPlaceSLTgtOrder(_execManageSym,isLong?'SELL':'BUY',qty,+newSL.toFixed(2),_execManagePos?.product||'CNC','SL-M','trigger');
-    st.innerHTML=`<span style="color:var(--g)">✅ SL trailed to ₹${newSL.toFixed(2)}</span>`;
-  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
-}
-
-async function execPartialExit(){
-  const qty=+document.getElementById('exec-partial-qty').value||0; const otype=document.getElementById('exec-partial-type').value;
-  const price=+document.getElementById('exec-partial-price').value||0;
-  if(!qty){toast('Enter exit quantity','⚠️');return;}
-  const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0; const side=isLong?'SELL':'BUY';
-  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Partial exit…</span>';
-  try{ const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
-    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
-    const body=_execBroker==='zerodha'?{tradingsymbol:_execManageSym,exchange:'NSE',transaction_type:side,order_type:otype,quantity:qty,product:_execManagePos?.product||'CNC',validity:'DAY',price:otype==='LIMIT'?price:0}:{symbol:_execManageSym,side,order_type:otype,qty,price:otype==='LIMIT'?price:0,product:_execManagePos?.product||'CNC',validity:'DAY'};
-    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)}); const data=await res.json();
-    if(data?.order_id||data?.orderId||data?.data?.order_id){ st.innerHTML=`<span style="color:var(--g)">✅ Partial exit: ${qty} shares</span>`; toast(`Partial exit: ${qty} ${_execManageSym}`,'✅'); }
-    else { st.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||JSON.stringify(data).slice(0,150)}</span>`; }
-  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
-}
-
-async function execPyramidAdd(){
-  const qty=+document.getElementById('exec-pyr-qty').value||0; const otype=document.getElementById('exec-pyr-type').value;
-  const price=+document.getElementById('exec-pyr-price').value||0;
-  if(!qty){toast('Enter pyramid quantity','⚠️');return;}
-  const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0; const side=isLong?'BUY':'SELL';
-  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Adding pyramid…</span>';
-  try{ const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
-    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
-    const body=_execBroker==='zerodha'?{tradingsymbol:_execManageSym,exchange:'NSE',transaction_type:side,order_type:otype,quantity:qty,product:_execManagePos?.product||'CNC',validity:'DAY',price:otype==='LIMIT'?price:0}:{symbol:_execManageSym,side,order_type:otype,qty,price:otype==='LIMIT'?price:0,product:_execManagePos?.product||'CNC',validity:'DAY'};
-    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)}); const data=await res.json();
-    if(data?.order_id||data?.orderId||data?.data?.order_id){ st.innerHTML=`<span style="color:var(--g)">✅ Pyramid: +${qty} shares</span>`; toast(`Pyramid: +${qty} ${_execManageSym}`,'✅'); }
-    else { st.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||JSON.stringify(data).slice(0,150)}</span>`; }
-  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
-}
-
-async function execCloseAll(){
-  const qty=Math.abs(+(_execManagePos?.quantity||_execManagePos?.netQty||0)); if(!qty){toast('No qty','⚠️');return;}
-  const isLong=(_execManagePos?.quantity||_execManagePos?.netQty||0)>0; const side=isLong?'SELL':'BUY';
-  const st=document.getElementById('exec-manage-status'); st.innerHTML='<span style="color:var(--y)">⏳ Closing…</span>';
-  try{ const workerUrl=getExecWorkerUrl(); const headers=getExecHeaders();
-    headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-place-order':_execBroker==='dhan'?'dhan-place-order':'de-place-order';
-    const body=_execBroker==='zerodha'?{tradingsymbol:_execManageSym,exchange:'NSE',transaction_type:side,order_type:'MARKET',quantity:qty,product:_execManagePos?.product||'CNC',validity:'DAY'}:{symbol:_execManageSym,side,order_type:'MARKET',qty,product:_execManagePos?.product||'CNC',validity:'DAY'};
-    const res=await fetch(workerUrl,{method:'POST',headers,body:JSON.stringify(body)}); const data=await res.json();
-    if(data?.order_id||data?.orderId||data?.data?.order_id){ st.innerHTML=`<span style="color:var(--g)">✅ Position closed</span>`; toast(`Closed ${_execManageSym}`,'✅'); document.getElementById('exec-manage-card').style.display='none'; setTimeout(execRefreshPositions,2000); }
-    else { st.innerHTML=`<span style="color:var(--r)">❌ ${data?.message||JSON.stringify(data).slice(0,150)}</span>`; }
-  }catch(e){ st.innerHTML=`<span style="color:var(--r)">❌ ${e.message}</span>`; }
-}
-
-async function execRefreshOrders(){
-  const workerUrl=getExecWorkerUrl(); if(!workerUrl)return; const tbl=document.getElementById('exec-orders-tbl');
-  try{ const headers=getExecHeaders(); headers['X-Kite-Action']=_execBroker==='zerodha'?'zd-orders':_execBroker==='dhan'?'dhan-orders':'de-orders';
-    const res=await fetch(workerUrl,{method:'GET',headers}); const data=await res.json(); const orders=data?.data||data||[];
-    if(!orders.length||!Array.isArray(orders)){tbl.innerHTML='<div style="padding:16px;text-align:center;color:var(--t4);font-size:12px">No orders today</div>';return;}
-    let html='<table style="width:100%;font-size:11.5px"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Status</th></tr></thead><tbody>';
-    orders.slice(0,20).forEach(o=>{
-      const sym=o.tradingsymbol||o.tradingSymbol||o.symbol||''; const side=o.transaction_type||o.transactionType||o.side||'';
-      const qty=o.quantity||o.qty||0; const price=o.average_price||o.price||0; const status=o.status||o.orderStatus||'';
+    const headers=exec2GetHeaders();
+    headers['X-Kite-Action']=_exec2.broker==='zerodha'?'zd-orders':_exec2.broker==='dhan'?'dhan-orders':'de-orders';
+    const res=await fetch(workerUrl,{method:'GET',headers});
+    const data=await res.json();
+    const orders=data?.data||data||[];
+    if(!orders.length||!Array.isArray(orders)){
+      container.innerHTML='<div style="padding:16px;text-align:center;color:var(--t4);font-size:12px">No orders today</div>';
+      return;
+    }
+    container.innerHTML='<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr><th style="padding:6px 10px;text-align:left;font-size:9px;color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--b1)">Time</th><th style="padding:6px 10px;text-align:left;font-size:9px;color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--b1)">Symbol</th><th style="padding:6px 10px;text-align:left;font-size:9px;color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--b1)">Side</th><th style="padding:6px 10px;text-align:right;font-size:9px;color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--b1)">Qty</th><th style="padding:6px 10px;text-align:right;font-size:9px;color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--b1)">Price</th><th style="padding:6px 10px;text-align:right;font-size:9px;color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--b1)">Status</th></tr></thead><tbody>'+
+    orders.slice(0,30).map(o=>{
+      const sym=o.tradingsymbol||o.tradingSymbol||o.symbol||'';
+      const side=o.transaction_type||o.transactionType||o.side||'';
+      const qty=o.quantity||o.qty||0;
+      const price=o.average_price||o.price||0;
+      const status=o.status||o.orderStatus||'';
       const time=o.order_timestamp||o.exchange_timestamp||'';
-      html+=`<tr><td style="font-size:10px;color:var(--t3)">${time?new Date(time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-'}</td><td style="font-weight:700;color:var(--t1)">${sym}</td><td style="color:${side.includes('BUY')?'var(--g)':'var(--r)'};font-weight:700">${side}</td><td class="mono">${qty}</td><td class="mono">₹${(+price).toFixed(2)}</td><td style="color:${status==='COMPLETE'||status==='TRADED'?'var(--g)':status==='REJECTED'?'var(--r)':'var(--y)'};font-weight:600;font-size:10.5px">${status}</td></tr>`;
-    });
-    tbl.innerHTML=html+'</tbody></table>';
-  }catch(e){ tbl.innerHTML=`<div style="padding:16px;color:var(--r);font-size:12px;text-align:center">❌ ${e.message}</div>`; }
+      const sideCol=side.includes('BUY')?'var(--g)':'var(--r)';
+      const stCol=status==='COMPLETE'||status==='TRADED'?'var(--g)':status==='REJECTED'?'var(--r)':'var(--y)';
+      return `<tr style="border-bottom:1px solid var(--b1)"><td style="padding:6px 10px;font-size:10px;color:var(--t3)">${time?new Date(time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-'}</td><td style="padding:6px 10px;font-weight:700;color:var(--t1)">${sym}</td><td style="padding:6px 10px;color:${sideCol};font-weight:700">${side}</td><td style="padding:6px 10px;text-align:right;font-family:'IBM Plex Mono',monospace">${qty}</td><td style="padding:6px 10px;text-align:right;font-family:'IBM Plex Mono',monospace">₹${(+price).toFixed(2)}</td><td style="padding:6px 10px;text-align:right;color:${stCol};font-weight:700;font-size:10px">${status}</td></tr>`;
+    }).join('')+'</tbody></table>';
+  }catch(e){
+    container.innerHTML=`<div style="padding:16px;text-align:center;color:var(--r);font-size:12px">❌ ${e.message}</div>`;
+  }
 }
-
-function execPopulateJournalDropdown(){
-  const sel=document.getElementById('exec-from-journal'); if(!sel)return;
+ 
+// ── Populate journal dropdown ──
+function exec2PopulateJournal(){
+  const sel=document.getElementById('exec2-from-journal');if(!sel)return;
   sel.innerHTML='<option value="">— Select open trade —</option>';
   trades.filter(t=>t.status==='Open'||t.status==='Partial').forEach(t=>{
-    const avgE=t.entries&&t.entries.length?t.entries.reduce((s,e)=>s+e.price*e.qty,0)/t.entries.reduce((s,e)=>s+e.qty,0):0;
-    sel.innerHTML+=`<option value="${t.id}">${t.symbol} · ${t.side} · Avg ₹${avgE.toFixed(2)}</option>`;
+    const avgE=t.entries?.length?t.entries.reduce((s,e)=>s+e.price*e.qty,0)/t.entries.reduce((s,e)=>s+e.qty,0):0;
+    sel.innerHTML+=`<option value="${t.id}">${t.symbol} · ${t.side} · ₹${avgE.toFixed(2)}</option>`;
   });
 }
-
-function execFillFromJournal(){
-  const id=document.getElementById('exec-from-journal').value; if(!id)return;
-  const t=trades.find(x=>x.id===id); if(!t)return;
-  document.getElementById('exec-sym').value=t.symbol||'';
-  document.getElementById('exec-side').value=(t.side||'Buy')==='Buy'?'BUY':'SELL';
-  const avgE=t.entries&&t.entries.length?t.entries.reduce((s,e)=>s+e.price*e.qty,0)/t.entries.reduce((s,e)=>s+e.qty,0):0;
-  document.getElementById('exec-price').value=avgE.toFixed(2);
-  const tQty=t.entries?t.entries.reduce((s,e)=>s+e.qty,0):0; const eQty=t.exits?t.exits.reduce((s,e)=>s+e.qty,0):0;
-  document.getElementById('exec-qty').value=tQty-eQty;
-  if(t.sl) document.getElementById('exec-sl').value=(+t.sl).toFixed(2);
-  if(t.target) document.getElementById('exec-tgt').value=(+t.target).toFixed(2);
+ 
+function exec2FillFromJournal(){
+  const id=document.getElementById('exec2-from-journal').value;if(!id)return;
+  const t=trades.find(x=>x.id===id);if(!t)return;
+  document.getElementById('exec2-sym').value=t.symbol||'';
+  exec2SetSide((t.side||'Buy')==='Buy'?'BUY':'SELL');
+  const avgE=t.entries?.length?t.entries.reduce((s,e)=>s+e.price*e.qty,0)/t.entries.reduce((s,e)=>s+e.qty,0):0;
+  document.getElementById('exec2-price').value=avgE.toFixed(2);
+  const tQty=t.entries?t.entries.reduce((s,e)=>s+e.qty,0):0;
+  const eQty=t.exits?t.exits.reduce((s,e)=>s+e.qty,0):0;
+  document.getElementById('exec2-qty').value=tQty-eQty;
+  if(t.sl){document.getElementById('exec2-bkt-sl').value=(+t.sl).toFixed(2);exec2ToggleBracket();}
+  if(t.target){document.getElementById('exec2-bkt-tgt').value=(+t.target).toFixed(2);}
   execFetchPrice(t.symbol);
-}
-
-function execFromPosSize(){
-  const sym=(document.getElementById('ps-symbol').value||'').trim().toUpperCase();
-  const entry=+document.getElementById('ps-entry').value||0; const sl=getPsSLPrice(); const target=getPsTgtPrice();
-  const qty=parseInt(document.getElementById('ps-qty')?.textContent)||0;
-  const side=document.getElementById('ps-side')?.value||'Buy';
-  if(!sym||!qty){toast('Calculate position size first','⚠️');return;}
-  nav('execute');
-  setTimeout(()=>{
-    document.getElementById('exec-sym').value=sym; document.getElementById('exec-side').value=side==='Buy'?'BUY':'SELL';
-    document.getElementById('exec-qty').value=qty; document.getElementById('exec-price').value=entry.toFixed(2);
-    if(sl>0)document.getElementById('exec-sl').value=sl.toFixed(2);
-    if(target>0)document.getElementById('exec-tgt').value=target.toFixed(2);
-    execFetchPrice(sym);
-  },200);
 }
 // ══════════════════════════════════════════════════
 // GTT ORDERS SYSTEM
