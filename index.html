@@ -11077,18 +11077,17 @@ function setGTTSource(src){
 }
 // ── Exec Symbol Autocomplete ──
 function onExecSymInput(val){
+  // Reuse GTT autocomplete logic with exec dropdown
   const q=val.trim().toUpperCase(); const drop=document.getElementById('exec-sym-drop');
   if(!q||q.length<1){drop.classList.remove('open');return;}
-  const scored=getSymbolDB().map(([sym,name,sector])=>{
-    let s=scoreMatch(sym,name.toUpperCase(),q);
-    if(sector&&sector.toUpperCase().includes(q)) s=Math.max(s,35);
-    return {sym,name,sector,score:s};
-  }).filter(x=>x.score>=0).sort((a,b)=>b.score-a.score).slice(0,12);
-  if(!scored.length){drop.classList.remove('open');return;}
-  execSymFocusIdx=-1;
-  let html='<div class="sym-dropdown-header">NSE Stocks</div>';
-  scored.forEach(s=>{ html+=`<div class="sym-opt" data-sym="${s.sym}" onclick="selectExecSym('${s.sym}')">${s.sym} — ${s.name}</div>`; });
-  drop.innerHTML=html;drop.classList.add('open');
+  // Borrow GTT dropdown, render into exec dropdown
+  onGttSymInput(val);
+  const gttDrop=document.getElementById('gtt-sym-drop');
+  if(gttDrop){
+    drop.innerHTML=gttDrop.innerHTML.replace(/selectGttSym/g,'selectExecSym');
+    drop.classList.add('open');
+    gttDrop.classList.remove('open');
+  }
 }
 let execSymFocusIdx=-1;
 function onExecSymKey(e){
