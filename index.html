@@ -10908,7 +10908,7 @@ async function exec2RunNudges(){
     if(!bktTgt) nudges.push({level:'info',icon:'ℹ️',text:'Bracket enabled but no target set'});
     if(bktSL&&bktTgt&&price){
       const rr=Math.abs(bktTgt-price)/Math.abs(price-bktSL);
-      if(rr<1) nudges.push({level:'warn',icon:'⚠️',text:`R:R is ${rr.toFixed(2)} — below 1:1, unfavorable`}); score-=10;
+     if(rr<1){ nudges.push({level:'warn',icon:'⚠️',text:`R:R is ${rr.toFixed(2)} — below 1:1, unfavorable`}); score-=10; }
       else nudges.push({level:'pass',icon:'✓',text:`R:R is 1:${rr.toFixed(2)}`});
     }
   }
