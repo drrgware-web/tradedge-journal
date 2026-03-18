@@ -17,14 +17,12 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--text); font-family: var(--sans); }
-    ::-webkit-scrollbar { width: 3px; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-    #loading { display:flex; align-items:center; justify-content:center; height:100vh; flex-direction:column; gap:12px; }
-    #loading .spinner { width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-    .fade-in { animation: fadeIn 0.25s ease-out both; }
-    .sugg-item:hover { background: rgba(0,255,136,0.06) !important; color: #00ff88 !important; }
+    ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    #loading { display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; gap: 12px; }
+    #loading .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.3s ease-out both; }
   </style>
 </head>
 <body>
@@ -35,1024 +33,540 @@
     </div>
   </div>
 
-<!-- NSE Stock Data (2668 stocks) -->
-<script>
-// 2668 NSE stocks
-const NSE_RAW=[
-["BAJEL","Bajel Projects Ltd"],["MRPL","Mangalore Refinery And Petrochemicals Limited"],["ITI","Iti Limited"],["PAISALO","Paisalo Digital Ltd"],["DCMSIL","DCM Shriram International Ltd"],
-["AKI","AKI India Ltd"],["DCMFINSERV","DCM Financial Services Ltd"],["SEMAC","Semac Consultants Ltd"],["INFOBEAN","InfoBeans Technologies Ltd"],["ELECTHERM","Electrotherm (india) Limited"],
-["JARO","Jaro Institute of Technol. Mgt. and Research Ltd"],["CHENNPETRO","Chennai Petroleum Corporation Limited"],["CSBBANK","CSB Bank Ltd"],["GANECOS","Ganesha Ecosphere Limited"],["SUNCLAY","Sundaram Clayton Ltd"],
-["NGIL","Nakoda Group of Industries Ltd"],["SHRADHA","Shradha Infraprojects Ltd"],["SURAJLTD","Suraj Ltd"],["MKPL","M K Proteins Ltd"],["SARLAPOLY","Sarla Performance Fibers Limited"],
-["GREENLAM","Greenlam Industries Limited"],["AEROFLEX","Aeroflex Industries Ltd"],["OLAELEC","Ola Electric Mobility Ltd"],["ZYDUSWELL","Zydus Wellness Limited"],["MMP","MMP Industries Ltd"],
-["TEJASNET","Tejas Networks Ltd"],["ISHANCH","Ishan Dyes and chemicals Ltd"],["COASTCORP","Coastal Corporation Ltd"],["DEVIT","Dev Information Technology Ltd"],["DEEPINDS","Deep Industries Ltd"],
-["BANSALWIRE","Bansal Wire Industries Ltd"],["ADANIPOWER","Adani Power Limited"],["MEGASTAR","Megastar Foods Ltd"],["EMMVEE","Emmvee Photovoltaic Power Ltd"],["CURAA","Cura Technologies Ltd"],
-["BAFNAPH","Bafna Pharmaceuticals Ltd"],["AVROIND","Avro India Ltd"],["IL&FSENGG","Il&fs Engineering And Construction Company Limited"],["EQUIPPP","Equippp Social Impact Technologies Ltd"],["SUMEETINDS","Sumeet Industries Limited"],
-["GAYAPROJ","Gayatri Projects Limited"],["SANGINITA","Sanginita Chemicals Ltd"],["GFSTEELS","Grand Foundry Ltd"],["SESHAPAPER","Seshasayee Paper And Boards Limited"],["AFIL","Akme Fintrade (India) Ltd"],
-["KSHINTL","KSH International Ltd"],["CUB","City Union Bank Limited"],["SUNDARAM","Sundaram Multi Pap Limited"],["SADHNANIQ","Sadhana Nitro Chem Ltd"],["BANARBEADS","Banaras Beads Limited"],
-["VIJIFIN","Viji Finance Limited"],["ARVEE","Arvee Laboratories (India) Ltd"],["SRTL","Shree Ram Twistex Ltd"],["ULTRACEMCO","Ultratech Cement Limited"],["HITECHCORP","Hitech Corporation"],
-["ORTEL","Ortel Communications Limited"],["JSWHL","Jsw Holdings Limited"],["ONEPOINT","One Point One Solutions Ltd"],["MANOMAY","Manomay Tex India Ltd"],["PARACABLES","Paramount Communications Limited"],
-["HMT","Hmt Limited"],["SUPREME","Supreme Holdings & Hospitality Ltd"],["SANWARIA","Sanwaria Agro Oils Limited"],["SECMARK","Secmark Consultancy Ltd"],["ARIS","Arisinfra Solutions Ltd"],
-["SAREGAMA","Saregama India Limited"],["TFCILTD","Tourism Finance Corporation Of India Limited"],["ABSL10BANK","Aditya Birla Sun Life BSE Top 10 Banks ETF"],["SVLL","Shree Vasu Logistics Ltd"],["SMLMAH","SML Mahindra Ltd"],
-["QUINTEGRA","Quintegra Solutions Limited"],["AADHARHFC","Aadhar Housing Finance Ltd"],["SUPREMEENG","Supreme Engineering Ltd"],["IZMO","Izmo Limited"],["JNKINDIA","JNK India Ltd"],
-["DODLA","Dodla Dairy Ltd"],["KRITIKA","Kritika Wires Ltd"],["DCAL","Dishman Carbogen Amcis Ltd"],["AURIGROW","Auri Grow India Ltd"],["RACLGEAR","RACL Geartech Ltd"],
-["TVSELECT","Tvs Electronics Limited"],["SEAMECLTD","Seamec Limited"],["ACUTAAS","Acutaas Chemicals Ltd"],["PAYTM","One 97 Communications Ltd"],["HAPPYFORGE","Happy Forgings Ltd"],
-["ZENTEC","Zen Technologies Limited"],["GODAVARIB","Godavari Biorefineries Ltd"],["CANHLIFE","Canara HSBC Life Insurance Company Ltd"],["SANSERA","Sansera Engineering Ltd"],["SPCENET","Spacenet Enterprises India Ltd"],
-["MATRIMONY","Matrimony.com Ltd"],["STALLION","Stallion India Fluorochemicals Ltd"],["POONAWALLA","Poonawalla Fincorp Ltd"],["LMW","LMW Ltd"],["CREST","Crest Ventures Limited"],
-["M&M","Mahindra & Mahindra Limited"],["LOTUSEYE","Lotus Eye Care Hospital Limited"],["PVP","Pvp Ventures Limited"],["UNITEDTEA","The United Nilgiri Tea Estates Company Limited"],["MEDIASSIST","Medi Assist Healthcare Services Ltd"],
-["NIRAJISPAT","Niraj Ispat Industries Limited"],["AVG","AVG Logistics Ltd"],["NEOGEN","Neogen Chemicals Ltd"],["GRASIM","Grasim Industries Limited"],["VINATIORGA","Vinati Organics Limited"],
-["TIPSMUSIC","Tips Music Ltd"],["ADVANCE","Advance Agrolife Ltd"],["BIKAJI","Bikaji Foods International Ltd"],["LINDEINDIA","Linde India Limited"],["CUPID","Cupid Limited"],
-["DMCC","DMCC Speciality Chemicals Ltd"],["XELPMOC","Xelpmoc Design and Tech Ltd"],["DCMSHRIRAM","Dcm Shriram Limited"],["VMM","Vishal Mega Mart Ltd"],["ASHIMASYN","Ashima Limited"],
-["AJAXENGG","Ajax Engineering Ltd"],["NITCO","Nitco Limited"],["GLOBALE","Globale Tessile Ltd"],["APOLLOTYRE","Apollo Tyres Limited"],["TRENT","Trent Limited"],
-["SUMIT","Sumit Woods Ltd"],["UNIVAFOODS","Univa Foods Ltd"],["SHRIPISTON","Shriram Pistons & Rings Limited"],["WAAREEINDO","Indosolar Ltd"],["PARAGMILK","Parag Milk Foods Limited"],
-["SPECTRUM","Spectrum Electrical Industries Ltd"],["AHLEAST","Asian Hotels (east) Limited"],["ETERNAL","Eternal Ltd"],["EMKAY","Emkay Global Financial Services Limited"],["SECURKLOUD","SecureKloud Technologies Ltd"],
-["RTNINDIA","RattanIndia Enterprises Ltd"],["GVPTECH","GVP Infotech Ltd"],["GOLDTECH","Goldstone Technologies Limited"],["HDFCBANK","Hdfc Bank Limited"],["TENNIND","Tenneco Clean Air India Ltd"],
-["TCPLPACK","TCPL Packaging Ltd"],["HONDAPOWER","Honda Siel Power Products Limited"],["GUJAPOLLO","Gujarat Apollo Industries Limited"],["URBANCO","Urban Company Ltd"],["TMCV","Tata Motors Commercial Vehicles Ltd"],
-["HESTERBIO","Hester Biosciences Limited"],["JINDALSAW","Jindal Saw Limited"],["DYNAMATECH","Dynamatic Technologies Limited"],["DOMS","Doms Industries Ltd"],["AVONMORE","Avonmore Capital & Management Services Ltd"],
-["PFIZER","Pfizer Limited"],["AYMSYNTEX","Aym Syntex Limited"],["RISHABH","Rishabh Instruments Ltd"],["BAJFINANCE","Bajaj Finance Limited"],["JUNIPER","Juniper Hotels Ltd"],
-["IBULLSLTD","Indiabulls Limited"],["INNOVANA","Innovana Thinklabs Ltd"],["AKSHAR","Akshar Spintex Ltd"],["ESABINDIA","Esab India Limited"],["LIBAS","Libas Consumer Products Ltd"],
-["MANBA","Manba Finance Ltd"],["WEWIN","We Win Ltd"],["GODREJIND","Godrej Industries Limited"],["MAHESHWARI","Maheshwari Logistics Ltd"],["PDSL","PDS Ltd"],
-["SETUINFRA","Setubandhan Infrastructure Ltd"],["CANFINHOME","Can Fin Homes Limited"],["BOROLTD","Borosil Ltd"],["PIRAMALFIN","PIRAMALFIN"],["AETHER","Aether Industries Ltd"],
-["SAILIFE","Sai Life Sciences Ltd"],["ASAHISONG","Asahi Songwon Colors Limited"],["NRL","Nupur Recyclers Ltd"],["MONARCH","Monarch Networth Capital Ltd"],["WHEELS","Wheels India Limited"],
-["KINGFA","Kingfa Science & Technology (india) Limited"],["QPOWER","Quality Power Electrical Equipments Ltd"],["SENORES","Senores Pharmaceuticals Ltd"],["J&KBANK","The Jammu & Kashmir Bank Limited"],["FORCEMOT","Force Motors Ltd"],
-["BSE","BSE (Bombay stock exchange) Ltd"],["WAAREEENER","Waaree Energies Ltd"],["JSWSTEEL","Jsw Steel Limited"],["COSMOFIRST","Cosmo First Ltd"],["CEIGALL","Ceigall India Ltd"],
-["MAHAPEXLTD","Maha Rashtra Apex Corporation Ltd"],["CIEINDIA","CIE Automotive India Ltd"],["MPSLTD","Mps Limited"],["PINELABS","Pine Labs Ltd"],["KAYNES","Kaynes Technology India Ltd"],
-["ASHIANA","Ashiana Housing Limited"],["MCX","Multi Commodity Exchange Of India Limited"],["INDRAMEDCO","Indraprastha Medical Corporation Limited"],["GENCON","Generic Engineering Construction & Projects Ltd"],["BANCOINDIA","Banco Products (i) Limited"],
-["ITC","Itc Limited"],["LOKESHMACH","Lokesh Machines Limited"],["TIIL","Technocraft Industries (india) Limited"],["RHETAN","Rhetan TMT Ltd"],["BAJAJ-AUTO","Bajaj Auto Limited"],
-["INDOTHAI","Indo Thai Securities Limited"],["VAKRANGEE","Vakrangee Limited"],["MARKOLINES","Markolines Pavement Technologies Ltd"],["NIFTY50TR2XLEV","NIFTY50TR2XLEV"],["NIFTY50PR2XLEV","NIFTY50PR2XLEV"],
-["CYBERTECH","Cybertech Systems And Software Limited"],["ABSLAMC","Aditya Birla Sun Life AMC Ltd"],["JUBLFOOD","Jubilant Foodworks Limited"],["HALEOSLABS","Haleos Labs Limited"],["NEWGEN","Newgen Software Technologies Ltd"],
-["BAJAJFINSV","Bajaj Finserv Limited"],["AVANTIFEED","Avanti Feeds Limited"],["POLICYBZR","PB Fintech Ltd"],["BETA","Beta Drugs Ltd"],["CCL","Ccl Products (india) Limited"],
-["JAIPURKURT","Nandani Creation Ltd"],["RRKABEL","R R Kabel Ltd"],["DLINKINDIA","D-link (india) Limited"],["MEIL","Mangal Electrical Industries Ltd"],["SEYAIND","Seya Industries Ltd"],
-["VENUSREM","Venus Remedies Limited"],["OLECTRA","Olectra Greentech Ltd"],["EMAMILTD","Emami Limited"],["ASIANTILES","Asian Granito India Limited"],["PROZONER","Prozone Realty Ltd"],
-["BALKRISHNA","Balkrishna Paper Mills Limited"],["XPROINDIA","Xpro India Limited"],["KSR","KSR Footwear Ltd"],["VIPULLTD","Vipul Limited"],["INDIASHLTR","India Shelter Finance Corporation Ltd"],
-["RBZJEWEL","RBZ Jewellers Ltd"],["LEMONTREE","Lemon Tree Hotels Ltd"],["SBIN","State Bank Of India Ltd"],["TATASTEEL","Tata Steel Limited"],["STARTECK","Startech Finance Ltd"],
-["CINEVISTA","Cinevista Limited"],["LUMAXIND","Lumax Industries Limited"],["TDPOWERSYS","Td Power Systems Limited"],["MAHSEAMLES","Maharashtra Seamless Limited"],["MAHLOG","Mahindra Logistics Ltd"],
-["SANOFICONR","Sanofi Consumer Healthcare India Ltd"],["RPTECH","Rashi Peripherals Ltd"],["MANORAMA","Manorama Industries Ltd"],["SJS","S J S Enterprises Ltd"],["AMANTA","Amanta Healthcare Ltd"],
-["ANIKINDS","Anik Industries Limited"],["CREATIVEYE","Creative Eye Limited"],["MANCREDIT","Mangal Credit & Fincorp Ltd"],["CRAFTSMAN","Craftsman Automation Ltd"],["PREMIERENE","Premier Energies Ltd"],
-["GHCLTEXTIL","GHCL Textiles Ltd"],["ARCHIES","Archies Limited"],["VESUVIUS","Vesuvius India Limited"],["KIMS","Krishna Institute of Medical Sciences Ltd"],["BONLON","Bonlon Industries Ltd"],
-["JLHL","Jupiter Life Line Hospitals Ltd"],["AGARIND","Agarwal Industrial Corporation Limited"],["MOALPHA50","Motilal Oswal Nifty Alpha 50 ETF"],["MOM50","Motilal Oswal M50 ETF"],["ALLTIME","All Time Plastics Ltd"],
-["METROPOLIS","Metropolis Healthcare Ltd"],["HIRECT","Hind Rectifiers Limited"],["PRICOLLTD","Pricol Ltd."],["NIFTYAUTO","NIFTYAUTO"],["AVADHSUGAR","Avadh Sugar & Energy"],
-["PICCADIL","Piccadily Agro Industries Ltd"],["NINSYS","NINtec Systems Ltd"],["LYKALABS","Lyka Labs Limited"],["JKTYRE","Jk Tyre & Industries Limited"],["TRU","TruCap Finance Ltd"],
-["ARVIND","Arvind Limited"],["BANK10ADD","DSP BSE Top 10 Banks ETF"],["NETWEB","Netweb Technologies India Ltd"],["GANESHCP","Ganesh Consumer Products Ltd"],["INDIGO","Interglobe Aviation Limited"],
-["GODIGIT","Go Digit General Insurance Ltd"],["ROLEXRINGS","Rolex Rings Ltd"],["VINEETLAB","Vineet Laboratories Ltd"],["SHREECEM","Shree Cements Limited"],["YASHO","Yasho Industries Ltd"],
-["TVSMOTOR","Tvs Motor Company Limited"],["BLSE","BLS E-Services Ltd"],["NIFTYFINSERVICE","NIFTYFINSERVICE"],["TBOTEK","TBO Tek Ltd"],["AUTOBEES","Nippon India Nifty Auto ETF"],
-["MTARTECH","MTAR Technologies Ltd"],["PUNJABCHEM","Punjab Chemicals & Crop Protection Limited"],["AUTOIETF","ICICI Prudential Nifty Auto ETF"],["KIRLOSIND","Kirloskar Industries Limited"],["DBCORP","D.b.corp Limited"],
-["MHLXMIRU","Mahalaxmi Rubtech Ltd"],["VBL","Varun Beverages Limited"],["BFSI","Mirae Asset Nifty Financial Services ETF - RG"],["APARINDS","Apar Industries Limited"],["AXISBANK","Axis Bank Limited"],
-["ICICIBANK","Icici Bank Limited"],["ASKAUTOLTD","ASK Automotive Ltd"],["GROWW","Billionbrains Garage Ventures Ltd"],["HDFCSENSEX","HDFC S&P BSE Sensex ETF"],["PREMIERPOL","Premier Polyfilm Limited"],
-["EMCURE","Emcure Pharmaceuticals Ltd"],["THYROCARE","Thyrocare Technologies Limited"],["CREDITACC","CreditAccess Grameen Ltd"],["INDGN","Indegene Ltd"],["FIVESTAR","Five-Star Business Finance Ltd"],
-["HEROMOTOCO","Hero Motocorp Limited"],["GMRAIRPORT","GMR Airports Ltd"],["SENSEXETF","Mirae Asset S&P BSE Sensex ETF"],["GLFL","Gujarat Lease Financing Limited"],["NGLFINE","NGL Fine Chem Ltd"],
-["SKFINDUS","SKF India (Industrial) Ltd"],["EBANKNIFTY","Edelweiss Nifty Bank ETF"],["NIFTYFINSRV2550","NIFTYFINSRV2550"],["HEXT","Hexaware Technologies Ltd"],["APEX","Apex Frozen Foods Ltd"],
-["MBEL","M & B Engineering Ltd"],["LGHL","Laxmi Goldorna House Ltd"],["BSLSENETFG","Birla Sun Life Sensex ETF"],["MARUTI","Maruti Suzuki India Limited"],["BAJAJHLDNG","Bajaj Holdings & Investment Limited"],
-["BANKETF","Mirae Asset Nifty Bank ETF"],["WSTCSTPAPR","West Coast Paper Mills Limited"],["FINIETF","ICICI Prudential Nifty Financial Serv. Ex-Bank ETF"],["BHARATFORG","Bharat Forge Limited"],["INDUSINDBK","Indusind Bank Limited"],
-["PSPPROJECT","PSP Projects Ltd"],["KIRLOSENG","Kirloskar Oil Engines Limited"],["AKASH","Akash Infraprojects Ltd"],["ANKITMETAL","Ankit Metal & Power Limited"],["HDFCNIFBAN","HDFC Nifty Banking ETF"],
-["IDEA","Vodafone Idea Ltd"],["KSHITIJPOL","Kshitij Polyline Ltd"],["EICHERMOT","Eicher Motors Limited"],["AMBER","Amber Enterprises India Ltd"],["LUMAXTECH","Lumax Auto Technologies Limited"],
-["GODREJCP","Godrej Consumer Products Limited"],["SENSEXBETA","UTI BSE Sensex ETF"],["CERA","Cera Sanitaryware Limited"],["GRINDWELL","Grindwell Norton Limited"],["NIFTYPVTBANK","NIFTYPVTBANK"],
-["BALAMINES","Balaji Amines Limited"],["ABCAPITAL","Aditya Birla Capital Ltd"],["PFOCUS","Prime Focus Limited"],["ASHOKLEY","Ashok Leyland Limited"],["EUROBOND","Euro Panel Products Ltd"],
-["BANKNIFTY","BANKNIFTY"],["HINDALCO","Hindalco Industries Limited"],["DREDGECORP","Dredging Corporation Of India Limited"],["RATNAVEER","Ratnaveer Precision Engineering Ltd"],["SHADOWFAX","Shadowfax Technologies Ltd"],
-["RUBYMILLS","The Ruby Mills Limited"],["THERMAX","Thermax Limited"],["JKCEMENT","Jk Cement Limited"],["GANDHITUBE","Gandhi Special Tubes Limited"],["DABUR","Dabur India Limited"],
-["SWSOLAR","Sterling & Wilson Renewable Energy Ltd"],["ESENSEX","Edelweiss BSE Sensex ETF"],["ASAHIINDIA","Asahi India Glass Limited"],["NV20BEES","Nippon India ETF Nifty 50 Value 20"],["BOROSCI","Borosil Scientific Ltd"],
-["AAATECH","AAA Technologies Ltd"],["CENTUM","Centum Electronics Limited"],["ATHERENERG","Ather Energy Ltd"],["GOLDENTOBC","Golden Tobacco Limited"],["SUPRAJIT","Suprajit Engineering Limited"],
-["NIFTYFMCG","NIFTYFMCG"],["SUMICHEM","Sumitomo Chemical India Ltd"],["HDFCNIFTY","HDFCNIFTY"],["NIFTYCONSUMPTION","NIFTYCONSUMPTION"],["JAMNAAUTO","Jamna Auto Industries Limited"],
-["BANKBEES","Nippon India ETF Bank Bees"],["RELIABLE","Reliable Data Services Ltd"],["EMAMIREAL","Emami Realty Ltd"],["NIFTY","NIFTY"],["NIFTYADD","NIFTYADD"],
-["GROWWNET","Groww Nifty India Internet ETF"],["PGHL","Procter & Gamble Health Ltd"],["BILVYAPAR","BIL Vyapar Ltd"],["NIFTYSERVSECTOR","NIFTYSERVSECTOR"],["FMGOETZE","Federal-mogul Goetze (india) Limited."],
-["SBIETFCON","SBI ETF Consumption"],["SRGHFL","SRG Housing Finance Ltd"],["CHOLAHLDNG","Cholamandalam Financial Holdings Ltd"],["IMFA","Indian Metals & Ferro Alloys Limited"],["MVGJL","Manoj Vaibhav Gems N Jewellers Ltd"],
-["SENSEXADD","DSP S&P BSE Sensex ETF"],["ABSLBANETF","Aditya Birla Sun Life Banking ETF"],["MOSERVICE","Motilal Oswal Nifty Services Sector ETF"],["TOP20","Mirae Asset Nifty Top 20 Equal Weight ETF"],["SUPREMEIND","Supreme Industries Limited"],
-["PRECWIRE","Precision Wires India Limited"],["ITCHOTELS","ITC Hotels Ltd"],["MFSL","Max Financial Services Limited"],["CORONA","Corona Remedies Ltd"],["AARTIIND","Aarti Industries Limited"],
-["AYE","Aye Finance Ltd"],["PVTBANIETF","ICICI Prudential Nifty Private Bank ETF"],["TOP15IETF","ICICI Prudential Nifty Top 15 Equal Weight ETF"],["NAVKARURB","Navkar Urbanstructure Ltd"],["RELIANCE","Reliance Industries Limited"],
-["AXISCETF","Axis Consumption ETF"],["ANANDRATHI","Anand Rathi Wealth Ltd"],["PGEL","Pg Electroplast Limited"],["LTF","L&T Finance Ltd"],["ENIFTY","ENIFTY"],
-["NIFTYTOP10EW","NIFTYTOP10EW"],["SHILPAMED","Shilpa Medicare Limited"],["ASIANHOTNR","Asian Hotels (north) Limited"],["BANKIETF","ICICI Prudential Nifty Bank ETF"],["BANKADD","DSP Nifty Bank ETF"],
-["WEBELSOLAR","Websol Energy System Limited"],["PIDILITIND","Pidilite Industries Limited"],["GODREJAGRO","Godrej Agrovet Ltd"],["ARVSMART","Arvind Smartspaces Limited"],["DCI","DC Infotech & Communication Ltd"],
-["NOCIL","Nocil Limited"],["SNXT50BETA","UTI BSE Sensex Next 50 ETF"],["MOCAPITAL","Motilal Oswal Nifty Capital Market ETF"],["ALPL30IETF","ICICI Prudential Nifty Alpha Low Volatility 30 ETF"],["INTERNET","Mirae Asset Nifty India Internet ETF"],
-["CONSUMIETF","ICICI Prudential Nifty India Consumption ETF"],["AXSENSEX","Axis S&P BSE Sensex ETF"],["TATACOMM","Tata Communications Limited"],["KFINTECH","KFin Technologies Ltd"],["LICHSGFIN","Lic Housing Finance Limited"],
-["UNIONBANK","Union Bank Of India Ltd"],["CYBERMEDIA","Cyber Media (india) Limited"],["RADICO","Radico Khaitan Limited"],["JUBLCPL","Jubilant Agri & Consumer Products Ltd"],["ARMANFIN","Arman Financial Services Limited"],
-["AXISNIFTY","Axis Nifty ETF"],["HCG","Healthcare Global Enterprises Limited"],["NIFTYETF","NIFTYETF"],["SHIVATEX","Shiva Texyarn Ltd"],["PVTBANKADD","DSP Nifty Private Bank ETF"],
-["GROWWNIFTY","GROWWNIFTY"],["BHARATSE","Bharat Seats Ltd"],["GROWWCAPM","Groww Nifty Capital Markets ETF"],["ASIANPAINT","Asian Paints Limited"],["NIFTYBEES","NIFTYBEES"],
-["NIFTYIETF","NIFTYIETF"],["IRISDOREME","Iris Clothings Ltd"],["BHARTIHEXA","Bharti Hexacom Ltd"],["SUNDRMBRAK","Sundaram Brake Linings Limited"],["BANKBETA","UTI Nifty Bank ETF"],
-["BANKBETF","Bajaj Finserv Nifty Bank ETF"],["NIFTYCAPITALMKT","NIFTYCAPITALMKT"],["NESTLEIND","Nestle India Limited"],["SETFNIF50","SBI ETF Nifty 50"],["ALKALI","Alkali Metals Limited"],
-["NIFTY1","NIFTY1"],["KOKUYOCMLN","Kokuyo Camlin Limited"],["RATNAMANI","Ratnamani Metals & Tubes Limited"],["GHCL","Ghcl Limited"],["NIFTYBETA","NIFTYBETA"],
-["EPACKPEB","EPack Prefab Technologies Ltd"],["TOP100CASE","Zerodha Nifty 100 ETF"],["KMEW","Knowledge Marine & Engineering Works Ltd"],["AXISBNKETF","Axis Banking ETF"],["KARURVYSYA","Karur Vysya Bank Limited"],
-["MAHKTECH","Mirae Asset Hang Seng TECH ETF"],["NIFTY100ESGSECLDR","NIFTY100ESGSECLDR"],["LT","Larsen & Toubro Limited"],["NAHARINDUS","Nahar Industrial Enterprises Limited"],["CHOLAFIN","Cholamandalam Investment And Finance Company Limited"],
-["TEAMLEASE","Teamlease Services Limited"],["SWELECTES","Swelect Energy Systems Limited"],["JASH","Jash Engineering Ltd"],["IONEXCHANG","Ion Exchange (India) Ltd"],["SWIGGY","Swiggy Ltd"],
-["LICNETFN50","LIC Nomura MF ETF - NIFTY 50 - Growth Plan"],["QNIFTY","QNIFTY"],["CGCL","Capri Global Capital Limited"],["NIFTY100","NIFTY100"],["ADANIENT","Adani Enterprises Limited"],
-["NAM-INDIA","Nippon Life India Asset Management Ltd"],["AMBUJACEM","Ambuja Cements Limited"],["SUPERHOUSE","Superhouse Limited"],["HDFCVALUE","HDFC Nifty 50 Value 20 ETF"],["FMCGIETF","ICICI Prudential FMCG ETF"],
-["GRANULES","Granules India Limited"],["NIFTY100LIQ15","NIFTY100LIQ15"],["TATACONSUM","TATA Consumer Products Ltd"],["CONSUMBEES","Nippon India ETF Nifty India Consumption"],["GROWWMOM50","Groww Nifty 500 Momentum 50 ETF"],
-["MUTHOOTFIN","Muthoot Finance Limited"],["SENSEXIETF","ICICI Prudential S&P BSE Sensex ETF"],["ABINFRA","A B Infrabuild Ltd"],["CONS","Kotak Nifty India Consumption ETF"],["WELINV","Welspun Investments And Commercials Limited"],
-["VIJAYA","Vijaya Diagnostic Centre Ltd"],["INDIANB","Indian Bank Ltd"],["KOTAKBANK","Kotak Mahindra Bank Limited"],["PSUBANKADD","DSP Nifty PSU Bank ETF"],["LICNFNHGP","LIC Nomura MF ETF - Nifty 100"],
-["IVALUE","Ivalue Infosolutions Ltd"],["MANAKCOAT","Manaksia Coated Metals & Industries Limited"],["SILLYMONKS","Silly Monks Entertainment Ltd"],["HERITGFOOD","Heritage Foods Limited"],["IDFNIFTYET","Bandhan Nifty 50 ETF"],
-["MOM30IETF","ICICI Prudential Nifty 200 Momentum 30 ETF"],["NIFTYALPHALOWVOL","NIFTYALPHALOWVOL"],["CARTRADE","Cartrade Tech Ltd"],["CSLFINANCE","CSL Finance Ltd"],["ESSENTIA","Integra Essentia Ltd"],
-["ADANIPORTS","Adani Ports And Special Economic Zone Limited"],["MIDWESTLTD","Midwest Ltd"],["KOLTEPATIL","Kolte - Patil Developers Limited"],["BHANDARI","Bhandari Hosiery Exports Ltd"],["NIFTY200MOMENTM30","NIFTY200MOMENTM30"],
-["SMCGLOBAL","SMC Global Securities Ltd"],["UTIAMC","UTI Asset Management Company Ltd"],["KAYA","Kaya Limited"],["DIFFNKG","Diffusion Engineers Ltd"],["MSCIADD","DSP MSCI India ETF"],
-["RPOWER","Reliance Power Limited"],["GROWWN200","Groww Nifty 200 ETF"],["NIFTY50VALUE20","NIFTY50VALUE20"],["GICRE","General Insurance Corporation of India Ltd"],["SAHYADRI","Sahyadri Industries Ltd"],
-["BANKNIFTY1","BANKNIFTY1"],["NIF100IETF","ICICI Prudential Nifty 100 ETF"],["NIFTYINDTOURISM","NIFTYINDTOURISM"],["ICEMAKE","ICE Make Refrigeration Ltd"],["INDUSTOWER","Indus Towers Ltd (Bharti Infratel)"],
-["THEINVEST","The Investment Trust of India Ltd"],["GAUDIUMIVF","Gaudium IVF and Women Health Ltd"],["BSLNIFTY","Aditya Birla Sun Life Nifty 50 ETF"],["HINDUNILVR","Hindustan Unilever Limited"],["RPGLIFE","Rpg Life Sciences Limited"],
-["ICICIGI","ICICI Lombard General Insurance Company Ltd"],["JMFINANCIL","Jm Financial Limited"],["EKC","Everest Kanto Cylinder Limited"],["SILGO","Silgo Retail Ltd"],["EIHAHOTELS","Eih Associated Hotels Limited"],
-["SBIETFPB","SBI ETF PRIVATE BANK"],["NIFTYBETF","Bajaj Finserv Nifty 50 ETF"],["VAIBHAVGBL","Vaibhav Global Limited"],["STARCEMENT","Star Cement Ltd"],["DALBHARAT","Dalmia Bharat Limited"],
-["INOXINDIA","Inox India Ltd"],["PODDARMENT","Poddar Pigments Limited"],["KALYANKJIL","Kalyan Jewellers India Ltd"],["GRWRHITECH","Garware Hi Tech Films Ltd"],["CDSL","Central Depository Services Ltd"],
-["ANTHEM","Anthem Biosciences Ltd"],["ZENSARTECH","Zensar Technologies Limited"],["LOWVOL","Mirae Asset Nifty 100 Low Volatility 30 ETF"],["GMRP&UI","GMR Power & Urban Infra Ltd"],["SBINEQWETF","SBI Nifty50 Equal Weight ETF"],
-["DANGEE","Dangee Dums Ltd"],["NIFTY50EQLWGT","NIFTY50EQLWGT"],["NIFTY100LOWVOL30","NIFTY100LOWVOL30"],["AVALON","Avalon Technologies Ltd"],["DENORA","De Nora India Limited"],
-["EQUAL50ADD","DSP Nifty 50 Equal Weight ETF"],["DEEDEV","DEE Development Engineers Ltd"],["NETF","Tata Nifty ETF"],["MUTHOOTCAP","Muthoot Capital Services Limited"],["SANGHIIND","Sanghi Industries Limited"],
-["NIFTY200","NIFTY200"],["RELIGARE","Religare Enterprises Limited"],["VIKRAMSOLR","Vikram Solar Ltd"],["ESG","Mirae Asset Nifty 100 ESG Sector Leaders ETF"],["NV20IETF","ICICI Prudential NV20 ETF"],
-["PTCIL","PTC Industries Ltd"],["NIFTYTATA25CAP","NIFTYTATA25CAP"],["WENDT","Wendt (india) Limited"],["AKZOINDIA","Akzo Nobel India Limited"],["IVZINNIFTY","Invesco India Nifty ETF"],
-["ADANIGREEN","Adani Green Energy Ltd"],["JSLL","Jeena Sikho Lifecare Ltd"],["SONACOMS","Sona BLW Precision Forgings Ltd"],["ORBTEXP","Orbit Exports Limited"],["BBNPNBETF","Baroda BNP Paribas Nifty Bank ETF"],
-["RETAIL","JHS Svendgaard Retail Ventures Ltd"],["NIFTYCASE","Zerodha Nifty 50 ETF"],["NIFTY500MOMENTM50","NIFTY500MOMENTM50"],["NEULANDLAB","Neuland Laboratories Limited"],["WILLAMAGOR","Williamson Magor & Company Limited"],
-["BAIDFIN","Baid Finserv Ltd"],["NIFTY100ESG","NIFTY100ESG"],["GMDCLTD","Gujarat Mineral Development Corporation Limited"],["MBAPL","Madhya Bharat Agro Products Ltd"],["SRM","SRM Contractors Ltd"],
-["NIF100BEES","Nippon India ETF NIFTY 100"],["SBIBPB","SBI BSE PSU Bank ETF"],["AONENIFTY","AONENIFTY"],["NIFTYGROWSECT15","NIFTYGROWSECT15"],["PITTIENG","Pitti Engineering Ltd"],
-["INDOSTAR","Indostar Capital Finance Ltd"],["ARIHANTCAP","Arihant Capital Markets Ltd"],["NIFTYPSUBANK","NIFTYPSUBANK"],["FEDFINA","Fedbank Financial Services Ltd"],["DOLATALGO","Dolat Algotech Ltd"],
-["MSCIINDIA","Kotak MSCI India ETF"],["LICI","Life Insurance Corporation of India Ltd"],["MOMENTUM30","Kotak Nifty 200 Momentum 30 ETF"],["LOWVOL1","Kotak Nifty 100 Low Vol 30 ETF"],["CONSUMER","Mirae Asset Nifty India New Age Consumption ETF"],
-["POKARNA","Pokarna Limited"],["SGIL","Synergy Green Industries Ltd"],["HALDER","Halder Venture Ltd"],["HEADSUP","Heads UP Ventures Ltd"],["NIFTY200ALPHA30","NIFTY200ALPHA30"],
-["BRITANNIA","Britannia Industries Limited"],["INDHOTEL","The Indian Hotels Company Limited"],["TRITURBINE","Triveni Turbine Limited"],["PSUBNKBEES","Nippon India ETF PSU Bank Bees"],["TOP10ADD","DSP Nifty Top 10 Equal Weight ETF"],
-["BOSCHLTD","Bosch Limited"],["LLOYDSME","Lloyds Metals & Energy Ltd"],["BIRLACORPN","Birla Corporation Limited"],["SUDEEPPHRM","Sudeep Pharma Ltd"],["MONTECARLO","Monte Carlo Fashions Limited"],
-["JSWCEMENT","JSW Cement Ltd"],["ALPHAETF","Mirae Asset Nifty 200 Alpha 30 ETF"],["ZEELEARN","Zee Learn Limited"],["FINEORG","Fine Organic Industries Ltd"],["TVSSRICHAK","Tvs Srichakra Limited"],
-["LORDSCHLO","Lords Chloro Alkali Ltd"],["SBIMIDMOM","SBIMIDMOM"],["FOSECOIND","Foseco India Limited"],["PIXTRANS","Pix Transmission Ltd"],["ABGSEC","Aditya Birla Sun Life CRISIL Broad Based Gilt ETF"],
-["HDFCGROWTH","HDFC Nifty Growth Sectors 15 ETF"],["SBFC","SBFC Finance Ltd"],["MONIFTY100","Motilal Oswal Nifty 100 ETF"],["SHILCTECH","Shilchar Technologies Ltd"],["SMARTWORKS","Smartworks Coworking Spaces Ltd"],
-["SPMLINFRA","Spml Infra Limited"],["AARON","Aaron Industries Ltd"],["MOTOUR","Motilal Oswal Nifty India Tourism ETF"],["LOWVOLIETF","ICICI Prudential Nifty 100 Low Volatility 30 ETF"],["UNOMINDA","Uno Minda Ltd"],
-["DPABHUSHAN","D.P. Abhushan Ltd"],["VGUARD","V-guard Industries Limited"],["NIITMTS","NIIT Learning Systems Ltd"],["KAPSTON","Kapston Services Ltd"],["HEG","Heg Limited"],
-["PSUBNKIETF","ICICI Prudential Nifty PSU Bank ETF"],["NIFTY500","NIFTY500"],["TECHM","Tech Mahindra Limited"],["BBTCL","B&B Triplewall Containers Ltd"],["HDFCPSUBK","HDFC Nifty PSU Bank ETF"],
-["ZFCVINDIA","ZF Commercial Vehicle Control System India Ltd"],["ASTRAL","Astral Ltd"],["SFL","Sheela Foam Limited"],["JGCHEM","J.G.Chemicals Ltd"],["ARIES","Aries Agro Limited"],
-["ANGELONE","Angel One Ltd"],["FOCUS","Focus Lighting & Fixtures Ltd"],["DBSTOCKBRO","Db (international) Stock Brokers Limited"],["PRAENG","Prajay Engineers Syndicate Limited"],["MOMOMENTUM","Motilal Oswal Nifty 200 Momentum 30 ETF"],
-["AARTECH","Aartech Solonics Ltd"],["NIFTYTOTALMKT","Nifty Total Market"],["PATANJALI","Patanjali Foods Ltd"],["HSCL","Himadri Speciality Chemical Limited"],["EQUAL50","Mirae Asset Nifty50 Equal Weight ETF"],
-["PPAP","Ppap Automotive Limited"],["DCMNVL","DCM Nouvelle Ltd"],["JAIBALAJI","Jai Balaji Industries Limited"],["HDFCLOWVOL","HDFC Nifty 100 Low Volatility 30 ETF"],["SYRMA","Syrma SGS Technology Ltd"],
-["NARMADA","Narmada Agrobase Ltd"],["BANARISUG","Bannari Amman Sugars Limited"],["BBETF0432","Bharat Bond ETF - April 2032"],["GARFIBRES","Garware Technical Fibres Ltd"],["RBLBANK","Rbl Bank Limited"],
-["HDFCBSE500","HDFC S & P BSE 500 ETF"],["TITAN","Titan Company Limited"],["NAHARPOLY","Nahar Poly Films Limited"],["KHANDSE","Khandwala Securities Limited"],["CAPTRUST","Capital Trust Ltd."],
-["ADANIENSOL","Adani Energy Solutions Ltd"],["LUXIND","Lux Industries Limited"],["MOQUALITY","Motilal Oswal S&P BSE Quality ETF Fund"],["JAGSNPHARM","Jagsonpal Pharmaceuticals Limited"],["VIDYAWIRES","Vidya Wires Ltd"],
-["RAMCOCEM","The Ramco Cements Limited"],["HATSUN","Hatsun Agro Product Limited"],["BODALCHEM","Bodal Chemicals Limited"],["GLOBE","Globe Textiles (India) Ltd"],["TMB","Tamilnad Mercantile Bank Ltd"],
-["INDIAGLYCO","India Glycols Limited"],["CARBORUNIV","Carborundum Universal Limited"],["TI","Tilaknagar Industries Limited"],["AWFIS","AWFIS Space Solutions Ltd"],["NHPC","Nhpc Limited"],
-["BLUSPRING","Bluspring Enterprises Ltd"],["3IINFOLTD","3i Infotech Ltd"],["NIFTYINDDIGITAL","NIFTYINDDIGITAL"],["KEI","Kei Industries Limited"],["SEDEMAC","Sedemac Mechatronics Ltd"],
-["IDFCFIRSTB","IDFC First Bank Ltd"],["MOMENTUM","Aditya Birla Sun Life Nifty 200 Momentum 30 ETF"],["HDFCPVTBAN","HDFC Nifty Private Bank ETF"],["PNBHOUSING","Pnb Housing Finance Limited"],["SUBROS","Subros Limited"],
-["AEGISLOG","Aegis Logistics Ltd"],["CROMPTON","Crompton Greaves Consumer Electricals Limited"],["VSSL","Vardhman Special Steels Limited"],["SATIN","Satin Creditcare Network Limited"],["ARTNIRMAN","Art Nirman Ltd"],
-["YUKEN","Yuken India Ltd"],["NTPCGREEN","NTPC Green Energy Ltd"],["JSL","Jindal Stainless Limited"],["KILITCH","Kilitch Drugs (india) Limited"],["PVRINOX","PVR Inox Ltd"],
-["GMBREW","Gm Breweries Limited"],["RAMKY","Ramky Infrastructure Limited"],["SANGAMIND","Sangam (india) Limited"],["MARATHON","Marathon Nextgen Realty Limited"],["SAPPHIRE","Sapphire Foods India Ltd"],
-["GSEC10ABSL","Aditya Birla Sun Life Crisil 10 Year Gilt ETF"],["HPAL","HP Adhesives Ltd"],["NIFTYCOMMODITIES","NIFTYCOMMODITIES"],["PSUBANK","Kotak Nifty PSU Bank ETF"],["BANKINDIA","Bank Of India Ltd"],
-["NEXT30ADD","DSP BSE SENSEX Next 30 ETF"],["NIFTYMIDLIQ15","NIFTYMIDLIQ15"],["SHARIABEES","Nippon India ETF Shariah BeES"],["IREDA","Indian Renewable Energy Development Agency Ltd"],["ORICONENT","Oricon Enterprises Limited"],
-["MOIPO","Motilal Oswal BSE Select IPO ETF"],["INDIAMART","Indiamart Intermesh Ltd"],["RECLTD","REC Ltd"],["NPBET","Tata Nifty Private Bank ETF"],["GROWWEV","Groww Nifty EV & New Age Automotive ETF"],
-["DIGISPICE","DigiSpice Technologies Ltd"],["EBBETF0433","Bharat Bond ETF - April 2033"],["GVPIL","GE Power India Ltd"],["AONETOTAL","Angel One Nifty Total Market ETF"],["MOLDTKPAC","Mold-tek Packaging Limited"],
-["JKIL","J.kumar Infraprojects Limited"],["RAIN","Rain Industries Limited"],["DCW","Dcw Limited"],["MONIFTY500","Motilal Oswal Nifty 500 ETF"],["STLNETWORK","STL Networks Ltd"],
-["FLUOROCHEM","Gujarat Fluorochemicals Ltd"],["TARMAT","Tarmat Limited"],["EVINDIA","Mirae Asset Nifty EV and New Age Automotive ETF"],["ELM250","Edelweiss Nifty LargeMidcap 250 ETF"],["METAL","Mirae Asset Nifty Metal ETF"],
-["NIFTYALPHA50","NIFTYALPHA50"],["NIFTY500MULTICAP","NIFTY500MULTICAP"],["SBILIFE","SBI Life Insurance Company Ltd"],["IKS","Inventurus Knowledge Solutions Ltd"],["PROTEAN","Protean eGov Technologies Ltd"],
-["INDIACEM","The India Cements Limited"],["KHAITANLTD","Khaitan (india) Limited"],["TNIDETF","Tata Nifty India Digital ETF"],["NIFTYLARGEMID250","NIFTYLARGEMID250"],["BAYERCROP","Bayer Cropscience Limited"],
-["SWARAJENG","Swaraj Engines Limited"],["HCLTECH","Hcl Technologies Limited"],["HGINFRA","H.G. Infra Engineering Ltd"],["THOMASCOTT","Thomas Scott (india) Limited"],["NIFTYMETAL","NIFTYMETAL"],
-["UNITDSPR","United Spirits Ltd"],["GOODLUCK","Goodluck India Limited"],["LEMERITE","Le Merite Exports Ltd"],["GLENMARK","Glenmark Pharmaceuticals Limited"],["VISHNU","Vishnu Chemicals Limited"],
-["VHLTD","Viceroy Hotels Ltd"],["BANKPSU","Mirae Asset Nifty PSU Bank ETF"],["BSE500IETF","ICICI Prudential S&P BSE 500 ETF"],["MOLOWVOL","Motilal Oswal S&P BSE Low Volatility ETF"],["AONETMMQ50","Angel One Nifty Total Market Momentum Qual. 50 ETF"],
-["ETHOSLTD","Ethos Ltd"],["DHANUKA","Dhanuka Agritech Limited"],["KSB","KSB Ltd"],["SETFNIFBK","SBI ETF Nifty Bank"],["LATENTVIEW","Latent View Analytics Ltd"],
-["YATRA","Yatra Online Ltd"],["MOMENTUM50","Motilal Oswal Nifty 500 Momentum 50 ETF"],["AXISCADES","AXISCADES Technologies Ltd"],["CONCOR","Container Corporation Of India Limited"],["BORORENEW","Borosil Renewables Ltd"],
-["MEDICAMEQ","Medicamen Biotech Ltd"],["MENONBE","Menon Bearings Limited"],["MANINDS","Man Industries (india) Limited"],["ASIANENE","Asian Energy Services Ltd"],["AXISHCETF","Axis Healthcare ETF"],
-["SURANASOL","Surana Solar Limited"],["ABDL","Allied Blenders & Distillers Ltd"],["LIKHITHA","Likhitha Infrastructure Ltd"],["GICL","Globe International Carriers Ltd"],["MSUMI","Motherson Sumi Wiring India Ltd"],
-["POWERINDIA","Hitachi Energy India Ltd"],["HDFCMOMENT","HDFC Nifty 200 Momentum 30 ETF"],["MAZDOCK","Mazagon Dock Shipbuilders Ltd"],["STYLAMIND","Stylam Industries Ltd"],["PASHUPATI","Pashupati Cotspin Ltd"],
-["PFC","Power Finance Corporation Limited"],["GREENPLY","Greenply Industries Limited"],["ICICIAMC","ICICI Prudential Asset Management Co Ltd"],["GODFRYPHLP","Godfrey Phillips India Limited"],["HOMEFIRST","Home First Finance Company India Ltd"],
-["MWL","Mangalam Worldwide Ltd"],["MOMGF","MOMGF"],["SELECTIPO","Mirae Asset BSE Select IPO ETF"],["SBGLP","Suratwwala Business Group Ltd"],["AZAD","Azad Engineering Ltd"],
-["DBREALTY","Valor Estate Ltd"],["LOVABLE","Lovable Lingerie Limited"],["OBCL","Orissa Bengal Carrier Ltd"],["ONESOURCE","OneSource Specialty Pharma Ltd"],["ANURAS","Anupam Rasayan India Ltd"],
-["ORIENTCEM","Orient Cement Limited"],["INFY","Infosys Limited"],["ACEINTEG","Ace Integrated Solutions Ltd"],["AUBANK","AU Small Finance Bank Ltd"],["CLEAN","Clean Science & Technology Ltd"],
-["GSEC10IETF","ICICI Prudential Nifty 10 yr Benchmark G-Sec ETF"],["INFRAIETF","ICICI Prudential Nifty Infrastructure ETF"],["JAYSREETEA","Jayshree Tea & Industries Limited"],["RVHL","Ravinder Heights Ltd"],["TMPV","Tata Motors Passenger Vehicles Ltd"],
-["SENCO","Senco Gold Ltd"],["NIFTY100EQLWGT","NIFTY100EQLWGT"],["STUDDS","Studds Accessories Ltd"],["APTUS","Aptus Value Housing Finance India Ltd"],["MODIRUBBER","Modi Rubber Ltd"],
-["INFRA","Mirae Asset Nifty India Infrastr. & Logistics ETF"],["CNXINFRA","CNXINFRA"],["TCI","Transport Corporation Of India Limited"],["SOMANYCERA","Somany Ceramics Limited"],["RICOAUTO","Rico Auto Industries Limited"],
-["EXICOM","Exicom Tele-Systems Ltd"],["RBA","Restaurant Brands Asia Ltd"],["RAJTV","Raj Television Network Limited"],["NIFTYMULTIMFG","NIFTYMULTIMFG"],["BASF","Basf India Limited"],
-["TIMKEN","Timken India Limited"],["BBOX","Black Box Ltd"],["LXCHEM","Laxmi Organic Industries Ltd"],["KANORICHEM","Kanoria Chemicals & Industries Limited"],["EVIETF","ICICI Prudential Nifty EV & New Age Automotive ETF"],
-["MULTICAP","Mirae Asset Nifty500 Multicap 50:25:25 ETF"],["NV20","Nifty50 Value 20"],["VMART","V-mart Retail Limited"],["JWL","Jupiter Wagons Ltd"],["OMNI","OMNI"],
-["CASTROLIND","Castrol India Limited"],["ONMOBILE","Onmobile Global Limited"],["BLBLIMITED","Blb Limited"],["RPPL","Rajshree Polypack Ltd"],["MINDACORP","Minda Corporation Limited"],
-["NDLVENTURE","NDL Ventures Ltd"],["EBBETF0431","Bharat Bond ETF - April 2031"],["TATVA","Tatva Chintan Pharma Chem Ltd"],["HDFCLIFE","HDFC Life Insurance Company Ltd"],["SANDHAR","Sandhar Technologies Limited"],
-["SOFTTECH","Softtech Engineers Ltd"],["KABRAEXTRU","Kabra Extrusion Technik Limited"],["IXIGO","Le Travenues Technology Ltd"],["PRSMJOHNSN","Prism Johnson Ltd"],["MITCON","Mitcon Consultancy & Engineering Services Ltd"],
-["ICICIPRULI","Icici Prudential Life Insurance Company Limited"],["KROSS","Kross Ltd"],["PACEDIGITK","Pace Digitek Ltd"],["NIFTY50VALUE30","NIFTY50VALUE30"],["BHARATBOND-APR33","BHARATBOND-APR33"],
-["NUVAMA","Nuvama Wealth Management Ltd"],["HDFCLIQUID","HDFC Nifty 1D Rate Liquid ETF"],["JINDRILL","Jindal Drilling And Industries Limited"],["LTM","LTIMindtree Ltd"],["AIAENG","Aia Engineering Limited"],
-["BHARATBOND-APR31","BHARATBOND-APR31"],["LIQUIDADD","DSP S&P BSE Liquid Rate ETF"],["LIQUIDSHRI","Shriram Nifty 1D Rate Liquid ETF"],["LIQUID1","Kotak Nifty 1D Rate Liquid ETF"],["LIQUIDPLUS","Mirae Asset Nifty 1D Rate Liquid ETF-Growth"],
-["LIQUIDBETF","Bajaj Finserv Nifty 1D Rate Liquid ETF"],["CASHIETF","ICICI Prudential BSE Liquid Rate ETF - Growth"],["AONELIQUID","Angel One Nifty 1D Rate Liquid ETF - Growth"],["LIQGRWBEES","Nippon India Nifty 1D Rate Liquid ETF - Growth"],["SBILIQETF","SBI Nifty 1D Rate Liquid ETF"],
-["ELIQUID","Edelweiss Nifty 1D Rate Liquid ETF"],["NESCO","Nesco Limited"],["HNDFDS","Hindustan Foods Ltd"],["CONSOFINVT","Consolidated Finvest & Holdings Limited"],["AFSL","Abans Financial Services Ltd"],
-["AURUM","Aurum Proptech Ltd"],["SDL26BEES","Nippon India ETF Nifty SDL-2026 Maturity"],["AARVI","Aarvi Encon Ltd"],["LIQUIDCASE","Zerodha Nifty 1D Rate Liquid ETF"],["GROWWLIQID","Groww Nifty 1D Rate Liquid ETF"],
-["SUPREMEINF","Supreme Infrastructure India Limited"],["DIVISLAB","Divi's Laboratories Limited"],["PERSISTENT","Persistent Systems Limited"],["BHARATBOND-APR30","BHARATBOND-APR30"],["ABSLLIQUID","Aditya Birla SL Crisil Overnight Fund AI Index ETF"],
-["LIQUID","Mirae Asset Nifty 1D Rate Liquid ETF"],["LIQUIDSBI","SBI Nifty 1D Rate ETF"],["LIQUIDBEES","Nippon India ETF Liquid BeES"],["LIQUIDETF","DSP BlackRock Liquid ETF"],["BFINVEST","Bf Investment Limited"],
-["PANACHE","Panache Digilife Ltd"],["NIFTY50DIVPOINT","NIFTY50DIVPOINT"],["SHIVAUM","Shiv Aum Steels Ltd"],["ENIL","Entertainment Network (india) Limited"],["MOGSEC","Motilal Oswal 5 Year G-Sec ETF"],
-["BCLIND","BCL Industries Ltd"],["GILT10BETA","UTI Nifty 10 yr Benchmark G-Sec ETF"],["TCIFINANCE","Tci Finance Limited"],["METALIETF","ICICI Prudential Nifty Metal ETF"],["NECLIFE","Nectar Lifesciences Limited"],
-["LAKPRE","Lakshmi Precision Screws Limited"],["EXCEL","Excel Realty N Infra Limited"],["GATECH","GACM Technologies Ltd"],["BHANDA-RE2","BHANDA-RE2"],["NAVINFLUOR","Navin Fluorine International Limited"],
-["BHARATBOND-APR32","BHARATBOND-APR32"],["WABAG","Va Tech Wabag Limited"],["LIQUIDIETF","ICICI Prudential S&P BSE Liquid Rate ETF"],["ENGINERSIN","Engineers India Limited"],["TATAINVEST","Tata Investment Corporation Limited"],
-["RAJOOENG","Rajoo Engineers Ltd"],["NIFTYMIDSELECT","NIFTYMIDSELECT"],["HAL","Hindustan Aeronautics Ltd"],["NAHARSPING","Nahar Spinning Mills Limited"],["COMSYN","Commercial Syn Bags Ltd"],
-["ORIENTLTD","Orient Press Limited"],["KARMAENG","Karma Energy Limited"],["SHARDACROP","Sharda Cropchem Limited"],["GOPAL","Gopal Snacks Ltd"],["MHRIL","Mahindra Holidays & Resorts India Limited"],
-["STYL","Seshaasai Technologies Ltd"],["NAHARCAP","Nahar Capital And Financial Services Limited"],["JTLIND","JTL Industries Ltd"],["NIFTYM150MOMNTM50","NIFTYM150MOMNTM50"],["3MINDIA","3m India Limited"],
-["TCS","Tata Consultancy Services Limited"],["AXISTECETF","Axis Technology ETF Regular Growth"],["HDBFS","HDB Financial Services Ltd"],["INCREDIBLE","Incredible Industries Ltd"],["MON50EQUAL","Motilal Oswal Nifty 50 Equal Weight ETF"],
-["NIFTYGS48YR","NIFTYGS48YR"],["VIPIND","Vip Industries Limited"],["SKMEGGPROD","Skm Egg Products Export (india) Limited"],["HDFCQUAL","HDFC Nifty 100 Quality 30 ETF"],["LICNETFGSC","LIC Nomura MF G-Sec Long Term ETF"],
-["NIFTYDIVOPPS50","NIFTYDIVOPPS50"],["NIFTYGS10YR","NIFTYGS10YR"],["CAPILLARY","Capillary Technologies India Ltd"],["MONEXT50","Motilal Oswal Nifty Next 50 ETF"],["DGCONTENT","Digicontent Ltd"],
-["AXISBPSETF","Axis AAA Bond Plus SDL ETF-2026 Matur. Reg. Growth"],["NIFTYGS1115YR","NIFTYGS1115YR"],["NIFTYGS813YR","NIFTYGS813YR"],["KSCL","Kaveri Seed Company Limited"],["SRHHYPOLTD","Sree Rayalaseema Hi-strength Hypo Limited"],
-["CNXIT","Nifty IT"],["UPL","Upl Limited"],["NIFTYGSCOMPSITE","NIFTYGSCOMPSITE"],["LICNETFSEN","LIC Nomura MF ETF - SENSEX"],["SGFIN","SG Finserve Ltd"],
-["SCPL","Sheetal Cool Products Ltd"],["JTEKTINDIA","JTEKT India Ltd"],["KIRLOSBROS","Kirloskar Brothers Limited"],["ADVAIT","Advait Energy Transitions Limited"],["ATAM","Atam Valves Ltd"],
-["BALAJEE","Shree Tirupati Balajee Agro Trading Co. Ltd"],["GROWWSC250","Groww Nifty Smallcap 250 ETF"],["CNXMNC","CNXMNC"],["EBBETF0430","Bharat Bond ETF - April 2030"],["JPOLYINVST","Jindal Poly Investment And Finance Company Limited"],
-["GOKEX","Gokaldas Exports Limited"],["AFCONS","Afcons Infrastructure Ltd"],["CANBK","Canara Bank Ltd"],["JAGRAN","Jagran Prakashan Limited"],["VENKEYS","Venky's (india) Limited"],
-["NIFTYGS10YRCLN","NIFTYGS10YRCLN"],["ORKLAINDIA","Orkla India Ltd"],["RAJRATAN","Rajratan Global Wire Ltd"],["COMMOIETF","ICICI Prudential Nifty Commodities ETF"],["GILT5BETA","UTI Nifty 5 yr Benchmark G-Sec ETF"],
-["LTGILTBEES","Nippon India ETF Nifty 8-13 yr G-Sec LongTerm Gilt"],["MANGLMCEM","Mangalam Cement Limited"],["NATCAPSUQ","Natural Capsules Ltd"],["INDSWFTLAB","Ind-swift Laboratories Limited"],["VIKRAN","Vikran Engineering Ltd"],
-["SIL","Standard Industries Limited"],["NIFTY200QUALITY30","NIFTY200QUALITY30"],["NIFTYINDIAMFG","NIFTYINDIAMFG"],["BHARATRAS","Bharat Rasayan Limited"],["BHAGYANGR","Bhagyanagar India"],
-["NIFTYMIDCAP50","NIFTYMIDCAP50"],["NIFTYMULTIINFRA","NIFTYMULTIINFRA"],["MOBIKWIK","One Mobikwik Systems Ltd"],["GULPOLY","Gulshan Polyols Limited"],["LTGILTCASE","Zerodha Nifty 8-13 Yr G-Sec ETF"],
-["AEPL","Artemis Electricals & Projects Ltd"],["ELGIEQUIP","Elgi Equipments Limited"],["SKYGOLD","Sky Gold Ltd"],["ITBETA","UTI Nifty IT ETF"],["DJML","DJ Mediaprint & Logistics Ltd"],
-["SNXT30BEES","Nippon India BSE Sensex Next 30 ETF"],["KAMDHENU","Kamdhenu Limited"],["TVVISION","Tv Vision Limited"],["ITIETF","ICICI Prudential IT ETF"],["NIFTYMS400MQ100","NIFTYMS400MQ100"],
-["GRSE","Garden Reach Shipbuilders & Engineers Ltd"],["WORTHPERI","Worth Peripherals Ltd"],["GILT5YBEES","Nippon India ETF 5 Year Gilt"],["MURUDCERA","Murudeshwar Ceramics Limited"],["MOTOGENFIN","The Motor & General Finance Limited"],
-["NIFTYCONSURDURBL","NIFTYCONSURDURBL"],["PIIND","Pi Industries Limited"],["ZAGGLE","Zaggle Prepaid Ocean Services Ltd"],["MOMIDMTM","Motilal Oswal Nifty Midcap150 Momentum 50 ETF"],["SHAH","Shah Metacorp Ltd"],
-["NBIFIN","N. B. I. Industrial Finance Company Limited"],["GKWLIMITED","Gkw Limited"],["IRCTC","Indian Railway Catering & Tourism Corporation Ltd"],["LENSKART","Lenskart Solutions Ltd"],["UNIPARTS","Uniparts India Ltd"],
-["MOM100","Motilal Oswal Midcap 100 ETF"],["NIFTY100EW","Kotak Nifty 100 Equal Weight ETF"],["ECAPINSURE","Edelweiss BSE Capital Markets & Insurance ETF"],["ACC","Acc Limited"],["SETF10GILT","SBI-ETF 10 Year GILT"],
-["WALCHANNAG","Walchandnagar Industries Limited"],["IITL","Industrial Investment Trust Limited"],["AGRITECH","Agri-tech (india) Limited"],["IOLCP","Iol Chemicals And Pharmaceuticals Limited"],["TTL","T T Limited"],
-["SBIETFIT","SBI ETF IT"],["GREAVESCOT","Greaves Cotton Limited"],["RELCHEMQ","Reliance Chemotex Industries Ltd"],["COFFEEDAY","Coffee Day Enterprises Limited"],["DYNPRO","Dynemic Products Ltd"],
-["HECPROJECT","HEC Infra Projects Ltd"],["MOINFRA","Motilal Oswal BSE India Infrastructure ETF"],["IT","Kotak IT ETF"],["DTIL","Dhunseri Tea & Industries Limited"],["CNXMIDCAP","CNXMIDCAP"],
-["DCBBANK","Dcb Bank Limited"],["MOSMALL250","Motilal Oswal Nifty Smallcap 250 ETF"],["PAGEIND","Page Industries Limited"],["KICL","Kalyani Investment Company Limited"],["NIFTYGS15YRPLUS","NIFTYGS15YRPLUS"],
-["IPCALAB","Ipca Laboratories Limited"],["UFLEX","Uflex Limited"],["BCONCEPTS","Brand Concepts Ltd"],["VSTIND","Vst Industries Limited"],["MASPTOP50","Mirae Asset S&P 500 Top 50 ETF"],
-["GROWWMETAL","Groww Nifty Metal ETF"],["NIFTYSML250MQ100","NIFTYSML250MQ100"],["NAUKRI","Info Edge (india) Limited"],["CEWATER","Concord Enviro Systems Ltd"],["GROWWMC150","Groww Nifty Midcap 150 ETF"],
-["NEXT50ADD","DSP Nifty Next 50 ETF"],["MIDSMALL","Mirae AN Midsmallcap400 Momentum Quality 100 ETF"],["HDFCNIFIT","HDFC Nifty IT ETF"],["MFML","Mahalaxmi Fabric Mills Ltd"],["ASTRAZEN","Astrazeneca Pharma India Limited"],
-["SUMMITSEC","Summit Securities Limited"],["FLAIR","Flair Writing Industries Ltd"],["INDOBORAX","Indo Borax & Chemicals Ltd"],["MAKEINDIA","Mirae Asset Nifty India Manufacturing ETF"],["APCL","Anjani Portland Cement Ltd.-$"],
-["MNC","Kotak Nifty MNC ETF"],["SWANDEF","Swan Defence and Heavy Industries Ltd"],["MARICO","Marico Limited"],["TTML","Tata Teleservices (maharashtra) Limited"],["QUALITY30","Kotak Nifty200 Quality 30 ETF"],
-["LAOPALA","La Opala Rg Limited"],["GKENERGY","GK Energy Ltd"],["ADROITINFO","Adroit Infotech Ltd"],["ENRIN","Siemens Energy India Ltd"],["NEXT50","Mirae Asset Nifty Next 50 ETF"],
-["LIBERTSHOE","Liberty Shoes Limited"],["HBLENGINE","HBL Engineering Ltd"],["OSWALPUMPS","Oswal Pumps Ltd"],["AWL","AWL Agri Business Ltd"],["HUDCO","Housing and Urban Development Corporation Ltd"],
-["GOKULAGRO","Gokul Agro Resources Limited"],["MUTHOOTMF","Muthoot Microfin Ltd"],["DEN","Den Networks Limited"],["CNXNIFTYJUNIOR","CNXNIFTYJUNIOR"],["EIMCOELECO","Eimco Elecon (india) Limited"],
-["ALBERTDAVD","Albert David Limited"],["HUHTAMAKI","Huhtamaki India Ltd"],["ALGOQUANT","Algoquant Fintech Ltd"],["NIFTYQLITY","Aditya Birla Sun Life Nifty 200 Quality 30 ETF"],["BGLOBAL","Bharatiya Global Infomedia Limited"],
-["NIFTYMIDSMALLCAP400","NIFTYMIDSMALLCAP400"],["NIFTYSMALLCAP250","NIFTYSMALLCAP250"],["INFRABEES","Nippon India ETF Infra BeES"],["SUVEN","Suven Life Sciences Limited"],["GSEC5IETF","ICICI Prudential Nifty 5 Yr Benchmark G-Sec ETF"],
-["ITETF","Mirae Asset Nifty IT ETF"],["QUAL30IETF","ICICI Prudential Nifty 200 Quality 30 ETF"],["NIFTYMIDCAP150","Nifty midcap 150"],["POLYMED","Poly Medicure Limited"],["ATULAUTO","Atul Auto Limited"],
-["SHANKARA","Shankara Building Products"],["ATLANTAELE","Atlanta Electricals Ltd"],["JIOFIN","Jio Financial Services Ltd"],["NBCC","Nbcc (india) Limited"],["TNPETRO","Tamilnadu Petroproducts Limited"],
-["NIFTYSMALLCAP50","NIFTYSMALLCAP50"],["APLLTD","Alembic Pharmaceuticals Limited"],["VENTIVE","Ventive Hospitality Ltd"],["MAYURUNIQ","Mayur Uniquoters Ltd"],["BANKBARODA","Bank Of Baroda Ltd"],
-["HARDWYN","Hardwyn India Ltd"],["MID150CASE","Zerodha Nifty Midcap 150 ETF"],["VARROC","Varroc Engineering Ltd"],["MODINATUR","Modi Naturals Ltd"],["KAKATCEM","Kakatiya Cement Sugar & Industries Limited"],
-["SAGILITY","Sagility India Ltd"],["EQUAL200","Mirae Asset BSE 200 Equal Weight ETF"],["SASKEN","Sasken Communication Technologies Limited"],["IIFL","IIFL Finance Ltd"],["MID150BEES","Nippon India ETF Nifty Midcap 150"],
-["HDFCSML250","HDFC Nifty Small Cap 250 ETF"],["WEL","Wonder Electricals Ltd"],["DMART","Avenue Supermarts Ltd"],["INTERARCH","Interarch Building Products Ltd"],["EIDPARRY","Eid Parry India Limited"],
-["LTFOODS","L T Foods Ltd"],["VINCOFE","Vintage Coffee & Beverages Ltd"],["PWL","Physicswallah Ltd"],["NKIND","Nk Industries Limited"],["ADVANIHOTR","Advani Hotels & Resorts (india) Limited"],
-["SMALLCAP","Mirae Asset Nifty Smallcap 250 Momen.Quali. 100ETF"],["PTL","Ptl Enterprises Limited"],["FLEXITUFF","Flexituff International Limited"],["360ONE","360 ONE WAM Ltd"],["SIRCA","Sirca Paints India Ltd"],
-["MOTHERSON","Samvardhana Motherson International Ltd"],["DIVOPPBEES","Nippon India ETF  Nifty Dividend Opportunities 50"],["BMWVENTLTD","BMW Ventures Ltd"],["ALPHA","Kotak Nifty Alpha 50 ETF"],["ITBEES","Nippon India ETF Nifty IT"],
-["BRIGADE","Brigade Enterprises Limited"],["GANESHHOU","Ganesh Housing Ltd"],["MIDCAPBETA","UTI Nifty Midcap 150 ETF"],["DCM","Dcm  Limited"],["BORANA","Borana Weaves Ltd"],
-["BECTORFOOD","Mrs Bectors Food Specialities Ltd"],["ADVENTHTL","Advent Hotels International Ltd"],["AHCL","Anlon Healthcare Ltd"],["UJJIVANSFB","Ujjivan Small Finance Bank Ltd"],["SGL","Stl Global Limited"],
-["NYKAA","FSN E-Commerce Ventures Ltd"],["IRB","Irb Infrastructure Developers Limited"],["TECH","Aditya Birla Sun Life Nifty IT ETF"],["GROWWPOWER","Groww BSE Power ETF"],["TRANSRAILL","Transrail Lighting Ltd"],
-["SBCL","Shivalik Bimetal Controls Ltd"],["EXIDEIND","Exide Industries Limited"],["DOLLAR","Dollar Industries Ltd"],["MARINE","Marine Electricals (India) Ltd"],["MIDSELIETF","ICICI Prudential S&P BSE Midcap Select ETF"],
-["PARASPETRO","Paras Petrofils Limited"],["ENDURANCE","Endurance Technologies Limited"],["JUBLPHARMA","Jubilant Pharmova Ltd"],["ASAL","Automotive Stampings And Assemblies Limited"],["PAUSHAKLTD","Paushak Ltd"],
-["DELHIVERY","Delhivery Ltd"],["GSPL","Gujarat State Petronet Limited"],["NEXT50IETF","ICICI Prudential Nifty Next 50 ETF"],["UFO","Ufo Moviez India Limited"],["ATLANTAA","Atlantaa Ltd"],
-["IMPAL","India Motor Parts And Accessories Limited"],["SBIETFQLTY","SBI - ETF Quality"],["GILLETTE","Gillette India Limited"],["TIMETECHNO","Time Technoplast Limited"],["DEFENCE","DEFENCE"],
-["UYFINCORP","U. Y. Fincorp Ltd"],["CNXSMALLCAP","CNXSMALLCAP"],["PRESTIGE","Prestige Estates Projects Limited"],["NTPC","Ntpc Limited"],["PDMJEPAPER","Pudumjee Paper Products Limited"],
-["EQUITASBNK","Equitas Small Finance Bank Ltd"],["SPAL","S. P. Apparels Limited"],["SUPRIYA","Supriya Lifescience Ltd"],["DHRUV","Dhruv Consultancy Services Ltd"],["ATALREAL","Atal Realtech Ltd"],
-["VOLTAS","Voltas Limited"],["JINDALPOLY","Jindal Poly Films Limited"],["WELCORP","Welspun Corp Limited"],["EUREKAFORB","Eureka Forbes Ltd"],["MMFL","Mm Forgings Limited"],
-["ICIL","Indo Count Industries Limited"],["BSHSL","Bombay Super Hybrid Seeds Ltd"],["WEIZMANIND","Weizmann Limited"],["SINDHUTRAD","Sindhu Trade Links Ltd"],["SML100CASE","Zerodha Nifty Smallcap 100 ETF"],
-["NIFTYCHEMICALS","NIFTYCHEMICALS"],["VEEDOL","Veedol Corporation Ltd"],["SANDESH","The Sandesh Limited"],["DECCANCE","Deccan Cements Limited"],["BLACKBUCK","BlackBuck Ltd"],
-["BLUEJET","Blue Jet Healthcare Ltd"],["VISASTEEL","Visa Steel Limited"],["VEDL","Vedanta Limited"],["OPTIEMUS","Optiemus Infracom Ltd"],["ICRA","Icra Limited"],
-["HDFCAMC","HDFC Asset Management Company Ltd"],["NIFTYMEDIA","NIFTYMEDIA"],["BALRAMCHIN","Balrampur Chini Mills Limited"],["PONNIERODE","Ponni Sugars (erode) Limited"],["KCP","Kcp Limited"],
-["VALIANTLAB","Valiant Laboratories Ltd"],["FIBERWEB","Fiberweb (India) Ltd"],["MIDCAPETF","Mirae Asset Nifty Midcap 150 ETF"],["ARVINDFASN","Arvind Fashions Ltd"],["RITCO","Ritco Logistics Ltd"],
-["BLISSGVS","Bliss Gvs Pharma Limited"],["IPL","India Pesticides Ltd"],["EDELWEISS","Edelweiss Financial Services Limited"],["LINC","Linc Ltd"],["HDFCNEXT50","HDFC Nifty Next 50 ETF"],
-["PALREDTEC","Palred Technologies Limited"],["ARE&M","Amara Raja Energy & Mobility Ltd"],["CHAMBLFERT","Chambal Fertilizers & Chemicals Limited"],["RGL","Renaissance Global Ltd"],["SPIC","Southern Petrochemicals Industries Corporation  Limited"],
-["SMALL250","SMALL250"],["NIFTYMICROCAP250","NIFTYMICROCAP250"],["ALKEM","Alkem Laboratories Limited"],["WAAREERTL","Waaree Renewables Technologies Ltd"],["ADFFOODS","Adf Foods Limited"],
-["SOLARWORLD","Solarworld Energy Solutions Ltd"],["TNPL","Tamil Nadu Newsprint & Papers Limited"],["LFIC","Lakshmi Finance & Industrial Corporation Limited"],["ICICIB22","Bharat 22 ETF"],["CUBEXTUB","Cubex Tubings Limited"],
-["SHREERAMA","Shree Rama Multi-tech Limited"],["VSTTILLERS","V.s.t Tillers Tractors Limited"],["GMMPFAUDLR","GMM Pfaudler Ltd"],["PYRAMID","Pyramid Technoplast Ltd"],["GLOBAL","Global Education Ltd"],
-["PASUPTAC","Pasupati Acrylon Ltd"],["MIDCAPIETF","ICICI Prudential Nifty Midcap 150 ETF"],["SALONA","Salona Cotspin Limited"],["UTTAMSUGAR","Uttam Sugar Mills Limited"],["AXISVALUE","Axis Nifty500 Value 50 ETF"],
-["UCOBANK","Uco Bank Ltd"],["PGIL","Pearl Global Industries Limited"],["GALAPREC","Gala Precision Engineering Ltd"],["SAKAR","Sakar Healthcare Ltd"],["IGL","Indraprastha Gas Limited"],
-["PNB","Punjab National Bank Ltd"],["KRSNAA","Krsnaa Diagnostics Ltd"],["HNGSNGBEES","Nippon India ETF Hang Seng Bees"],["REDINGTON","Redington (india) Limited"],["STCINDIA","The State Trading Corporation Of India Limited"],
-["GSEC10YEAR","Mirae Asset Nifty 8-13 Yr G-Sec ETF"],["KRN","KRN Heat Exchanger and Refrigeration Ltd"],["GALLANTT","Gallant Ispat Ltd"],["ADVENZYMES","Advanced Enzyme Technologies Limited"],["HMVL","Hindustan Media Ventures Limited"],
-["JINDALPHOT","Jindal Photo Limited"],["SPLPETRO","Supreme Petrochem Ltd"],["SIGMAADV","Sigma Advanced System Ltd"],["THOMASCOOK","Thomas Cook  (india)  Limited"],["UGARSUGAR","The Ugar Sugar Works Limited"],
-["LPDC","Landmark Property Development Company Limited"],["TTKHLTCARE","Ttk Healthcare Limited"],["APCOTEXIND","Apcotex Industries Limited"],["SIGNPOST","Signpost India Ltd"],["GEMAROMA","Gem Aromatics Ltd"],
-["PARAS","Paras Defence and Space Technologies Ltd"],["AGIIL","AGI Infra Ltd"],["GLOTTIS","Glottis Ltd"],["FELDVR","Future Enterprises DVR"],["SMSPHARMA","Sms Pharmaceuticals Limited"],
-["RELTD","Ravindra Energy Ltd"],["SATIA","Satia Industries Ltd"],["DIXON","Dixon Technologies Ltd"],["LANDMARK","Landmark Cars Ltd"],["PTC","Ptc India Limited"],
-["SETFNN50","SBI Nifty Next 50"],["MOMNC","Motilal Oswal Nifty MNC ETF"],["SVPGLOB","SVP Global Ventures Ltd"],["PRIVISCL","Privi Speciality Chemicals Ltd"],["HERANBA","Heranba Industries Ltd"],
-["21STCENMGM","Twenty First Century Management Services Ltd"],["SIS","Security & Intelligence Services India"],["NOVAAGRI","Nova Agritech Ltd"],["NIFTYINDDEFENCE","NIFTYINDDEFENCE"],["CAMS","Computer Age Management Services Ltd"],
-["HITECHGEAR","The Hi-tech Gears Limited"],["PPLPHARMA","Piramal Pharma Ltd"],["IRFC","Indian Railway Finance Corporation Ltd"],["RPPINFRA","R.p.p. Infra Projects Limited"],["MONEYBOXX","Moneyboxx Finance Ltd"],
-["APOLLOHOSP","Apollo Hospitals Enterprise Limited"],["NDRAUTO","NDR Auto Components Ltd"],["AMAGI","Amagi Media Labs Ltd"],["MIDQ50ADD","DSP Nifty Midcap 150 Quality 50 ETF"],["GPPL","Gujarat Pipavav Port Limited"],
-["CLEDUCATE","CL Educate"],["BHARTIARTL","Bharti Airtel Limited"],["SHANTIGEAR","Shanthi Gears Limited"],["EMUDHRA","eMudhra Ltd"],["BERGEPAINT","Berger Paints (i) Limited"],
-["GRMOVER","GRM Overseas Ltd"],["JAYNECOIND","Jayaswal Neco Industries Limited"],["SHIVAMILLS","Shiva Mills Ltd"],["COLPAL","Colgate Palmolive (india) Limited"],["RUSTOMJEE","Keystone Realtors Ltd"],
-["CMSINFO","CMS Info Systems Ltd"],["MIDCAP","Kotak Nifty Midcap 50 ETF"],["TECHNOE","Techno Electric & Engineering Company Ltd"],["MON100","Motilal Oswal NASDAQ 100 ETF"],["PRIMO","Primo Chemicals Ltd"],
-["THEJO","Thejo Engineering Ltd"],["PHOENIXLTD","The Phoenix Mills Limited"],["COFORGE","Coforge (Niit Tech) Ltd"],["JAINREC","Jain Resource Recycling Ltd"],["TAJGVK","Taj Gvk Hotels & Resorts Limited"],
-["FEDERALBNK","The Federal Bank  Limited"],["NIFTYM150QLTY50","NIFTYM150QLTY50"],["TVSHLTD","TVS Holdings Ltd"],["ERIS","Eris Lifesciences Ltd"],["KECL","Kirloskar Electric Company Limited"],
-["JUNIORBEES","Nippon India ETF Junior BeES"],["RPSGVENT","RPSG Ventures Ltd"],["SREEL","Sreeleathers Limited"],["NATHBIOGEN","Nath Bio-genes (india) Limited"],["EMULTIMQ","Edelweiss Nifty500 Multicap Momentum Qual. 50 ETF"],
-["VAL30IETF","ICICI Prudential Nifty200 Value 30 ETF"],["PKTEA","The Peria Karamalai Tea & Produce Company Limited"],["AGI","AGI Greenpac Ltd"],["IGIL","International Gemmological Institute (India) Ltd"],["DIAMINESQ","Diamines & Chemicals Ltd"],
-["MAFANG","Mirae Asset NYSE FANG+ ETF"],["SPORTKING","Sportking India Ltd"],["GLAXO","Glaxosmithkline Pharmaceuticals Limited"],["ACCELYA","Accelya Kale Solutions Limited"],["KPEL","K.P. Energy Ltd"],
-["PAVNAIND","Pavna Industries Ltd"],["MODEFENCE","Motilal Oswal Nifty India Defence ETF"],["JINDALSTEL","Jindal Steel Ltd"],["COHANCE","Cohance Lifesciences Ltd"],["NIVABUPA","Niva Bupa Health Insurance Company Ltd"],
-["INGERRAND","Ingersoll Rand (india) Limited"],["RKFORGE","Ramkrishna Forgings Limited"],["KSOLVES","Ksolves India Ltd"],["OMAXAUTO","Omax Autos Limited"],["ANDHRAPAP","Andhra Paper Ltd"],
-["GROWWCHEM","Groww Nifty Chemicals ETF"],["HATHWAY","Hathway Cable & Datacom Limited"],["POLYCAB","Polycab India Ltd"],["SKFINDIA","Skf India Limited"],["DEEPAKFERT","Deepak Fertilizers And Petrochemicals Corporation Limited"],
-["INNOVACAP","Innova Captab Ltd"],["ARFIN","Arfin India Ltd"],["ONELIFECAP","Onelife Capital Advisors Limited"],["UMESLTD","Usha Martin Education & Solutions Limited"],["WONDERLA","Wonderla Holidays Limited"],
-["KRISHIVAL","Empyrean Cashews Ltd"],["SMLT","Sarthak Metals Ltd"],["SYSTMTXC","Systematix Corporate Services Ltd"],["VASWANI","Vaswani Industries Limited"],["ABSLMSCIN","Aditya Birla Sun Life MSCI India ETF"],
-["SARVESHWAR","Sarveshwar Foods Ltd"],["CIGNITITEC","Cigniti Technologies Limited"],["ROUTE","Route Mobile Ltd"],["NEXT50BETA","UTI Nifty Next 50 ETF"],["MOREPENLAB","Morepen Laboratories Limited"],
-["AARNAV","Aarnav Fashions Ltd"],["GPIL","Godawari Power And Ispat Limited"],["ELIN","Elin Electronics Ltd"],["MONQ50","Motilal Oswal Nasdaq Q 50 ETF"],["SURYALAXMI","Suryalakshmi Cotton Mills Limited"],
-["MOHEALTH","Motilal Oswal S&P BSE Healthcare ETF"],["NLCINDIA","Nlc India Limited"],["ROML","Raj Oil Mills Ltd"],["SIGACHI","Sigachi Industries Ltd"],["CARYSIL","Carysil Ltd"],
-["GENESYS","Genesys International Corporation Limited"],["INDOFARM","Indo Farm Equipment Ltd"],["SETL","Standard Enginnering Technology Ltd"],["HFCL","HFCL Ltd"],["SUZLON","Suzlon Energy Limited"],
-["HAVELLS","Havells India Limited"],["NRBBEARING","Nrb Bearing Limited"],["BHARATWIRE","Bharat Wire Ropes Limited"],["NAVNETEDUL","Navneet Education Limited"],["BIRLAMONEY","Aditya Birla Money Limited"],
-["AGARWALEYE","Dr Agarwals Health Care Ltd"],["IIFLCAPS","IIFL Capital Services Ltd"],["PCBL","PCBL Ltd"],["SHK","S H Kelkar And Company Limited"],["CCAVENUE","AvenuesAI Ltd"],
-["EDUCOMP","Educomp Solutions Limited"],["CARERATING","CARE Ratings Ltd"],["CHEMCON","Chemcon Speciality Chemicals Ltd"],["OCCLLTD","OCCL Ltd"],["GROWWLOVOL","Groww Nifty 500 Low Volatility 50 ETF"],
-["NIBE","NIBE Ltd"],["NATCOPHARM","Natco Pharma Limited"],["DOLPHIN","Dolphin Offshore Enterprises (India) Ltd"],["RAYMOND","Raymond Limited"],["PROSTARM","Prostarm Info Systems Ltd"],
-["GROWWDEFNC","Groww Nifty India Defence ETF"],["SUNPHARMA","Sun Pharmaceuticals Industries Limited"],["VTL","Vardhman Textiles Limited"],["EIHOTEL","Eih Limited"],["GIPCL","Gujarat Industries Power Company Limited"],
-["BAJAJHFL","Bajaj Housing Finance Ltd"],["TIRUPATIFL","Tirupati Forge Ltd"],["BIOFILCHEM","Biofil Chemicals & Pharmaceuticals Ltd"],["BOSCH-HCIL","Bosch Home Comfort India Ltd"],["PETRONET","Petronet Lng Limited"],
-["CAPITALSFB","Capital Small Finance Bank Ltd"],["GSFC","Gujarat State Fertilizers & Chemicals Limited"],["HEIDELBERG","Heidelbergcement India Limited"],["MODISONLTD","Modison Ltd"],["INFOMEDIA","Infomedia Press Limited"],
-["LALPATHLAB","Dr. Lal Path Labs Ltd."],["PURVA","Puravankara Projects Limited"],["SJVN","Sjvn Limited"],["INSECTICID","Insecticides (india) Limited"],["MOVALUE","Motilal Oswal S&P BSE Enhanced Value ETF Fund"],
-["CTE","Cambridge Technology Enterprises Limited"],["CENTRUM","Centrum Capital Ltd"],["LUPIN","Lupin Limited"],["TORNTPOWER","Torrent Power Limited"],["POWERGRID","Power Grid Corporation Of India Limited"],
-["NIFTY50PR1XINV","NIFTY50PR1XINV"],["JAICORPLTD","Jai Corp Limited"],["TNTELE","Tamilnadu Telecommunication Limited"],["MEP","Mep Infrastructure Developers Limited"],["GLAND","Gland Pharma Ltd"],
-["ASALCBR","Associated Alcohols & Breweries Ltd"],["ORIENTELEC","Orient Electric Ltd"],["REDTAPE","Redtape Ltd"],["KOTHARIPRO","Kothari Products Limited"],["PHARMABEES","Nippon India NIFTY Pharma ETF Growth Plan"],
-["INDOWIND","Indowind Energy Limited"],["PREMIER","Premier Limited"],["CNXENERGY","CNXENERGY"],["ABBOTINDIA","Abbott India Limited"],["VHL","Vardhman Holdings Limited"],
-["SUNTV","Sun Tv Network Limited"],["MAHLIFE","Mahindra Lifespace Developers Limited"],["WANBURY","Wanbury Limited"],["NIFTY50TR1XINV","NIFTY50TR1XINV"],["LOTUSDEV","Sri Lotus Developers & Realty Ltd"],
-["ARKADE","Arkade Developers Ltd"],["MOENERGY","Motilal Oswal Nifty Energy ETF"],["CHOICEIN","Choice International Ltd"],["CHEMFAB","Chemfab Alkalis Ltd"],["BAJAJCON","Bajaj Consumer Care Ltd"],
-["DIACABS","Diamond Power Infrastructure Ltd"],["HEALTHCARE","Mirae Asset Nifty 500 Healthcare ETF"],["GODREJPROP","Godrej Properties Limited"],["SHYAMMETL","Shyam Metalics & Energy Ltd"],["JUSTDIAL","Just Dial Limited"],
-["SONATSOFTW","Sonata Software Limited"],["IVP","Ivp Limited"],["LICNMID100","LIC MF Nifty Midcap 100 ETF"],["SUNDARMFIN","Sundaram Finance Limited"],["TATAPOWER","Tata Power Company Limited"],
-["SCODATUBES","Scoda Tubes Ltd"],["SMARTLINK","Smartlink Network Systems Limited"],["INSPIRISYS","Inspirisys Solutions Ltd"],["TREEHOUSE","Tree House Education & Accessories Limited"],["WINSOME","Winsome Yarns Limited"],
-["PRUDENT","Prudent Corporate Advisory Services Ltd"],["ANUP","The Anup Engineering Ltd"],["CIPLA","Cipla Limited"],["NITIRAJ","Nitiraj Engineers Ltd"],["GPTHEALTH","GPT Healthcare Ltd"],
-["CHEVIOT","Cheviot Company Ltd"],["RVTH","Revathi Equipment India Ltd"],["HINDCOMPOS","Hindustan Composites Limited"],["HONASA","Honasa Consumer Ltd"],["PRINCEPIPE","Prince Pipes & Fittings Ltd"],
-["EIFFL","Euro India Fresh Foods Ltd"],["MAZDA","Mazda Limited"],["AUSOMENT","Ausom Enterprise Limited"],["MAGADSUGAR","Magadh Sugar & Energy Ltd"],["RPEL","Raghav Productivity Enhancers Ltd"],
-["BLS","Bls International Services Limited"],["ENTERO","Entero Healthcare Solutions Ltd"],["SHRIRAMFIN","Shriram Finance Ltd"],["DATAMATICS","Datamatics Global Services Limited"],["GAIL","Gail (india) Limited"],
-["ENERGY","ENERGY"],["ZUARI","Zuari Agro Chemicals Limited"],["MUNJALSHOW","Munjal Showa Limited"],["GROWWNXT50","Groww Nifty Next 50 ETF"],["HDFCMID150","HDFC Nifty Midcap 150 ETF"],
-["JPASSOCIAT","Jaiprakash Associates Limited"],["JSWINFRA","JSW Infrastructure Ltd"],["HBSL","HB Stockholdings Ltd"],["DIVIDEND","Mirae Asset BSE 500 Dividend Leaders 50 ETF"],["FLEXIADD","DSP Nifty500 Flexicap Quality 30 ETF"],
-["SOLARINDS","Solar Industries India Limited"],["DRREDDY","Dr. Reddy's Laboratories Limited"],["INDNIPPON","India Nippon Electricals Limited"],["KIRIINDUS","Kiri Industries Limited"],["VLSFINANCE","Vls Finance Limited"],
-["HEXATRADEX","Hexa Tradex Limited"],["BALAJITELE","Balaji Telefilms Limited"],["MAHABANK","Bank Of Maharashtra Ltd"],["DYCL","Dynamic Cables Ltd"],["BELRISE","Belrise Industries Ltd"],
-["PAKKA","Pakka Ltd"],["NEXTMEDIA","Next Mediaworks Limited"],["POCL","Pondy Oxides & Chemicals Ltd"],["EPIGRAL","Epigral Ltd"],["GNA","Gna Axles Limited"],
-["TBZ","Tribhovandas Bhimji Zaveri Limited"],["IEX","Indian Energy Exchange Ltd"],["FILATEX","Filatex India Limited"],["SHAILY","Shaily Engineering Plastics Ltd"],["BHAGCHEM","Bhagiradha Chemicals & Industries Ltd"],
-["GILLANDERS","Gillanders Arbuthnot & Company Limited"],["WOCKPHARMA","Wockhardt Limited"],["MALLCOM","Mallcom (India) Ltd"],["RESPONIND","Responsive Industries Limited"],["SIGIND","Signet Industries Ltd"],
-["IOB","Indian Overseas Bank Ltd"],["PATINTLOG","Patel Integrated Logistics Limited"],["FMNL","Future Market Networks Limited"],["PILITA","Pil Italica Lifestyle Limited"],["TATAELXSI","Tata Elxsi Limited"],
-["TSFINV","Tsf Investments Ltd"],["AMNPLST","Amines & Plasticizers Ltd"],["ITADD","DSP Nifty IT ETF"],["CNXPHARMA","CNXPHARMA"],["PILANIINVS","Pilani Investment And Industries Corporation Limited"],
-["MACPOWER","Macpower CNC Machines Ltd"],["CHALET","Chalet Hotels Ltd"],["DHARMAJ","Dharmaj Crop Guard Ltd"],["WIPRO","Wipro Limited"],["KRITINUT","Kriti Nutrients Ltd"],
-["TASTYBITE","Tasty Bite Eatables Ltd"],["KPIL","Kalpataru Projects International Ltd"],["NAGREEKCAP","Nagreeka Capital & Infrastructure Limited"],["RATEGAIN","Rategain Travel Technologies Ltd"],["MUNJALAU","Munjal Auto Industries Limited"],
-["CUMMINSIND","Cummins India Limited"],["FINCABLES","Finolex Cables Limited"],["HGS","Hinduja Global Solutions Limited"],["MEDICO","Medico Remedies Ltd"],["AUROPHARMA","Aurobindo Pharma Limited"],
-["RAINBOW","Rainbow Childrens Medicare Ltd"],["POLYPLEX","Polyplex Corporation Limited"],["GRAPHITE","Graphite India Limited"],["TCIEXP","Tci Express Limited"],["CENTRALBK","Central Bank Of India Ltd"],
-["NIFTYCPSE","NIFTYCPSE"],["ELECON","Elecon Engineering Company Limited"],["SAMHI","Samhi Hotels Ltd"],["NMDC","Nmdc Limited"],["LLOYDSENGG","Lloyds Engineering Works Ltd"],
-["MCLOUD","Magellanic Cloud Ltd"],["MOHITIND","Mohit Industries Limited"],["SADBHIN","Sadbhav Infrastructure Project Limited"],["SBICARD","SBI Cards & Payment Services Ltd"],["STARHEALTH","Star Health & Allied Insurance Company Ltd"],
-["JSFB","Jana Small Finance Bank Ltd"],["TATACAP","Tata Capital Ltd"],["VIYASH","Viyash Scientific Ltd"],["ABFRL","Aditya Birla Fashion And Retail Limited"],["ZENITHSTL","Zenith Steel Pipes & Industries Ltd"],
-["GAYAHWS","Gayatri Highways Ltd"],["PRIMESECU","Prime Securities Limited"],["ASHOKAMET","Ashoka Metcast Ltd"],["NPST","Network People Services Technologies Ltd"],["CONTROLPR","Control Print Limited"],
-["JUBLINGREA","Jubilant Ingrevia Ltd"],["KNAGRI","KN Agri Resources Ltd"],["MARKSANS","Marksans Pharma Limited"],["CEMPRO","Cemindia Projects Ltd"],["KIOCL","Kiocl Limited"],
-["LATTEYS","Latteys Industries Ltd"],["NIFTYHEALTHCARE","NIFTYHEALTHCARE"],["VIMTALABS","Vimta Labs Limited"],["GUJTHEM","Gujarat Themis Biosyn Ltd"],["EMIL","Electronics Mart India Ltd"],
-["MOTISONS","Motisons Jewellers Ltd"],["LASA","Lasa Supergenerics Ltd"],["YATHARTH","Yatharth Hospital & Trauma Care Services Ltd"],["ONGC","Oil & Natural Gas Corporation Limited"],["URAVIDEF","Uravi T and Wedge Lamps Ltd"],
-["YESBANK","Yes Bank Limited"],["GABRIEL","Gabriel India Limited"],["HEALTHIETF","ICICI Prudential Healthcare ETF"],["MMTC","Mmtc Limited"],["ORCHPHARMA","Orchid Pharma Ltd"],
-["AKUMS","Akums Drugs & Pharmaceuticals Ltd"],["CHEMICAL","Kotak Nifty Chemicals ETF"],["HEALTHY","Aditya Birla Sun Life NIFTY Healthcare ETF"],["SUNDROP","Sundrop Brands Ltd"],["OSWALGREEN","Oswal Green Tech Ltd"],
-["NIFTYMIDSMLHLTH","NIFTYMIDSMLHLTH"],["GRAVITA","Gravita India Limited"],["REPRO","Repro India Limited"],["ASHOKA","Ashoka Buildcon Limited"],["INDBANK","Indbank Merchant Banking Services Limited"],
-["MIRZAINT","Mirza International Limited"],["JYOTICNC","Jyoti CNC Automation Ltd"],["COALINDIA","Coal India Limited"],["GOKUL","Gokul Refoils And Solvent Limited"],["PANSARI","Pansari Developers Ltd"],
-["PRAXIS","Praxis Home Retail Ltd"],["SAMMAANCAP","Sammaan Capital Ltd"],["AEQUS","Aequs Ltd"],["RADIANTCMS","Radiant Cash Management Services Ltd"],["SURANAT&P","Surana Telecom And Power Limited"],
-["TIINDIA","Tube Investments of India Ltd"],["RHIM","RHI Magnesita India Ltd"],["BGRENERGY","Bgr Energy Systems Limited"],["NUVOCO","Nuvoco Vistas Corporation Ltd"],["RALLIS","Rallis India Limited"],
-["CPSEETF","CPSE ETF*"],["TRACXN","Tracxn Technologies Ltd"],["NIITLTD","Niit Limited"],["RTNPOWER","Rattanindia Power Limited"],["KANANIIND","Kanani Industries Limited"],
-["CNXPSE","CNXPSE"],["SCHAEFFLER","Schaeffler India Ltd"],["AVL","Aditya Vision Ltd"],["NCLIND","Ncl Industries Limited"],["BIGBLOC","Bigbloc Construction Limited"],
-["ARENTERP","Rajdarshan Industries Ltd"],["NETWORK18","Network18 Media & Investments Limited"],["NSIL","Nalwa Sons Investments Limited"],["JBCHEPHARM","Jb Chemicals & Pharmaceuticals Limited"],["ALKYLAMINE","Alkyl Amines Chemicals Limited"],
-["IGPL","Ig Petrochemicals Limited"],["HEALTHADD","DSP Nifty Healthcare ETF"],["INTENTECH","Intense Technologies Ltd"],["MASTERTR","Master Trust Ltd"],["MOREALTY","Motilal Oswal Nifty Realty ETF"],
-["PENINLAND","Peninsula Land Limited"],["GRINFRA","G R Infraprojects Ltd"],["SAATVIKGL","Saatvik Green Energy Ltd"],["TARSONS","Tarsons Products Ltd"],["INOXWIND","Inox Wind Limited"],
-["RUBFILA","Rubfila International Ltd"],["NIBL","Nrb Industrial Bearings Limited"],["MOTILALOFS","Motilal Oswal Financial Services Limited"],["JSWENERGY","Jsw Energy Limited"],["TEXINFRA","Texmaco Infrastructure & Holdings Limited"],
-["SNOWMAN","Snowman Logistics Limited"],["PNC","Pritish Nandy Communications Limited"],["TRIDENT","Trident Limited"],["SHANTI","Shanti Overseas (India) Ltd"],["FLFL","Future Lifestyle Fashions Limited"],
-["CYIENTDLM","Cyient DLM Ltd"],["CHEMPLASTS","Chemplast Sanmar Ltd"],["SPECIALITY","Speciality Restaurants Limited"],["SHAKTIPUMP","Shakti Pumps (india) Limited"],["MANYAVAR","Vedant Fashions Ltd"],
-["ALEMBICLTD","Alembic Limited"],["MAWANASUG","Mawana Sugars Limited"],["STEELXIND","Steel Exchange India Ltd"],["VOLTAMP","Voltamp Transformers Limited"],["VADILALIND","Vadilal Industries Limited"],
-["SCHNEIDER","Schneider Electric Infrastructure Limited"],["KPRMILL","K.p.r. Mill Limited"],["TRIVENI","Triveni Engineering & Industries Limited"],["IRIS","IRIS Business Services Ltd"],["DSSL","Dynacons Systems & Solutions Limited"],
-["CNXREALTY","CNXREALTY"],["GOLDIAM","Goldiam International Limited"],["MOPSE","Motilal Oswal Nifty PSE ETF"],["EASEMYTRIP","Easy Trip Planners Ltd"],["NIFTYOILANDGAS","NIFTYOILANDGAS"],
-["CAPLIPOINT","Caplin Point Laboratories Limited"],["UBL","United Breweries Limited"],["LGEINDIA","LG Electronics India Ltd"],["CGPOWER","CG Power and Industrial Solutions Ltd"],["ABCOTS","AB Cotspin India Ltd"],
-["BAJAJINDEF","Indef Manufacturing Ltd"],["VERANDA","Veranda Learning Solutions Ltd"],["RUCHIRA","Ruchira Papers Limited"],["ALMONDZ","Almondz Global Securities Limited"],["MPHASIS","Mphasis Limited"],
-["BLUESTARCO","Blue Star Limited"],["TEAMGTY","Team India Guaranty Ltd"],["SURYAROSNI","Surya Roshni Limited"],["KNRCON","Knr Constructions Limited"],["VISAKAIND","Visaka Industries Limited"],
-["GROWWRAIL","Groww Nifty India Railways PSU ETF"],["PIONEEREMB","Pioneer Embroideries Limited"],["THANGAMAYL","Thangamayil Jewellery Limited"],["MUFIN","Mufin Green Finance Ltd"],["SUNFLAG","Sunflag Iron And Steel Company Limited"],
-["AKSHARCHEM","AksharChem (India) Ltd"],["TIRUMALCHM","Thirumalai Chemicals Limited"],["MOSCHIP","Moschip Technologies Ltd"],["FINKURVE","Finkurve Financial Services Ltd"],["GROWWHOSPI","GROWWHOSPI"],
-["TARAPUR","Tarapur Transformers Limited"],["NILASPACES","Nila Spaces Ltd"],["V2RETAIL","V2 Retail Limited"],["CROWN","Crown Lifters Ltd"],["OSWALSEEDS","Shreeoswal Seeds & Chemicals Ltd"],
-["TRAVELFOOD","Travel Food Services Ltd"],["SILINV","Sil Investments Limited"],["JBMA","Jbm Auto Limited"],["TOLINS","Tolins Tyres Ltd"],["ISGEC","ISGEC Heavy Engineering  Ltd"],
-["NELCO","Nelco Limited"],["HCL-INSYS","Hcl Infosystems Limited"],["PCJEWELLER","Pc Jeweller Limited"],["SOTL","Savita Oil Technologies Limited"],["URJA","Urja Global Ltd"],
-["CANTABIL","Cantabil Retail India Limited"],["RAJRILTD","Raj Rayon Industries Ltd"],["63MOONS","63 Moons Technologies Ltd"],["RVNL","Rail Vikas Nigam Ltd"],["ONWARDTEC","Onward Technologies Limited"],
-["MAHEPC","Mahindra EPC Irrigation Ltd"],["REGENCERAM","Regency Ceramics Limited"],["AXITA","Axita Cotton Ltd"],["CEATLTD","Ceat Limited"],["SANATHAN","Sanathan Textiles Ltd"],
-["BIOCON","Biocon Limited"],["GUFICBIO","Gufic Biosciences Limited"],["BAJAJHCARE","Bajaj Healthcare Ltd"],["SASTASUNDR","Sastasundar Ventures Limited"],["NCC","Ncc Limited"],
-["VERTOZ","Vertoz Ltd"],["SUNDRMFAST","Sundram Fasteners Limited"],["CINELINE","Cineline India Limited"],["MASTEK","Mastek Limited"],["PARADEEP","Paradeep Phosphates Ltd"],
-["ABLBL","Aditya Birla Lifestyle Brands Ltd"],["OFSS","Oracle Financial Services Software Limited"],["NH","Narayana Hrudayalaya Ltd."],["BLUESTONE","Bluestone Jewellery and Lifestyle Ltd"],["KRISHANA","Krishana Phoschem Ltd"],
-["SANGHVIMOV","Sanghvi Movers Limited"],["ABSLPSE","Aditya Birla Sun Life Nifty PSE ETF"],["GICHSGFIN","Gic Housing Finance Limited"],["ANDHRSUGAR","The Andhra Sugars Limited"],["PLAZACABLE","Plaza Wires Ltd"],
-["ORIENTALTL","Oriental Trimex Limited"],["KDDL","Kddl Limited"],["DHUNINV","Dhunseri Investments Limited"],["HLEGLAS","HLE Glascoat Ltd"],["MANINFRA","Man Infraconstruction Limited"],
-["IL&FSTRANS","Il&fs Transportation Networks Limited"],["IFBIND","Ifb Industries Limited"],["ANTELOPUS","Antelopus Selan Energy Ltd"],["NITINSPIN","Nitin Spinners Limited"],["NIACL","New India Assurance Company Ltd"],
-["EXXARO","Exxaro Tiles Ltd"],["CYIENT","Cyient Limited"],["TITAGARH","Titagarh Rail Systems Ltd"],["ANANTRAJ","Anant Raj Limited"],["MAXESTATES","Max Estates Ltd"],
-["ORIENTBELL","Orient Bell Limited"],["CAMPUS","Campus Activewear Ltd"],["JAYKAY","Jaykay Enterprises Ltd"],["GEEKAYWIRE","Geekay Wires Ltd"],["EXCELSOFT","Excelsoft Technologies Ltd"],
-["SANOFI","Sanofi India Limited"],["SIEMENS","Siemens Limited"],["TEMBO","Tembo Global Industries Ltd"],["STANLEY","Stanley Lifestyles Ltd"],["KUANTUM","Kuantum Papers Ltd"],
-["DNAMEDIA","Diligent Media Corporation Ltd"],["GROBTEA","The Grob Tea Company Limited"],["MSTCLTD","MSTC Ltd"],["EVEREADY","Eveready Industries India Limited"],["VALIANTORG","Valiant Organics Ltd"],
-["ADOR","Ador Welding Ltd"],["STLTECH","Sterlite Technologies Limited"],["AFFORDABLE","Affordable Robotic & Automation Ltd"],["SAURASHCEM","Saurashtra Cement Ltd"],["ELDEHSG","Eldeco Housing & Industries Ltd"],
-["BLAL","BEML Land Assets Ltd"],["HIKAL","Hikal Limited"],["DAVANGERE","Davangere Sugar Company Ltd"],["GVKPIL","Gvk Power & Infrastructure Limited"],["SUVIDHAA","Suvidhaa Infoserve Ltd"],
-["HILINFRA","HILINFRA"],["RSYSTEMS","R Systems International Limited"],["ACL","Andhra Cements Ltd"],["IVC","Il&fs Investment Managers Limited"],["QUICKHEAL","Quick Heal Technologies Limited"],
-["RAYMONDLSL","Raymond Lifestyle Ltd"],["JAYAGROGN","Jayant Agro Organics Limited"],["DBOL","Dhampur Bio Organics Ltd"],["SIGNATURE","SignatureGlobal India Ltd"],["DBL","Dilip Buildcon Limited"],
-["IGARASHI","Igarashi Motors India Limited"],["PRAKASHSTL","Prakash Steelage Limited"],["GTLINFRA","Gtl Infrastructure Limited"],["MRF","Mrf Limited"],["MANAPPURAM","Manappuram Finance Limited"],
-["NSLNISP","NMDC Steel Ltd"],["JETFREIGHT","Jet Freight Logistics Ltd"],["MAHSCOOTER","Maharashtra Scooters Limited"],["SSWL","Steel Strips Wheels Limited"],["VRAJ","Vraj Iron & Steel Ltd"],
-["BLUECHIP","Blue Chip India Limited"],["TPHQ","Teamo Productions HQ Ltd"],["CPPLUS","Aditya Infotech Ltd"],["BEML","Beml Limited"],["BHEL","Bharat Heavy Electricals Limited"],
-["BIRLACABLE","Birla Cable Limited"],["ESCORTS","Escorts Kubota Ltd"],["MAMATA","Mamata Machinery Ltd"],["SYMPHONY","Symphony Limited"],["TANLA","Tanla Solutions Limited"],
-["ANSALAPI","Ansal Properties & Infrastructure Limited"],["MAXHEALTH","Max Healthcare Institute Ltd"],["GOLD360","360 ONE Gold ETF"],["DREAMFOLKS","Dreamfolks Services Ltd"],["BROOKS","Brooks Laboratories Limited"],
-["HMAAGRO","HMA Agro Industries Ltd"],["GNFC","Gujarat Narmada Valley Fertilizers And Chemicals Limited"],["UTLSOLAR","Fujiyama Power Systems Ltd"],["GROWWPSE","Groww Nifty PSE ETF"],["CESC","Cesc Limited"],
-["INOXGREEN","Inox Green Energy Services Ltd"],["SOMATEX","Soma Textiles & Industries Limited"],["MCL","Madhav Copper Ltd"],["ABMINTLLTD","A B M International Ltd"],["TAKE","Take Solutions Limited"],
-["MTNL","Mahanagar Telephone Nigam Limited"],["DIGIDRIVE","Digidrive Distributors Ltd"],["SYNCOMF","Syncom Formulations (India) Ltd"],["ORCHASP","Orchasp Ltd"],["UNIVPHOTO","Universus Photo Imagings Ltd"],
-["S&SPOWER","S & S Power Switchgear Ltd"],["NAZARA","Nazara Technologies Ltd"],["AEGISVOPAK","Aegis Vopak Terminals Ltd"],["MEESHO","Meesho Ltd"],["NORBTEAEXP","Norben Tea & Exports Limited"],
-["NEXT50ETF","Kotak Nifty Next 50 ETF"],["AFFLE","Affle India Ltd"],["OILIETF","ICICI Prudential Nifty Oil & Gas ETF"],["SRF","Srf Limited"],["LODHA","Lodha Developers Ltd"],
-["PLATIND","Platinum Industries Ltd"],["MOKSH","Moksh Ornaments Ltd"],["APLAPOLLO","Apl Apollo Tubes Limited"],["CONCORDBIO","Concord Biotech Ltd"],["METROBRAND","Metro Brands Ltd"],
-["PAR","Par Drugs & Chemicals Ltd"],["JINDWORLD","Jindal Worldwide Limited"],["GLOBUSSPR","Globus Spirits Limited"],["ALIVUS","Alivus Life Sciences Ltd"],["NELCAST","Nelcast Limited"],
-["VGL","Varvee Global Ltd"],["ROTO","Roto Pumps Ltd"],["MANAKSIA","Manaksia Limited"],["MANKIND","Mankind Pharma Ltd"],["EPL","EPL Ltd"],
-["FUSION","Fusion Micro Finance Ltd"],["PLASTIBLEN","Plastiblends India Limited"],["BBTC","Bombay Burmah Trading Corporation Limited"],["TATACHEM","Tata Chemicals Limited"],["CENTURYPLY","Century Plyboards (india) Limited"],
-["SHIVALIK","Shivalik Rasayan Ltd"],["TRIGYN","Trigyn Technologies Limited"],["BLUEDART","Blue Dart Express Limited"],["FIEMIND","Fiem Industries Limited"],["GEECEE","Geecee Ventures Limited"],
-["MOGOLD","Motilal Oswal Gold ETF"],["BRIGHOTEL","Brigade Hotel Ventures Ltd"],["AIRAN","Airan Ltd"],["CCHHL","Country Club Hospitality & Holidays Limited"],["ZYDUSLIFE","Zydus Lifesciences Ltd"],
-["GARUDA","Garuda Construction and Engineering Ltd"],["STEELCITY","Steel City Securities Ltd"],["BEARDSELL","Beardsell Limited"],["KEYFINSERV","Keynote Financial Services Ltd"],["TECILCHEM","TECIL Chemical & Hydro Power Ltd"],
-["LYPSAGEMS","Lypsa Gems & Jewellery Limited"],["SHARDAMOTR","Sharda Motor Industries Limited"],["QUADFUTURE","Quadrant Future Tek Ltd"],["PSB","Punjab & Sind Bank"],["VAISHALI","Vaishali Pharma Ltd"],
-["BDL","Bharat Dynamics Ltd"],["BUILDPRO","Shankara Buildpro Ltd"],["GOLDETF","Mirae Asset Gold ETF"],["MANUFGBEES","Nippon India Nifty India Manufacturing ETF"],["NEPHROPLUS","Nephrocare Health Services Ltd"],
-["INDOUS","Indo US Bio-Tech Ltd"],["PALASHSECU","Palash Securities"],["BCG","Brightcom Group Ltd"],["TRF","Trf Limited"],["JYOTHYLAB","Jyothy Laboratories Limited"],
-["GANESHBE","Ganesh Benzoplast Ltd"],["AGROPHOS","Agro Phos India Ltd"],["KSL","Kalyani Steels Limited"],["BOMDYEING","Bombay Dyeing & Mfg Company Limited"],["VETO","Veto Switchgears And Cables Limited"],
-["HYBRIDFIN","Hybrid Financial Services Ltd"],["COROMANDEL","Coromandel International Limited"],["WHIRLPOOL","Whirlpool Of India Limited"],["DIVGIITTS","Divgi Torqtransfer Systems Ltd"],["BRNL","Bharat Road Network"],
-["SMALLADD","DSP Nifty Smallcap 250 ETF"],["VRLLOG","Vrl Logistics Limited"],["BSL","Bsl Limited"],["RADHIKAJWE","Radhika Jeweltech Ltd"],["TINNARUBR","Tinna Rubber & Infrastructure Ltd"],
-["INDORAMA","Indo Rama Synthetics (india) Limited"],["DHANBANK","Dhanlaxmi Bank Limited"],["MIDHANI","Mishra Dhatu Nigam Ltd"],["OAL","Oriental Aromatics Ltd"],["GANDHAR","Gandhar Oil Refinery (India) Ltd"],
-["BLKASHYAP","B. L. Kashyap And Sons Limited"],["AMJLAND","AMJ Land Holdings Ltd"],["RENUKA","Shree Renuka Sugars Limited"],["OIL","Oil India Limited"],["SCI","Shipping Corporation Of India Limited"],
-["AERONEU","Aeroflex Neu Ltd"],["ODIGMA","Odigma Consultancy Solutions Ltd"],["KIRLPNU","Kirloskar Pneumatic Company Ltd"],["KALYANIFRG","Kalyani Forge Limited"],["MANORG","Mangalam Organics Ltd"],
-["LAXMIINDIA","Laxmi India Finance Ltd"],["AIIL","Authum Investment & Infrastructure Ltd"],["BEL","Bharat Electronics Limited"],["EUROPRATIK","Euro Pratik Sales Ltd"],["STARPAPER","Star Paper Mills Limited"],
-["SAMBHV","Sambhv Steel Tubes Ltd"],["RIIL","Reliance Industrial Infrastructure Limited"],["TATATECH","Tata Technologies Ltd"],["STYLEBAAZA","Baazar Style Retail Ltd"],["REFEX","Refex Industries Limited"],
-["FINPIPE","Finolex Industries Limited"],["VARDMNPOLY","Vardhman Polytex Limited"],["GROWWRLTY","Groww Nifty Realty ETF"],["GULFOILLUB","Gulf Oil Lubricants India Limited"],["SULA","Sula Vineyards Ltd"],
-["GVT&D","GE Vernova T&D India Ltd"],["DLF","Dlf Limited"],["WELENT","Welspun Enterprises Limited"],["KRITI","Kriti Industries (India) Ltd"],["SBC","SBC Exports Ltd"],
-["MUKANDLTD","Mukand Limited"],["SPARC","Sun Pharma Advanced Research Company Limited"],["BANSWRAS","Banswara Syntex Limited"],["MID150","Kotak Nifty Midcap 150 ETF"],["HTMEDIA","Ht Media Limited"],
-["PEARLPOLY","Pearl Polymers Limited"],["LAXMICOT","Laxmi Cotspin Ltd"],["CARRARO","CARRARO"],["RAMCOSYS","Ramco Systems Limited"],["ZUARIIND","Zuari Industries Ltd"],
-["OMKARCHEM","Omkar Speciality Chemicals Limited"],["ORISSAMINE","The Orissa Minerals Development Company Limited"],["RUSHIL","Rushil Decor Limited"],["NRAIL","N R Agarwal Industries Ltd"],["UNIECOM","Unicommerce eSolutions Ltd"],
-["CPCAP","CP Capital Limited"],["SHALPAINTS","Shalimar Paints Limited"],["KELLTONTEC","Kellton Tech Solutions Limited"],["SHIVAMAUTO","Shivam Autotech Limited"],["RADIOCITY","Music Broadcast"],
-["KAJARIACER","Kajaria Ceramics Limited"],["WEWORK","Wework India Management Ltd"],["ARROWGREEN","Arrow Greentech Limited"],["GATECHDVR","GACM Technologies Ltd-DVR"],["OBEROIRLTY","Oberoi Realty Limited"],
-["PATELRMART","Patel Retail Ltd"],["INTELLECT","Intellect Design Arena Limited"],["SIYSIL","Siyaram Silk Mills Limited"],["SCHAND","S Chand and Company Limited"],["CEREBRAINT","Cerebra Integrated Technologies Limited"],
-["EXCELINDUS","Excel Industries Limited"],["ABSLNN50ET","Aditya Birla Sun Life Nifty Next 50 ETF"],["TATAGOLD","Tata Gold Exchange Traded Fund"],["WELSPUNLIV","Welspun Living Ltd"],["GOLDBEES","Nippon India ETF Gold Bees"],
-["DEVX","Dev Accelerator Ltd"],["KWIL","Kwality Walls India Ltd"],["APOLLOPIPE","Apollo Pipes Ltd"],["TIPSFILMS","Tips Films Ltd"],["MASFIN","MAS Financial Services Ltd"],
-["NIPPOBATRY","Indo-national Limited"],["KOPRAN","Kopran Limited"],["KCPSUGIND","Kcp Sugar And Industries Corporation Limited"],["ENERGYDEV","Energy Development Company Limited"],["ANMOL","Anmol India Ltd"],
-["MGL","Mahanagar Gas Limited"],["GOCLCORP","Gocl Corporation Limited"],["IMAGICAA","Imagicaaworld Entertainment Ltd"],["RANEHOLDIN","Rane Holdings Limited"],["ALLDIGI","Alldigi Tech Ltd"],
-["HIMATSEIDE","Himatsingka Seide Limited"],["SALASAR","Salasar Techno Engineering Ltd"],["AJOONI","Ajooni Biotech Ltd"],["IMPEXFERRO","Impex Ferro Tech Limited"],["GUJGASLTD","Gujarat Gas Limited"],
-["UGROCAP","Ugro Capital Ltd"],["XCHANGING","Xchanging Solutions Limited"],["GUJRAFFIA","Gujarat Raffia Industries Ltd"],["DAMODARIND","Damodar Industries Limited"],["WINDLAS","Windlas Biotech Ltd"],
-["CENTENKA","Century Enka Limited"],["PRAJIND","Praj Industries Limited"],["LICMFGOLD","LIC MF Gold ETF"],["BSLGOLDETF","Aditya Birla Sun Life Gold ETF"],["GINNIFILA","Ginni Filaments Limited"],
-["NILKAMAL","Nilkamal Limited"],["KKCL","Kewal Kiran Clothing Limited"],["SKIPPER","Skipper Limited"],["QGOLDHALF","Quantum Gold Fund ETF"],["FEL","Future Enterprises Limited"],
-["SHRENIK","Shrenik Ltd"],["KRONOX","Kronox Lab Sciences Ltd"],["ALPA","Alpa Laboratories Limited"],["NAVA","Nava Ltd"],["PRAKASH","Prakash Industries Limited"],
-["KOTARISUG","Kothari Sugars And Chemicals Limited"],["AROGRANITE","Aro Granite Industries Limited"],["JKLAKSHMI","Jk Lakshmi Cement Limited"],["FABTECH","Fabtech Technologies Ltd"],["ARCHIDPLY","Archidply Industries Limited"],
-["GROWWGOLD","Groww Gold ETF"],["HONAUT","Honeywell Automation India Limited"],["ZODIAC","Zodiac Energy Ltd"],["ASPINWALL","Aspinwall And Company Limited"],["UDS","Updater Services Ltd"],
-["HCG-RE","HCG-RE"],["AARTIDRUGS","Aarti Drugs Limited"],["SUDARCOLOR","Sudarshan Colorants India Ltd"],["CHOICEGOLD","Choice Gold ETF"],["CORALFINAC","Coral India Finance & Housing Ltd"],
-["IVZINGOLD","Invesco India Gold ETF"],["ASTRAMICRO","Astra Microwave Products Limited"],["GOLDADD","DSP Gold ETF"],["ANTGRAPHIC","Antarctica Limited"],["TEGA","Tega Industries Ltd"],
-["PNGJL","P N Gadgil Jewellers Ltd"],["SETFGOLD","SBI Gold ETS"],["AJANTPHARM","Ajanta Pharma Limited"],["5PAISA","5Paisa Capital Ltd"],["SAGCEM","Sagar Cements Limited"],
-["HDFCGOLD","HDFC Gold ETF"],["GOLD1","Kotak Gold ETF"],["VARDHACRLC","Vardhman Acrylics Limited"],["USHAMART","Usha Martin Limited"],["FISCHER","Fischer Medical Ventures Ltd"],
-["JISLJALEQS","Jain Irrigation Systems Limited"],["SYNGENE","Syngene International Limited"],["DENTA","Denta Water & Infra Solutions Ltd"],["RAMRAT","Ram Ratna Wires Ltd"],["KALPATARU","KALPATARU"],
-["ARTEMISMED","Artemis Medicare Services Ltd"],["MAXIND","Max India Ltd"],["RUDRA","Rudra Global Infra Products Ltd"],["ALANKIT","Alankit Limited"],["BALUFORGE","Balu Forge Industries Ltd"],
-["GOLDBETA","UTI - Gold Exchange Traded Fund"],["SHAHALLOYS","Shah Alloys Limited"],["ZOTA","Zota Health Care Ltd"],["PANACEABIO","Panacea Biotec Limited"],["GAEL","Gujarat Ambuja Exports Limited"],
-["GKSL","Gujarat Kidney & Super Speciality Ltd"],["VINYLINDIA","Vinyl Chemicals (india) Limited"],["UNIDT","United Drilling Tools Ltd"],["GOLDIETF","ICICI Prudential Gold ETF"],["TRANSWORLD","Shreyas Shipping & Logistics Ltd"],
-["DHAMPURSUG","Dhampur Sugar Mills Limited"],["ESTER","Ester Industries Limited"],["LAL","Lorenzini Apparels Ltd"],["KANSAINER","Kansai Nerolac Paints Limited"],["IFCI","Ifci Limited"],
-["AONEGOLD","Angel One Gold ETF"],["PRITIKAUTO","Pritika Auto Industries Ltd"],["MUFTI","Credo Brands Marketing Ltd"],["ANUHPHR","Anuh Pharma Ltd"],["SICALLOG","Sical Logistics Ltd"],
-["SWANCORP","Swan Corp Ltd"],["RSWM","Rswm Limited"],["SHAREINDIA","Share India Securities Ltd"],["JAYBARMARU","Jay Bharat Maruti Limited"],["ORIENTCER","Orient Ceratech Ltd"],
-["HCC","Hindustan Construction Company Limited"],["CNL","Creative Newtech Ltd"],["BBNPPGOLD","Baroda BNP Paribas Gold ETF"],["UCAL","Ucal Ltd"],["KEC","Kec International Limited"],
-["ARSSBL","Anand Rathi Share & Stock Brokers Ltd"],["KTKBANK","The Karnataka Bank Limited"],["PNCINFRA","Pnc Infratech Limited"],["RAMAPHO","Rama Phosphates Ltd"],["SHEMAROO","Shemaroo Entertainment Limited"],
-["THEMISMED","Themis Medicare Limited"],["ELECTCAST","Electrosteel Castings Limited"],["GALAXYSURF","Galaxy Surfactants Ltd"],["ASTERDM","Aster DM Healthcare Ltd"],["GLOSTERLTD","Gloster Ltd"],
-["GOLDCASE","Zerodha Gold ETF"],["TERASOFT","Tera Software Ltd"],["CRIZAC","Crizac Ltd"],["KEEPLEARN","DSJ Keep Learning Ltd"],["HYUNDAI","Hyundai Motor India Ltd"],
-["SHALBY","Shalby Ltd"],["BALKRISIND","Balkrishna Industries Limited"],["BHARATGEAR","Bharat Gears Limited"],["PFS","Ptc India Financial Services Limited"],["TREJHARA","Trejhara Solutions Ltd"],
-["MUKKA","Mukka Proteins Ltd"],["UNITECH","Unitech Limited"],["CRAMC","Canara Robeco Asset Management Company Ltd"],["GRPLTD","Grp Limited"],["MANALIPETC","Manali Petrochemicals Limited"],
-["ABB","Abb India Limited"],["STYRENIX","Styrenix Performance Materials Ltd"],["AWHCL","Antony Waste Handling Cell Ltd"],["CORDSCABLE","Cords Cable Industries Limited"],["LGBBROSLTD","Lg Balakrishnan & Bros Limited"],
-["UNIVASTU","Univastu India Ltd"],["BBL","Bharat Bijlee Limited"],["EMSLIMITED","EMS Ltd"],["RUBICON","Rubicon Research Ltd"],["DALMIASUG","Dalmia Bharat Sugar And Industries Limited"],
-["INDIANCARD","Indian Card Clothing Company Limited"],["TPLPLASTEH","Tpl Plastech Limited"],["ACE","Action Construction Equipment Limited"],["ROSSARI","Rossari Biotech Ltd"],["UTKARSHBNK","Utkarsh Small Finance Bank Ltd"],
-["TIJARIA","Tijaria Polypipes Limited"],["SINCLAIR","Sinclairs Hotels Ltd"],["SSDL","Saraswati Saree Depot Ltd"],["GOLDBND","Bandhan Gold ETF"],["EXPLEOSOL","Expleo Solutions Ltd"],
-["GENUSPOWER","Genus Power Infrastructures Limited"],["TORNTPHARM","Torrent Pharmaceuticals Limited"],["MEDPLUS","Medplus Health Services Ltd"],["UNIMECH","Unimech Aerospace and Manufacturing Ltd"],["IGCL","Indogulf Cropsciences Ltd"],
-["NIRAJ","Niraj Cement Structurals Ltd"],["PATELENG","Patel Engineering Limited"],["AKG","AKG Exim Ltd"],["UNIONGOLD","Union Gold ETF"],["AIROLAM","Airo Lam Ltd"],
-["RAJMET","Rajnandini Metal Ltd"],["BIL","Bhartiya International Limited"],["ACI","Archean Chemical Industries Ltd"],["SHANTIGOLD","Shanti Gold International Ltd"],["RELAXO","Relaxo Footwears Limited"],
-["EGOLD","Edelweiss Gold ETF"],["AXISGOLD","Axis Gold ETF"],["SHRINGARMS","Shringar House of Mangalsutra Ltd"],["GTL","Gtl Limited"],["UNIENTER","Uniphos Enterprises Limited"],
-["ATL","Allcargo Terminals Ltd"],["JPPOWER","Jaiprakash Power Ventures Limited"],["ALICON","Alicon Castalloy Limited"],["SGMART","SG Mart Ltd"],["SOLARA","Solara Active Pharma Sciences Ltd"],
-["APOLLO","Apollo Micro Systems Ltd"],["RITES","Rites Ltd"],["ADSL","Allied Digital Services Limited"],["INDOAMIN","Indo Amines Ltd"],["CALSOFT","California Software Company Limited"],
-["RAILTEL","Railtel Corporation of India Ltd"],["INTLCONV","International Conveyors Ltd"],["PRECAM","Precision Camshafts Limited"],["RANASUG","Rana Sugars Limited"],["SUBEXLTD","Subex Ltd"],
-["LCCINFOTEC","Lcc Infotech Limited"],["INVENTURE","Inventure Growth & Securities Limited"],["MEDANTA","Global Health Ltd"],["REPCOHOME","Repco Home Finance Limited"],["BANG","Bang Overseas Limited"],
-["SITINET","Siti Networks Limited"],["FCONSUMER","Future Consumer Limited"],["OSWALAGRO","Oswal Agro Mills Ltd"],["NAGREEKEXP","Nagreeka Exports Limited"],["FCL","Fineotex Chemical Limited"],
-["GOYALALUM","Goyal Aluminiums Ltd"],["JKPAPER","Jk Paper Limited"],["DELTACORP","Delta Corp Limited"],["GLOBALVECT","Global Vectra Helicorp Limited"],["SAGARDEEP","Sagardeep Alloys Ltd"],
-["SERVOTECH","Servotech Power Systems Ltd"],["TEXMOPIPES","Texmo Pipes And Products Limited"],["CENTEXT","Century Extrusions Limited"],["ROSSELLIND","Rossell India Limited"],["CEINSYS","Ceinsys Tech Ltd"],
-["STEELCAS","Steelcast Ltd"],["TEXRAIL","Texmaco Rail & Engineering Limited"],["DONEAR","Donear Industries Limited"],["ITDC","India Tourism Development Corporation Ltd"],["MAANALU","Maan Aluminium Limited"],
-["GEOJITFSL","Geojit Financial Services Ltd"],["SOUTHBANK","The South Indian Bank Limited"],["SHYAMCENT","Shyam Century Ferrous Limited"],["ECLERX","Eclerx Services Limited"],["IDEAFORGE","Ideaforge Technology Ltd"],
-["MODIS","Modis Navnirman Ltd"],["WIPL","Western India Plywoods Ltd"],["TWCGOLDETF","The Wealth Company Gold ETF"],["ASHAPURMIN","Ashapura Minechem Limited"],["ORIENTHOT","Oriental Hotels Limited"],
-["ESAFSFB","ESAF Small Finance Bank Ltd"],["LTTS","L&t Technology Services Limited"],["VINDHYATEL","Vindhya Telelinks Limited"],["BATAINDIA","Bata India Limited"],["MOLDTECH","Mold-tek Technologies Limited"],
-["UNIVCABLES","Universal Cables Limited"],["ORIENTTECH","Orient Technologies Ltd"],["AJMERA","Ajmera Realty & Infra India Limited"],["TFL","Transwarranty Finance Limited"],["NDGL","Naga Dhunseri Group Limited"],
-["CAMLINFINE","Camlin Fine Sciences Limited"],["BEDMUTHA","Bedmutha Industries Limited"],["NILAINFRA","Nila Infrastructures Limited"],["MAITHANALL","Maithan Alloys Limited"],["BFUTILITIE","Bf Utilities Limited"],
-["PRABHA","Prabha Energy Ltd"],["SAFARI","Safari Industries (India) Ltd"],["DAMCAPITAL","Dam Capital Advisors Ltd"],["AUTOIND","Autoline Industries Limited"],["SONAMLTD","Sonam Ltd"],
-["DIAMONDYD","Prataap Snacks Ltd"],["LINCOLN","Lincoln Pharmaceuticals Limited"],["TVSSCS","TVS Supply Chain Solutions Ltd"],["GATEWAY","Gateway Distriparks Ltd"],["CLSEL","Chamanlal Setia Exports Ltd"],
-["ESSARSHPNG","Essar Shipping Limited"],["SAKUMA","Sakuma Exports Limited"],["TOKYOPLAST","Tokyo Plast International Limited"],["INDTERRAIN","Indian Terrain Fashions Limited"],["HINDCON","Hindcon Chemicals Ltd"],
-["AUTOAXLES","Automotive Axles Limited"],["APOLSINHOT","Apollo Sindoori Hotels Limited"],["FAIRCHEMOR","Fairchem Organics Ltd"],["BAJAJELEC","Bajaj Electricals Limited"],["UFBL","United Foodbrands Ltd"],
-["SCILAL","Shipping Corporation of India Land & Assets Ltd"],["SUNTECK","Sunteck Realty Limited"],["GANGESSECU","Ganges Securities Ltd"],["DBEIL","Deepak Builders & Engineers India Ltd"],["ORIENTPPR","Orient Paper & Industries Limited"],
-["HLVLTD","HLV Ltd"],["ASTRON","Astron Paper & Board Mill Ltd"],["SURAJEST","Suraj Estate Developers Ltd"],["FOODSIN","Foods & Inns Ltd"],["SUTLEJTEX","Sutlej Textiles And Industries Limited"],
-["AMBIKCO","Ambika Cotton Mills Limited"],["BSOFT","Birlasoft Ltd"],["DCXINDIA","DCX Systems Ltd"],["GFLLIMITED","GFL Ltd"],["MALUPAPER","Malu Paper Mills Limited"],
-["ATUL","Atul Limited"],["STAR","Strides Shasun Limited"],["TIL","Til Limited"],["MADRASFERT","Madras Fertilizers Limited"],["ALOKINDS","Alok Industries Ltd"],
-["SAMBHAAV","Sambhaav Media Limited"],["KRYSTAL","Krystal Integrated Services Ltd"],["M&MFIN","Mahindra & Mahindra Financial Services Limited"],["KAMATHOTEL","Kamat Hotels (i) Limited"],["VMSTMT","VMS TMT Ltd"],
-["LAXMIDENTL","Laxmi Dental Ltd"],["ALLCARGO","Allcargo Logistics Limited"],["SHREEJISPG","Shreeji Shipping Global Ltd"],["SHOPERSTOP","Shoppers Stop Limited"],["SHREEPUSHK","Shree Pushkar Chemicals & Fertilisers Limited"],
-["FDC","Fdc Limited"],["BALMLAWRIE","Balmer Lawrie & Company Limited"],["PENIND","Pennar Industries Limited"],["STERTOOLS","Sterling Tools Limited"],["OMFREIGHT","Om Freight Forwarders Ltd"],
-["DWARKESH","Dwarikesh Sugar Industries Limited"],["HINDZINC","Hindustan Zinc Limited"],["LAGNAM","Lagnam Spintex Ltd"],["RUPA","Rupa & Company Limited"],["WCIL","Western Carriers (India) Ltd"],
-["BALPHARMA","Bal Pharma Limited"],["GSS","Gss Infotech Limited"],["AARTIPHARM","Aarti Pharmalabs Ltd"],["KITEX","Kitex Garments Limited"],["ECOSMOBLTY","Ecos (India) Mobility & Hospitality Ltd"],
-["RKDL","Ravi Kumar Distilleries Limited"],["GUJALKALI","Gujarat Alkalies And Chemicals Limited"],["KHAICHEM","Khaitan Chemicals & Fertilizers Ltd"],["FSL","Firstsource Solutions Limited"],["SIKKO","Sikko Industries Ltd"],
-["SHRIRAMPPS","Shriram Properties Ltd"],["AVTNPL","Avt Natural Products Limited"],["SELMC","SEL Manufacturing Company Ltd"],["APTECHT","Aptech Limited"],["AURIONPRO","Aurionpro Solutions Limited"],
-["SURAKSHA","Suraksha Diagnostic Ltd"],["IRCON","Ircon International Ltd"],["PNBGILTS","Pnb Gilts Limited"],["FCSSOFT","Fcs Software Solutions Limited"],["HEMIPROP","Hemisphere Properties India Ltd"],
-["BEPL","Bhansali Engineering Polymers Limited"],["HUBTOWN","Hubtown Limited"],["BELLACASA","Bella Casa Fashion & Retail Ltd"],["AVANTEL","Avantel Ltd"],["DCMSRIND","DCM Shriram Industries Ltd"],
-["INA","Insolation Energy Ltd"],["ZEEL","Zee Entertainment Enterprises Limited"],["PGHH","Procter & Gamble Hygiene And Health Care Limited"],["HITECH","Hi-Tech Pipes Ltd"],["ROHLTD","Royal Orchid Hotels Limited"],
-["MOL","Meghmani Organics Ltd"],["GTECJAINX","G-Tec Janix Education Ltd"],["ABREL","Aditya Birla Real Estate Ltd"],["ROSSTECH","Rossell Techsys Ltd"],["RUCHINFRA","Ruchi Infrastructure Limited"],
-["SAIL","Steel Authority Of India Limited"],["MARALOVER","Maral Overseas Limited"],["TREL","TransIndia Real Estate Ltd"],["ACCURACY","Accuracy Shipping Ltd"],["HARIOMPIPE","Hariom Pipe Industries Ltd"],
-["MSPL","Msp Steel & Power Limited"],["VIDHIING","Vidhi Specialty Food Ingredients"],["SANSTAR","Sanstar Ltd"],["SINTERCOM","Sintercom India Ltd"],["SDBL","Som Distilleries & Breweries Limited"],
-["DIGJAMLMTD","Digjam Ltd"],["ELGIRUBCO","Elgi Rubber Company Limited"],["PPL","Prakash Pipes Ltd"],["GANGAFORGE","Ganga Forging Ltd"],["HILTON","Hilton Metal Forging Limited"],
-["RSSOFTWARE","R. S. Software (india) Limited"],["AAVAS","AAVAS Financiers Ltd"],["JITFINFRA","JITF Infra Logistics Ltd"],["TOTAL","Total Transport Systems Ltd"],["KAMOPAINTS","Kamdhenu Ventures Ltd"],
-["STOVEKRAFT","Stove Kraft Ltd"],["HARSHA","Harsha Engineers International Ltd"],["GREENPANEL","Greenpanel Industries Ltd"],["QUESS","Quess Corp Limited"],["NAVKARCORP","Navkar Corporation Limited"],
-["KAUSHALYA","Kaushalya Infrastructure Development Corporation Limited"],["AAREYDRUGS","Aarey Drugs & Pharmaceuticals Ltd"],["SOBHA","Sobha Limited"],["INDOCO","Indoco Remedies Limited"],["BHAGERIA","Bhageria Industries Limited"],
-["NFL","National Fertilizers Limited"],["MANAKSTEEL","Manaksia Steels Limited"],["UNITEDPOLY","United Polyfab Gujarat Ltd"],["COCHINSHIP","Cochin Shipyard Ltd"],["LLOYDSENT","Lloyds Enterprises Ltd"],
-["ZIMLAB","Zim Laboratories Ltd"],["WAKEFIT","Wakefit Innovations Ltd"],["DATAPATTNS","Data Patterns (India) Ltd"],["INDIGOPNTS","Indigo Paints Ltd"],["PVSL","Popular Vehicles & Services Ltd"],
-["SHEKHAWATI","Shekhawati Industries Ltd"],["PARSVNATH","Parsvnath Developers Limited"],["WSI","W S Industries (i) Limited"],["TARACHAND","Tara Chand Infralogistic Solutions Ltd"],["BVCL","Barak Valley Cements Limited"],
-["BANKA","Banka Bioloo Ltd"],["KOTHARIPET","Kothari Petrochemicals Limited"],["AMDIND","Amd Industries Limited"],["IFGLEXPOR","IFGL Refractories Ltd"],["SOMICONVEY","Somi Conveyor Beltings Limited"],
-["MADHAV","Madhav Marbles And Granites Limited"],["KMSUGAR","K.m.sugar Mills Limited"],["THELEELA","Leela Palaces Hotels & Resorts Ltd"],["CELLO","Cello World Ltd"],["EFCIL","EFC (I) Ltd"],
-["JHS","Jhs Svendgaard Laboratories Limited"],["HINDCOPPER","Hindustan Copper Limited"],["20MICRONS","20 Microns Limited"],["FORTIS","Fortis Healthcare Limited"],["CRISIL","Crisil Limited"],
-["DEVYANI","Devyani International Ltd"],["MANGALAM","Mangalam Drugs And Organics Limited"],["SUDARSCHEM","Sudarshan Chemical Industries Limited"],["MARSONS","Marsons Ltd"],["BAJAJHIND","Bajaj Hindusthan Sugar Limited"],
-["GPTINFRA","Gpt Infraprojects Limited"],["AMRUTANJAN","Amrutanjan Health Care Limited"],["PARKHOSPS","Park Medi World Ltd"],["VIKASLIFE","Vikas Lifecare Ltd"],["VPRPL","Vishnu Prakash R Punglia Ltd"],
-["MAGNUM","Magnum Ventures Limited"],["TALBROAUTO","Talbros Automotive Components Limited"],["AEROENTER","Aeroflex Enterprises Ltd"],["NATIONALUM","National Aluminium Company Limited"],["TARIL","Transformers & Rectifiers India Ltd"],
-["DEEPAKNTR","Deepak Nitrite Limited"],["INDIANHUME","Indian Hume Pipe Company Limited"],["SRPL","Shree Ram Proteins Ltd"],["FRACTAL","Fractal Analytics Ltd"],["SILVERBND","Bandhan Silver ETF"],
-["OMAXE","Omaxe Limited"],["NORTHARC","Northern ARC Capital Ltd"],["SIMPLEXINF","Simplex Infrastructures Limited"],["MGEL","Mangalam Global Enterprise Ltd"],["E2E","E2E Networks Ltd"],
-["RHL","Robust Hotels Pvt Ltd"],["MICEL","MIC Electronics Ltd"],["VENUSPIPES","Venus Pipes & Tubes Ltd"],["GENUSPAPER","Genus Paper & Boards Limited"],["HAPPSTMNDS","Happiest Minds Technologies Ltd"],
-["GSLSU","Global Surfaces Ltd"],["HINDPETRO","Hindustan Petroleum Corporation Limited"],["BPL","Bpl Limited"],["DRCSYSTEMS","DRC Systems India Ltd"],["SALZERELEC","Salzer Electronics Limited"],
-["TARC","Tarc Ltd"],["SIGMA","Sigma Solve Ltd"],["RAYMONDREL","Raymond Realty Ltd"],["KALAMANDIR","Sai Silks (Kalamandir) Ltd"],["ZODIACLOTH","Zodiac Clothing Company Limited"],
-["RAMASTEEL","Rama Steel Tubes Limited"],["NAGAFERT","Nagarjuna Fertilizers And Chemicals Limited"],["LOYALTEX","Loyal Textile Mills Ltd"],["EMMBI","Emmbi Industries Limited"],["CELEBRITY","Celebrity Fashions Limited"],
-["GOACARBON","Goa Carbon Limited"],["KHADIM","Khadim India Ltd"],["ORTINGLOBE","Ortin Laboratories Ltd"],["MASKINVEST","Mask Investments Limited"],["SPENCERS","Spencers Retail Ltd"],
-["SAMPANN","Sampann Utpadan India Ltd"],["RAMANEWS","Shree Rama Newsprint Limited"],["FAZE3Q","Faze Three Ltd"],["GCSL","Gretex Corporate Services Ltd"],["RCF","Rashtriya Chemicals And Fertilizers Limited"],
-["ACMESOLAR","ACME Solar Holdings Ltd"],["BIRLANU","BirlaNu Ltd"],["NUCLEUS","Nucleus Software Exports Limited"],["MIRCELECTR","Mirc Electronics Limited"],["AMBICAAGAR","Ambica Agarbathies Aroma & Industries Ltd"],
-["MOSILVER","Motilal Oswal Silver ETF"],["CLEANMAX","Clean Max Enviro Energy Solutions Ltd"],["OSIAHYPER","Osia Hyper Retail Ltd"],["PREMEXPLN","Premier Explosives Limited"],["TATSILV","Tata Silver Exchange Traded Fund"],
-["LAURUSLABS","Laurus Labs Limited"],["RAMCOIND","Ramco Industries Limited"],["MBLINFRA","Mbl Infrastructures Limited"],["BLUECOAST","Blue Coast Hotels Limited"],["KPITTECH","KPIT Technologies Ltd"],
-["BASML","Bannari Amman Spinning Mills Limited"],["COMPINFO","Compuage Infocom Limited"],["AARTISURF","Aarti Surfactants Ltd"],["FIRSTCRY","Brainbees Solutions Ltd"],["HINDWAREAP","Hindware Home Innovation Ltd"],
-["SHREDIGCEM","Shree Digvijay Cement Co. Ltd"],["UNICHEMLAB","Unichem Laboratories Limited"],["SILVERBETA","UTI Silver ETF"],["ATLASCYCLE","Atlas Cycles (haryana) Limited"],["SUKHJITS","Sukhjit Starch & Chemicals Ltd"],
-["SILVER1","Kotak Silver ETF"],["AHLADA","Ahlada Engineers Ltd"],["VITAL","Vital Chemtech Ltd"],["STEL","Stel Holdings Limited"],["SILVERCASE","Zerodha Silver ETF"],
-["NURECA","Nureca Ltd"],["ALPHAGEO","Alphageo (india) Limited"],["KAVDEFENCE","Kavveri Defence & Wireless Technologies Ltd"],["DVL","Dhunseri Ventures Ltd"],["TICL","Tantia Constructions Ltd"],
-["JYOTISTRUC","Jyoti Structures Limited"],["A2ZINFRA","A2z Infra Engineering Limited"],["SPANDANA","Spandana Sphoorty Financial Ltd"],["NDTV","New Delhi Television Limited"],["IFBAGRO","Ifb Agro Industries Limited"],
-["DPWIRES","D P Wires Ltd"],["ESILVER","Edelweiss Silver ETF"],["SILVERTUC","Silver Touch Technologies Ltd"],["NECCLTD","North Eastern Carrying Corporation Limited"],["KERNEX","Kernex Microsystems (india) Limited"],
-["SILVERIETF","ICICI Prudential Silver ETF"],["SILVER","Aditya Birla Sun Life Silver ETF"],["USK","Udayshivakumar Infra Ltd"],["SILVER360","360 ONE Silver ETF"],["EIEL","Enviro Infra Engineers Ltd"],
-["BHARATCOAL","Bharat Coking Coal Ltd"],["CAPACITE","Capacite Infraprojects Ltd"],["DELPHIFX","Delphi World Money Ltd"],["GROWWSLVR","GROWWSLVR"],["BPCL","Bharat Petroleum Corporation Limited"],
-["SILVERBEES","Nippon India Silver ETF"],["IKIO","IKIO Lighting Ltd"],["CCCL","Consolidated Construction Consortium Limited"],["BUTTERFLY","Butterfly Gandhimathi Appliances Limited"],["RAJESHEXPO","Rajesh Exports Limited"],
-["SETCO","Setco Automotive Limited"],["PIGL","Power & Instrumentation (Gujarat) Ltd"],["TOUCHWOOD","Touchwood Entertainment Ltd"],["KESORAMIND","Kesoram Industries Limited"],["SILVERADD","DSP Silver ETF"],
-["SURYODAY","Suryoday Small Finance Bank Ltd"],["BESTAGRO","Best Agrolife Ltd"],["DUCON","Ducon Infratechnologies Limited"],["HDFCSILVER","HDFC Silver ETF"],["HISARMETAL","Hisar Metal Industries Ltd"],
-["EMBDL","Embassy Development Limited"],["VCL","Vaxtex Cotfab Ltd"],["TAINWALCHM","Tainwala Chemical And Plastic (i) Limited"],["3PLAND","3P Land Holdings Ltd"],["RML","Rane (madras) Limited"],
-["SBISILVER","SBI Silver ETF"],["TVTODAY","Tv Today Network Limited"],["JMA","Jullundur Motor Agency (delhi) Limited"],["INDIAVIX","India VIX"],["MOIL","Moil Limited"],
-["AXISILVER","Axis Silver ETF"],["SAKSOFT","Saksoft Limited"],["KOHINOOR","Kohinoor Foods Limited"],["PARKHOTELS","Apeejay Surrendra Park Hotels Ltd"],["AONESILVER","Angel One Silver ETF"],
-["SARDAEN","Sarda Energy & Minerals Limited"],["SEJALLTD","Sejal Glass Ltd"],["PNGSREVA","PNGS Reva Diamond Jewellery Limited"],["DELTAMAGNT","Delta Magnets Limited"],["WEALTH","Wealth First Portfolio Managers Ltd"],
-["ZENITHEXPO","Zenith Exports Limited"],["MCLEODRUSS","Mcleod Russel India Limited"],["MTEDUCARE","Mt Educare Limited"],["MADHUCON","Madhucon Projects Limited"],["MANAKALUCO","Manaksia Aluminium Company Limited"],
-["AGSTRA","AGS Transact Technologies Ltd"],["SILVERAG","Mirae Asset Silver ETF"],["SADBHAV","Sadbhav Engineering Limited"],["ZEEMEDIA","Zee Media Corporation Limited"],["ARSHIYA","Arshiya Limited"],
-["PRECOT","Precot Meridian Limited"],["HPIL","Hindprakash Industries Ltd"],["IOC","Indian Oil Corporation Limited"],["DIL","Debock Industries Ltd"],["EUROTEXIND","Eurotex Industries And Exports Limited"],
-["TGBHOTELS","Tgb Banquets And Hotels Limited"],["GTPL","GTPL Hathway"],["TIGERLOGS","Tiger Logistics (India) Ltd"],["ROLLT","Rollatainers Limited"],["SKIL","Skil Infrastructure Limited"],
-["SIMBHALS","Simbhaoli Sugars Limited"],["HDIL","Housing Development And Infrastructure Limited"],["MORARJEE","Morarjee Textiles Limited"],["VIVIDHA","Visagar Polytex Limited"],["EBGNG","GNG Electronics Ltd"],
-["RCOM","Reliance Communications Limited"],["SANCO","Sanco Industries Limited"],["SOUTHWEST","South West Pinnacle Exploration Ltd"],["GENSOL","Gensol Engineering Ltd"],["MANUGRAPH","Manugraph India Limited"],
-["AAKASH","Aakash Exploration Services Ltd"],["NOIDATOLL","Noida Toll Bridge Company Limited"],["SHREYANIND","Shreyans Industries Limited"],["AQYLON","Aqylon Nexus Ltd"],["RMDRIP","R M Drip & Sprinklers Systems Ltd"],
-["LEXUS","Lexus Granito (India) Ltd"],["PANAMAPET","Panama Petrochem Limited"],["RELINFRA","Reliance Infrastructure Limited"],["SALSTEEL","SAL Steel"],["LANCORHOL","Lancor Holdings Ltd"],
-["WINDMACHIN","Windsor Machines Limited"],["UEL","Ujaas Energy Ltd"],["NACLIND","NACL Industries Ltd"],["RNBDENIMS","R&B Denims Ltd"],["EASTSILK","Eastern Silk Industries Limited"],
-["ABAN","Aban Offshore Limited"],["BOHRAIND","Bohra Industries Ltd"],["SABEVENTS","Sab Events & Governance Now Media Limited"],["CMICABLES","Cmi Limited"],["MAPMYINDIA","C.E. Info Systems Ltd"],
-["INDIQUBE","Indiqube Spaces Ltd"],["SANDUMA","Sandur Manganese & Iron Ores Ltd"],["UMIYA-MRO","Umiya Buildcon Ltd"],["UNIINFO","Uniinfo Telecom Services Ltd"],["AHLUCONT","Ahluwalia Contracts (india) Limited"],
-["HDFCNIF100","HDFC Nifty 100 ETF"],["CPEDU","Career Point Edutech Ltd"],["VINNY","Vinny Overseas Ltd"],["RACE","Race Eco Chain Ltd"],["IRMENERGY","IRM Energy Ltd"],
-["GREENPOWER","Orient Green Power Company Limited"],["EVERESTIND","Everest Industries Limited"],["RAJSREESUG","Rajshree Sugars & Chemicals Limited"],["EMAMIPAP","Emami Paper Mills Ltd"],["VIPCLOTHNG","Vip Clothing Limited"],
-["BALAXI","Balaxi Pharmaceuticals Ltd"],["KPIGREEN","KPI Green Energy Ltd"],["KREBSBIO","Krebs Biochemicals And Industries Limited"],["MITTAL","Mittal Life Style Ltd"],["EPACK","Epack Durable Ltd"],
-["MUKTAARTS","Mukta Arts Limited"],["VLEGOV","VL E-Governance & IT Solutions Ltd"],["DIGITIDE","Digitide Solutions Ltd"],["HARRMALAYA","Harrisons  Malayalam Limited"],["POWERMECH","Power Mech Projects Limited"],
-["VIKASECO","Vikas Ecotech Limited"],["FACT","Fertilizers And Chemicals Travancore Limited"],["VSTL","Vibhor Steel Tubes Ltd"],["WESTLIFE","Westlife Foodworld Ltd"],["INDOTECH","Indo Tech Transformers Limited"],
-["ARIHANTSUP","Arihant Superstructures Ltd"],["CHEMBOND","Chembond Material Technologies Ltd"],["AKSHOPTFBR","Aksh Optifibre Limited"],["MAHASTEEL","Mahamaya Steel Industries Limited"],["ASMS","Bartronics India Ltd"],
-["FILATFASH","Filatex Fashions Ltd"],["SAKHTISUG","Sakthi Sugars Limited"],["RADAAN","Radaan Mediaworks India Limited"],["KRBL","Krbl Limited"],["VISHWARAJ","Vishwaraj Sugar Industries Ltd"],
-["PRITI","Priti International Ltd"],["SOLEX","Solex Energy Ltd"],["PRUDMOULI","Prudential Sugar Corporation Ltd"],["GLOBECIVIL","GLOBECIVIL"],["GOCOLORS","Go Fashion (India) Ltd"],
-["CHEMBONDCH","Chembond Chemicals Ltd"],["REPL","Rudrabhishek Enterprises Ltd"],["SUYOG","Suyog Telematics Ltd"],["SEPC","SEPC Ltd"],["BTML","Bodhi Tree Multimedia Ltd"],
-["GESHIP","The Great Eastern Shipping Company Limited"],["OMINFRAL","Om Infra Ltd"],["LAMBODHARA","Lambodhara Textiles Limited"],["DPSCLTD","Dpsc Limited"],["BYKE","The Byke Hospitality Ltd"],
-["KRISHNADEF","Krishna Defence & Allied Industries Ltd"],["RKSWAMY","R K Swamy Ltd"],["DSFCL","DCM Shriram Fine Chemicals Ltd"],["GULFPETRO","Gp Petroleums Limited"],["REMSONSIND","Remsons Industries Limited"],
-["DICIND","Dic India Limited"],["VASCONEQ","Vascon Engineers Limited"],["DISHTV","Dish Tv India Limited"],["JOCIL","Jocil Limited"],["ADL","Archidply Decor Ltd"],
-["TCC","TCC Concept Ltd"],["BAGFILMS","B.a.g Films And Media Limited"],["NDL","Nandan Denim Limited"],["JISLDVREQS","Jain Irrigation Systems Limited"],["DHARAN","Dharan Infra-EPC Ltd"],
-["ASTEC","Astec Lifesciences Limited"],["ISFT","Intrasoft Technologies Limited"],["MINDTECK","Mindteck (india) Limited"],["KANPRPLA","Kanpur Plastipack Ltd"],["SPLIL","Spl Industries Limited"],
-["BANDHANBNK","Bandhan Bank Ltd"],["RKEC","RKEC Projects Ltd"],["ELLEN","ELLEN"],["ICDSLTD","ICDS Ltd"],["UMAEXPORTS","Uma Exports Ltd"],
-["CIFL","Capital India Finance Ltd"],["ATGL","Adani Total Gas Ltd"],["SRD","Shankar Lal Rampal Dye-Chem Ltd"],["VIRINCHI","Virinchi Ltd"],["XTGLOBAL","XT Global Infotech Ltd"],
-["TTKPRESTIG","Ttk Prestige Limited"],["KRIDHANINF","Kridhan Infra Limited"],["DDEVPLSTIK","DDev Plastiks Industries Ltd"],["MODTHREAD","Modern Threads (I) Ltd"],["REGAAL","Regaal Resources Ltd"],
-["COMPUSOFT","Compucom Software Limited"],["SUPERSPIN","Super Spinning Mills Limited"],["HGM","Handson Global Management (HGM) Ltd"],["MIDCAPADD","DSP Nifty Midcap 150 ETF"],["SHYAMTEL","Shyam Telecom Limited"],
-["CONFIPET","Confidence Petroleum India Ltd"],["HINDOILEXP","Hindustan Oil Exploration Company Limited"],["HPL","Hpl Electric & Power Limited"],["COUNCODOS","Country Condo's Limited"],["HAVISHA","Sri Havisha Hospitality & Infrastructure Ltd"],
-["OILCOUNTUB","Oil Country Tubular Limited"],["IDBI","Idbi Bank Limited"],["FINOPB","Fino Payments Bank Ltd"],
-];
-const NSE_STOCKS = NSE_RAW.map(([s,n]) => ({symbol:s+".NS",name:n,ticker:s}));
-</script>
+  <script type="text/babel">
+    const { useState, useMemo, useCallback, useEffect, useRef } = React;
 
-<script type="text/babel">
-const { useState, useMemo, useCallback, useEffect, useRef } = React;
+    /* ═══════════════════════════════════════════════════════════
+       CONFIG — adjust this path to match your repo structure
+       ═══════════════════════════════════════════════════════════ */
+    const DATA_URL = './data/rrm_data.json';   // relative to this HTML file
+    // If your HTML is in /pages/ and data in /data/, use: '../data/rrm_data.json'
 
-const DATA_URL = './data/rrm_data.json';
+    /* ═══════════════════════════════════════════════════════════
+       CONSTANTS
+       ═══════════════════════════════════════════════════════════ */
+    const Q_COLORS = { Leading: '#00ff88', Improving: '#00c8ff', Weakening: '#ffd000', Lagging: '#ff3366' };
+    const LIGHT_MAP = { GREEN: '#00ff88', YELLOW: '#ffd000', BLUE: '#00c8ff', RED: '#ff3366' };
+    const GROUP_META = [
+      { key: 'sectors',         label: 'Sectors',  icon: '◉', desc: '16 NSE Sector Indices' },
+      { key: 'etfs',            label: 'ETFs',     icon: '◆', desc: '54 NSE ETFs' },
+      { key: 'asset_classes',   label: 'Assets',   icon: '◈', desc: '12 Asset Classes' },
+      { key: 'market_segments', label: 'Segments', icon: '◇', desc: '4 Market Segments' },
+      { key: 'global_indices',  label: 'Global',   icon: '🌐', desc: '25 Global Indices' },
+      { key: 'custom_stocks',   label: 'My Stocks',icon: '★', desc: 'Custom Watchlist' },
+    ];
+    const BENCHMARKS = [
+      { key: '^NSEI',    label: 'Nifty 50' },
+      { key: '^NSEBANK', label: 'Bank Nifty' },
+      { key: '^CRSLDX',  label: 'Nifty 500' },
+    ];
 
-const Q_COLORS = { Leading:'#00ff88', Improving:'#00c8ff', Weakening:'#ffd000', Lagging:'#ff3366' };
-const LIGHT_MAP = { GREEN:'#00ff88', YELLOW:'#ffd000', BLUE:'#00c8ff', RED:'#ff3366' };
-const GROUP_META = [
-  { key:'sectors', label:'Sectors', icon:'\u25C9' },
-  { key:'etfs', label:'ETFs', icon:'\u25C6' },
-  { key:'asset_classes', label:'Assets', icon:'\u25C8' },
-  { key:'market_segments', label:'Segments', icon:'\u25C7' },
-  { key:'global_indices', label:'Global', icon:'\uD83C\uDF10' },
-  { key:'custom_stocks', label:'My Stocks', icon:'\u2605' },
-];
-const BENCHMARKS = [
-  { key:'^NSEI', label:'Nifty 50' },
-  { key:'^NSEBANK', label:'Bank Nifty' },
-  { key:'^CRSLDX', label:'Nifty 500' },
-];
-const GRID_COLS = '200px 85px 80px 45px 75px 105px';
+    /* ═══════════════════════════════════════════════════════════
+       DATA TRANSFORMER
+       Converts rrm_data.json → flat array per group with D/W/M
+       ═══════════════════════════════════════════════════════════ */
+    function transformData(raw, benchKey, groupKey) {
+      const bm = raw?.benchmarks_data?.[benchKey];
+      if (!bm) return [];
 
-function transformData(raw, benchKey, groupKey) {
-  const bm = raw?.benchmarks_data?.[benchKey];
-  if (!bm) return [];
-  const daily = bm.daily?.[groupKey] || [];
-  const weekly = bm.weekly?.[groupKey] || [];
-  const monthly = bm.monthly?.[groupKey] || [];
-  const wMap = {}; weekly.forEach(s => { wMap[s.symbol] = s; });
-  const mMap = {}; monthly.forEach(s => { mMap[s.symbol] = s; });
-  return daily.map(d => {
-    const w = wMap[d.symbol] || {};
-    const m = mMap[d.symbol] || {};
-    return {
-      symbol: d.symbol, name: d.name, color: d.color, group: d.group || '',
-      daily:   { q: d.quadrant||'', rsr: d.current?.rs_ratio||100, rsm: d.current?.rs_momentum||100 },
-      weekly:  { q: w.quadrant||'', rsr: w.current?.rs_ratio||100, rsm: w.current?.rs_momentum||100 },
-      monthly: { q: m.quadrant||'', rsr: m.current?.rs_ratio||100, rsm: m.current?.rs_momentum||100 },
-      dailyTail: d.tail||[], weeklyTail: w.tail||[], monthlyTail: m.tail||[],
+      const daily   = bm.daily?.[groupKey]   || [];
+      const weekly  = bm.weekly?.[groupKey]   || [];
+      const monthly = bm.monthly?.[groupKey]  || [];
+
+      // Build lookup maps by symbol
+      const wMap = {}; weekly.forEach(s  => { wMap[s.symbol] = s; });
+      const mMap = {}; monthly.forEach(s => { mMap[s.symbol] = s; });
+
+      return daily.map(d => {
+        const w = wMap[d.symbol] || {};
+        const m = mMap[d.symbol] || {};
+        return {
+          symbol: d.symbol,
+          name:   d.name,
+          color:  d.color,
+          group:  d.group || '',
+          daily:   { q: d.quadrant || '', rsr: d.current?.rs_ratio || 100, rsm: d.current?.rs_momentum || 100 },
+          weekly:  { q: w.quadrant || '', rsr: w.current?.rs_ratio || 100, rsm: w.current?.rs_momentum || 100 },
+          monthly: { q: m.quadrant || '', rsr: m.current?.rs_ratio || 100, rsm: m.current?.rs_momentum || 100 },
+          // Pass tail data through for future mini-chart use
+          dailyTail:   d.tail || [],
+          weeklyTail:  w.tail || [],
+          monthlyTail: m.tail || [],
+        };
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SIGNAL COMPUTATION (MTF Confluence + RRG-RSI + Actions)
+       ═══════════════════════════════════════════════════════════ */
+    function computeSignals(item) {
+      const { daily: d, weekly: w, monthly: m } = item;
+      const right = q => q === 'Leading' || q === 'Improving';
+
+      // MTF Confluence Score (1–5)
+      let score = 0;
+      if (right(m.q)) score += (m.rsr >= 100 && m.rsm >= 100) ? 2 : 1; // Monthly Power Trinity = +2
+      if (right(w.q)) score += (w.rsr >= 100 && w.rsm >= 100) ? 2 : 1; // Weekly Power Trinity = +2
+      if (right(d.q)) score += 1;                                        // Daily right = +1
+      score = Math.min(score, 5);
+
+      // Traffic Light
+      let light;
+      if      (right(m.q) && right(w.q) && right(d.q))  light = 'GREEN';   // All 3 aligned
+      else if (right(m.q) && !right(w.q) && right(d.q)) light = 'YELLOW';  // Hook entry — M strong, W dip, D up
+      else if (!right(m.q) && right(w.q) && right(d.q)) light = 'BLUE';    // Counter-trend — no monthly backing
+      else                                               light = 'RED';     // Structural weakness
+
+      // RRG-RSI Combo (proxy: weekly RS-Momentum in sweet zone 98–106)
+      const weeklyMomOk = w.rsm >= 98 && w.rsm <= 106;
+      const rsiOk = right(w.q) && weeklyMomOk;
+
+      // Action
+      let action;
+      if      (score >= 4 && rsiOk)    action = 'AGGRESSIVE BUY';
+      else if (score >= 3 && rsiOk)    action = 'BUY ON DIP';
+      else if (light === 'YELLOW')     action = 'HOOK ENTRY';
+      else if (light === 'BLUE')       action = 'SCALP ONLY';
+      else if (score >= 3)             action = 'HOLD';
+      else                             action = 'AVOID';
+
+      return { score, light, rsiOk, action };
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TINY COMPONENTS
+       ═══════════════════════════════════════════════════════════ */
+    const Dot = ({ color, active, s = 7 }) => (
+      <span style={{
+        display: 'inline-block', width: s, height: s, borderRadius: '50%',
+        background: active ? color : 'rgba(255,255,255,0.05)',
+        boxShadow: active ? `0 0 8px ${color}50` : 'none',
+        transition: 'all 0.3s',
+      }} />
+    );
+
+    const QBadge = ({ q }) => {
+      const c = Q_COLORS[q] || '#444';
+      return (
+        <span style={{
+          padding: '1px 6px', borderRadius: 3, border: `1px solid ${c}25`,
+          background: `${c}08`, color: c, fontSize: 10, fontWeight: 600,
+          fontFamily: 'var(--mono)', letterSpacing: '0.03em',
+        }}>
+          {q || '—'}
+        </span>
+      );
     };
-  });
-}
 
-function computeSignals(item) {
-  const { daily:d, weekly:w, monthly:m } = item;
-  const right = q => q === 'Leading' || q === 'Improving';
-  let score = 0;
-  if (right(m.q)) score += (m.rsr>=100 && m.rsm>=100) ? 2 : 1;
-  if (right(w.q)) score += (w.rsr>=100 && w.rsm>=100) ? 2 : 1;
-  if (right(d.q)) score += 1;
-  score = Math.min(score, 5);
-  let light;
-  if (right(m.q) && right(w.q) && right(d.q)) light = 'GREEN';
-  else if (right(m.q) && !right(w.q) && right(d.q)) light = 'YELLOW';
-  else if (!right(m.q) && right(w.q) && right(d.q)) light = 'BLUE';
-  else light = 'RED';
-  const rsiOk = right(w.q) && w.rsm >= 98 && w.rsm <= 106;
-  let action;
-  if (score>=4 && rsiOk) action='AGGRESSIVE BUY';
-  else if (score>=3 && rsiOk) action='BUY ON DIP';
-  else if (light==='YELLOW') action='HOOK ENTRY';
-  else if (light==='BLUE') action='SCALP ONLY';
-  else if (score>=3) action='HOLD';
-  else action='AVOID';
-  return { score, light, rsiOk, action };
-}
-
-// ═══ TINY COMPONENTS ═══
-const Dot = ({color, active, s=7}) => (
-  <span style={{ display:'inline-block', width:s, height:s, borderRadius:'50%',
-    background: active ? color : 'rgba(255,255,255,0.05)',
-    boxShadow: active ? `0 0 8px ${color}50` : 'none', transition:'all .3s' }} />
-);
-
-const QBadge = ({q}) => {
-  const c = Q_COLORS[q] || '#444';
-  return <span style={{ padding:'1px 6px', borderRadius:3, border:`1px solid ${c}25`,
-    background:`${c}08`, color:c, fontSize:10, fontWeight:600,
-    fontFamily:'var(--mono)', letterSpacing:'0.03em' }}>{q || '\u2014'}</span>;
-};
-
-const ScoreBar = ({score}) => {
-  const c = score>=4 ? '#00ff88' : score>=3 ? '#ffd000' : '#ff3366';
-  return (
-    <div style={{ display:'flex', alignItems:'center', gap:5, minWidth:70 }}>
-      <div style={{ flex:1, height:3, borderRadius:2, background:'rgba(255,255,255,0.04)', overflow:'hidden' }}>
-        <div style={{ width:`${(score/5)*100}%`, height:'100%', background:c, borderRadius:2,
-          boxShadow:`0 0 8px ${c}30`, transition:'width .5s ease' }} />
-      </div>
-      <span style={{ color:c, fontWeight:700, fontSize:12, fontFamily:'var(--mono)', width:12, textAlign:'right' }}>{score}</span>
-    </div>
-  );
-};
-
-const Sparkline = ({data, width=55, height=18, color='#00c8ff'}) => {
-  if (!data || data.length < 2) return null;
-  const vals = data.map(d => d.rs_ratio);
-  const min = Math.min(...vals), max = Math.max(...vals), range = max-min||1;
-  const pts = vals.map((v,i) => `${(i/(vals.length-1))*width},${height-((v-min)/range)*(height-2)-1}`).join(' ');
-  return <svg width={width} height={height} style={{display:'block'}}><polyline points={pts} fill="none" stroke={color} strokeWidth="1.2" strokeLinejoin="round"/></svg>;
-};
-
-// ═══ ASSET ROW ═══
-const AssetRow = ({item, sig, expanded, onToggle}) => {
-  const lc = LIGHT_MAP[sig.light];
-  return (
-    <div style={{borderBottom:'1px solid rgba(255,255,255,0.025)'}} className="fade-in">
-      <div onClick={onToggle} style={{
-        display:'grid', gridTemplateColumns:GRID_COLS,
-        alignItems:'center', gap:8, padding:'8px 14px', cursor:'pointer',
-        background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent', transition:'background .2s',
-      }}>
-        <div>
-          <div style={{color:'#fff',fontWeight:600,fontSize:11.5,fontFamily:'var(--mono)',lineHeight:1.3}}>{item.name}</div>
-          <div style={{color:'rgba(255,255,255,0.2)',fontSize:9,fontFamily:'var(--mono)'}}>{item.symbol}</div>
+    const ScoreBar = ({ score }) => {
+      const c = score >= 4 ? '#00ff88' : score >= 3 ? '#ffd000' : '#ff3366';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 70 }}>
+          <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
+            <div style={{
+              width: `${(score / 5) * 100}%`, height: '100%', background: c, borderRadius: 2,
+              boxShadow: `0 0 8px ${c}30`, transition: 'width 0.5s ease',
+            }} />
+          </div>
+          <span style={{ color: c, fontWeight: 700, fontSize: 12, fontFamily: 'var(--mono)', width: 12, textAlign: 'right' }}>{score}</span>
         </div>
-        <div style={{display:'flex',gap:3,alignItems:'center'}}>
-          {['GREEN','YELLOW','BLUE','RED'].map(l => <Dot key={l} color={LIGHT_MAP[l]} active={sig.light===l}/>)}
-          <span style={{fontSize:8,color:lc,fontFamily:'var(--mono)',fontWeight:700,marginLeft:2}}>{sig.light}</span>
-        </div>
-        <ScoreBar score={sig.score}/>
-        <span style={{fontSize:10,fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',
-          color:sig.rsiOk?'#00ff88':'rgba(255,255,255,0.1)'}}>
-          {sig.rsiOk ? '\u2713' : '\u2717'}
-        </span>
-        <QBadge q={item.weekly.q}/>
-        <span style={{padding:'2px 5px',borderRadius:3,fontSize:8.5,fontWeight:700,
-          fontFamily:'var(--mono)',textAlign:'center',whiteSpace:'nowrap',
-          color:lc,background:`${lc}08`,border:`1px solid ${lc}15`}}>
-          {sig.action}
-        </span>
-      </div>
-      {expanded && (
-        <div style={{padding:'2px 14px 10px',display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-          {[['DAILY',item.daily,item.dailyTail],['WEEKLY',item.weekly,item.weeklyTail],['MONTHLY',item.monthly,item.monthlyTail]].map(([label,tf,tail]) => {
-            const qc = Q_COLORS[tf.q]||'#444';
-            return (
-              <div key={label} style={{background:'rgba(255,255,255,0.012)',borderRadius:6,padding:'8px 10px',border:`1px solid ${qc}12`}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                  <span style={{fontSize:8,color:'var(--text3)',fontWeight:700,letterSpacing:'0.1em',fontFamily:'var(--mono)'}}>{label}</span>
-                  <QBadge q={tf.q}/>
-                </div>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
-                  <div style={{display:'flex',gap:14}}>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontSize:7.5,color:'var(--text3)',fontFamily:'var(--mono)',marginBottom:1}}>RS-R</div>
-                      <div style={{fontSize:14,fontWeight:700,color:tf.rsr>=100?'#00ff88':'#ff3366',fontFamily:'var(--mono)'}}>{tf.rsr.toFixed(1)}</div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       MINI SPARKLINE (RS-Ratio trail from tail data)
+       ═══════════════════════════════════════════════════════════ */
+    const Sparkline = ({ data, width = 60, height = 20, color = '#00c8ff' }) => {
+      if (!data || data.length < 2) return null;
+      const vals = data.map(d => d.rs_ratio);
+      const min = Math.min(...vals); const max = Math.max(...vals);
+      const range = max - min || 1;
+      const pts = vals.map((v, i) => {
+        const x = (i / (vals.length - 1)) * width;
+        const y = height - ((v - min) / range) * (height - 2) - 1;
+        return `${x},${y}`;
+      }).join(' ');
+      return (
+        <svg width={width} height={height} style={{ display: 'block' }}>
+          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.2" strokeLinejoin="round" />
+          <line x1="0" y1={height - ((100 - min) / range) * (height - 2) - 1} x2={width} y2={height - ((100 - min) / range) * (height - 2) - 1}
+            stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" strokeDasharray="2,2" />
+        </svg>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       ASSET ROW — expandable with D/W/M detail cards
+       ═══════════════════════════════════════════════════════════ */
+    const AssetRow = ({ item, sig, expanded, onToggle, idx }) => {
+      const lc = LIGHT_MAP[sig.light];
+      return (
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }} className="fade-in" >
+          <div onClick={onToggle} style={{
+            display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
+            alignItems: 'center', gap: 6, padding: '8px 12px', cursor: 'pointer',
+            background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
+            transition: 'background 0.2s',
+          }}>
+            {/* Name */}
+            <div>
+              <div style={{ color: '#fff', fontWeight: 600, fontSize: 11.5, fontFamily: 'var(--mono)', lineHeight: 1.3 }}>{item.name}</div>
+              <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, fontFamily: 'var(--mono)' }}>{item.symbol}</div>
+            </div>
+            {/* Signal dots */}
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {['GREEN','YELLOW','BLUE','RED'].map(l => <Dot key={l} color={LIGHT_MAP[l]} active={sig.light === l} />)}
+              <span style={{ fontSize: 8, color: lc, fontFamily: 'var(--mono)', fontWeight: 700, marginLeft: 2 }}>{sig.light}</span>
+            </div>
+            {/* Score */}
+            <ScoreBar score={sig.score} />
+            {/* RSI check */}
+            <span style={{
+              fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center',
+              color: sig.rsiOk ? '#00ff88' : 'rgba(255,255,255,0.1)',
+            }}>
+              {sig.rsiOk ? '✓' : '✗'}
+            </span>
+            {/* Weekly Q */}
+            <QBadge q={item.weekly.q} />
+            {/* Action */}
+            <span style={{
+              padding: '2px 5px', borderRadius: 3, fontSize: 8.5, fontWeight: 700,
+              fontFamily: 'var(--mono)', textAlign: 'center', whiteSpace: 'nowrap',
+              color: lc, background: `${lc}08`, border: `1px solid ${lc}15`,
+            }}>
+              {sig.action}
+            </span>
+          </div>
+
+          {/* Expanded detail */}
+          {expanded && (
+            <div style={{ padding: '2px 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+              {[['DAILY', item.daily, item.dailyTail], ['WEEKLY', item.weekly, item.weeklyTail], ['MONTHLY', item.monthly, item.monthlyTail]].map(([label, tf, tail]) => {
+                const qc = Q_COLORS[tf.q] || '#444';
+                return (
+                  <div key={label} style={{
+                    background: 'rgba(255,255,255,0.012)', borderRadius: 6, padding: '8px 10px',
+                    border: `1px solid ${qc}12`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 8, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)' }}>{label}</span>
+                      <QBadge q={tf.q} />
                     </div>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontSize:7.5,color:'var(--text3)',fontFamily:'var(--mono)',marginBottom:1}}>RS-M</div>
-                      <div style={{fontSize:14,fontWeight:700,color:tf.rsm>=100?'#00ff88':'#ff3366',fontFamily:'var(--mono)'}}>{tf.rsm.toFixed(1)}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 14 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-RATIO</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: tf.rsr >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsr.toFixed(1)}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-MOM</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: tf.rsm >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsm.toFixed(1)}</div>
+                        </div>
+                      </div>
+                      <Sparkline data={tail} color={qc} />
                     </div>
                   </div>
-                  <Sparkline data={tail} color={qc}/>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ═══ ADD STOCK MODAL with 2668-stock autocomplete ═══
-const AddStockModal = ({onClose, onAdd}) => {
-  const [mode, setMode] = useState('manual');
-  const [ticker, setTicker] = useState('');
-  const [name, setName] = useState('');
-  const [group, setGroup] = useState('Watchlist');
-  const [pasteText, setPasteText] = useState('');
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSugg, setShowSugg] = useState(false);
-  const [hlIdx, setHlIdx] = useState(-1);
-  const listRef = useRef(null);
-
-  const handleTickerChange = (val) => {
-    setTicker(val);
-    setHlIdx(-1);
-    const q = val.trim().toUpperCase();
-    if (q.length >= 1) {
-      // Search by ticker first, then by name
-      const byTicker = window.NSE_STOCKS.filter(s => s.ticker.startsWith(q));
-      const byName = window.NSE_STOCKS.filter(s => s.name.toUpperCase().includes(q) && !s.ticker.startsWith(q));
-      const matches = [...byTicker, ...byName].slice(0, 10);
-      setSuggestions(matches);
-      setShowSugg(matches.length > 0);
-    } else {
-      setShowSugg(false);
-    }
-  };
-
-  const selectSuggestion = (s) => {
-    setTicker(s.ticker);
-    setName(s.name);
-    setShowSugg(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if (!showSugg) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); setHlIdx(i => Math.min(i+1, suggestions.length-1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setHlIdx(i => Math.max(i-1, 0)); }
-    else if (e.key === 'Enter' && hlIdx >= 0) { e.preventDefault(); selectSuggestion(suggestions[hlIdx]); }
-    else if (e.key === 'Escape') { setShowSugg(false); }
-  };
-
-  const handleAdd = () => {
-    if (mode === 'manual' && ticker.trim()) {
-      const sym = ticker.trim().toUpperCase() + (ticker.includes('.') ? '' : '.NS');
-      onAdd({ symbol:sym, name:name||ticker.toUpperCase(), group });
-      setTicker(''); setName('');
-    } else if (mode === 'paste' && pasteText.trim()) {
-      pasteText.split('\n').filter(l=>l.trim()).forEach(l => {
-        const parts = l.split(',').map(s=>s.trim());
-        if (parts[0]) onAdd({ symbol:parts[0].toUpperCase()+(parts[0].includes('.')?'':'.NS'), name:parts[1]||parts[0].toUpperCase(), group });
-      });
-      setPasteText('');
-    }
-  };
-
-  const inp = {
-    background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)',
-    borderRadius:5, padding:'7px 10px', color:'#fff', fontSize:12,
-    fontFamily:'var(--mono)', outline:'none', width:'100%',
-  };
-
-  return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999}}
-      onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{
-        background:'#0c0c18',border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,padding:22,width:420,maxWidth:'92vw',
-      }}>
-        <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
-          <span style={{fontSize:13,fontWeight:700,color:'var(--green)',fontFamily:'var(--mono)'}}>ADD STOCKS</span>
-          <span style={{fontSize:9,color:'var(--text3)',fontFamily:'var(--mono)',alignSelf:'center'}}>2,668 NSE stocks</span>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:16}}>{'\u2715'}</button>
-        </div>
-        <div style={{display:'flex',gap:4,marginBottom:14}}>
-          {['manual','paste'].map(m => (
-            <button key={m} onClick={()=>setMode(m)} style={{
-              padding:'4px 12px',borderRadius:4,fontSize:10,fontWeight:600,cursor:'pointer',
-              border:`1px solid ${mode===m?'#00ff8835':'rgba(255,255,255,0.05)'}`,
-              background:mode===m?'#00ff880c':'transparent',
-              color:mode===m?'#00ff88':'rgba(255,255,255,0.3)',fontFamily:'var(--mono)',
-            }}>{m==='manual'?'MANUAL':'PASTE LIST'}</button>
-          ))}
-        </div>
-
-        {mode === 'manual' ? (
-          <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            <div style={{position:'relative'}}>
-              <input value={ticker} onChange={e=>handleTickerChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={()=>{ if(suggestions.length) setShowSugg(true); }}
-                onBlur={()=>setTimeout(()=>setShowSugg(false),200)}
-                placeholder="Type ticker or company name..." style={inp} autoComplete="off" />
-              {showSugg && (
-                <div ref={listRef} style={{
-                  position:'absolute',top:'100%',left:0,right:0,zIndex:10,
-                  background:'#12121f',border:'1px solid rgba(255,255,255,0.1)',
-                  borderRadius:5,marginTop:2,maxHeight:240,overflowY:'auto',
-                }}>
-                  {suggestions.map((s,i) => (
-                    <div key={s.symbol} className="sugg-item" onMouseDown={()=>selectSuggestion(s)}
-                      style={{
-                        padding:'7px 10px',cursor:'pointer',fontSize:11,fontFamily:'var(--mono)',
-                        color: i===hlIdx ? '#00ff88' : 'rgba(255,255,255,0.6)',
-                        background: i===hlIdx ? 'rgba(0,255,136,0.06)' : 'transparent',
-                        borderBottom:'1px solid rgba(255,255,255,0.03)',
-                        display:'flex',justifyContent:'space-between',alignItems:'center',
-                      }}>
-                      <span>
-                        <span style={{fontWeight:700,color:i===hlIdx?'#00ff88':'#fff'}}>{s.ticker}</span>
-                        <span style={{opacity:0.4,marginLeft:8,fontSize:9,fontFamily:'var(--sans)'}}>{s.name}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <input value={name} onChange={e=>setName(e.target.value)} placeholder="Display name (auto-filled)" style={{...inp,fontFamily:'var(--sans)'}} />
-            <select value={group} onChange={e=>setGroup(e.target.value)} style={inp}>
-              <option value="Watchlist">Watchlist</option>
-              <option value="Core Holdings">Core Holdings</option>
-              <option value="Swing Trades">Swing Trades</option>
-            </select>
-          </div>
-        ) : (
-          <textarea value={pasteText} onChange={e=>setPasteText(e.target.value)} rows={6}
-            placeholder={"RELIANCE, Reliance Industries\nHDFCBANK, HDFC Bank\nTCS"}
-            style={{...inp,resize:'none',fontSize:11}} />
-        )}
-        <button onClick={handleAdd} style={{
-          marginTop:14,width:'100%',padding:'9px',borderRadius:5,
-          border:'1px solid #00ff8830',background:'#00ff880a',
-          color:'#00ff88',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'var(--mono)',
-        }}>+ ADD</button>
-      </div>
-    </div>
-  );
-};
-
-// ═══ MAIN DASHBOARD ═══
-function RRMSignalsDashboard() {
-  const [rrmData, setRrmData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [benchmark, setBenchmark] = useState('^NSEI');
-  const [activeGroup, setActiveGroup] = useState('sectors');
-  const [filter, setFilter] = useState('ALL');
-  const [expandedIdx, setExpandedIdx] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [customStocks, setCustomStocks] = useState([]);
-
-  useEffect(() => {
-    fetch(DATA_URL)
-      .then(r => { if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(data => { setRrmData(data); setLoading(false); })
-      .catch(err => { console.error('Fetch error:', err); setError(err.message); setLoading(false); });
-  }, []);
-
-  const items = useMemo(() => {
-    if (!rrmData) return [];
-    if (activeGroup === 'custom_stocks') return customStocks;
-    return transformData(rrmData, benchmark, activeGroup);
-  }, [rrmData, benchmark, activeGroup, customStocks]);
-
-  const enriched = useMemo(() => items.map(item => ({...item, sig:computeSignals(item)})), [items]);
-
-  const filtered = useMemo(() => {
-    let list = enriched;
-    if (filter !== 'ALL') list = list.filter(i => i.sig.light === filter);
-    return list.sort((a,b) => b.sig.score - a.sig.score || a.name.localeCompare(b.name));
-  }, [enriched, filter]);
-
-  const counts = useMemo(() => {
-    const c = {ALL:enriched.length,GREEN:0,YELLOW:0,BLUE:0,RED:0};
-    enriched.forEach(i => c[i.sig.light]++);
-    return c;
-  }, [enriched]);
-
-  const handleAddStock = useCallback(stock => {
-    const col = '#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
-    setCustomStocks(prev => [...prev, {
-      ...stock, color:col,
-      daily:{q:'Improving',rsr:99.5,rsm:100.5}, weekly:{q:'Improving',rsr:99.0,rsm:100.2},
-      monthly:{q:'Lagging',rsr:98.0,rsm:99.0}, dailyTail:[], weeklyTail:[], monthlyTail:[],
-    }]);
-  }, []);
-
-  const meta = rrmData?.metadata;
-
-  if (!loading && error) return (
-    <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12,padding:20}}>
-      <span style={{fontSize:32}}>{'\u26A0'}</span>
-      <span style={{fontFamily:'var(--mono)',fontSize:13,color:'var(--red)'}}>Failed to load RRM data</span>
-      <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--text3)'}}>{error}</span>
-      <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--text2)',textAlign:'center',maxWidth:340}}>
-        Check that <code style={{color:'#00c8ff'}}>{DATA_URL}</code> exists. Run the GitHub Actions workflow first.
-      </span>
-    </div>
-  );
-
-  if (loading) return null;
-
-  return (
-    <div style={{minHeight:'100vh',background:'var(--bg)',padding:'16px 20px 40px',display:'flex',flexDirection:'column',alignItems:'center'}}>
-      <div style={{width:'100%',maxWidth:920}}>
-
-        {/* Header */}
-        <div style={{marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-            <h1 style={{fontSize:17,fontWeight:700,fontFamily:'var(--mono)',letterSpacing:'-0.02em'}}>
-              <span style={{color:'var(--green)'}}>RRM</span>{' '}
-              <span style={{color:'rgba(255,255,255,0.65)'}}>SIGNALS</span>
-            </h1>
-            <span style={{fontSize:8,color:'var(--text3)',fontFamily:'var(--mono)'}}>v4.1</span>
-            {meta && <span style={{fontSize:8,color:'var(--text3)',fontFamily:'var(--mono)'}}>{meta.date}</span>}
-          </div>
-          <div style={{display:'flex',gap:12,fontSize:8.5,color:'var(--text3)',marginTop:2,fontFamily:'var(--mono)'}}>
-            <span>{'\u2776'} RRG-RSI</span><span>{'\u2777'} MTF CONFLUENCE</span><span>{'\u2778'} SECTOR SYNC</span>
-          </div>
-        </div>
-
-        {/* Benchmark */}
-        <div style={{display:'flex',gap:3,marginBottom:8}}>
-          {BENCHMARKS.map(b => (
-            <button key={b.key} onClick={()=>{setBenchmark(b.key);setExpandedIdx(null);}} style={{
-              padding:'3px 8px',borderRadius:3,fontSize:9,fontWeight:600,cursor:'pointer',
-              border:`1px solid ${benchmark===b.key?'#00c8ff30':'var(--border)'}`,
-              background:benchmark===b.key?'#00c8ff08':'transparent',
-              color:benchmark===b.key?'#00c8ff':'var(--text3)',fontFamily:'var(--mono)',
-            }}>{b.label}</button>
-          ))}
-        </div>
-
-        {/* Group tabs */}
-        <div style={{display:'flex',gap:3,marginBottom:8,flexWrap:'wrap'}}>
-          {GROUP_META.map(g => {
-            const active = activeGroup===g.key;
-            const ct = g.key==='custom_stocks' ? customStocks.length
-              : (rrmData?.benchmarks_data?.[benchmark]?.daily?.[g.key]?.length || 0);
-            return (
-              <button key={g.key} onClick={()=>{setActiveGroup(g.key);setExpandedIdx(null);setFilter('ALL');}} style={{
-                padding:'4px 9px',borderRadius:4,fontSize:10,fontWeight:600,cursor:'pointer',
-                border:`1px solid ${active?'rgba(255,255,255,0.12)':'var(--border)'}`,
-                background:active?'rgba(255,255,255,0.05)':'transparent',
-                color:active?'#fff':'var(--text2)',fontFamily:'var(--mono)',transition:'all .2s',
-              }}>{g.icon} {g.label} <span style={{opacity:0.35}}>({ct})</span></button>
-            );
-          })}
-          <button onClick={()=>setShowAddModal(true)} style={{
-            padding:'4px 9px',borderRadius:4,fontSize:10,fontWeight:600,cursor:'pointer',
-            border:'1px solid #00ff8825',background:'#00ff8806',color:'var(--green)',fontFamily:'var(--mono)',
-          }}>+ ADD</button>
-        </div>
-
-        {/* Filter pills */}
-        <div style={{display:'flex',gap:3,marginBottom:8}}>
-          {['ALL','GREEN','YELLOW','BLUE','RED'].map(f => {
-            const active = filter===f;
-            const c = f==='ALL'?'#fff':LIGHT_MAP[f];
-            return (
-              <button key={f} onClick={()=>setFilter(f)} style={{
-                padding:'3px 7px',borderRadius:3,fontSize:9,fontWeight:600,cursor:'pointer',
-                border:`1px solid ${active?c+'30':'var(--border)'}`,
-                background:active?`${c}08`:'transparent',
-                color:active?c:'var(--text3)',fontFamily:'var(--mono)',
-              }}>{f} ({counts[f]})</button>
-            );
-          })}
-        </div>
-
-        {/* Column headers */}
-        <div style={{display:'grid',gridTemplateColumns:GRID_COLS,gap:8,padding:'4px 14px',borderBottom:'1px solid rgba(255,255,255,0.04)',marginBottom:1}}>
-          {['ASSET','SIGNAL','SCORE','RSI','WEEKLY','ACTION'].map(h => (
-            <span key={h} style={{fontSize:7.5,fontWeight:700,color:'var(--text3)',letterSpacing:'0.1em',
-              fontFamily:'var(--mono)',textAlign:h==='RSI'?'center':'left'}}>{h}</span>
-          ))}
-        </div>
-
-        {/* Data list */}
-        <div style={{borderRadius:6,border:'1px solid var(--border)',overflow:'hidden'}}>
-          {filtered.map((item,i) => (
-            <AssetRow key={item.symbol+i} item={item} sig={item.sig}
-              expanded={expandedIdx===i} onToggle={()=>setExpandedIdx(expandedIdx===i?null:i)} />
-          ))}
-          {filtered.length === 0 && (
-            <div style={{padding:30,textAlign:'center',color:'var(--text3)',fontSize:11,fontFamily:'var(--mono)'}}>
-              {activeGroup==='custom_stocks' ? 'No custom stocks yet. Click + ADD.' :
-               items.length===0 ? 'No data for this group/benchmark.' : 'No assets match this filter.'}
+                );
+              })}
             </div>
           )}
         </div>
+      );
+    };
 
-        {/* Legend */}
-        <div style={{marginTop:10,padding:'8px 12px',background:'var(--surface)',borderRadius:5,border:'1px solid var(--border)'}}>
-          <div style={{fontSize:7.5,color:'var(--text3)',fontWeight:700,letterSpacing:'0.1em',marginBottom:5,fontFamily:'var(--mono)'}}>SIGNAL LOGIC</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 16px',fontSize:10,color:'var(--text2)'}}>
-            <div><span style={{color:'var(--green)'}}>●</span> GREEN — M+W+D right side</div>
-            <div><span style={{color:'var(--yellow)'}}>●</span> YELLOW — M strong, W dip, D ↑</div>
-            <div><span style={{color:'var(--blue)'}}>●</span> BLUE — W+D strong, no M backing</div>
-            <div><span style={{color:'var(--red)'}}>●</span> RED — Structural weakness</div>
-          </div>
-          <div style={{fontSize:8.5,color:'var(--text3)',marginTop:4,fontFamily:'var(--mono)'}}>
-            Score 4-5 = High conviction · RSI {'\u2713'} = Weekly momentum sweet zone · {BENCHMARKS.find(b=>b.key===benchmark)?.label || benchmark}
+    /* ═══════════════════════════════════════════════════════════
+       ADD STOCK MODAL
+       ═══════════════════════════════════════════════════════════ */
+    const AddStockModal = ({ onClose, onAdd }) => {
+      const [mode, setMode] = useState('manual');
+      const [ticker, setTicker] = useState('');
+      const [name, setName] = useState('');
+      const [group, setGroup] = useState('Watchlist');
+      const [pasteText, setPasteText] = useState('');
+
+      const handleAdd = () => {
+        if (mode === 'manual' && ticker.trim()) {
+          const sym = ticker.trim().toUpperCase() + (ticker.includes('.') ? '' : '.NS');
+          onAdd({ symbol: sym, name: name || ticker.toUpperCase(), group });
+          setTicker(''); setName('');
+        } else if (mode === 'paste' && pasteText.trim()) {
+          pasteText.split('\n').filter(l => l.trim()).forEach(l => {
+            const [t, n] = l.split(',').map(s => s.trim());
+            if (t) onAdd({ symbol: t.toUpperCase() + (t.includes('.') ? '' : '.NS'), name: n || t.toUpperCase(), group });
+          });
+          setPasteText('');
+        }
+      };
+
+      const inputStyle = {
+        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 5, padding: '7px 10px', color: '#fff', fontSize: 12,
+        fontFamily: 'var(--mono)', outline: 'none', width: '100%',
+      };
+
+      return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}
+          onClick={onClose}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#0c0c18', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
+            padding: 22, width: 380, maxWidth: '92vw',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--mono)' }}>ADD STOCKS</span>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+              {['manual', 'paste'].map(m => (
+                <button key={m} onClick={() => setMode(m)} style={{
+                  padding: '4px 12px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                  border: `1px solid ${mode === m ? '#00ff8835' : 'rgba(255,255,255,0.05)'}`,
+                  background: mode === m ? '#00ff880c' : 'transparent',
+                  color: mode === m ? '#00ff88' : 'rgba(255,255,255,0.3)',
+                  fontFamily: 'var(--mono)',
+                }}>
+                  {m === 'manual' ? 'MANUAL' : 'PASTE LIST'}
+                </button>
+              ))}
+            </div>
+            {mode === 'manual' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input value={ticker} onChange={e => setTicker(e.target.value)} placeholder="Ticker (e.g. RELIANCE)" style={inputStyle} />
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Display name (optional)" style={{...inputStyle, fontFamily: 'var(--sans)'}} />
+                <select value={group} onChange={e => setGroup(e.target.value)} style={inputStyle}>
+                  <option value="Watchlist">Watchlist</option>
+                  <option value="Core Holdings">Core Holdings</option>
+                  <option value="Swing Trades">Swing Trades</option>
+                </select>
+              </div>
+            ) : (
+              <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={6}
+                placeholder={"RELIANCE, Reliance Industries\nHDFCBANK, HDFC Bank\nTCS"}
+                style={{...inputStyle, resize: 'none', fontSize: 11}} />
+            )}
+            <button onClick={handleAdd} style={{
+              marginTop: 14, width: '100%', padding: '9px', borderRadius: 5,
+              border: '1px solid #00ff8830', background: '#00ff880a',
+              color: '#00ff88', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)',
+            }}>
+              + ADD
+            </button>
           </div>
         </div>
+      );
+    };
 
-      </div>
-      {showAddModal && <AddStockModal onClose={()=>setShowAddModal(false)} onAdd={handleAddStock} />}
-    </div>
-  );
-}
+    /* ═══════════════════════════════════════════════════════════
+       MAIN DASHBOARD
+       ═══════════════════════════════════════════════════════════ */
+    function RRMSignalsDashboard() {
+      const [rrmData, setRrmData]       = useState(null);
+      const [loading, setLoading]       = useState(true);
+      const [error, setError]           = useState(null);
+      const [benchmark, setBenchmark]   = useState('^NSEI');
+      const [activeGroup, setActiveGroup] = useState('sectors');
+      const [filter, setFilter]         = useState('ALL');
+      const [expandedIdx, setExpandedIdx] = useState(null);
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [customStocks, setCustomStocks] = useState([]);
 
-ReactDOM.createRoot(document.getElementById('root')).render(<RRMSignalsDashboard />);
-</script>
+      // Fetch rrm_data.json
+      useEffect(() => {
+        fetch(DATA_URL)
+          .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+          .then(data => { setRrmData(data); setLoading(false); })
+          .catch(err => { setError(err.message); setLoading(false); });
+      }, []);
+
+      // Transform data for active group + benchmark
+      const items = useMemo(() => {
+        if (!rrmData) return [];
+        if (activeGroup === 'custom_stocks') return customStocks;
+        return transformData(rrmData, benchmark, activeGroup);
+      }, [rrmData, benchmark, activeGroup, customStocks]);
+
+      // Compute signals
+      const enriched = useMemo(() =>
+        items.map(item => ({ ...item, sig: computeSignals(item) })),
+        [items]
+      );
+
+      // Filter + sort
+      const filtered = useMemo(() => {
+        let list = enriched;
+        if (filter !== 'ALL') list = list.filter(i => i.sig.light === filter);
+        return list.sort((a, b) => b.sig.score - a.sig.score || a.name.localeCompare(b.name));
+      }, [enriched, filter]);
+
+      // Counts
+      const counts = useMemo(() => {
+        const c = { ALL: enriched.length, GREEN: 0, YELLOW: 0, BLUE: 0, RED: 0 };
+        enriched.forEach(i => c[i.sig.light]++);
+        return c;
+      }, [enriched]);
+
+      // Add stock handler
+      const handleAddStock = useCallback(stock => {
+        const col = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+        setCustomStocks(prev => [...prev, {
+          ...stock, color: col,
+          daily:   { q: 'Improving', rsr: 99.5, rsm: 100.5 },
+          weekly:  { q: 'Improving', rsr: 99.0, rsm: 100.2 },
+          monthly: { q: 'Lagging',   rsr: 98.0, rsm: 99.0 },
+          dailyTail: [], weeklyTail: [], monthlyTail: [],
+        }]);
+      }, []);
+
+      // Metadata
+      const meta = rrmData?.metadata;
+
+      // ─── Error state ───
+      if (!loading && error) return (
+        <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, padding: 20 }}>
+          <span style={{ fontSize: 32 }}>⚠</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--red)' }}>Failed to load RRM data</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)' }}>{error}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text2)', textAlign: 'center', maxWidth: 320 }}>
+            Make sure <code style={{ color: '#00c8ff' }}>{DATA_URL}</code> exists and the GitHub Actions workflow has run at least once.
+          </span>
+        </div>
+      );
+
+      // ─── Loading state ───
+      if (loading) return null; // HTML loading spinner shows
+
+      return (
+        <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '14px 10px 40px' }}>
+
+          {/* ── Header ── */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
+                <span style={{ color: 'var(--green)' }}>RRM</span>{' '}
+                <span style={{ color: 'rgba(255,255,255,0.65)' }}>SIGNALS</span>
+              </h1>
+              <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>v4.1</span>
+              {meta && <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{meta.date}</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 12, fontSize: 8.5, color: 'var(--text3)', marginTop: 2, fontFamily: 'var(--mono)' }}>
+              <span>❶ RRG-RSI</span><span>❷ MTF CONFLUENCE</span><span>❸ SECTOR SYNC</span>
+            </div>
+          </div>
+
+          {/* ── Benchmark selector ── */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+            {BENCHMARKS.map(b => (
+              <button key={b.key} onClick={() => { setBenchmark(b.key); setExpandedIdx(null); }} style={{
+                padding: '3px 8px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${benchmark === b.key ? '#00c8ff30' : 'var(--border)'}`,
+                background: benchmark === b.key ? '#00c8ff08' : 'transparent',
+                color: benchmark === b.key ? '#00c8ff' : 'var(--text3)',
+                fontFamily: 'var(--mono)',
+              }}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Group tabs ── */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }}>
+            {GROUP_META.map(g => {
+              const active = activeGroup === g.key;
+              const ct = g.key === 'custom_stocks' ? customStocks.length
+                : (rrmData?.benchmarks_data?.[benchmark]?.daily?.[g.key]?.length || 0);
+              return (
+                <button key={g.key} onClick={() => { setActiveGroup(g.key); setExpandedIdx(null); setFilter('ALL'); }}
+                  title={g.desc}
+                  style={{
+                    padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                    border: `1px solid ${active ? 'rgba(255,255,255,0.12)' : 'var(--border)'}`,
+                    background: active ? 'rgba(255,255,255,0.05)' : 'transparent',
+                    color: active ? '#fff' : 'var(--text2)',
+                    fontFamily: 'var(--mono)', transition: 'all 0.2s',
+                  }}>
+                  {g.icon} {g.label} <span style={{ opacity: 0.35 }}>({ct})</span>
+                </button>
+              );
+            })}
+            <button onClick={() => setShowAddModal(true)} style={{
+              padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              border: '1px solid #00ff8825', background: '#00ff8806', color: 'var(--green)',
+              fontFamily: 'var(--mono)',
+            }}>
+              + ADD
+            </button>
+          </div>
+
+          {/* ── Filter pills ── */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+            {['ALL', 'GREEN', 'YELLOW', 'BLUE', 'RED'].map(f => {
+              const active = filter === f;
+              const c = f === 'ALL' ? '#fff' : LIGHT_MAP[f];
+              return (
+                <button key={f} onClick={() => setFilter(f)} style={{
+                  padding: '3px 7px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                  border: `1px solid ${active ? c + '30' : 'var(--border)'}`,
+                  background: active ? `${c}08` : 'transparent',
+                  color: active ? c : 'var(--text3)',
+                  fontFamily: 'var(--mono)',
+                }}>
+                  {f} ({counts[f]})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Column headers ── */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
+            gap: 6, padding: '4px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 1,
+          }}>
+            {['ASSET', 'SIGNAL', 'SCORE', 'RSI', 'WEEKLY', 'ACTION'].map(h => (
+              <span key={h} style={{
+                fontSize: 7.5, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.1em',
+                fontFamily: 'var(--mono)', textAlign: h === 'RSI' ? 'center' : 'left',
+              }}>{h}</span>
+            ))}
+          </div>
+
+          {/* ── Data list ── */}
+          <div style={{ borderRadius: 6, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {filtered.map((item, i) => (
+              <AssetRow key={item.symbol + i} item={item} sig={item.sig}
+                expanded={expandedIdx === i} onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)} idx={i} />
+            ))}
+            {filtered.length === 0 && (
+              <div style={{ padding: 30, textAlign: 'center', color: 'var(--text3)', fontSize: 11, fontFamily: 'var(--mono)' }}>
+                {activeGroup === 'custom_stocks'
+                  ? 'No custom stocks yet. Click + ADD to start.'
+                  : items.length === 0
+                    ? `No ${activeGroup.replace('_',' ')} data for this benchmark.`
+                    : 'No assets match this filter.'}
+              </div>
+            )}
+          </div>
+
+          {/* ── Legend ── */}
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--surface)', borderRadius: 5, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 5, fontFamily: 'var(--mono)' }}>SIGNAL LOGIC</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px', fontSize: 10, color: 'var(--text2)' }}>
+              <div><span style={{ color: 'var(--green)' }}>●</span> GREEN — M+W+D right side</div>
+              <div><span style={{ color: 'var(--yellow)' }}>●</span> YELLOW — M strong, W dip, D ↑</div>
+              <div><span style={{ color: 'var(--blue)' }}>●</span> BLUE — W+D strong, no M backing</div>
+              <div><span style={{ color: 'var(--red)' }}>●</span> RED — Structural weakness</div>
+            </div>
+            <div style={{ fontSize: 8.5, color: 'var(--text3)', marginTop: 4, fontFamily: 'var(--mono)' }}>
+              Score 4–5 = High conviction · RSI ✓ = Weekly momentum sweet zone · {BENCHMARKS.find(b => b.key === benchmark)?.label || benchmark}
+            </div>
+          </div>
+
+          {showAddModal && <AddStockModal onClose={() => setShowAddModal(false)} onAdd={handleAddStock} />}
+        </div>
+      );
+    }
+
+    // ── MOUNT ──
+    ReactDOM.createRoot(document.getElementById('root')).render(<RRMSignalsDashboard />);
+  </script>
 </body>
 </html>
