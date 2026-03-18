@@ -2544,6 +2544,53 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
           </div>
         </div>
 
+       <!-- ═══ GOOGLE DRIVE ARCHIVE — paste this BEFORE the "Data" card at bottom of Settings ═══ -->
+    <div style="font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.1em;margin:20px 0 8px;padding-left:2px">📁 Google Drive Archive</div>
+    <div class="card" style="border:1px solid rgba(59,139,255,.25)">
+      <div class="card-head" style="background:rgba(59,139,255,.04)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">📁</span>
+          <span class="card-title">Google Drive Archive (Hybrid Mode)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="gd-status-txt" style="font-size:10.5px;color:var(--t3)">Not connected</span>
+          <span class="sync-dot" id="gd-dot"></span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="font-size:11.5px;color:var(--t3);margin-bottom:14px;line-height:1.7;padding:10px 12px;background:var(--bg3);border:1px solid var(--b1);border-radius:8px">
+          <b style="color:var(--t1)">How it works:</b> Active trades stay in Supabase (fast). Closed trades older than 30 days auto-archive to <b style="color:var(--b)">TradEdge_Archive</b> folder in <b style="color:var(--t1)">your</b> Google Drive.
+          <div style="margin-top:6px;display:flex;gap:16px;font-size:10px;color:var(--t4)">
+            <span>🏥 Active → Supabase</span><span>📦 Archive → Google Drive</span>
+          </div>
+        </div>
+        <div class="fg f-full" style="margin-bottom:12px">
+          <label class="fl">Google OAuth Client ID</label>
+          <div style="display:flex;gap:8px">
+            <input class="fi" id="gd-client-id" placeholder="123456789-abc.apps.googleusercontent.com" value="1086073222826-e0b21hrhdv8b28p6hrotj9mjt29f7sgv.apps.googleusercontent.com" style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:10.5px">
+            <button class="btn btn-ghost btn-sm" onclick="gdSaveClientId()">💾</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <button class="btn btn-y btn-sm" onclick="gdSignIn()">Sign in with Google</button>
+          <button class="btn btn-ghost btn-sm" onclick="gdSignOut()">Sign Out</button>
+          <button class="btn btn-ghost btn-sm" onclick="gdRefreshArchiveList()">↻ Refresh</button>
+        </div>
+        <div id="gd-storage-health" style="margin-bottom:14px"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:12px;background:var(--bg3);border:1px solid var(--b1);border-radius:8px">
+          <button class="btn btn-y" onclick="gdArchiveNow()">📦 Archive Now</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3);cursor:pointer">
+            <input type="checkbox" id="gd-auto-archive" onchange="gdToggleAutoArchive(this.checked)" style="accent-color:var(--y)"> Auto-archive (20+ old trades)
+          </label>
+        </div>
+        <div id="gd-archive-status" style="font-size:11px;color:var(--t3);min-height:14px;margin-bottom:10px"></div>
+        <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📦 Archived Months</div>
+        <div id="gd-archive-list" style="max-height:300px;overflow-y:auto">
+          <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">Sign in to view archives</div>
+        </div>
+      </div>
+    </div>
+        
         <div class="card">
           <div class="card-head"><span class="card-title">Data</span></div>
           <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -11632,5 +11679,6 @@ let _miniRrgAnimId=0;
 (function _miniPulse(){_miniRrgAnimId=requestAnimationFrame(_miniPulse);const m=document.getElementById('mini-rrg-modal');if(m&&m.style.display==='block')miniRrgDraw()})();
 
 </script>
+<script src="gdrive-archive.js"></script>
 </body>
 </html>
