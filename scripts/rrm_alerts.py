@@ -271,6 +271,38 @@ def send_alerts(alerts, token, chat_id, max_alerts=20):
     log.info(f"Sent {sent} Telegram message(s) with {len(alerts)} alerts.")
 
 
+# ═══ SUPABASE POSITIONS FETCH ═══
+
+def fetch_positions_from_supabase(supabase_url, anon_key):
+    """Fetch open positions from Supabase tradedge_trades table."""
+    import urllib.request
+
+    api_url = f"{supabase_url.rstrip('/')}/rest/v1/tradedge_trades?select=trades_json&limit=1"
+    headers = {
+        "apikey": anon_key,
+        "Authorization": f"Bearer {anon_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            rows = json.loads(resp.read())
+
+        if not rows or not rows[0].get("trades_json"):
+            log.info("Supabase: no trades_json found")
+            return []
+
+        trades = json.loads(rows[0]["trades_json"])
+        open_trades = [t for t in trades if t.get("status") == "Open"]
+        log.info(f"Supabase: fetched {len(open_trades)} open positions from {len(trades)} total trades")
+        return open_trades
+
+    except Exception as e:
+        log.warning(f"Supabase fetch failed: {e}")
+        return []
+
+
 # ═══ MAIN ═══
 
 def main():
@@ -308,16 +340,27 @@ def main():
     else:
         log.info("No previous snapshot found — first run, saving baseline.")
 
-    # Load held positions (optional)
+    # Load held positions — Supabase first, then local file fallback
     held_symbols = set()
-    if os.path.exists(args.positions):
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_ANON_KEY", "")
+
+    if supabase_url and supabase_key:
+        log.info("Fetching positions from Supabase...")
+        positions = fetch_positions_from_supabase(supabase_url, supabase_key)
+        held_symbols = {p.get("symbol", "").replace(".NS", "") for p in positions}
+        if held_symbols:
+            log.info(f"Held positions (Supabase): {len(held_symbols)} open — {', '.join(sorted(held_symbols)[:10])}{'...' if len(held_symbols)>10 else ''}")
+    elif os.path.exists(args.positions):
         try:
             with open(args.positions) as f:
                 positions = json.load(f)
             held_symbols = {p.get("symbol", "").replace(".NS", "") for p in positions if p.get("status") == "Open"}
-            log.info(f"Held positions: {len(held_symbols)} open")
+            log.info(f"Held positions (file): {len(held_symbols)} open")
         except Exception as e:
             log.warning(f"Could not load positions: {e}")
+    else:
+        log.info("No position source available (no Supabase creds, no positions.json)")
 
     # Detect alerts
     alerts = detect_alerts(current, previous, held_symbols)
@@ -345,12 +388,13 @@ def main():
             for s in current.values():
                 summary_counts[s["light"]] = summary_counts.get(s["light"], 0) + 1
 
+            pos_line = f"\n📌 {len(held_symbols)} open positions tracked" if held_symbols else ""
             summary = (
                 f"✅ <b>MATRIX Daily</b> — {date}\n"
                 f"━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🟢 {summary_counts['GREEN']} | 🟡 {summary_counts['YELLOW']} | "
                 f"🔵 {summary_counts['BLUE']} | 🔴 {summary_counts['RED']}\n"
-                f"📊 {len(current)} assets scanned\n"
+                f"📊 {len(current)} assets scanned{pos_line}\n"
                 f"✨ No signal changes detected"
             )
             send_telegram(token, chat_id, summary)
