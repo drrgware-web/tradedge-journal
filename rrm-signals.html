@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TradEdge — RRM Signals</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080810; --surface: rgba(255,255,255,0.02); --border: rgba(255,255,255,0.04);
+      --green: #00ff88; --yellow: #ffd000; --blue: #00c8ff; --red: #ff3366;
+      --mono: 'JetBrains Mono', monospace; --sans: 'Space Grotesk', sans-serif;
+      --text: #fff; --text2: rgba(255,255,255,0.4); --text3: rgba(255,255,255,0.15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); }
+    ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    #loading { display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; gap: 12px; }
+    #loading .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.3s ease-out both; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div id="loading">
+      <div class="spinner"></div>
+      <span style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.25)">Loading RRM data...</span>
+    </div>
+  </div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useCallback, useEffect, useRef } = React;
+
+    /* ═══════════════════════════════════════════════════════════
+       CONFIG — adjust this path to match your repo structure
+       ═══════════════════════════════════════════════════════════ */
+    const DATA_URL = './data/rrm_data.json';   // relative to this HTML file
+    // If your HTML is in /pages/ and data in /data/, use: '../data/rrm_data.json'
+
+    /* ═══════════════════════════════════════════════════════════
+       CONSTANTS
+       ═══════════════════════════════════════════════════════════ */
+    const Q_COLORS = { Leading: '#00ff88', Improving: '#00c8ff', Weakening: '#ffd000', Lagging: '#ff3366' };
+    const LIGHT_MAP = { GREEN: '#00ff88', YELLOW: '#ffd000', BLUE: '#00c8ff', RED: '#ff3366' };
+    const GROUP_META = [
+      { key: 'sectors',         label: 'Sectors',  icon: '◉', desc: '16 NSE Sector Indices' },
+      { key: 'etfs',            label: 'ETFs',     icon: '◆', desc: '54 NSE ETFs' },
+      { key: 'asset_classes',   label: 'Assets',   icon: '◈', desc: '12 Asset Classes' },
+      { key: 'market_segments', label: 'Segments', icon: '◇', desc: '4 Market Segments' },
+      { key: 'global_indices',  label: 'Global',   icon: '🌐', desc: '25 Global Indices' },
+      { key: 'custom_stocks',   label: 'My Stocks',icon: '★', desc: 'Custom Watchlist' },
+    ];
+    const BENCHMARKS = [
+      { key: '^NSEI',    label: 'Nifty 50' },
+      { key: '^NSEBANK', label: 'Bank Nifty' },
+      { key: '^CRSLDX',  label: 'Nifty 500' },
+    ];
+
+    /* ═══════════════════════════════════════════════════════════
+       DATA TRANSFORMER
+       Converts rrm_data.json → flat array per group with D/W/M
+       ═══════════════════════════════════════════════════════════ */
+    function transformData(raw, benchKey, groupKey) {
+      const bm = raw?.benchmarks_data?.[benchKey];
+      if (!bm) return [];
+
+      const daily   = bm.daily?.[groupKey]   || [];
+      const weekly  = bm.weekly?.[groupKey]   || [];
+      const monthly = bm.monthly?.[groupKey]  || [];
+
+      // Build lookup maps by symbol
+      const wMap = {}; weekly.forEach(s  => { wMap[s.symbol] = s; });
+      const mMap = {}; monthly.forEach(s => { mMap[s.symbol] = s; });
+
+      return daily.map(d => {
+        const w = wMap[d.symbol] || {};
+        const m = mMap[d.symbol] || {};
+        return {
+          symbol: d.symbol,
+          name:   d.name,
+          color:  d.color,
+          group:  d.group || '',
+          daily:   { q: d.quadrant || '', rsr: d.current?.rs_ratio || 100, rsm: d.current?.rs_momentum || 100 },
+          weekly:  { q: w.quadrant || '', rsr: w.current?.rs_ratio || 100, rsm: w.current?.rs_momentum || 100 },
+          monthly: { q: m.quadrant || '', rsr: m.current?.rs_ratio || 100, rsm: m.current?.rs_momentum || 100 },
+          // Pass tail data through for future mini-chart use
+          dailyTail:   d.tail || [],
+          weeklyTail:  w.tail || [],
+          monthlyTail: m.tail || [],
+        };
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SIGNAL COMPUTATION (MTF Confluence + RRG-RSI + Actions)
+       ═══════════════════════════════════════════════════════════ */
+    function computeSignals(item) {
+      const { daily: d, weekly: w, monthly: m } = item;
+      const right = q => q === 'Leading' || q === 'Improving';
+
+      // MTF Confluence Score (1–5)
+      let score = 0;
+      if (right(m.q)) score += (m.rsr >= 100 && m.rsm >= 100) ? 2 : 1; // Monthly Power Trinity = +2
+      if (right(w.q)) score += (w.rsr >= 100 && w.rsm >= 100) ? 2 : 1; // Weekly Power Trinity = +2
+      if (right(d.q)) score += 1;                                        // Daily right = +1
+      score = Math.min(score, 5);
+
+      // Traffic Light
+      let light;
+      if      (right(m.q) && right(w.q) && right(d.q))  light = 'GREEN';   // All 3 aligned
+      else if (right(m.q) && !right(w.q) && right(d.q)) light = 'YELLOW';  // Hook entry — M strong, W dip, D up
+      else if (!right(m.q) && right(w.q) && right(d.q)) light = 'BLUE';    // Counter-trend — no monthly backing
+      else                                               light = 'RED';     // Structural weakness
+
+      // RRG-RSI Combo (proxy: weekly RS-Momentum in sweet zone 98–106)
+      const weeklyMomOk = w.rsm >= 98 && w.rsm <= 106;
+      const rsiOk = right(w.q) && weeklyMomOk;
+
+      // Action
+      let action;
+      if      (score >= 4 && rsiOk)    action = 'AGGRESSIVE BUY';
+      else if (score >= 3 && rsiOk)    action = 'BUY ON DIP';
+      else if (light === 'YELLOW')     action = 'HOOK ENTRY';
+      else if (light === 'BLUE')       action = 'SCALP ONLY';
+      else if (score >= 3)             action = 'HOLD';
+      else                             action = 'AVOID';
+
+      return { score, light, rsiOk, action };
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TINY COMPONENTS
+       ═══════════════════════════════════════════════════════════ */
+    const Dot = ({ color, active, s = 7 }) => (
+      <span style={{
+        display: 'inline-block', width: s, height: s, borderRadius: '50%',
+        background: active ? color : 'rgba(255,255,255,0.05)',
+        boxShadow: active ? `0 0 8px ${color}50` : 'none',
+        transition: 'all 0.3s',
+      }} />
+    );
+
+    const QBadge = ({ q }) => {
+      const c = Q_COLORS[q] || '#444';
+      return (
+        <span style={{
+          padding: '1px 6px', borderRadius: 3, border: `1px solid ${c}25`,
+          background: `${c}08`, color: c, fontSize: 10, fontWeight: 600,
+          fontFamily: 'var(--mono)', letterSpacing: '0.03em',
+        }}>
+          {q || '—'}
+        </span>
+      );
+    };
+
+    const ScoreBar = ({ score }) => {
+      const c = score >= 4 ? '#00ff88' : score >= 3 ? '#ffd000' : '#ff3366';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 70 }}>
+          <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
+            <div style={{
+              width: `${(score / 5) * 100}%`, height: '100%', background: c, borderRadius: 2,
+              boxShadow: `0 0 8px ${c}30`, transition: 'width 0.5s ease',
+            }} />
+          </div>
+          <span style={{ color: c, fontWeight: 700, fontSize: 12, fontFamily: 'var(--mono)', width: 12, textAlign: 'right' }}>{score}</span>
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       MINI SPARKLINE (RS-Ratio trail from tail data)
+       ═══════════════════════════════════════════════════════════ */
+    const Sparkline = ({ data, width = 60, height = 20, color = '#00c8ff' }) => {
+      if (!data || data.length < 2) return null;
+      const vals = data.map(d => d.rs_ratio);
+      const min = Math.min(...vals); const max = Math.max(...vals);
+      const range = max - min || 1;
+      const pts = vals.map((v, i) => {
+        const x = (i / (vals.length - 1)) * width;
+        const y = height - ((v - min) / range) * (height - 2) - 1;
+        return `${x},${y}`;
+      }).join(' ');
+      return (
+        <svg width={width} height={height} style={{ display: 'block' }}>
+          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.2" strokeLinejoin="round" />
+          <line x1="0" y1={height - ((100 - min) / range) * (height - 2) - 1} x2={width} y2={height - ((100 - min) / range) * (height - 2) - 1}
+            stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" strokeDasharray="2,2" />
+        </svg>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       ASSET ROW — expandable with D/W/M detail cards
+       ═══════════════════════════════════════════════════════════ */
+    const AssetRow = ({ item, sig, expanded, onToggle, idx }) => {
+      const lc = LIGHT_MAP[sig.light];
+      return (
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }} className="fade-in" >
+          <div onClick={onToggle} style={{
+            display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
+            alignItems: 'center', gap: 6, padding: '8px 12px', cursor: 'pointer',
+            background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
+            transition: 'background 0.2s',
+          }}>
+            {/* Name */}
+            <div>
+              <div style={{ color: '#fff', fontWeight: 600, fontSize: 11.5, fontFamily: 'var(--mono)', lineHeight: 1.3 }}>{item.name}</div>
+              <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, fontFamily: 'var(--mono)' }}>{item.symbol}</div>
+            </div>
+            {/* Signal dots */}
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {['GREEN','YELLOW','BLUE','RED'].map(l => <Dot key={l} color={LIGHT_MAP[l]} active={sig.light === l} />)}
+              <span style={{ fontSize: 8, color: lc, fontFamily: 'var(--mono)', fontWeight: 700, marginLeft: 2 }}>{sig.light}</span>
+            </div>
+            {/* Score */}
+            <ScoreBar score={sig.score} />
+            {/* RSI check */}
+            <span style={{
+              fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center',
+              color: sig.rsiOk ? '#00ff88' : 'rgba(255,255,255,0.1)',
+            }}>
+              {sig.rsiOk ? '✓' : '✗'}
+            </span>
+            {/* Weekly Q */}
+            <QBadge q={item.weekly.q} />
+            {/* Action */}
+            <span style={{
+              padding: '2px 5px', borderRadius: 3, fontSize: 8.5, fontWeight: 700,
+              fontFamily: 'var(--mono)', textAlign: 'center', whiteSpace: 'nowrap',
+              color: lc, background: `${lc}08`, border: `1px solid ${lc}15`,
+            }}>
+              {sig.action}
+            </span>
+          </div>
+
+          {/* Expanded detail */}
+          {expanded && (
+            <div style={{ padding: '2px 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+              {[['DAILY', item.daily, item.dailyTail], ['WEEKLY', item.weekly, item.weeklyTail], ['MONTHLY', item.monthly, item.monthlyTail]].map(([label, tf, tail]) => {
+                const qc = Q_COLORS[tf.q] || '#444';
+                return (
+                  <div key={label} style={{
+                    background: 'rgba(255,255,255,0.012)', borderRadius: 6, padding: '8px 10px',
+                    border: `1px solid ${qc}12`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 8, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)' }}>{label}</span>
+                      <QBadge q={tf.q} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 14 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-RATIO</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: tf.rsr >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsr.toFixed(1)}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-MOM</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: tf.rsm >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsm.toFixed(1)}</div>
+                        </div>
+                      </div>
+                      <Sparkline data={tail} color={qc} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       ADD STOCK MODAL
+       ═══════════════════════════════════════════════════════════ */
+    const AddStockModal = ({ onClose, onAdd }) => {
+      const [mode, setMode] = useState('manual');
+      const [ticker, setTicker] = useState('');
+      const [name, setName] = useState('');
+      const [group, setGroup] = useState('Watchlist');
+      const [pasteText, setPasteText] = useState('');
+
+      const handleAdd = () => {
+        if (mode === 'manual' && ticker.trim()) {
+          const sym = ticker.trim().toUpperCase() + (ticker.includes('.') ? '' : '.NS');
+          onAdd({ symbol: sym, name: name || ticker.toUpperCase(), group });
+          setTicker(''); setName('');
+        } else if (mode === 'paste' && pasteText.trim()) {
+          pasteText.split('\n').filter(l => l.trim()).forEach(l => {
+            const [t, n] = l.split(',').map(s => s.trim());
+            if (t) onAdd({ symbol: t.toUpperCase() + (t.includes('.') ? '' : '.NS'), name: n || t.toUpperCase(), group });
+          });
+          setPasteText('');
+        }
+      };
+
+      const inputStyle = {
+        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 5, padding: '7px 10px', color: '#fff', fontSize: 12,
+        fontFamily: 'var(--mono)', outline: 'none', width: '100%',
+      };
+
+      return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}
+          onClick={onClose}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#0c0c18', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
+            padding: 22, width: 380, maxWidth: '92vw',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--mono)' }}>ADD STOCKS</span>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+              {['manual', 'paste'].map(m => (
+                <button key={m} onClick={() => setMode(m)} style={{
+                  padding: '4px 12px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                  border: `1px solid ${mode === m ? '#00ff8835' : 'rgba(255,255,255,0.05)'}`,
+                  background: mode === m ? '#00ff880c' : 'transparent',
+                  color: mode === m ? '#00ff88' : 'rgba(255,255,255,0.3)',
+                  fontFamily: 'var(--mono)',
+                }}>
+                  {m === 'manual' ? 'MANUAL' : 'PASTE LIST'}
+                </button>
+              ))}
+            </div>
+            {mode === 'manual' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input value={ticker} onChange={e => setTicker(e.target.value)} placeholder="Ticker (e.g. RELIANCE)" style={inputStyle} />
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Display name (optional)" style={{...inputStyle, fontFamily: 'var(--sans)'}} />
+                <select value={group} onChange={e => setGroup(e.target.value)} style={inputStyle}>
+                  <option value="Watchlist">Watchlist</option>
+                  <option value="Core Holdings">Core Holdings</option>
+                  <option value="Swing Trades">Swing Trades</option>
+                </select>
+              </div>
+            ) : (
+              <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={6}
+                placeholder={"RELIANCE, Reliance Industries\nHDFCBANK, HDFC Bank\nTCS"}
+                style={{...inputStyle, resize: 'none', fontSize: 11}} />
+            )}
+            <button onClick={handleAdd} style={{
+              marginTop: 14, width: '100%', padding: '9px', borderRadius: 5,
+              border: '1px solid #00ff8830', background: '#00ff880a',
+              color: '#00ff88', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)',
+            }}>
+              + ADD
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       MAIN DASHBOARD
+       ═══════════════════════════════════════════════════════════ */
+    function RRMSignalsDashboard() {
+      const [rrmData, setRrmData]       = useState(null);
+      const [loading, setLoading]       = useState(true);
+      const [error, setError]           = useState(null);
+      const [benchmark, setBenchmark]   = useState('^NSEI');
+      const [activeGroup, setActiveGroup] = useState('sectors');
+      const [filter, setFilter]         = useState('ALL');
+      const [expandedIdx, setExpandedIdx] = useState(null);
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [customStocks, setCustomStocks] = useState([]);
+
+      // Fetch rrm_data.json
+      useEffect(() => {
+        fetch(DATA_URL)
+          .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+          .then(data => { setRrmData(data); setLoading(false); })
+          .catch(err => { setError(err.message); setLoading(false); });
+      }, []);
+
+      // Transform data for active group + benchmark
+      const items = useMemo(() => {
+        if (!rrmData) return [];
+        if (activeGroup === 'custom_stocks') return customStocks;
+        return transformData(rrmData, benchmark, activeGroup);
+      }, [rrmData, benchmark, activeGroup, customStocks]);
+
+      // Compute signals
+      const enriched = useMemo(() =>
+        items.map(item => ({ ...item, sig: computeSignals(item) })),
+        [items]
+      );
+
+      // Filter + sort
+      const filtered = useMemo(() => {
+        let list = enriched;
+        if (filter !== 'ALL') list = list.filter(i => i.sig.light === filter);
+        return list.sort((a, b) => b.sig.score - a.sig.score || a.name.localeCompare(b.name));
+      }, [enriched, filter]);
+
+      // Counts
+      const counts = useMemo(() => {
+        const c = { ALL: enriched.length, GREEN: 0, YELLOW: 0, BLUE: 0, RED: 0 };
+        enriched.forEach(i => c[i.sig.light]++);
+        return c;
+      }, [enriched]);
+
+      // Add stock handler
+      const handleAddStock = useCallback(stock => {
+        const col = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+        setCustomStocks(prev => [...prev, {
+          ...stock, color: col,
+          daily:   { q: 'Improving', rsr: 99.5, rsm: 100.5 },
+          weekly:  { q: 'Improving', rsr: 99.0, rsm: 100.2 },
+          monthly: { q: 'Lagging',   rsr: 98.0, rsm: 99.0 },
+          dailyTail: [], weeklyTail: [], monthlyTail: [],
+        }]);
+      }, []);
+
+      // Metadata
+      const meta = rrmData?.metadata;
+
+      // ─── Error state ───
+      if (!loading && error) return (
+        <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, padding: 20 }}>
+          <span style={{ fontSize: 32 }}>⚠</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--red)' }}>Failed to load RRM data</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)' }}>{error}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text2)', textAlign: 'center', maxWidth: 320 }}>
+            Make sure <code style={{ color: '#00c8ff' }}>{DATA_URL}</code> exists and the GitHub Actions workflow has run at least once.
+          </span>
+        </div>
+      );
+
+      // ─── Loading state ───
+      if (loading) return null; // HTML loading spinner shows
+
+      return (
+        <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '14px 10px 40px' }}>
+
+          {/* ── Header ── */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
+                <span style={{ color: 'var(--green)' }}>RRM</span>{' '}
+                <span style={{ color: 'rgba(255,255,255,0.65)' }}>SIGNALS</span>
+              </h1>
+              <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>v4.1</span>
+              {meta && <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{meta.date}</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 12, fontSize: 8.5, color: 'var(--text3)', marginTop: 2, fontFamily: 'var(--mono)' }}>
+              <span>❶ RRG-RSI</span><span>❷ MTF CONFLUENCE</span><span>❸ SECTOR SYNC</span>
+            </div>
+          </div>
+
+          {/* ── Benchmark selector ── */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+            {BENCHMARKS.map(b => (
+              <button key={b.key} onClick={() => { setBenchmark(b.key); setExpandedIdx(null); }} style={{
+                padding: '3px 8px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${benchmark === b.key ? '#00c8ff30' : 'var(--border)'}`,
+                background: benchmark === b.key ? '#00c8ff08' : 'transparent',
+                color: benchmark === b.key ? '#00c8ff' : 'var(--text3)',
+                fontFamily: 'var(--mono)',
+              }}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Group tabs ── */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }}>
+            {GROUP_META.map(g => {
+              const active = activeGroup === g.key;
+              const ct = g.key === 'custom_stocks' ? customStocks.length
+                : (rrmData?.benchmarks_data?.[benchmark]?.daily?.[g.key]?.length || 0);
+              return (
+                <button key={g.key} onClick={() => { setActiveGroup(g.key); setExpandedIdx(null); setFilter('ALL'); }}
+                  title={g.desc}
+                  style={{
+                    padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                    border: `1px solid ${active ? 'rgba(255,255,255,0.12)' : 'var(--border)'}`,
+                    background: active ? 'rgba(255,255,255,0.05)' : 'transparent',
+                    color: active ? '#fff' : 'var(--text2)',
+                    fontFamily: 'var(--mono)', transition: 'all 0.2s',
+                  }}>
+                  {g.icon} {g.label} <span style={{ opacity: 0.35 }}>({ct})</span>
+                </button>
+              );
+            })}
+            <button onClick={() => setShowAddModal(true)} style={{
+              padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              border: '1px solid #00ff8825', background: '#00ff8806', color: 'var(--green)',
+              fontFamily: 'var(--mono)',
+            }}>
+              + ADD
+            </button>
+          </div>
+
+          {/* ── Filter pills ── */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+            {['ALL', 'GREEN', 'YELLOW', 'BLUE', 'RED'].map(f => {
+              const active = filter === f;
+              const c = f === 'ALL' ? '#fff' : LIGHT_MAP[f];
+              return (
+                <button key={f} onClick={() => setFilter(f)} style={{
+                  padding: '3px 7px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                  border: `1px solid ${active ? c + '30' : 'var(--border)'}`,
+                  background: active ? `${c}08` : 'transparent',
+                  color: active ? c : 'var(--text3)',
+                  fontFamily: 'var(--mono)',
+                }}>
+                  {f} ({counts[f]})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Column headers ── */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
+            gap: 6, padding: '4px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 1,
+          }}>
+            {['ASSET', 'SIGNAL', 'SCORE', 'RSI', 'WEEKLY', 'ACTION'].map(h => (
+              <span key={h} style={{
+                fontSize: 7.5, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.1em',
+                fontFamily: 'var(--mono)', textAlign: h === 'RSI' ? 'center' : 'left',
+              }}>{h}</span>
+            ))}
+          </div>
+
+          {/* ── Data list ── */}
+          <div style={{ borderRadius: 6, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {filtered.map((item, i) => (
+              <AssetRow key={item.symbol + i} item={item} sig={item.sig}
+                expanded={expandedIdx === i} onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)} idx={i} />
+            ))}
+            {filtered.length === 0 && (
+              <div style={{ padding: 30, textAlign: 'center', color: 'var(--text3)', fontSize: 11, fontFamily: 'var(--mono)' }}>
+                {activeGroup === 'custom_stocks'
+                  ? 'No custom stocks yet. Click + ADD to start.'
+                  : items.length === 0
+                    ? `No ${activeGroup.replace('_',' ')} data for this benchmark.`
+                    : 'No assets match this filter.'}
+              </div>
+            )}
+          </div>
+
+          {/* ── Legend ── */}
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--surface)', borderRadius: 5, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 5, fontFamily: 'var(--mono)' }}>SIGNAL LOGIC</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px', fontSize: 10, color: 'var(--text2)' }}>
+              <div><span style={{ color: 'var(--green)' }}>●</span> GREEN — M+W+D right side</div>
+              <div><span style={{ color: 'var(--yellow)' }}>●</span> YELLOW — M strong, W dip, D ↑</div>
+              <div><span style={{ color: 'var(--blue)' }}>●</span> BLUE — W+D strong, no M backing</div>
+              <div><span style={{ color: 'var(--red)' }}>●</span> RED — Structural weakness</div>
+            </div>
+            <div style={{ fontSize: 8.5, color: 'var(--text3)', marginTop: 4, fontFamily: 'var(--mono)' }}>
+              Score 4–5 = High conviction · RSI ✓ = Weekly momentum sweet zone · {BENCHMARKS.find(b => b.key === benchmark)?.label || benchmark}
+            </div>
+          </div>
+
+          {showAddModal && <AddStockModal onClose={() => setShowAddModal(false)} onAdd={handleAddStock} />}
+        </div>
+      );
+    }
+
+    // ── MOUNT ──
+    ReactDOM.createRoot(document.getElementById('root')).render(<RRMSignalsDashboard />);
+  </script>
+</body>
+</html>
