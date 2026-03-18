@@ -1,0 +1,37 @@
+# =============================================================================
+# Keep-Alive — Prevents GitHub from disabling scheduled workflows
+# =============================================================================
+# GitHub auto-disables cron workflows after 60 days of no repo activity.
+# This workflow runs every 50 days and makes a no-op commit to keep
+# all scheduled workflows (MPS, RRM, Scanner) alive.
+#
+# Also runs on workflow_dispatch for manual trigger if needed.
+# =============================================================================
+
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: '0 12 1,21 * *'   # 1st and 21st of every month at 12:00 UTC (~5:30 PM IST)
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update keepalive timestamp
+        run: |
+          # Write timestamp to a tiny file — minimal footprint
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .keepalive
+          
+          git config user.name "TradEdge Bot"
+          git config user.email "tradedge-bot@users.noreply.github.com"
+          git add .keepalive
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "🤖 keep-alive: $(date -u +%Y-%m-%d)"
+          git push
