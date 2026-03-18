@@ -21,7 +21,7 @@ log = logging.getLogger("pos_sync")
 
 def fetch_positions(supabase_url, anon_key):
     """Fetch open positions from Supabase."""
-    api_url = f"{supabase_url.rstrip('/')}/rest/v1/tradedge_trades?select=trades_json&limit=1"
+    api_url = f"{supabase_url.rstrip('/')}/rest/v1/tradedge_trades?select=trades_json&order=updated_at.desc&limit=1"
     headers = {
         "apikey": anon_key,
         "Authorization": f"Bearer {anon_key}",
