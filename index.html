@@ -39,7 +39,40 @@ body.light{
 /* ── RRM POSITION INTELLIGENCE ── */
 .rrm-filter-btn{ transition:all .2s; }
 .rrm-filter-btn.active{ background:var(--bg4)!important; border-color:var(--b2)!important; }
-
+/* ── RRG Side Panel ── */
+.rrg-layout{display:grid;grid-template-columns:1fr 320px;gap:0;border-radius:12px;overflow:hidden;border:1px solid var(--b1);background:var(--bg2)}
+@media(max-width:1100px){.rrg-layout{grid-template-columns:1fr}.rrg-side-panel{max-height:360px}}
+.rrg-chart-col{padding:12px;min-width:0}
+.rrg-side-panel{border-left:1px solid var(--b1);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden}
+.rrg-side-head{padding:10px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.rrg-side-head .rrg-filter-input{background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:4px 8px;color:var(--t1);font-size:11px;outline:none;width:100%;font-family:'Outfit',sans-serif}
+.rrg-side-head .rrg-filter-input:focus{border-color:var(--y)}
+.rrg-side-head .rrg-filter-input::placeholder{color:var(--t4)}
+.rrg-side-body{flex:1;overflow-y:auto;padding:0}
+.rrg-quad-section{border-bottom:1px solid var(--b1)}
+.rrg-quad-section:last-child{border-bottom:none}
+.rrg-quad-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;user-select:none;transition:background .15s}
+.rrg-quad-header:hover{background:rgba(255,255,255,.02)}
+.rrg-quad-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rrg-quad-label{font-size:12px;font-weight:700;margin-left:8px;flex:1}
+.rrg-quad-count{font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;background:var(--bg4);color:var(--t3);min-width:20px;text-align:center}
+.rrg-quad-items{padding:0 10px 6px}
+.rrg-quad-item{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;transition:background .12s;font-size:11.5px}
+.rrg-quad-item:hover{background:rgba(255,255,255,.04)}
+.rrg-quad-item-cb{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--b3);flex-shrink:0;cursor:pointer;accent-color:var(--y)}
+.rrg-quad-item-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.rrg-quad-item-sym{font-weight:700;color:var(--t1);font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rrg-quad-item-score{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;flex-shrink:0}
+.rrg-quad-item-arrow{font-size:10px;flex-shrink:0;margin-left:2px}
+.rrg-q-leading .rrg-quad-dot{background:#22c55e}.rrg-q-leading .rrg-quad-label{color:#22c55e}.rrg-q-leading .rrg-quad-count{background:rgba(34,197,94,.12);color:#22c55e}.rrg-q-leading .rrg-quad-item-dot{background:#22c55e}.rrg-q-leading .rrg-quad-item-score{background:rgba(34,197,94,.12);color:#22c55e}
+.rrg-q-improving .rrg-quad-dot{background:#60a5fa}.rrg-q-improving .rrg-quad-label{color:#60a5fa}.rrg-q-improving .rrg-quad-count{background:rgba(96,165,250,.12);color:#60a5fa}.rrg-q-improving .rrg-quad-item-dot{background:#60a5fa}.rrg-q-improving .rrg-quad-item-score{background:rgba(96,165,250,.12);color:#60a5fa}
+.rrg-q-weakening .rrg-quad-dot{background:#f59e0b}.rrg-q-weakening .rrg-quad-label{color:#f59e0b}.rrg-q-weakening .rrg-quad-count{background:rgba(245,158,11,.12);color:#f59e0b}.rrg-q-weakening .rrg-quad-item-dot{background:#f59e0b}.rrg-q-weakening .rrg-quad-item-score{background:rgba(245,158,11,.12);color:#f59e0b}
+.rrg-q-lagging .rrg-quad-dot{background:#f87171}.rrg-q-lagging .rrg-quad-label{color:#f87171}.rrg-q-lagging .rrg-quad-count{background:rgba(248,113,113,.12);color:#f87171}.rrg-q-lagging .rrg-quad-item-dot{background:#f87171}.rrg-q-lagging .rrg-quad-item-score{background:rgba(248,113,113,.12);color:#f87171}
+.rrg-side-actions{display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--b1);font-size:11px;flex-shrink:0}
+.rrg-side-actions a{color:var(--c);text-decoration:underline;cursor:pointer;font-weight:600}
+.rrg-side-actions a:hover{color:var(--y)}
+.rrg-shown-count{color:var(--t4);margin-left:auto;font-size:10px}
+.rrg-arrow-up{color:#22c55e}.rrg-arrow-down{color:#f87171}.rrg-arrow-flat{color:#f59e0b}
 
 /* ── INFO TOOLTIP ── */
 .info-btn{
@@ -2719,24 +2752,41 @@ ALTER TABLE tradedge_trades ADD COLUMN IF NOT EXISTS prefs_json  TEXT;</pre</div
         </div>
       </details>
 
-      <!-- All Positions RRM Chart -->
-      <div class="card" style="padding:12px;margin-top:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">📊 All Positions — Relative Rotation Matrix vs Nifty 50</div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <button onclick="allRrgSetTF('daily')" id="allrrg-tf-d" class="btn btn-ghost btn-xs" style="border:1px solid #00e5ff;color:#00e5ff;font-weight:700">Daily</button>
-            <button onclick="allRrgSetTF('weekly')" id="allrrg-tf-w" class="btn btn-ghost btn-xs" style="border:1px solid var(--b2);color:var(--t4)">Weekly</button>
+    <!-- All Positions RRM Chart + Side Panel -->
+      <div class="rrg-layout" style="margin-top:12px">
+        <!-- LEFT: RRG Canvas -->
+        <div class="rrg-chart-col">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">📊 All Positions — Relative Rotation Matrix vs Nifty 50</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button onclick="allRrgSetTF('daily')" id="allrrg-tf-d" class="btn btn-ghost btn-xs" style="border:1px solid #00e5ff;color:#00e5ff;font-weight:700">Daily</button>
+              <button onclick="allRrgSetTF('weekly')" id="allrrg-tf-w" class="btn btn-ghost btn-xs" style="border:1px solid var(--b2);color:var(--t4)">Weekly</button>
+            </div>
+          </div>
+          <canvas id="all-rrg-canvas" width="960" height="520" style="width:100%;border-radius:8px;background:#080d14;cursor:crosshair"></canvas>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+            <div id="all-rrg-status" style="font-size:10px;color:var(--t4)"></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="btn btn-ghost btn-xs" id="rrg-play-btn" onclick="rrg_togglePlay()" style="font-size:10px;padding:3px 10px">&#9654; Play Trail</button>
+              <span style="font-size:10px;color:var(--t4)">Tail:</span>
+              <input type="range" id="rrg-tail-slider" min="2" max="15" value="6" oninput="rrg_setTail(+this.value)" style="width:120px;accent-color:var(--c)">
+              <span id="rrg-tail-val" style="font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace;min-width:30px">6 pts</span>
+            </div>
           </div>
         </div>
-        <canvas id="all-rrg-canvas" width="960" height="480" style="width:100%;border-radius:8px;background:#080d14;cursor:crosshair"></canvas>
-        <div id="all-rrg-status" style="font-size:10px;color:var(--t4);margin-top:4px"></div>
+        <!-- RIGHT: Quadrant Classification Side Panel -->
+        <div class="rrg-side-panel">
+          <div class="rrg-side-head">
+            <input class="rrg-filter-input" id="rrg-side-filter" placeholder="&#128269; Filter..." oninput="rrgSidePanelRender()">
+          </div>
+          <div class="rrg-side-actions">
+            <a onclick="rrgSideSelectAll()">Select All</a>
+            <a onclick="rrgSideClearAll()">Clear All</a>
+            <span class="rrg-shown-count" id="rrg-shown-count">0/0 shown</span>
+          </div>
+          <div class="rrg-side-body" id="rrg-side-body"></div>
+        </div>
       </div>
-
-      <!-- Responsive: stack on mobile -->
-      <style>@media(max-width:900px){#page-rrm>div:nth-child(5){grid-template-columns:1fr!important}}</style>
-
-    </div>
-
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -11677,7 +11727,225 @@ function miniRrgDraw(){
 }
 let _miniRrgAnimId=0;
 (function _miniPulse(){_miniRrgAnimId=requestAnimationFrame(_miniPulse);const m=document.getElementById('mini-rrg-modal');if(m&&m.style.display==='block')miniRrgDraw()})();
+// ══════════════════════════════════════════════════
+// RRG SIDE PANEL — Leading / Improving / Weakening / Lagging
+// ══════════════════════════════════════════════════
+let _rrgSideSelected = new Set();
+let _rrgSideCollapsed = {};
+let _rrgTailLen = 6;
+let _rrgPlaying = false;
+let _rrgPlayTimer = null;
 
+function rrgGetQuadrantForPanel(sym, tf){
+  const live = _rrmLiveData[tf]?.[sym];
+  if(live) return { r: live.rs_ratio, m: live.rs_momentum };
+  const idx = _rrmStockIndex[tf]?.[sym];
+  if(idx?.current) return { r: idx.current.rs_ratio, m: idx.current.rs_momentum };
+  const cached = _rrmCache?.[sym];
+  if(tf === 'daily' && cached?.dailyRatio != null) return { r: cached.dailyRatio, m: cached.dailyMom };
+  if(tf === 'weekly' && cached?.weeklyRatio != null) return { r: cached.weeklyRatio, m: cached.weeklyMom };
+  return null;
+}
+
+function rrgClassifyQuadrant(r, m){
+  if(r >= 100 && m >= 100) return 'Leading';
+  if(r >= 100 && m < 100)  return 'Weakening';
+  if(r < 100 && m >= 100)  return 'Improving';
+  return 'Lagging';
+}
+
+function rrgGetMomentumArrow(sym, tf){
+  const trail = _rrmLiveTrails[tf]?.[sym];
+  if(!trail || trail.length < 2) return 'flat';
+  const cur = trail[trail.length - 1];
+  const prev = trail[trail.length - 2];
+  const diff = cur.m - prev.m;
+  if(diff > 0.3) return 'up';
+  if(diff < -0.3) return 'down';
+  return 'flat';
+}
+
+function rrgSidePanelRender(){
+  const body = document.getElementById('rrg-side-body');
+  if(!body) return;
+  const tf = _allRrgTF;
+  const filter = (document.getElementById('rrg-side-filter')?.value || '').trim().toUpperCase();
+  const allSyms = Object.keys(_allRrgData).filter(sym => {
+    const d = _allRrgData[sym];
+    return d && d[tf] && d[tf].length > 0;
+  });
+  const quadrants = { Leading:[], Improving:[], Weakening:[], Lagging:[] };
+  allSyms.forEach(sym => {
+    const vals = rrgGetQuadrantForPanel(sym, tf);
+    if(!vals) return;
+    if(filter && !sym.includes(filter)) return;
+    const q = rrgClassifyQuadrant(vals.r, vals.m);
+    const arrow = rrgGetMomentumArrow(sym, tf);
+    quadrants[q].push({ sym, score: Math.round(vals.r), ratio: vals.r, momentum: vals.m, arrow, color: _allRrgData[sym]?.color || '#ccc' });
+  });
+  Object.values(quadrants).forEach(arr => arr.sort((a, b) => b.ratio - a.ratio));
+  const total = Object.values(quadrants).reduce((s, arr) => s + arr.length, 0);
+  const countEl = document.getElementById('rrg-shown-count');
+  if(countEl) countEl.textContent = total + '/' + allSyms.length + ' shown';
+  const qOrder = ['Leading', 'Improving', 'Weakening', 'Lagging'];
+  let html = '';
+  qOrder.forEach(qName => {
+    const items = quadrants[qName];
+    const qClass = 'rrg-q-' + qName.toLowerCase();
+    const collapsed = !!_rrgSideCollapsed[qName];
+    html += '<div class="rrg-quad-section ' + qClass + '">';
+    html += '<div class="rrg-quad-header" onclick="rrgSideToggleQuad(\'' + qName + '\')">';
+    html += '<div class="rrg-quad-dot"></div>';
+    html += '<div class="rrg-quad-label">' + qName + '</div>';
+    html += '<div class="rrg-quad-count">' + items.length + '</div>';
+    html += '</div>';
+    if(!collapsed){
+      html += '<div class="rrg-quad-items">';
+      if(!items.length){
+        html += '<div style="padding:4px 6px;font-size:10px;color:var(--t4)">\u2014</div>';
+      }
+      items.forEach(item => {
+        const checked = _rrgSideSelected.has(item.sym);
+        const arrowIcon = item.arrow === 'up' ? '\u2197' : item.arrow === 'down' ? '\u2198' : '\u2192';
+        const arrowClass = item.arrow === 'up' ? 'rrg-arrow-up' : item.arrow === 'down' ? 'rrg-arrow-down' : 'rrg-arrow-flat';
+        html += '<div class="rrg-quad-item" onclick="rrgSideToggleSym(\'' + item.sym + '\')" title="R:' + item.ratio.toFixed(1) + ' M:' + item.momentum.toFixed(1) + '">';
+        html += '<input type="checkbox" class="rrg-quad-item-cb" ' + (checked ? 'checked' : '') + ' onclick="event.stopPropagation();rrgSideToggleSym(\'' + item.sym + '\')">';
+        html += '<div class="rrg-quad-item-dot" style="background:' + item.color + '"></div>';
+        html += '<div class="rrg-quad-item-sym">' + item.sym + '</div>';
+        html += '<div class="rrg-quad-item-score">' + item.score + '</div>';
+        html += '<div class="rrg-quad-item-arrow ' + arrowClass + '">' + arrowIcon + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  body.innerHTML = html;
+}
+
+function rrgSideToggleQuad(qName){ _rrgSideCollapsed[qName] = !_rrgSideCollapsed[qName]; rrgSidePanelRender(); }
+function rrgSideToggleSym(sym){
+  if(_rrgSideSelected.has(sym)) _rrgSideSelected.delete(sym);
+  else _rrgSideSelected.add(sym);
+  rrgSidePanelRender(); allRrgDraw();
+}
+function rrgSideSelectAll(){ Object.keys(_allRrgData).forEach(sym => _rrgSideSelected.add(sym)); rrgSidePanelRender(); allRrgDraw(); }
+function rrgSideClearAll(){ _rrgSideSelected.clear(); rrgSidePanelRender(); allRrgDraw(); }
+function rrg_setTail(val){ _rrgTailLen = val; document.getElementById('rrg-tail-val').textContent = val + ' pts'; allRrgDraw(); }
+function rrg_togglePlay(){
+  const btn = document.getElementById('rrg-play-btn');
+  if(_rrgPlaying){ _rrgPlaying = false; clearInterval(_rrgPlayTimer); if(btn) btn.innerHTML = '&#9654; Play Trail'; return; }
+  _rrgPlaying = true; if(btn) btn.innerHTML = '&#9646;&#9646; Pause';
+  let step = 1; const slider = document.getElementById('rrg-tail-slider'); const maxTail = +slider.max || 15;
+  _rrgPlayTimer = setInterval(() => {
+    if(step > maxTail){ _rrgPlaying = false; clearInterval(_rrgPlayTimer); if(btn) btn.innerHTML = '&#9654; Play Trail'; return; }
+    _rrgTailLen = step; slider.value = step; document.getElementById('rrg-tail-val').textContent = step + ' pts'; allRrgDraw(); step++;
+  }, 500);
+}
+
+// ══════════════════════════════════════════════════
+// OVERRIDE allRrgDraw — supports side panel highlighting + tail length
+// ══════════════════════════════════════════════════
+allRrgDraw = function(){
+  const c = document.getElementById('all-rrg-canvas'); if(!c) return;
+  const dpr = window.devicePixelRatio || 1;
+  const dispW = c.clientWidth, dispH = c.clientHeight || Math.round(dispW * 0.54);
+  if(c.width !== dispW * dpr || c.height !== dispH * dpr){ c.width = dispW * dpr; c.height = dispH * dpr; }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = dispW, H = dispH;
+  ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#080d14'; ctx.fillRect(0, 0, W, H);
+
+  const hasSelection = _rrgSideSelected.size > 0;
+  const allTrails = [];
+  Object.entries(_allRrgData).forEach(([sym, d]) => {
+    let trail = d[_allRrgTF];
+    if(trail && trail.length){
+      allTrails.push({ sym, trail: trail.slice(-_rrgTailLen), color: d.color, selected: !hasSelection || _rrgSideSelected.has(sym) });
+    }
+  });
+
+  let rMin = 96, rMax = 104, mMin = 96, mMax = 104;
+  allTrails.forEach(({ trail }) => trail.forEach(p => { rMin = Math.min(rMin, p.r - 0.5); rMax = Math.max(rMax, p.r + 0.5); mMin = Math.min(mMin, p.m - 0.5); mMax = Math.max(mMax, p.m + 0.5); }));
+  rMin -= 2; rMax += 2; mMin -= 2; mMax += 2;
+
+  const mg = { l: 48, r: 16, t: 24, b: 28 }, cw = W - mg.l - mg.r, ch = H - mg.t - mg.b;
+  const tX = v => mg.l + (v - rMin) / (rMax - rMin) * cw;
+  const tY = v => mg.t + (1 - (v - mMin) / (mMax - mMin)) * ch;
+  const cx = tX(100), cy = tY(100);
+
+  ctx.fillStyle = 'rgba(0,255,100,0.04)'; ctx.fillRect(cx, mg.t, W - mg.r - cx, cy - mg.t);
+  ctx.fillStyle = 'rgba(59,130,246,0.04)'; ctx.fillRect(mg.l, mg.t, cx - mg.l, cy - mg.t);
+  ctx.fillStyle = 'rgba(249,115,22,0.04)'; ctx.fillRect(cx, cy, W - mg.r - cx, H - mg.b - cy);
+  ctx.fillStyle = 'rgba(239,68,68,0.04)'; ctx.fillRect(mg.l, cy, cx - mg.l, H - mg.b - cy);
+
+  ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx, mg.t); ctx.lineTo(cx, H - mg.b); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mg.l, cy); ctx.lineTo(W - mg.r, cy); ctx.stroke();
+
+  ctx.font = '11px sans-serif'; ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#22c55e'; ctx.fillText('LEADING', cx + 8, mg.t + 16);
+  ctx.fillStyle = '#3b82f6'; ctx.fillText('IMPROVING', mg.l + 4, mg.t + 16);
+  ctx.fillStyle = '#f97316'; ctx.fillText('WEAKENING', cx + 8, H - mg.b - 8);
+  ctx.fillStyle = '#ef4444'; ctx.fillText('LAGGING', mg.l + 4, H - mg.b - 8);
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#475569'; ctx.font = '9px sans-serif';
+  ctx.save(); ctx.translate(13, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('JdK RS-Momentum \u2192', 0, 0); ctx.restore();
+  ctx.fillText('JdK RS-Ratio \u2192', W / 2 - 28, H - 5);
+  ctx.fillStyle = '#334155'; ctx.font = '9px monospace';
+  for(let v = Math.ceil(rMin); v <= Math.floor(rMax); v += 2) ctx.fillText(v, tX(v) - 8, H - mg.b + 14);
+  for(let v = Math.ceil(mMin); v <= Math.floor(mMax); v += 2) ctx.fillText(v, 2, tY(v) + 3);
+
+  if(!allTrails.length){
+    ctx.fillStyle = '#64748b'; ctx.font = '13px sans-serif';
+    ctx.fillText('Click Refresh to compute RRM for open positions', W / 2 - 170, H / 2);
+    rrgSidePanelRender();
+    return;
+  }
+
+  const sorted = [...allTrails].sort((a, b) => (a.selected ? 1 : 0) - (b.selected ? 1 : 0));
+
+  sorted.forEach(({ sym, trail, color, selected }) => {
+    const alpha = selected ? 1.0 : 0.15;
+    const lw = selected ? 2.5 : 1;
+    if(selected){ ctx.shadowColor = color; ctx.shadowBlur = 6; }
+    ctx.beginPath();
+    trail.forEach((p, i) => { const x = tX(p.r), y = tY(p.m); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.globalAlpha = alpha; ctx.stroke(); ctx.shadowBlur = 0;
+
+    trail.forEach((p, i) => {
+      const x = tX(p.r), y = tY(p.m), last = i === trail.length - 1;
+      ctx.globalAlpha = alpha * (0.3 + 0.7 * (i / Math.max(trail.length - 1, 1)));
+      ctx.beginPath(); ctx.arc(x, y, last ? (selected ? 5 : 3) : 2, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      if(last && selected){
+        ctx.strokeStyle = '#0c1018'; ctx.lineWidth = 1.5; ctx.stroke();
+        const pulse = Math.sin(Date.now() / 300) * 0.5 + 0.5;
+        ctx.globalAlpha = (0.15 + 0.25 * pulse) * alpha;
+        ctx.beginPath(); ctx.arc(x, y, 8 + 3 * pulse, 0, Math.PI * 2);
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    });
+
+    if(selected){
+      const cur = trail[trail.length - 1];
+      ctx.font = 'bold 10px sans-serif'; ctx.fillStyle = color; ctx.globalAlpha = alpha;
+      ctx.fillText(sym, tX(cur.r) + 8, tY(cur.m) - 6); ctx.globalAlpha = 1;
+    }
+  });
+
+  rrgSidePanelRender();
+};
+
+// Hook allRrgCompute to also render the side panel
+const _origAllRrgCompute2 = allRrgCompute;
+allRrgCompute = async function(){
+  await _origAllRrgCompute2();
+  rrgSidePanelRender();
+};
 </script>
 <script src="gdrive-archive.js"></script>
 </body>
