@@ -1,13 +1,12 @@
 """
 ================================================================================
-RRM Data Fetcher v4.0 — Multi-Benchmark Relative Momentum Matrix Engine
+RRM Data Fetcher v4.1 — Multi-Benchmark + Global Indices + Custom Stocks
 ================================================================================
-UPGRADE from v3.1:
-  - 46 sectors (was 16) — full Definedge universe
-  - 54 ETFs (was 11) — full Definedge universe
-  - Monthly timeframe (was daily+weekly only)
-  - Monthly drill-down for stock-level multi-TF alignment
-  - Backward compatible JSON structure
+UPGRADE from v4.0:
+  - NEW: 25 Global Indices (US, Europe, Asia, Commodities, Crypto, Forex)
+  - NEW: Custom Stocks support (loaded from custom_stocks.json)
+  - Both groups appear as separate keys in the output JSON
+  - Backward compatible — all v4.0 fields unchanged
 
 Requirements:  pip install yfinance numpy
 ================================================================================
@@ -29,11 +28,11 @@ def load_config(config_path):
         try:
             with open(config_path) as f:
                 cfg = json.load(f)
-            log.info(f"Config: {config_path} — {len(cfg.get('sectors',{}))} sectors, {len(cfg.get('etfs',{}))} ETFs")
+            log.info(f"Config: {config_path} — {len(cfg.get('sectors',{}))} sectors, {len(cfg.get('etfs',{}))} ETFs, {len(cfg.get('global_indices',{}))} globals")
             return cfg
         except Exception as e:
             log.warning(f"Config load failed: {e}")
-    log.info("Using built-in defaults (v4.0 — 46 sectors, 54 ETFs)")
+    log.info("Using built-in defaults (v4.1 — 16 sectors, 54 ETFs, 25 global indices)")
     return DEFAULT_CONFIG()
 
 def DEFAULT_CONFIG():
@@ -41,11 +40,9 @@ def DEFAULT_CONFIG():
         "benchmarks": {"^NSEI": "Nifty 50", "^NSEBANK": "Nifty Bank", "^CRSLDX": "Nifty 500"},
         "default_benchmark": "^NSEI",
         # ═══════════════════════════════════════════════════════
-        # 46 SECTORS (full Definedge universe)
-        # Yahoo Finance tickers for NSE sectoral/thematic indices
+        # 16 SECTORS (v4.0 — unchanged)
         # ═══════════════════════════════════════════════════════
         "sectors": {
-            # ── Original 16 sectors (v3.1) ──
             "^CNXAUTO":     {"name": "Nifty Auto",         "color": "#ef4444"},
             "^NSEBANK":     {"name": "Nifty Bank",         "color": "#3b82f6"},
             "^CNXFIN":      {"name": "Nifty Fin Service",  "color": "#6366f1"},
@@ -62,17 +59,12 @@ def DEFAULT_CONFIG():
             "^CNXCONSUM":   {"name": "Nifty Consumption",  "color": "#e879f9"},
             "^CNXCMDT":     {"name": "Nifty Commodities",  "color": "#d97706"},
             "^CNXMNC":      {"name": "Nifty MNC",          "color": "#64748b"},
-            # ── Additional sectors (only those with working Yahoo Finance API data) ──
-            "^CNXPSE":               {"name": "Nifty PSE",                "color": "#fde68a"},
-            # NOTE: 29 newer NSE thematic indices (Healthcare, EV, Defence, Digital, etc.)
-            # are not available via yfinance API as of March 2026. Their themes are covered
-            # by corresponding ETFs in the ETFs section below. Re-check periodically.
+            "^CNXPSE":      {"name": "Nifty PSE",          "color": "#fde68a"},
         },
         # ═══════════════════════════════════════════════════════
-        # 54 ETFs (full Definedge universe)
+        # 54 ETFs (v4.0 — unchanged)
         # ═══════════════════════════════════════════════════════
         "etfs": {
-            # ── Original 11 ETFs (v3.1) ──
             "NIFTYBEES.NS":   {"name": "Nifty 50 ETF",        "color": "#3b82f6"},
             "BANKBEES.NS":    {"name": "Bank ETF",             "color": "#6366f1"},
             "ITBEES.NS":      {"name": "IT ETF",               "color": "#06b6d4"},
@@ -84,7 +76,6 @@ def DEFAULT_CONFIG():
             "GOLDBEES.NS":    {"name": "Gold ETF",             "color": "#eab308"},
             "SILVERBEES.NS":  {"name": "Silver ETF",           "color": "#94a3b8"},
             "MON100.NS":      {"name": "NASDAQ 100 ETF",       "color": "#22d3ee"},
-            # ── NEW: 43 additional ETFs from Definedge ──
             "ABSLPSE.NS":     {"name": "PSE ETF",              "color": "#fde68a"},
             "ALPHA.NS":       {"name": "Alpha ETF",            "color": "#a78bfa"},
             "AONETOTAL.NS":   {"name": "Top 750 ETF",          "color": "#67e8f9"},
@@ -96,7 +87,7 @@ def DEFAULT_CONFIG():
             "DIVOPPBEES.NS":  {"name": "Dividend Opp 50 ETF",  "color": "#fbbf24"},
             "ESG.NS":         {"name": "ESG Leaders ETF",      "color": "#34d399"},
             "FINIETF.NS":     {"name": "FinServ Ex-Bank ETF",  "color": "#60a5fa"},
-            "FMCGIETF.NS":   {"name": "FMCG ETF",             "color": "#22c55e"},
+            "FMCGIETF.NS":    {"name": "FMCG ETF",             "color": "#22c55e"},
             "GILT5YBEES.NS":  {"name": "Gilt 5Y ETF",          "color": "#0ea5e9"},
             "GROWWEV.NS":     {"name": "EV Auto ETF",          "color": "#67e8f9"},
             "GROWWRAIL.NS":   {"name": "Railways PSU ETF",     "color": "#bef264"},
@@ -129,7 +120,9 @@ def DEFAULT_CONFIG():
             "SELECTIPO.NS":   {"name": "Select IPO ETF",       "color": "#fda4af"},
             "TOP10ADD.NS":    {"name": "Top 10 ETF",            "color": "#fed7aa"},
         },
-        # ── Asset classes (unchanged from v3.1) ──
+        # ═══════════════════════════════════════════════════════
+        # 12 ASSET CLASSES (v4.0 — unchanged)
+        # ═══════════════════════════════════════════════════════
         "asset_classes": {
             "GC=F":           {"name": "Gold",              "color": "#eab308"},
             "SI=F":           {"name": "Silver",            "color": "#94a3b8"},
@@ -144,18 +137,83 @@ def DEFAULT_CONFIG():
             "^GSPC":          {"name": "S&P 500",            "color": "#6366f1"},
             "^IXIC":          {"name": "NASDAQ",             "color": "#a855f7"},
         },
-        # ── Market segments (unchanged from v3.1) ──
+        # ═══════════════════════════════════════════════════════
+        # 4 MARKET SEGMENTS (v4.0 — unchanged)
+        # ═══════════════════════════════════════════════════════
         "market_segments": {
             "^NSMIDCP":           {"name": "Nifty Next 50",   "color": "#6366f1"},
             "NIFTYMIDCAP150.NS":  {"name": "Midcap 150",      "color": "#a855f7"},
             "^NSEMDCP50":         {"name": "Midcap 50",        "color": "#d946ef"},
             "^NSEBANK":           {"name": "Bank Index",       "color": "#0ea5e9"},
         },
+        # ═══════════════════════════════════════════════════════
+        # NEW v4.1: 25 GLOBAL INDICES
+        # 6 sub-groups: US, Europe, Asia, Commodities, Crypto, Forex
+        # ═══════════════════════════════════════════════════════
+        "global_indices": {
+            # ── US ──
+            "^GSPC":      {"name": "S&P 500",          "color": "#6366f1", "group": "US"},
+            "^DJI":       {"name": "Dow Jones",        "color": "#8b5cf6", "group": "US"},
+            "^IXIC":      {"name": "NASDAQ Composite",  "color": "#a855f7", "group": "US"},
+            "^RUT":       {"name": "Russell 2000",      "color": "#c084fc", "group": "US"},
+            # ── Europe ──
+            "^GDAXI":     {"name": "DAX (Germany)",    "color": "#f59e0b", "group": "Europe"},
+            "^FTSE":      {"name": "FTSE 100 (UK)",    "color": "#ef4444", "group": "Europe"},
+            "^FCHI":      {"name": "CAC 40 (France)",  "color": "#3b82f6", "group": "Europe"},
+            "^STOXX50E":  {"name": "Euro Stoxx 50",    "color": "#14b8a6", "group": "Europe"},
+            # ── Asia ──
+            "^N225":      {"name": "Nikkei 225",       "color": "#ec4899", "group": "Asia"},
+            "^HSI":       {"name": "Hang Seng",        "color": "#fb923c", "group": "Asia"},
+            "000001.SS":  {"name": "Shanghai Comp",    "color": "#ef4444", "group": "Asia"},
+            "^KS11":      {"name": "KOSPI (Korea)",    "color": "#22c55e", "group": "Asia"},
+            "^TWII":      {"name": "Taiwan Weighted",  "color": "#06b6d4", "group": "Asia"},
+            "^STI":       {"name": "Straits Times",    "color": "#84cc16", "group": "Asia"},
+            # ── Commodities ──
+            "GC=F":       {"name": "Gold",             "color": "#eab308", "group": "Commodities"},
+            "SI=F":       {"name": "Silver",           "color": "#94a3b8", "group": "Commodities"},
+            "CL=F":       {"name": "Crude Oil WTI",    "color": "#f97316", "group": "Commodities"},
+            "HG=F":       {"name": "Copper",           "color": "#d97706", "group": "Commodities"},
+            # ── Crypto ──
+            "BTC-USD":    {"name": "Bitcoin",          "color": "#f59e0b", "group": "Crypto"},
+            "ETH-USD":    {"name": "Ethereum",         "color": "#6366f1", "group": "Crypto"},
+            # ── Forex ──
+            "DX-Y.NYB":  {"name": "US Dollar Index",  "color": "#22c55e", "group": "Forex"},
+            "USDINR=X":  {"name": "USD/INR",          "color": "#14b8a6", "group": "Forex"},
+            "EURUSD=X":  {"name": "EUR/USD",          "color": "#3b82f6", "group": "Forex"},
+            "GBPUSD=X":  {"name": "GBP/USD",          "color": "#ef4444", "group": "Forex"},
+            "USDJPY=X":  {"name": "USD/JPY",          "color": "#ec4899", "group": "Forex"},
+        },
         "sector_constituents": {},
     }
 
 # =============================================================================
-# JdK RS-RATIO / RS-MOMENTUM (unchanged from v3.1)
+# CUSTOM STOCKS LOADER (NEW v4.1)
+# =============================================================================
+def load_custom_stocks(config_dir=None):
+    """Load user-added custom stocks from custom_stocks.json"""
+    search_paths = [
+        "data/custom_stocks.json",
+        "../data/custom_stocks.json",
+        "custom_stocks.json",
+    ]
+    if config_dir:
+        search_paths.insert(0, os.path.join(config_dir, "custom_stocks.json"))
+
+    for path in search_paths:
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                stocks = data.get("custom_stocks", [])
+                log.info(f"Custom stocks: loaded {len(stocks)} from {path}")
+                return stocks
+            except Exception as e:
+                log.warning(f"Custom stocks load failed ({path}): {e}")
+    log.info("Custom stocks: none found (custom_stocks.json not present)")
+    return []
+
+# =============================================================================
+# JdK RS-RATIO / RS-MOMENTUM (unchanged from v4.0)
 # =============================================================================
 def calc_rs(sector_prices, bench_prices, window=10):
     if len(sector_prices) < window * 3 or len(bench_prices) < window * 3:
@@ -228,7 +286,6 @@ def resample_weekly(closes, dates):
     return wc, wd
 
 def resample_monthly(closes, dates):
-    """Resample daily data to monthly (last close of each month)."""
     from datetime import datetime as dt
     mc, md, cm = [], [], None
     for c, d in zip(closes, dates):
@@ -278,15 +335,12 @@ def stock_color(name, idx):
 # RRM FOR A SET OF ITEMS (one timeframe)
 # =============================================================================
 def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, window, resample_fn=None):
-    """
-    Generic RRM calculation for any timeframe.
-    resample_fn: None for daily, resample_weekly for weekly, resample_monthly for monthly
-    """
     results = []
     for entry in items_cfg:
         sym = entry["symbol"]
         name = entry.get("name", sym)
         color = entry.get("color", "#94a3b8")
+        extra = {k: v for k, v in entry.items() if k not in ("symbol", "name", "color")}
         if sym not in price_data: continue
 
         sc, sd = price_data[sym]["closes"], price_data[sym]["dates"]
@@ -305,7 +359,14 @@ def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, w
         if not tail: continue
 
         cur = tail[-1]
-        results.append({"symbol": sym, "name": name, "color": color, "quadrant": quadrant(cur["rs_ratio"], cur["rs_momentum"]), "current": cur, "tail": tail})
+        item = {
+            "symbol": sym, "name": name, "color": color,
+            "quadrant": quadrant(cur["rs_ratio"], cur["rs_momentum"]),
+            "current": cur, "tail": tail,
+        }
+        # Preserve extra fields (e.g. "group" for global indices, "sector" for custom stocks)
+        item.update(extra)
+        results.append(item)
     return results
 
 def qsum(items):
@@ -314,7 +375,7 @@ def qsum(items):
 # =============================================================================
 # CALCULATE RRM FOR ONE BENCHMARK
 # =============================================================================
-def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail, weekly_tail, monthly_tail, window):
+def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, custom_stock_items, daily_tail, weekly_tail, monthly_tail, window):
     if bench_sym not in price_data:
         log.warning(f"Benchmark {bench_sym} not in price data, skipping")
         return None
@@ -325,32 +386,45 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail,
     etfs = config.get("etfs", {})
     asset_classes = config.get("asset_classes", {})
     market_segments = config.get("market_segments", {})
+    global_indices = config.get("global_indices", {})
 
     def to_list(cfg):
-        return [{"symbol": k, "name": v.get("name", k), "color": v.get("color", "#94a3b8")} for k, v in cfg.items() if k != bench_sym]
+        return [{"symbol": k, **v} for k, v in cfg.items() if k != bench_sym]
 
-    sec_list, etf_list = to_list(sectors), to_list(etfs)
-    ac_list, ms_list = to_list(asset_classes), to_list(market_segments)
+    sec_list = to_list(sectors)
+    etf_list = to_list(etfs)
+    ac_list = to_list(asset_classes)
+    ms_list = to_list(market_segments)
+    gi_list = to_list(global_indices)
 
-    # Daily
+    # Custom stocks as item list
+    cs_list = [{"symbol": s["symbol"], "name": s.get("name", s["symbol"]), "color": stock_color(s.get("name", s["symbol"]), i), "sector": s.get("sector", ""), "group": s.get("group", "Custom")} for i, s in enumerate(custom_stock_items)]
+
+    # ── Daily ──
     d_sec = calc_rrm_items(price_data, sec_list, bc, bd, daily_tail, window, resample_fn=None)
     d_etf = calc_rrm_items(price_data, etf_list, bc, bd, daily_tail, window, resample_fn=None)
     d_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, daily_tail, window, resample_fn=None)
     d_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, daily_tail, window, resample_fn=None)
+    d_gi  = calc_rrm_items(price_data, gi_list,  bc, bd, daily_tail, window, resample_fn=None)
+    d_cs  = calc_rrm_items(price_data, cs_list,  bc, bd, daily_tail, window, resample_fn=None)
 
-    # Weekly
+    # ── Weekly ──
     w_sec = calc_rrm_items(price_data, sec_list, bc, bd, weekly_tail, window, resample_fn=resample_weekly)
     w_etf = calc_rrm_items(price_data, etf_list, bc, bd, weekly_tail, window, resample_fn=resample_weekly)
     w_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, weekly_tail, window, resample_fn=resample_weekly)
     w_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, weekly_tail, window, resample_fn=resample_weekly)
+    w_gi  = calc_rrm_items(price_data, gi_list,  bc, bd, weekly_tail, window, resample_fn=resample_weekly)
+    w_cs  = calc_rrm_items(price_data, cs_list,  bc, bd, weekly_tail, window, resample_fn=resample_weekly)
 
-    # Monthly
+    # ── Monthly ──
     m_sec = calc_rrm_items(price_data, sec_list, bc, bd, monthly_tail, window, resample_fn=resample_monthly)
     m_etf = calc_rrm_items(price_data, etf_list, bc, bd, monthly_tail, window, resample_fn=resample_monthly)
     m_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
     m_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
+    m_gi  = calc_rrm_items(price_data, gi_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
+    m_cs  = calc_rrm_items(price_data, cs_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
 
-    # Drill-down (stocks within each sector, benchmarked against the sector index)
+    # ── Drill-down (unchanged from v4.0) ──
     drilldown = {}
     for sec_sym, stocks in sector_stocks.items():
         if sec_sym not in price_data: continue
@@ -366,9 +440,21 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail,
             drilldown[sec_sym] = {"sector_name": sec_name, "benchmark": sec_sym, "daily": dd_d, "weekly": dd_w, "monthly": dd_m}
 
     return {
-        "daily":   {"sectors": d_sec, "etfs": d_etf, "asset_classes": d_ac, "market_segments": d_ms, "quadrant_summary": qsum(d_sec), "tail_length": daily_tail},
-        "weekly":  {"sectors": w_sec, "etfs": w_etf, "asset_classes": w_ac, "market_segments": w_ms, "quadrant_summary": qsum(w_sec), "tail_length": weekly_tail},
-        "monthly": {"sectors": m_sec, "etfs": m_etf, "asset_classes": m_ac, "market_segments": m_ms, "quadrant_summary": qsum(m_sec), "tail_length": monthly_tail},
+        "daily": {
+            "sectors": d_sec, "etfs": d_etf, "asset_classes": d_ac,
+            "market_segments": d_ms, "global_indices": d_gi, "custom_stocks": d_cs,
+            "quadrant_summary": qsum(d_sec), "tail_length": daily_tail,
+        },
+        "weekly": {
+            "sectors": w_sec, "etfs": w_etf, "asset_classes": w_ac,
+            "market_segments": w_ms, "global_indices": w_gi, "custom_stocks": w_cs,
+            "quadrant_summary": qsum(w_sec), "tail_length": weekly_tail,
+        },
+        "monthly": {
+            "sectors": m_sec, "etfs": m_etf, "asset_classes": m_ac,
+            "market_segments": m_ms, "global_indices": m_gi, "custom_stocks": m_cs,
+            "quadrant_summary": qsum(m_sec), "tail_length": monthly_tail,
+        },
         "drilldown": drilldown,
     }
 
@@ -377,15 +463,19 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail,
 # =============================================================================
 def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10):
     today = datetime.now().strftime("%Y-%m-%d")
-    log.info(f"╔════════════════════════════════════════════════╗")
-    log.info(f"║  RRM v4.0 MULTI-BENCHMARK + MONTHLY — {today} ║")
-    log.info(f"╚════════════════════════════════════════════════╝")
+    log.info(f"╔════════════════════════════════════════════════════════╗")
+    log.info(f"║  RRM v4.1 MULTI-BENCHMARK + GLOBAL INDICES — {today} ║")
+    log.info(f"╚════════════════════════════════════════════════════════╝")
 
     benchmarks = config.get("benchmarks", {})
     sectors = config.get("sectors", {})
     etfs = config.get("etfs", {})
     asset_classes = config.get("asset_classes", {})
     market_segments = config.get("market_segments", {})
+    global_indices = config.get("global_indices", {})
+
+    # Load custom stocks
+    custom_stocks = load_custom_stocks()
 
     # Collect ALL symbols
     all_syms = set()
@@ -394,6 +484,9 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     all_syms.update(etfs.keys())
     all_syms.update(asset_classes.keys())
     all_syms.update(market_segments.keys())
+    all_syms.update(global_indices.keys())
+    for cs in custom_stocks:
+        all_syms.add(cs["symbol"])
 
     # Sector constituents
     sector_stocks = {}
@@ -404,21 +497,26 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
             for s in constituents:
                 all_syms.add(s["symbol"])
 
-    log.info(f"Total symbols to fetch: {len(all_syms)} ({len(sectors)} sectors, {len(etfs)} ETFs, {len(asset_classes)} assets, {len(market_segments)} segments)")
+    log.info(f"Total symbols to fetch: {len(all_syms)}")
+    log.info(f"  {len(sectors)} sectors, {len(etfs)} ETFs, {len(asset_classes)} assets")
+    log.info(f"  {len(market_segments)} segments, {len(global_indices)} global indices, {len(custom_stocks)} custom stocks")
 
-    # Single fetch for ALL symbols (efficient)
+    # Single fetch for ALL symbols
     price_data = fetch_prices(list(all_syms), period="5y")
 
     # Calculate RRM for EACH benchmark
     benchmarks_data = {}
     for bench_sym, bench_name in benchmarks.items():
         log.info(f"\n═══ BENCHMARK: {bench_name} ({bench_sym}) ═══")
-        result = calc_for_benchmark(bench_sym, config, price_data, sector_stocks, daily_tail, weekly_tail, monthly_tail, window)
+        result = calc_for_benchmark(
+            bench_sym, config, price_data, sector_stocks, custom_stocks,
+            daily_tail, weekly_tail, monthly_tail, window,
+        )
         if result:
             benchmarks_data[bench_sym] = result
-            log.info(f"  Daily sectors: {len(result['daily']['sectors'])}, ETFs: {len(result['daily']['etfs'])}")
-            log.info(f"  Weekly sectors: {len(result['weekly']['sectors'])}, ETFs: {len(result['weekly']['etfs'])}")
-            log.info(f"  Monthly sectors: {len(result['monthly']['sectors'])}, ETFs: {len(result['monthly']['etfs'])}")
+            log.info(f"  Daily: {len(result['daily']['sectors'])} sectors, {len(result['daily']['etfs'])} ETFs, {len(result['daily']['global_indices'])} globals, {len(result['daily']['custom_stocks'])} custom")
+            log.info(f"  Weekly: {len(result['weekly']['sectors'])} sectors, {len(result['weekly']['global_indices'])} globals")
+            log.info(f"  Monthly: {len(result['monthly']['sectors'])} sectors, {len(result['monthly']['global_indices'])} globals")
             log.info(f"  Drilldowns: {len(result['drilldown'])}")
 
     output = {
@@ -429,9 +527,12 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
         "metadata": {
             "generated_at": datetime.now().isoformat(),
             "date": today,
+            "version": "4.1",
             "benchmarks_calculated": list(benchmarks_data.keys()),
             "total_sectors": max((len(b["daily"]["sectors"]) for b in benchmarks_data.values()), default=0),
             "total_etfs": max((len(b["daily"]["etfs"]) for b in benchmarks_data.values()), default=0),
+            "total_global_indices": max((len(b["daily"]["global_indices"]) for b in benchmarks_data.values()), default=0),
+            "total_custom_stocks": max((len(b["daily"]["custom_stocks"]) for b in benchmarks_data.values()), default=0),
             "total_drilldown_sectors": max((len(b["drilldown"]) for b in benchmarks_data.values()), default=0),
             "timeframes": ["daily", "weekly", "monthly"],
         },
@@ -439,14 +540,16 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
 
     log.info(f"\n═══ FINAL SUMMARY ═══")
     log.info(f"Benchmarks: {', '.join(benchmarks_data.keys())}")
-    log.info(f"Sectors: {output['metadata']['total_sectors']}, ETFs: {output['metadata']['total_etfs']}, Drilldowns: {output['metadata']['total_drilldown_sectors']}")
+    log.info(f"Sectors: {output['metadata']['total_sectors']}, ETFs: {output['metadata']['total_etfs']}")
+    log.info(f"Global Indices: {output['metadata']['total_global_indices']}, Custom Stocks: {output['metadata']['total_custom_stocks']}")
+    log.info(f"Drilldowns: {output['metadata']['total_drilldown_sectors']}")
     log.info(f"Timeframes: daily, weekly, monthly")
 
     return output
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RRM v4.0 Multi-Benchmark + Monthly Fetcher")
+    parser = argparse.ArgumentParser(description="RRM v4.1 Multi-Benchmark + Global Indices Fetcher")
     parser.add_argument("--output", "-o", type=str, default=None)
     parser.add_argument("--config", "-c", type=str, default=None)
     parser.add_argument("--daily-tail", type=int, default=5)
