@@ -1,21 +1,41 @@
-name: RRM Daily Update v4.0
+# ═══════════════════════════════════════════════════════════════
+# TradEdge RRM v4.1 — Daily Data Fetcher
+# Runs Mon–Fri at 5:30 PM IST (12:00 UTC) after market close
+# Fetches: 16 sectors, 54 ETFs, 12 asset classes, 4 segments,
+#          25 global indices, custom stocks → rrm_data.json
+# ═══════════════════════════════════════════════════════════════
+
+name: RRM Daily Fetch
 
 on:
   schedule:
-    # Run at 4:30 PM IST (11:00 UTC) on weekdays
-    - cron: '0 11 * * 1-5'
+    # 5:30 PM IST = 12:00 UTC (Mon–Fri)
+    - cron: '0 12 * * 1-5'
   workflow_dispatch:
+    # Manual trigger from GitHub Actions tab
+    inputs:
+      daily_tail:
+        description: 'Daily tail length (data points for RRG trail)'
+        required: false
+        default: '10'
+      weekly_tail:
+        description: 'Weekly tail length'
+        required: false
+        default: '8'
+      monthly_tail:
+        description: 'Monthly tail length'
+        required: false
+        default: '5'
 
 permissions:
   contents: write
 
 jobs:
-  update-rrm:
+  fetch-rrm:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -26,30 +46,35 @@ jobs:
       - name: Install dependencies
         run: pip install yfinance numpy
 
-      - name: Run RRM Fetcher v4.0
+      - name: Run RRM Fetcher v4.1
         run: |
-          cd scripts
-          python rrm_fetcher.py \
-            --output ../data/rrm_data.json \
-            --daily-tail 10 \
-            --weekly-tail 8 \
-            --monthly-tail 5 \
-            --window 10
+          python scripts/rrm_fetcher.py \
+            --output data/rrm_data.json \
+            --daily-tail ${{ github.event.inputs.daily_tail || '10' }} \
+            --weekly-tail ${{ github.event.inputs.weekly_tail || '8' }} \
+            --monthly-tail ${{ github.event.inputs.monthly_tail || '5' }}
 
-      - name: Count results
+      - name: Verify output
         run: |
-          SECTORS=$(python3 -c "import json; d=json.load(open('data/rrm_data.json')); print(d['metadata']['total_sectors'])")
-          ETFS=$(python3 -c "import json; d=json.load(open('data/rrm_data.json')); print(d['metadata']['total_etfs'])")
-          DRILLS=$(python3 -c "import json; d=json.load(open('data/rrm_data.json')); print(d['metadata']['total_drilldown_sectors'])")
-          echo "SECTORS=${SECTORS}" >> $GITHUB_ENV
-          echo "ETFS=${ETFS}" >> $GITHUB_ENV
-          echo "DRILLS=${DRILLS}" >> $GITHUB_ENV
+          echo "=== RRM Data Verification ==="
+          python -c "
+          import json
+          d = json.load(open('data/rrm_data.json'))
+          m = d['metadata']
+          print(f'Version:  {m[\"version\"]}')
+          print(f'Date:     {m[\"date\"]}')
+          print(f'Sectors:  {m[\"total_sectors\"]}')
+          print(f'ETFs:     {m[\"total_etfs\"]}')
+          print(f'Globals:  {m[\"total_global_indices\"]}')
+          print(f'Custom:   {m[\"total_custom_stocks\"]}')
+          print(f'Drills:   {m[\"total_drilldown_sectors\"]}')
+          print(f'Benchmarks: {\", \".join(m[\"benchmarks_calculated\"])}')
+          "
 
-      - name: Commit & Push
+      - name: Commit & push data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/rrm_data.json
-          DATE=$(date -u +"%Y-%m-%d")
-          git commit -m "📊 RRM v4.0 ${DATE}: ${SECTORS} sectors, ${ETFS} ETFs, ${DRILLS} drilldowns (D+W+M)" || echo "No changes"
+          git diff --cached --quiet || git commit -m "RRM v4.1 data update — $(date -u +%Y-%m-%d)"
           git push
