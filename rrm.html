@@ -148,6 +148,12 @@ select.cs{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);backgroun
 .pos-empty{color:var(--t4);font-family:var(--fm);font-size:10px;font-style:italic;padding:8px 0;text-align:center}
 .pos-error{color:#f87171;font-family:var(--fm);font-size:10px;padding:8px;background:rgba(239,68,68,.1);border-radius:4px;text-align:center}
 .ft{text-align:center;padding:14px 0;font-family:var(--fm);font-size:9px;color:var(--t4);letter-spacing:1px;border-top:1px solid var(--bd);margin-top:16px}
+.pos-body{max-height:2000px;overflow:hidden;transition:max-height .4s ease,opacity .3s ease;opacity:1}
+.pos-body.collapsed{max-height:0;opacity:0;margin:0;padding:0}
+.pos-collapse-btn{background:none;border:1px solid var(--bd);border-radius:4px;color:var(--t3);font-family:var(--fm);font-size:9px;padding:3px 10px;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:4px}
+.pos-collapse-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.pos-collapse-btn .arrow{transition:transform .3s;display:inline-block}
+.pos-collapse-btn .arrow.up{transform:rotate(180deg)}
 .ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:16px}
 .sp{width:40px;height:40px;border:3px solid var(--bd);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -173,7 +179,7 @@ let TRADE_JOURNAL_DATA = null;  // { trades: [...], loadedFrom: 'localStorage'|'
 let TRADE_JOURNAL_LOADING = false;
 let TRADE_JOURNAL_ERROR = null;
 let SHOW_POSITIONS_OVERLAY = true;
-
+let POS_COLLAPSED = false;
 // Supabase config — enables cross-device sync with Trade Journal
 const SUPABASE_CONFIG = {
   url: 'https://urnrdpyhncezljirpnmy.supabase.co',
@@ -1430,7 +1436,7 @@ function renderMyPositionsPanel() {
   
   return `<div class="pos-panel">
     <div class="pos-header">
-      <div class="pos-title">📊 MY POSITIONS · ${a.count} OPEN</div>
+   <div style="display:flex;align-items:center;gap:10px"><div class="pos-title">📊 MY POSITIONS · ${a.count} OPEN</div><button class="pos-collapse-btn" onclick="togglePosCollapse()"><span class="arrow ${POS_COLLAPSED ? '' : 'up'}" id="pos-arrow">▼</span>${POS_COLLAPSED ? 'Show' : 'Hide'}</button></div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="pos-toggle">
           <input type="checkbox" id="posOverlay" ${SHOW_POSITIONS_OVERLAY ? 'checked' : ''} onchange="SHOW_POSITIONS_OVERLAY=this.checked;render()">
@@ -1440,6 +1446,7 @@ function renderMyPositionsPanel() {
       </div>
     </div>
     
+    <div class="pos-body ${POS_COLLAPSED ? 'collapsed' : ''}" id="pos-body">
     <div class="pos-stats">
       <div class="pos-stat">
         <div class="pos-stat-label">INVESTED</div>
@@ -1456,6 +1463,7 @@ function renderMyPositionsPanel() {
     </div>
     
     <div class="pos-grid">${posCardsHtml}</div>
+    </div>
   </div>`;
 }
 
@@ -1463,6 +1471,13 @@ function renderMyPositionsPanel() {
 function togglePositionsOverlay(show) {
   SHOW_POSITIONS_OVERLAY = show;
   render();
+}
+  function togglePosCollapse() {
+  POS_COLLAPSED = !POS_COLLAPSED;
+  const body = document.getElementById('pos-body');
+  const arrow = document.getElementById('pos-arrow');
+  if (body) body.classList.toggle('collapsed', POS_COLLAPSED);
+  if (arrow) arrow.classList.toggle('up', !POS_COLLAPSED);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
