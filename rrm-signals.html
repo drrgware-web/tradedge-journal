@@ -102,6 +102,22 @@
       else                                               light = 'RED';
       const weeklyMomOk = w.rsm >= 98 && w.rsm <= 106;
       const rsiOk = right(w.q) && weeklyMomOk;
+      
+      // ── SWEET ZONE SCORE (0–5) for swing trading ──
+      let sz = 0;
+      // 1. RS-Ratio > 100 (relative strength)
+      if (w.rsr > 100) sz++;
+      // 2. RS-Momentum in sweet zone 98–106
+      if (weeklyMomOk) sz++;
+      // 3. RSI(14) in pullback zone 40–60 (use real RSI if available, else estimate from momentum)
+      const rsiVal = item?.weekly?.rsi || item?.current?.rsi || null;
+      const rsiInZone = rsiVal ? (rsiVal >= 40 && rsiVal <= 60) : (w.rsm >= 98 && w.rsm <= 103);
+      if (rsiInZone) sz++;
+      // 4. Weekly quadrant = Leading or Improving
+      if (right(w.q)) sz++;
+      // 5. MTF Score >= 3
+      if (score >= 3) sz++;
+
       let action;
       if      (score >= 4 && rsiOk)    action = 'AGGRESSIVE BUY';
       else if (score >= 3 && rsiOk)    action = 'BUY ON DIP';
@@ -109,7 +125,7 @@
       else if (light === 'BLUE')       action = 'SCALP ONLY';
       else if (score >= 3)             action = 'HOLD';
       else                             action = 'AVOID';
-      return { score, light, rsiOk, action };
+      return { score, light, rsiOk, action, sz, rsiVal };
     }
 
     /* ═══════════════════════════════════════════════════════════
@@ -146,6 +162,21 @@
       );
     };
 
+    const SZBadge = ({ sz, rsiVal }) => {
+      const c = sz >= 4 ? '#00ff88' : sz >= 3 ? '#ffd000' : sz >= 2 ? '#00c8ff' : '#ff3366';
+      const label = sz >= 4 ? '★' : sz >= 3 ? '◆' : sz >= 2 ? '◇' : '·';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, minWidth: 45 }} title={`Sweet Zone: ${sz}/5${rsiVal ? ` · RSI: ${rsiVal}` : ''}`}>
+          <span style={{ fontSize: 10, color: c }}>{label}</span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)', color: c,
+            padding: '0 4px', borderRadius: 3, background: `${c}10`, border: `1px solid ${c}20`,
+          }}>{sz}/5</span>
+          {rsiVal && <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{Math.round(rsiVal)}</span>}
+        </div>
+      );
+    };
+
     const Sparkline = ({ data, width = 60, height = 20, color = '#00c8ff' }) => {
       if (!data || data.length < 2) return null;
       const vals = data.map(d => d.rs_ratio);
@@ -173,7 +204,7 @@
       return (
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }} className="fade-in">
           <div onClick={onToggle} style={{
-            display: 'grid', gridTemplateColumns: 'minmax(100px,1fr) 80px 70px 35px 65px 85px',
+            display: 'grid', gridTemplateColumns: 'minmax(100px,1fr) 80px 65px 45px 35px 60px 80px',
             alignItems: 'center', gap: 4, padding: '4px 10px', cursor: 'pointer',
             background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent', transition: 'background 0.2s',
           }}>
@@ -186,6 +217,7 @@
               <span style={{ fontSize: 8, color: lc, fontFamily: 'var(--mono)', fontWeight: 700, marginLeft: 2 }}>{sig.light}</span>
             </div>
             <ScoreBar score={sig.score} />
+            <SZBadge sz={sig.sz} rsiVal={sig.rsiVal} />
             <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center', color: sig.rsiOk ? '#00ff88' : 'rgba(255,255,255,0.1)' }}>
               {sig.rsiOk ? '✓' : '✗'}
             </span>
@@ -916,7 +948,7 @@
                 <button key={tf} onClick={() => setHelixTF(tf)} style={{ padding: '2px 7px', borderRadius: 3, fontSize: 8, fontWeight: 700, cursor: 'pointer', border: `1px solid ${helixTF === tf ? '#00c8ff30' : 'rgba(255,255,255,0.04)'}`, background: helixTF === tf ? '#00c8ff08' : 'transparent', color: helixTF === tf ? '#00c8ff' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>{tf.charAt(0).toUpperCase()}</button>
               ))}
               <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.06)', margin: '0 2px' }} />
-              <button onClick={() => setShowRSI(!showRSI)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showRSI ? '#00ff8830' : 'rgba(255,255,255,0.04)'}`, background: showRSI ? '#00ff8808' : 'transparent', color: showRSI ? '#00ff88' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>RSI</button>
+              <button onClick={() => setShowRSI(!showRSI)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showRSI ? '#00ff8830' : 'rgba(255,255,255,0.04)'}`, background: showRSI ? '#00ff8808' : 'transparent', color: showRSI ? '#00ff88' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>RSM</button>
               <button onClick={() => setShowMTF(!showMTF)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showMTF ? '#ffd00030' : 'rgba(255,255,255,0.04)'}`, background: showMTF ? '#ffd00008' : 'transparent', color: showMTF ? '#ffd000' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>MTF</button>
               <button onClick={() => setShowTrails(!showTrails)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showTrails ? '#00c8ff30' : 'rgba(255,255,255,0.04)'}`, background: showTrails ? '#00c8ff08' : 'transparent', color: showTrails ? '#00c8ff' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>TRAIL</button>
               <button onClick={() => {
@@ -932,7 +964,7 @@
           <div style={{ padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 14, fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)', flexWrap: 'wrap' }}>
             <span>Bubble size = MTF Score (1–5)</span>
             <span>Color = Signal (<span style={{ color: '#00ff88' }}>G</span>/<span style={{ color: '#ffd000' }}>Y</span>/<span style={{ color: '#00c8ff' }}>B</span>/<span style={{ color: '#ff3366' }}>R</span>)</span>
-            {showRSI && <span><span style={{ color: '#00ff88' }}>◌</span> = RSI sweet zone</span>}
+            {showRSI && <span><span style={{ color: '#00ff88' }}>◌</span> = RSM sweet zone (98–106)</span>}
             <span>TF: {helixTF.toUpperCase()}</span>
             <span>{points.length} assets</span>
           </div>
@@ -1045,6 +1077,7 @@
       const filtered = useMemo(() => {
         let list = enriched;
         if (filter === 'RSI') list = list.filter(i => i.sig.rsiOk);
+        else if (filter === 'SWEET') list = list.filter(i => i.sig.sz >= 4);
         else if (filter !== 'ALL') list = list.filter(i => i.sig.light === filter);
         return list.sort((a, b) => b.sig.score - a.sig.score || a.name.localeCompare(b.name));
       }, [enriched, filter]);
@@ -1164,17 +1197,24 @@
                 border: `1px solid ${filter === 'RSI' ? '#00ff8840' : 'var(--border)'}`,
                 background: filter === 'RSI' ? '#00ff8810' : 'transparent',
                 color: filter === 'RSI' ? '#00ff88' : 'var(--text3)', fontFamily: 'var(--mono)',
-              }}>◌ RSI Zone ({enriched.filter(i => i.sig.rsiOk).length})</button>
+              }}>◌ RSM Zone ({enriched.filter(i => i.sig.rsiOk).length})</button>
+              {/* Sweet Zone filter */}
+              <button onClick={() => setFilter(filter === 'SWEET' ? 'ALL' : 'SWEET')} style={{
+                padding: '3px 7px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${filter === 'SWEET' ? '#ffd00040' : 'var(--border)'}`,
+                background: filter === 'SWEET' ? '#ffd00010' : 'transparent',
+                color: filter === 'SWEET' ? '#ffd000' : 'var(--text3)', fontFamily: 'var(--mono)',
+              }}>★ Sweet Zone ({enriched.filter(i => i.sig.sz >= 4).length})</button>
             </div>
           {activeGroup !== 'positions' && (
             <div style={{
-              display: 'grid', gridTemplateColumns: 'minmax(100px,1fr) 80px 70px 35px 65px 85px',
+              display: 'grid', gridTemplateColumns: 'minmax(100px,1fr) 80px 65px 45px 35px 60px 80px',
               gap: 4, padding: '4px 10px', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 1,
             }}>
-              {['ASSET', 'SIGNAL', 'SCORE', 'RSI', 'WEEKLY', 'ACTION'].map(h => (
+              {['ASSET', 'SIGNAL', 'SCORE', 'SZ', 'RSM', 'WEEKLY', 'ACTION'].map(h => (
                 <span key={h} style={{
                   fontSize: 7.5, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.1em',
-                  fontFamily: 'var(--mono)', textAlign: h === 'RSI' ? 'center' : 'left',
+                  fontFamily: 'var(--mono)', textAlign: (h === 'RSM' || h === 'SZ') ? 'center' : 'left',
                 }}>{h}</span>
               ))}
             </div>
@@ -1211,7 +1251,10 @@
               <div><span style={{ color: 'var(--red)' }}>●</span> RED — Structural weakness</div>
             </div>
             <div style={{ fontSize: 8.5, color: 'var(--text3)', marginTop: 4, fontFamily: 'var(--mono)' }}>
-              Score 4–5 = High conviction · RSI ✓ = Weekly momentum sweet zone · {BENCHMARKS.find(b => b.key === benchmark)?.label || benchmark}
+              Score 4–5 = High conviction · RSM ✓ = Weekly RS-Momentum sweet zone (98–106) · {BENCHMARKS.find(b => b.key === benchmark)?.label || benchmark}
+            </div>
+            <div style={{ fontSize: 8.5, color: 'var(--text3)', marginTop: 2, fontFamily: 'var(--mono)' }}>
+              SZ (Sweet Zone) = RS-Ratio{'>'} 100 + RSM 98–106 + RSI 40–60 + Right Side + MTF ≥ 3 · ★ = 4–5/5 = Prime Swing Entry
             </div>
           </div>
 
