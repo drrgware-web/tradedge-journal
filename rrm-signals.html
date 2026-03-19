@@ -702,12 +702,18 @@
           const tf = item[helixTF] || item.weekly;
           const sig = item.sig;
           const tail = helixTF === 'daily' ? item.dailyTail : helixTF === 'monthly' ? item.monthlyTail : item.weeklyTail;
+          const trimmedTail = playing ? (tail || []).slice(0, playStep) : (tail || []).slice(-8);
+          // During play, bubble position = last trail point (time-lapse)
+          const lastTrailPt = playing && trimmedTail.length > 0 ? trimmedTail[trimmedTail.length - 1] : null;
           return {
             name: item.name?.replace(/^Nifty\s?/, '') || item.symbol,
-            symbol: item.symbol, rsr: tf.rsr, rsm: tf.rsm, q: tf.q,
+            symbol: item.symbol,
+            rsr: lastTrailPt ? lastTrailPt.rs_ratio : tf.rsr,
+            rsm: lastTrailPt ? lastTrailPt.rs_momentum : tf.rsm,
+            q: tf.q,
             score: sig.score, light: sig.light, action: sig.action, rsiOk: sig.rsiOk,
             color: LIGHT_MAP[sig.light] || '#444', qColor: Q_COLORS[tf.q] || '#444',
-            tail: playing ? (tail || []).slice(0, playStep) : (tail || []).slice(-8),
+            tail: trimmedTail,
           };
         });
       }, [enriched, helixTF, playing, playStep]);
@@ -718,7 +724,7 @@
         const dpr = window.devicePixelRatio || 1;
         const rect = c.getBoundingClientRect();
         const W = rect.width;
-        const H = expanded ? Math.min(window.innerHeight - 120, 650) : 380;
+        const H = expanded ? Math.min(window.innerHeight - 100, 800) : 520;
         c.style.height = H + 'px';
         c.width = W * dpr; c.height = H * dpr;
         const ctx = c.getContext('2d');
