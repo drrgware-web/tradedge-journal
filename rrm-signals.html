@@ -277,18 +277,31 @@
         const keys = ['Gold', 'Silver', 'Crude Oil', 'USD/INR', 'Bitcoin', 'US 10Y Yield', 'Dow Jones', 'S&P 500', 'NASDAQ'];
         const found = [];
 
-        // Add benchmark index itself as first card (special handling since it's excluded from RRM calc)
+        // Add benchmark index as first card
+        // Look it up from an ALTERNATE benchmark's data to get real RS values
         const benchLabel = rrmData?.available_benchmarks?.[benchmark] || 'Benchmark';
-        // Get benchmark's own RS vs itself = always 100, but show it as a reference
-        found.push({
-          symbol: benchmark, name: benchLabel, color: '#22d3ee',
-          daily: { q: 'Leading', rsr: 100, rsm: 100 },
-          weekly: { q: 'Leading', rsr: 100, rsm: 100 },
-          monthly: { q: 'Leading', rsr: 100, rsm: 100 },
-          dailyTail: [], weeklyTail: [], monthlyTail: [],
-          sig: { score: 5, light: 'GREEN', rsiOk: true, action: 'BENCHMARK', sz: 5, rsiVal: null },
-          _isBenchmark: true,
-        });
+        const altBenchmarks = Object.keys(rrmData?.available_benchmarks || {}).filter(b => b !== benchmark);
+        let benchItem = null;
+        for (const altB of altBenchmarks) {
+          const altSegments = transformData(rrmData, altB, 'market_segments');
+          const altSectors = transformData(rrmData, altB, 'sectors');
+          benchItem = [...altSegments, ...altSectors].find(a => a.symbol === benchmark);
+          if (benchItem) break;
+        }
+        if (benchItem) {
+          found.push({ ...benchItem, name: benchLabel, _isBenchmark: true, sig: computeSignals(benchItem) });
+        } else {
+          // Fallback: static benchmark card
+          found.push({
+            symbol: benchmark, name: benchLabel, color: '#22d3ee',
+            daily: { q: 'Leading', rsr: 100, rsm: 100 },
+            weekly: { q: 'Leading', rsr: 100, rsm: 100 },
+            monthly: { q: 'Leading', rsr: 100, rsm: 100 },
+            dailyTail: [], weeklyTail: [], monthlyTail: [],
+            sig: { score: 5, light: 'GREEN', rsiOk: true, action: 'BENCHMARK', sz: 5, rsiVal: null },
+            _isBenchmark: true,
+          });
+        }
 
         keys.forEach(k => {
           const item = all.find(a => a.name?.includes(k) || a.symbol?.includes(k.toUpperCase().replace(/\s/g,'')));
@@ -308,7 +321,7 @@
             {macroItems.map(m => {
               const qc = m._isBenchmark ? '#22d3ee' : (Q_COLORS[m.weekly.q] || '#444');
               const momDir = m.weekly.rsm >= 100 ? '↑' : '↓';
-              const score = m._isBenchmark ? '—' : m.weekly.rsr?.toFixed(0);
+              const score = m.weekly.rsr?.toFixed(0) || '—';
               return (
                 <div key={m.symbol} className="macro-card" style={{
                   background: m._isBenchmark ? 'rgba(34,211,238,0.06)' : `${qc}06`,
@@ -318,9 +331,9 @@
                   <div style={{ fontSize: 8, color: m._isBenchmark ? '#22d3ee' : 'var(--text2)', fontFamily: 'var(--mono)', marginBottom: 2, whiteSpace: 'nowrap', fontWeight: m._isBenchmark ? 700 : 400 }}>{m.name}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>{score}</span>
-                    <span style={{ fontSize: 10, color: m.weekly.rsm >= 100 ? '#00ff88' : '#ff3366', fontWeight: 600 }}>{m._isBenchmark ? '●' : momDir}</span>
+                    <span style={{ fontSize: 10, color: m.weekly.rsm >= 100 ? '#00ff88' : '#ff3366', fontWeight: 600 }}>{momDir}</span>
                   </div>
-                  <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', marginTop: 1 }}>{m._isBenchmark ? 'BENCHMARK' : m.weekly.q}</div>
+                  <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', marginTop: 1 }}>{m._isBenchmark ? m.weekly.q + ' (vs alt)' : m.weekly.q}</div>
                 </div>
               );
             })}
@@ -668,7 +681,7 @@
 
         // 1. Read from localStorage
         try {
-          const raw = localStorage.getItem('tradedge_trades');
+          const raw = localStorage.getItem('te_trades');
           if (raw) {
             localTrades = JSON.parse(raw).filter(t => t.status === 'Open' || t.status === 'Partial');
           }
@@ -691,11 +704,11 @@
             cloudTrades = (Array.isArray(parsed) ? parsed : []).filter(t => t.status === 'Open' || t.status === 'Partial');
           }
 
-          // Merge: deduplicate by symbol+side, prefer cloud data if available
+          // Merge: deduplicate by id (preferred) or symbol+side
           const merged = new Map();
-          cloudTrades.forEach(t => merged.set(`${t.symbol}_${t.side}_${t.entryDate || ''}`, { ...t, _src: 'cloud' }));
+          cloudTrades.forEach(t => merged.set(t.id || `${t.symbol}_${t.side}`, { ...t, _src: 'cloud' }));
           localTrades.forEach(t => {
-            const key = `${t.symbol}_${t.side}_${t.entryDate || ''}`;
+            const key = t.id || `${t.symbol}_${t.side}`;
             if (!merged.has(key)) merged.set(key, { ...t, _src: 'local' });
           });
 
@@ -766,18 +779,23 @@
           </div>
           {enriched.map((pos, i) => {
             const qc = pos.rrm ? Q_COLORS[pos.rrm.weekly.q] : '#444';
+            const entries = pos.entries || [];
+            const totalQty = entries.reduce((s, e) => s + (Number(e.qty) || 0), 0) || pos.qty || 0;
+            const avgPrice = totalQty > 0 && entries.length ? (entries.reduce((s, e) => s + (Number(e.price) || 0) * (Number(e.qty) || 0), 0) / totalQty).toFixed(1) : (pos.entryPrice || '');
+            const entryDate = (entries[0] || {}).date || pos.entryDate || '';
             return (
               <div key={pos.id || pos.symbol + i} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px',
                 borderBottom: '1px solid rgba(255,255,255,0.025)',
               }}>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'var(--mono)' }}>{pos.symbol}</span>
-                    {pos._src === 'cloud' && <span style={{ fontSize: 6, color: '#00c8ff', fontFamily: 'var(--mono)' }}>☁</span>}
+                    {pos.setup && <span style={{ fontSize: 7, color: '#ffd000', fontFamily: 'var(--mono)' }}>{pos.setup}</span>}
+                    {pos._src === 'cloud' && <span style={{ fontSize: 6, color: '#00c8ff' }}>☁</span>}
                   </div>
                   <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
-                    {pos.side || 'BUY'} · {pos.qty || ''} · {pos.entryPrice ? '₹' + pos.entryPrice : ''} {pos.entryDate ? '· ' + pos.entryDate : ''}
+                    {pos.side || 'Buy'} · {totalQty} qty · {avgPrice ? '₹' + avgPrice : ''} {entryDate ? '· ' + entryDate : ''} {pos.sl ? '· SL ₹' + pos.sl : ''}
                   </div>
                 </div>
                 {pos.rrm ? (
@@ -1580,7 +1598,7 @@
                 border: `1px solid ${activeGroup === 'positions' ? '#ff336630' : 'var(--border)'}`,
                 background: activeGroup === 'positions' ? '#ff33660a' : 'transparent',
                 color: activeGroup === 'positions' ? '#ff3366' : 'var(--text2)', fontFamily: 'var(--mono)',
-              }}>📈 Positions ({(() => { try { return JSON.parse(localStorage.getItem('tradedge_trades') || '[]').filter(t=>t.status==='Open').length; } catch(e) { return 0; } })()})</button>
+              }}>📈 Positions ({(() => { try { return JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t=>t.status==='Open').length; } catch(e) { return 0; } })()})</button>
             <button onClick={() => setShowAddModal(true)} style={{
               padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
               border: '1px solid #00ff8825', background: '#00ff8806', color: 'var(--green)', fontFamily: 'var(--mono)',
