@@ -416,21 +416,21 @@ def run_full_pipeline(quick=False, single_stock=None):
                         "guru_ratings": guru_data,
                         "surveillance": surv_data,
                         "price_history": price_hist,
-                            "prev_fundamentals": {},  # Populated when historical data available
-                            "yoy_fundamentals": {},   # Populated when historical data available
-                            "management": [],  # Would need separate data source
-                            "major_shareholders": [],  # Would need separate data source
-                            "quarterly_results": [],  # Would need screener.in or moneycontrol
-                            "ownership": {},  # Would need NSE corporate filings
-                        }
+                        "prev_fundamentals": {},
+                        "yoy_fundamentals": {},
+                        "management": [],
+                        "major_shareholders": [],
+                        "quarterly_results": [],
+                        "ownership": {},
+                    }
 
-                        # Save per-stock JSON
-                        STOCK_DETAIL_DIR.mkdir(parents=True, exist_ok=True)
-                        with open(STOCK_DETAIL_DIR / f"{symbol}.json", "w") as sf:
-                            json.dump(detail, sf, indent=2, default=str)
+                    # Save per-stock JSON
+                    STOCK_DETAIL_DIR.mkdir(parents=True, exist_ok=True)
+                    with open(STOCK_DETAIL_DIR / f"{symbol}.json", "w") as sf:
+                        json.dump(detail, sf, indent=2, default=str)
 
-                    except Exception as e:
-                        pass
+                except Exception as e:
+                    pass
 
             except Exception as e:
                 continue
