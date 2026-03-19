@@ -50,7 +50,7 @@
       { key: 'sectors',         label: 'Sectors',  icon: '◉', desc: '16 NSE Sector Indices' },
       { key: 'etfs',            label: 'ETFs',     icon: '◆', desc: '54 NSE ETFs' },
       { key: 'asset_classes',   label: 'Assets',   icon: '◈', desc: '12 Asset Classes' },
-      { key: 'market_segments', label: 'Segments', icon: '◇', desc: '4 Market Segments' },
+      { key: 'market_segments', label: 'Segments', icon: '◇', desc: '11 Market Segments' },
       { key: 'global_indices',  label: 'Global',   icon: '🌐', desc: '25 Global Indices' },
       { key: 'custom_stocks',   label: 'My Stocks',icon: '★', desc: 'Custom Watchlist' },
     ];
@@ -274,8 +274,22 @@
         const sectors = transformData(rrmData, benchmark, 'sectors');
         const all = [...segments, ...assets, ...globals, ...sectors];
 
-        const keys = ['Nifty 50', 'Gold', 'Silver', 'Crude Oil', 'USD/INR', 'Bitcoin', 'US 10Y Yield', 'Dow Jones', 'S&P 500', 'NASDAQ'];
+        const keys = ['Gold', 'Silver', 'Crude Oil', 'USD/INR', 'Bitcoin', 'US 10Y Yield', 'Dow Jones', 'S&P 500', 'NASDAQ'];
         const found = [];
+
+        // Add benchmark index itself as first card (special handling since it's excluded from RRM calc)
+        const benchLabel = rrmData?.available_benchmarks?.[benchmark] || 'Benchmark';
+        // Get benchmark's own RS vs itself = always 100, but show it as a reference
+        found.push({
+          symbol: benchmark, name: benchLabel, color: '#22d3ee',
+          daily: { q: 'Leading', rsr: 100, rsm: 100 },
+          weekly: { q: 'Leading', rsr: 100, rsm: 100 },
+          monthly: { q: 'Leading', rsr: 100, rsm: 100 },
+          dailyTail: [], weeklyTail: [], monthlyTail: [],
+          sig: { score: 5, light: 'GREEN', rsiOk: true, action: 'BENCHMARK', sz: 5, rsiVal: null },
+          _isBenchmark: true,
+        });
+
         keys.forEach(k => {
           const item = all.find(a => a.name?.includes(k) || a.symbol?.includes(k.toUpperCase().replace(/\s/g,'')));
           if (item) found.push({ ...item, sig: computeSignals(item) });
@@ -292,19 +306,21 @@
           </div>
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
             {macroItems.map(m => {
-              const qc = Q_COLORS[m.weekly.q] || '#444';
+              const qc = m._isBenchmark ? '#22d3ee' : (Q_COLORS[m.weekly.q] || '#444');
               const momDir = m.weekly.rsm >= 100 ? '↑' : '↓';
+              const score = m._isBenchmark ? '—' : m.weekly.rsr?.toFixed(0);
               return (
                 <div key={m.symbol} className="macro-card" style={{
-                  background: `${qc}06`, border: `1px solid ${qc}15`, borderRadius: 6,
+                  background: m._isBenchmark ? 'rgba(34,211,238,0.06)' : `${qc}06`,
+                  border: `1px solid ${m._isBenchmark ? 'rgba(34,211,238,0.2)' : qc + '15'}`, borderRadius: 6,
                   padding: '6px 10px', minWidth: 90, flexShrink: 0, transition: 'all 0.2s', cursor: 'default',
                 }}>
-                  <div style={{ fontSize: 8, color: 'var(--text2)', fontFamily: 'var(--mono)', marginBottom: 2, whiteSpace: 'nowrap' }}>{m.name}</div>
+                  <div style={{ fontSize: 8, color: m._isBenchmark ? '#22d3ee' : 'var(--text2)', fontFamily: 'var(--mono)', marginBottom: 2, whiteSpace: 'nowrap', fontWeight: m._isBenchmark ? 700 : 400 }}>{m.name}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>{m.weekly.rsr.toFixed(0)}</span>
-                    <span style={{ fontSize: 10, color: m.weekly.rsm >= 100 ? '#00ff88' : '#ff3366', fontWeight: 600 }}>{momDir}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>{score}</span>
+                    <span style={{ fontSize: 10, color: m.weekly.rsm >= 100 ? '#00ff88' : '#ff3366', fontWeight: 600 }}>{m._isBenchmark ? '●' : momDir}</span>
                   </div>
-                  <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', marginTop: 1 }}>{m.weekly.q}</div>
+                  <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', marginTop: 1 }}>{m._isBenchmark ? 'BENCHMARK' : m.weekly.q}</div>
                 </div>
               );
             })}
