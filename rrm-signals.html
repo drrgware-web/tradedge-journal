@@ -174,7 +174,7 @@
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }} className="fade-in">
           <div onClick={onToggle} style={{
             display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
-            alignItems: 'center', gap: 6, padding: '8px 12px', cursor: 'pointer',
+            alignItems: 'center', gap: 6, padding: '5px 12px', cursor: 'pointer',
             background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent', transition: 'background 0.2s',
           }}>
             <div>
@@ -310,7 +310,7 @@
 
       return (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
-          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
+          <div style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
             SECTOR ROTATION MAP — Weekly Quadrants
           </div>
 
@@ -325,11 +325,11 @@
                   background: `${qc}04`, border: `1px solid ${qc}12`, borderRadius: 6, padding: '8px 10px',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>
                       {qIcons[qName]} {qName.toUpperCase()}
                     </span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>
-                      {items.length} <span style={{ fontSize: 8, opacity: 0.5 }}>({pct}%)</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>
+                      {items.length} <span style={{ fontSize: 9, opacity: 0.5 }}>({pct}%)</span>
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -337,7 +337,7 @@
                       const isRotating = rotating.find(r => r.symbol === item.symbol);
                       return (
                         <span key={item.symbol} className="rotation-cell" style={{
-                          fontSize: 8, fontFamily: 'var(--mono)', fontWeight: 600,
+                          fontSize: 9.5, fontFamily: 'var(--mono)', fontWeight: 600,
                           padding: '2px 5px', borderRadius: 3,
                           background: isRotating ? `${Q_COLORS[isRotating.to]}15` : 'rgba(255,255,255,0.03)',
                           color: isRotating ? Q_COLORS[isRotating.to] : 'var(--text2)',
@@ -359,13 +359,13 @@
           {/* Rotation alerts */}
           {rotating.length > 0 && (
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-              <div style={{ fontSize: 7.5, color: 'var(--yellow)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)', marginBottom: 4 }}>
+              <div style={{ fontSize: 9, color: 'var(--yellow)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)', marginBottom: 4 }}>
                 ⚡ ROTATION DETECTED ({rotating.length})
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {rotating.map(r => (
                   <span key={r.symbol} style={{
-                    fontSize: 8.5, fontFamily: 'var(--mono)', fontWeight: 600,
+                    fontSize: 9.5, fontFamily: 'var(--mono)', fontWeight: 600,
                     padding: '2px 6px', borderRadius: 3,
                     background: 'rgba(255,208,0,0.06)', border: '1px solid rgba(255,208,0,0.15)',
                     color: 'var(--yellow)',
@@ -426,7 +426,7 @@
 
       return (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
-          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
+          <div style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
             RS CORRELATION MATRIX — Weekly RS-Ratio Proximity
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -527,7 +527,7 @@
 
       return (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
-          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
+          <div style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
             MARKET ANALYSIS — {BENCHMARKS.find(b => b.key === benchmark)?.label}
           </div>
 
@@ -535,13 +535,13 @@
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
             {/* Regime */}
             <div style={{ background: `${regime.color}06`, border: `1px solid ${regime.color}15`, borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>REGIME</div>
+              <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>REGIME</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: regime.color, fontFamily: 'var(--mono)' }}>{regime.label}</div>
-              <div style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)', marginTop: 2 }}>{rightPct}% right side</div>
+              <div style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)', marginTop: 2 }}>{rightPct}% right side</div>
             </div>
             {/* Breadth bar */}
             <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px' }}>
-              <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>BREADTH</div>
+              <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>BREADTH</div>
               <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 1 }}>
                 <div style={{ width: `${(qDist.Leading / total) * 100}%`, background: '#00ff88', transition: 'width 0.5s' }} />
                 <div style={{ width: `${(qDist.Improving / total) * 100}%`, background: '#00c8ff', transition: 'width 0.5s' }} />
@@ -557,7 +557,7 @@
             </div>
             {/* High conviction */}
             <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>HIGH CONVICTION</div>
+              <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>HIGH CONVICTION</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: highConviction > 0 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{highConviction}</div>
               <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Score ≥ 4</div>
             </div>
@@ -569,7 +569,7 @@
               <div style={{ fontSize: 7, color: '#00ff88', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>▲ MOMENTUM LEADERS</div>
               {topMom.map(m => (
                 <div key={m.symbol} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
-                  <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{m.name?.replace(/^Nifty\s?/, '').slice(0, 12)}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{m.name?.replace(/^Nifty\s?/, '').slice(0, 12)}</span>
                   <span style={{ fontSize: 10, color: '#00ff88', fontFamily: 'var(--mono)', fontWeight: 700 }}>{m.weekly.rsm.toFixed(1)}</span>
                 </div>
               ))}
@@ -578,7 +578,7 @@
               <div style={{ fontSize: 7, color: '#ff3366', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>▼ MOMENTUM LAGGARDS</div>
               {bottomMom.map(m => (
                 <div key={m.symbol} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
-                  <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{m.name?.replace(/^Nifty\s?/, '').slice(0, 12)}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{m.name?.replace(/^Nifty\s?/, '').slice(0, 12)}</span>
                   <span style={{ fontSize: 10, color: '#ff3366', fontFamily: 'var(--mono)', fontWeight: 700 }}>{m.weekly.rsm.toFixed(1)}</span>
                 </div>
               ))}
@@ -594,7 +594,7 @@
               {insights.map((ins, i) => {
                 const ic = ins.type === 'bull' ? '#00ff88' : ins.type === 'bear' ? '#ff3366' : '#ffd000';
                 return (
-                  <div key={i} style={{ fontSize: 9.5, color: 'var(--text2)', fontFamily: 'var(--mono)', padding: '2px 0', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                  <div key={i} style={{ fontSize: 10.5, color: 'var(--text2)', fontFamily: 'var(--mono)', padding: '2px 0', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                     <span style={{ color: ic, flexShrink: 0 }}>●</span>
                     <span>{ins.text}</span>
                   </div>
@@ -691,6 +691,9 @@
       const [showRSI, setShowRSI] = useState(true);
       const [showMTF, setShowMTF] = useState(true);
       const [showTrails, setShowTrails] = useState(true);
+      const [playing, setPlaying] = useState(false);
+      const [playStep, setPlayStep] = useState(8);
+      const playRef = useRef(null);
       const hoverRef = useRef(null);
       const [hoveredItem, setHoveredItem] = useState(null);
 
@@ -704,7 +707,7 @@
             symbol: item.symbol, rsr: tf.rsr, rsm: tf.rsm, q: tf.q,
             score: sig.score, light: sig.light, action: sig.action, rsiOk: sig.rsiOk,
             color: LIGHT_MAP[sig.light] || '#444', qColor: Q_COLORS[tf.q] || '#444',
-            tail: (tail || []).slice(-8),
+            tail: (tail || []).slice(-(playing ? playStep : 8)),
           };
         });
       }, [enriched, helixTF]);
@@ -752,7 +755,7 @@
           ctx.setLineDash([]);
 
           // Quadrant labels
-          ctx.font = '600 9px JetBrains Mono'; ctx.globalAlpha = 0.12;
+          ctx.font = '700 10px JetBrains Mono'; ctx.globalAlpha = 0.25;
           ctx.fillStyle = '#00ff88'; ctx.fillText('LEADING', cx + 6, mg.t + 14);
           ctx.fillStyle = '#00c8ff'; ctx.fillText('IMPROVING', mg.l + 4, mg.t + 14);
           ctx.fillStyle = '#ffd000'; ctx.fillText('WEAKENING', cx + 6, H - mg.b - 6);
@@ -760,10 +763,10 @@
           ctx.globalAlpha = 1;
 
           // Axes
-          ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.font = '500 8px JetBrains Mono';
+          ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '600 9px JetBrains Mono';
           ctx.save(); ctx.translate(12, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('RS-MOMENTUM →', 0, 0); ctx.restore();
           ctx.fillText('RS-RATIO →', W / 2 - 25, H - 6);
-          ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = '500 7px JetBrains Mono';
+          ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '600 8px JetBrains Mono';
           for (let v = Math.ceil(rMin); v <= Math.floor(rMax); v += 2) ctx.fillText(v.toString(), tX(v) - 5, H - mg.b + 12);
           for (let v = Math.ceil(mMin); v <= Math.floor(mMax); v += 2) ctx.fillText(v.toString(), 2, tY(v) + 3);
 
@@ -774,7 +777,7 @@
             points.forEach(p => {
               if (!p.tail || p.tail.length < 2) return;
               const isH = hovered === p.symbol;
-              const alpha = hovered ? (isH ? 0.7 : 0.05) : 0.25;
+              const alpha = hovered ? (isH ? 0.85 : 0.08) : 0.45;
               ctx.globalAlpha = alpha;
               ctx.beginPath();
               p.tail.forEach((t, i) => { const x = tX(t.rs_ratio), y = tY(t.rs_momentum); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
@@ -828,9 +831,9 @@
 
             // Label
             if (isH || points.length <= 20 || p.score >= 4) {
-              ctx.font = isH ? '700 10px JetBrains Mono' : '600 8px JetBrains Mono';
+              ctx.font = isH ? '700 11px JetBrains Mono' : '600 9px JetBrains Mono';
               ctx.fillStyle = isH ? '#fff' : p.color;
-              ctx.globalAlpha = isH ? 1 : alpha * 0.7;
+              ctx.globalAlpha = isH ? 1 : alpha * 0.9;
               const lx = x + r + 4, ly = y - r - 2;
               ctx.fillText(p.name.slice(0, 12), lx, ly);
               if (isH) {
@@ -899,6 +902,11 @@
               <button onClick={() => setShowRSI(!showRSI)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showRSI ? '#00ff8830' : 'rgba(255,255,255,0.04)'}`, background: showRSI ? '#00ff8808' : 'transparent', color: showRSI ? '#00ff88' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>RSI</button>
               <button onClick={() => setShowMTF(!showMTF)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showMTF ? '#ffd00030' : 'rgba(255,255,255,0.04)'}`, background: showMTF ? '#ffd00008' : 'transparent', color: showMTF ? '#ffd000' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>MTF</button>
               <button onClick={() => setShowTrails(!showTrails)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showTrails ? '#00c8ff30' : 'rgba(255,255,255,0.04)'}`, background: showTrails ? '#00c8ff08' : 'transparent', color: showTrails ? '#00c8ff' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>TRAIL</button>
+              <button onClick={() => {
+                if (playing) { clearInterval(playRef.current); setPlaying(false); setPlayStep(8); return; }
+                setPlaying(true); setShowTrails(true); let s = 1; setPlayStep(1);
+                playRef.current = setInterval(() => { s++; if (s > 8) { clearInterval(playRef.current); setPlaying(false); return; } setPlayStep(s); }, 600);
+              }} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${playing ? '#ffd00040' : 'rgba(255,255,255,0.04)'}`, background: playing ? '#ffd00010' : 'transparent', color: playing ? '#ffd000' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>{playing ? '⏸ PAUSE' : '▶ PLAY'}</button>
               <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.06)', margin: '0 2px' }} />
               <button onClick={() => setExpanded(!expanded)} style={{ padding: '2px 8px', borderRadius: 3, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.06)', background: expanded ? 'rgba(255,255,255,0.04)' : 'transparent', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--mono)' }}>{expanded ? '⊖ Compact' : '⊕ Expand'}</button>
             </div>
