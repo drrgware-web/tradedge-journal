@@ -660,20 +660,61 @@
        ═══════════════════════════════════════════════════════════ */
     const PositionsTab = ({ rrmData, benchmark }) => {
       const [positions, setPositions] = useState([]);
+      const [source, setSource] = useState('loading'); // 'local', 'cloud', 'both', 'loading'
 
       useEffect(() => {
+        let localTrades = [];
+        let cloudTrades = [];
+
+        // 1. Read from localStorage
         try {
           const raw = localStorage.getItem('tradedge_trades');
           if (raw) {
-            const trades = JSON.parse(raw).filter(t => t.status === 'Open' || t.status === 'Partial');
-            setPositions(trades);
+            localTrades = JSON.parse(raw).filter(t => t.status === 'Open' || t.status === 'Partial');
           }
         } catch(e) {}
+
+        // 2. Fetch from Supabase
+        const SUPA_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+        const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzY5MDIsImV4cCI6MjA4ODM1MjkwMn0.eExEFw1XGAlYBGECqCpl928UvXv5Jchuyr1YYkcrbdw';
+
+        fetch(`${SUPA_URL}/rest/v1/tradedge_trades?select=trades_json&order=created_at.desc&limit=1`, {
+          headers: {
+            'apikey': SUPA_KEY,
+            'Authorization': `Bearer ${SUPA_KEY}`,
+          }
+        })
+        .then(r => r.json())
+        .then(rows => {
+          if (rows && rows.length > 0 && rows[0].trades_json) {
+            const parsed = typeof rows[0].trades_json === 'string' ? JSON.parse(rows[0].trades_json) : rows[0].trades_json;
+            cloudTrades = (Array.isArray(parsed) ? parsed : []).filter(t => t.status === 'Open' || t.status === 'Partial');
+          }
+
+          // Merge: deduplicate by symbol+side, prefer cloud data if available
+          const merged = new Map();
+          cloudTrades.forEach(t => merged.set(`${t.symbol}_${t.side}_${t.entryDate || ''}`, { ...t, _src: 'cloud' }));
+          localTrades.forEach(t => {
+            const key = `${t.symbol}_${t.side}_${t.entryDate || ''}`;
+            if (!merged.has(key)) merged.set(key, { ...t, _src: 'local' });
+          });
+
+          const all = Array.from(merged.values());
+          setPositions(all);
+
+          const hasLocal = localTrades.length > 0;
+          const hasCloud = cloudTrades.length > 0;
+          setSource(hasLocal && hasCloud ? 'both' : hasCloud ? 'cloud' : hasLocal ? 'local' : 'none');
+        })
+        .catch(() => {
+          // Supabase fetch failed, use localStorage only
+          setPositions(localTrades);
+          setSource(localTrades.length > 0 ? 'local' : 'none');
+        });
       }, []);
 
       const enriched = useMemo(() => {
         if (!rrmData || !positions.length) return [];
-        // Try to find RRM data for each position
         const allGroups = ['sectors', 'etfs', 'asset_classes', 'market_segments', 'global_indices'];
         const allItems = [];
         allGroups.forEach(g => {
@@ -682,7 +723,7 @@
         });
 
         return positions.map(pos => {
-          const sym = pos.symbol?.toUpperCase() + '.NS';
+          const sym = pos.symbol?.toUpperCase() + (pos.symbol?.includes('.') ? '' : '.NS');
           const rrmItem = allItems.find(a => a.symbol === sym || a.symbol === pos.symbol);
           return {
             ...pos,
@@ -691,24 +732,53 @@
         });
       }, [rrmData, benchmark, positions]);
 
+      if (source === 'loading') return (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text3)', fontSize: 10, fontFamily: 'var(--mono)' }}>
+          Loading positions...
+        </div>
+      );
+
       if (!positions.length) return (
         <div style={{ padding: 20, textAlign: 'center', color: 'var(--text3)', fontSize: 10, fontFamily: 'var(--mono)' }}>
           No open positions in journal
+          <div style={{ fontSize: 8, marginTop: 4, color: 'var(--text3)' }}>
+            Checked: localStorage + Supabase cloud
+          </div>
         </div>
       );
 
       return (
         <div style={{ borderRadius: 6, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          {/* Source indicator */}
+          <div style={{ padding: '5px 12px', borderBottom: '1px solid rgba(255,255,255,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+              {positions.length} open position{positions.length !== 1 ? 's' : ''}
+            </span>
+            <span style={{
+              fontSize: 7, fontFamily: 'var(--mono)', fontWeight: 600,
+              padding: '1px 5px', borderRadius: 3,
+              background: source === 'cloud' || source === 'both' ? 'rgba(0,200,255,0.08)' : 'rgba(255,255,255,0.03)',
+              color: source === 'cloud' || source === 'both' ? '#00c8ff' : 'var(--text3)',
+              border: `1px solid ${source === 'cloud' || source === 'both' ? '#00c8ff20' : 'rgba(255,255,255,0.04)'}`,
+            }}>
+              {source === 'both' ? '☁ Cloud + Local' : source === 'cloud' ? '☁ Supabase' : '💾 Local'}
+            </span>
+          </div>
           {enriched.map((pos, i) => {
             const qc = pos.rrm ? Q_COLORS[pos.rrm.weekly.q] : '#444';
             return (
-              <div key={pos.id || i} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+              <div key={pos.id || pos.symbol + i} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px',
                 borderBottom: '1px solid rgba(255,255,255,0.025)',
               }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'var(--mono)' }}>{pos.symbol}</div>
-                  <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{pos.side} · {pos.status}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'var(--mono)' }}>{pos.symbol}</span>
+                    {pos._src === 'cloud' && <span style={{ fontSize: 6, color: '#00c8ff', fontFamily: 'var(--mono)' }}>☁</span>}
+                  </div>
+                  <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+                    {pos.side || 'BUY'} · {pos.qty || ''} · {pos.entryPrice ? '₹' + pos.entryPrice : ''} {pos.entryDate ? '· ' + pos.entryDate : ''}
+                  </div>
                 </div>
                 {pos.rrm ? (
                   <>
