@@ -811,6 +811,22 @@ const StockPage = () => {
   const py = d.yoy_fundamentals || {};
   const fh = d.fund_holdings || {};
   const o = d.oneil || {};
+  
+  // Safe defaults for arrays (prevent .map() on undefined)
+  if (!d.guru_ratings) d.guru_ratings = [];
+  if (!d.quarterly_results) d.quarterly_results = [];
+  if (!d.major_shareholders) d.major_shareholders = [];
+  if (!d.management) d.management = [];
+  if (!d.catalysts) d.catalysts = [];
+  if (!d.price_history) d.price_history = [];
+  if (!d.surveillance) d.surveillance = {flags:[], red_flag_count:0, assessment:"Data not available"};
+  if (!d.surveillance.flags) d.surveillance.flags = [];
+  if (!d.ownership) d.ownership = {promoter:[],mutual_funds:[],fii:[],public:[],dii:[]};
+  if (!d.ownership.promoter) d.ownership.promoter = [];
+  if (!d.ownership.mutual_funds) d.ownership.mutual_funds = [];
+  if (!d.ownership.fii) d.ownership.fii = [];
+  if (!d.ownership.public) d.ownership.public = [];
+  if (!d.ownership.dii) d.ownership.dii = [];
 
   return (
     <div>
