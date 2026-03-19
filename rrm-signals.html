@@ -828,13 +828,14 @@
             ctx.shadowBlur = 0;
 
             // Pulsating head glow
-            if (!playing || (playing && trimmedTail && playStep >= 8)) {
-              // not needed during play mid-animation
-            }
-            const pulse = Math.sin(Date.now() / 400 + p.rsr * 10) * 0.4 + 0.6;
-            ctx.globalAlpha = alpha * 0.2 * pulse;
-            ctx.beginPath(); ctx.arc(x, y, r + 5 + 2 * pulse, 0, Math.PI * 2);
+            const pulse = Math.sin(Date.now() / 350 + p.rsr * 10) * 0.5 + 0.5;
+            ctx.globalAlpha = alpha * (0.15 + 0.25 * pulse);
+            ctx.beginPath(); ctx.arc(x, y, r + 5 + 3 * pulse, 0, Math.PI * 2);
             ctx.strokeStyle = p.color; ctx.lineWidth = 1.5; ctx.stroke();
+            // Second outer ring for stronger effect
+            ctx.globalAlpha = alpha * 0.08 * pulse;
+            ctx.beginPath(); ctx.arc(x, y, r + 10 + 4 * pulse, 0, Math.PI * 2);
+            ctx.strokeStyle = p.color; ctx.lineWidth = 1; ctx.stroke();
             ctx.globalAlpha = alpha;
 
             // Score inside
@@ -1043,7 +1044,8 @@
 
       const filtered = useMemo(() => {
         let list = enriched;
-        if (filter !== 'ALL') list = list.filter(i => i.sig.light === filter);
+        if (filter === 'RSI') list = list.filter(i => i.sig.rsiOk);
+        else if (filter !== 'ALL') list = list.filter(i => i.sig.light === filter);
         return list.sort((a, b) => b.sig.score - a.sig.score || a.name.localeCompare(b.name));
       }, [enriched, filter]);
 
@@ -1156,10 +1158,14 @@
                   }}>{f} ({counts[f]})</button>
                 );
               })}
+              {/* RSI Sweet Zone filter */}
+              <button onClick={() => setFilter(filter === 'RSI' ? 'ALL' : 'RSI')} style={{
+                padding: '3px 7px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${filter === 'RSI' ? '#00ff8840' : 'var(--border)'}`,
+                background: filter === 'RSI' ? '#00ff8810' : 'transparent',
+                color: filter === 'RSI' ? '#00ff88' : 'var(--text3)', fontFamily: 'var(--mono)',
+              }}>◌ RSI Zone ({enriched.filter(i => i.sig.rsiOk).length})</button>
             </div>
-          )}
-
-          {/* ── Column headers ── */}
           {activeGroup !== 'positions' && (
             <div style={{
               display: 'grid', gridTemplateColumns: 'minmax(100px,1fr) 80px 70px 35px 65px 85px',
