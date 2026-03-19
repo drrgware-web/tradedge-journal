@@ -1,12 +1,12 @@
 """
 ================================================================================
-RRM Data Fetcher v4.1 — Multi-Benchmark + Global Indices + Custom Stocks
+RRM Data Fetcher v4.2 — Multi-Benchmark + Global Indices + Custom Stocks + RSI
 ================================================================================
-UPGRADE from v4.0:
-  - NEW: 25 Global Indices (US, Europe, Asia, Commodities, Crypto, Forex)
-  - NEW: Custom Stocks support (loaded from custom_stocks.json)
-  - Both groups appear as separate keys in the output JSON
-  - Backward compatible — all v4.0 fields unchanged
+UPGRADE from v4.1:
+  - NEW: RSI(14) computed for Daily, Weekly, Monthly timeframes
+  - RSI included in each instrument's "current" object in rrm_data.json
+  - RSI zone classification: overbought/bullish/bearish/oversold
+  - Backward compatible — all v4.1 fields unchanged
 
 Requirements:  pip install yfinance numpy
 ================================================================================
@@ -21,6 +21,59 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("rrm_fetcher")
 
 # =============================================================================
+# RSI COMPUTATION (NEW v4.2)
+# =============================================================================
+def compute_rsi(prices, period=14):
+    """
+    Compute RSI (Relative Strength Index) using Wilder's smoothing.
+    
+    Args:
+        prices: list of closing prices (oldest first)
+        period: RSI lookback period (default 14)
+    
+    Returns:
+        float RSI value (0-100) or None if insufficient data
+    """
+    if len(prices) < period + 1:
+        return None
+    
+    prices = np.array(prices, dtype=float)
+    deltas = np.diff(prices)
+    
+    gains = np.where(deltas > 0, deltas, 0)
+    losses = np.where(deltas < 0, -deltas, 0)
+    
+    # First average (SMA)
+    avg_gain = np.mean(gains[:period])
+    avg_loss = np.mean(losses[:period])
+    
+    # Wilder's smoothing for remaining values
+    for i in range(period, len(deltas)):
+        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+    
+    if avg_loss == 0:
+        return 100.0
+    
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return round(rsi, 1)
+
+
+def rsi_zone(rsi_val):
+    """Classify RSI into zones"""
+    if rsi_val is None:
+        return 'unknown'
+    if rsi_val >= 70:
+        return 'overbought'
+    elif rsi_val >= 50:
+        return 'bullish'
+    elif rsi_val >= 30:
+        return 'bearish'
+    else:
+        return 'oversold'
+
+# =============================================================================
 # CONFIG
 # =============================================================================
 def load_config(config_path):
@@ -32,7 +85,7 @@ def load_config(config_path):
             return cfg
         except Exception as e:
             log.warning(f"Config load failed: {e}")
-    log.info("Using built-in defaults (v4.1 — 16 sectors, 54 ETFs, 25 global indices)")
+    log.info("Using built-in defaults (v4.2 — 16 sectors, 54 ETFs, 25 global indices + RSI)")
     return DEFAULT_CONFIG()
 
 def DEFAULT_CONFIG():
@@ -147,36 +200,29 @@ def DEFAULT_CONFIG():
             "^NSEBANK":           {"name": "Bank Index",       "color": "#0ea5e9"},
         },
         # ═══════════════════════════════════════════════════════
-        # NEW v4.1: 25 GLOBAL INDICES
-        # 6 sub-groups: US, Europe, Asia, Commodities, Crypto, Forex
+        # 25 GLOBAL INDICES (v4.1 — unchanged)
         # ═══════════════════════════════════════════════════════
         "global_indices": {
-            # ── US ──
             "^GSPC":      {"name": "S&P 500",          "color": "#6366f1", "group": "US"},
             "^DJI":       {"name": "Dow Jones",        "color": "#8b5cf6", "group": "US"},
             "^IXIC":      {"name": "NASDAQ Composite",  "color": "#a855f7", "group": "US"},
             "^RUT":       {"name": "Russell 2000",      "color": "#c084fc", "group": "US"},
-            # ── Europe ──
             "^GDAXI":     {"name": "DAX (Germany)",    "color": "#f59e0b", "group": "Europe"},
             "^FTSE":      {"name": "FTSE 100 (UK)",    "color": "#ef4444", "group": "Europe"},
             "^FCHI":      {"name": "CAC 40 (France)",  "color": "#3b82f6", "group": "Europe"},
             "^STOXX50E":  {"name": "Euro Stoxx 50",    "color": "#14b8a6", "group": "Europe"},
-            # ── Asia ──
             "^N225":      {"name": "Nikkei 225",       "color": "#ec4899", "group": "Asia"},
             "^HSI":       {"name": "Hang Seng",        "color": "#fb923c", "group": "Asia"},
             "000001.SS":  {"name": "Shanghai Comp",    "color": "#ef4444", "group": "Asia"},
             "^KS11":      {"name": "KOSPI (Korea)",    "color": "#22c55e", "group": "Asia"},
             "^TWII":      {"name": "Taiwan Weighted",  "color": "#06b6d4", "group": "Asia"},
             "^STI":       {"name": "Straits Times",    "color": "#84cc16", "group": "Asia"},
-            # ── Commodities ──
             "GC=F":       {"name": "Gold",             "color": "#eab308", "group": "Commodities"},
             "SI=F":       {"name": "Silver",           "color": "#94a3b8", "group": "Commodities"},
             "CL=F":       {"name": "Crude Oil WTI",    "color": "#f97316", "group": "Commodities"},
             "HG=F":       {"name": "Copper",           "color": "#d97706", "group": "Commodities"},
-            # ── Crypto ──
             "BTC-USD":    {"name": "Bitcoin",          "color": "#f59e0b", "group": "Crypto"},
             "ETH-USD":    {"name": "Ethereum",         "color": "#6366f1", "group": "Crypto"},
-            # ── Forex ──
             "DX-Y.NYB":  {"name": "US Dollar Index",  "color": "#22c55e", "group": "Forex"},
             "USDINR=X":  {"name": "USD/INR",          "color": "#14b8a6", "group": "Forex"},
             "EURUSD=X":  {"name": "EUR/USD",          "color": "#3b82f6", "group": "Forex"},
@@ -187,10 +233,9 @@ def DEFAULT_CONFIG():
     }
 
 # =============================================================================
-# CUSTOM STOCKS LOADER (NEW v4.1)
+# CUSTOM STOCKS LOADER (v4.1 — unchanged)
 # =============================================================================
 def load_custom_stocks(config_dir=None):
-    """Load user-added custom stocks from custom_stocks.json"""
     search_paths = [
         "data/custom_stocks.json",
         "../data/custom_stocks.json",
@@ -198,7 +243,6 @@ def load_custom_stocks(config_dir=None):
     ]
     if config_dir:
         search_paths.insert(0, os.path.join(config_dir, "custom_stocks.json"))
-
     for path in search_paths:
         if os.path.exists(path):
             try:
@@ -332,7 +376,7 @@ def stock_color(name, idx):
     return PALETTE[(h + idx) % len(PALETTE)]
 
 # =============================================================================
-# RRM FOR A SET OF ITEMS (one timeframe)
+# RRM FOR A SET OF ITEMS (one timeframe) — UPGRADED with RSI
 # =============================================================================
 def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, window, resample_fn=None):
     results = []
@@ -345,6 +389,9 @@ def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, w
 
         sc, sd = price_data[sym]["closes"], price_data[sym]["dates"]
         bc, bd = bench_closes, bench_dates
+
+        # Keep raw daily closes for RSI before resampling
+        raw_daily_closes = sc[:]
 
         if resample_fn:
             sc, sd = resample_fn(sc, sd)
@@ -359,12 +406,24 @@ def calc_rrm_items(price_data, items_cfg, bench_closes, bench_dates, tail_len, w
         if not tail: continue
 
         cur = tail[-1]
+
+        # ── RSI COMPUTATION (NEW v4.2) ──
+        # Compute RSI on the timeframe-appropriate prices (resampled if weekly/monthly)
+        rsi_val = compute_rsi(sc, 14)
+        cur["rsi"] = rsi_val
+        cur["rsi_zone"] = rsi_zone(rsi_val)
+
+        # Also compute daily RSI for reference (always from raw daily data)
+        if resample_fn is not None:
+            cur["daily_rsi"] = compute_rsi(raw_daily_closes, 14)
+        else:
+            cur["daily_rsi"] = rsi_val
+
         item = {
             "symbol": sym, "name": name, "color": color,
             "quadrant": quadrant(cur["rs_ratio"], cur["rs_momentum"]),
             "current": cur, "tail": tail,
         }
-        # Preserve extra fields (e.g. "group" for global indices, "sector" for custom stocks)
         item.update(extra)
         results.append(item)
     return results
@@ -397,7 +456,6 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, custom_stoc
     ms_list = to_list(market_segments)
     gi_list = to_list(global_indices)
 
-    # Custom stocks as item list
     cs_list = [{"symbol": s["symbol"], "name": s.get("name", s["symbol"]), "color": stock_color(s.get("name", s["symbol"]), i), "sector": s.get("sector", ""), "group": s.get("group", "Custom")} for i, s in enumerate(custom_stock_items)]
 
     # ── Daily ──
@@ -424,7 +482,7 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, custom_stoc
     m_gi  = calc_rrm_items(price_data, gi_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
     m_cs  = calc_rrm_items(price_data, cs_list,  bc, bd, monthly_tail, window, resample_fn=resample_monthly)
 
-    # ── Drill-down (unchanged from v4.0) ──
+    # ── Drill-down ──
     drilldown = {}
     for sec_sym, stocks in sector_stocks.items():
         if sec_sym not in price_data: continue
@@ -463,9 +521,9 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, custom_stoc
 # =============================================================================
 def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10):
     today = datetime.now().strftime("%Y-%m-%d")
-    log.info(f"╔════════════════════════════════════════════════════════╗")
-    log.info(f"║  RRM v4.1 MULTI-BENCHMARK + GLOBAL INDICES — {today} ║")
-    log.info(f"╚════════════════════════════════════════════════════════╝")
+    log.info(f"╔════════════════════════════════════════════════════════════╗")
+    log.info(f"║  RRM v4.2 MULTI-BENCHMARK + GLOBAL + RSI — {today}  ║")
+    log.info(f"╚════════════════════════════════════════════════════════════╝")
 
     benchmarks = config.get("benchmarks", {})
     sectors = config.get("sectors", {})
@@ -474,10 +532,8 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     market_segments = config.get("market_segments", {})
     global_indices = config.get("global_indices", {})
 
-    # Load custom stocks
     custom_stocks = load_custom_stocks()
 
-    # Collect ALL symbols
     all_syms = set()
     all_syms.update(benchmarks.keys())
     all_syms.update(sectors.keys())
@@ -488,7 +544,6 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     for cs in custom_stocks:
         all_syms.add(cs["symbol"])
 
-    # Sector constituents
     sector_stocks = {}
     for sec_sym in sectors:
         constituents = get_constituents(sec_sym, config)
@@ -501,10 +556,8 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     log.info(f"  {len(sectors)} sectors, {len(etfs)} ETFs, {len(asset_classes)} assets")
     log.info(f"  {len(market_segments)} segments, {len(global_indices)} global indices, {len(custom_stocks)} custom stocks")
 
-    # Single fetch for ALL symbols
     price_data = fetch_prices(list(all_syms), period="5y")
 
-    # Calculate RRM for EACH benchmark
     benchmarks_data = {}
     for bench_sym, bench_name in benchmarks.items():
         log.info(f"\n═══ BENCHMARK: {bench_name} ({bench_sym}) ═══")
@@ -527,7 +580,8 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
         "metadata": {
             "generated_at": datetime.now().isoformat(),
             "date": today,
-            "version": "4.1",
+            "version": "4.2",
+            "features": ["rs_ratio", "rs_momentum", "rsi_14", "multi_tf", "global_indices", "custom_stocks"],
             "benchmarks_calculated": list(benchmarks_data.keys()),
             "total_sectors": max((len(b["daily"]["sectors"]) for b in benchmarks_data.values()), default=0),
             "total_etfs": max((len(b["daily"]["etfs"]) for b in benchmarks_data.values()), default=0),
@@ -544,12 +598,13 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     log.info(f"Global Indices: {output['metadata']['total_global_indices']}, Custom Stocks: {output['metadata']['total_custom_stocks']}")
     log.info(f"Drilldowns: {output['metadata']['total_drilldown_sectors']}")
     log.info(f"Timeframes: daily, weekly, monthly")
+    log.info(f"NEW: RSI(14) computed per instrument per timeframe")
 
     return output
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RRM v4.1 Multi-Benchmark + Global Indices Fetcher")
+    parser = argparse.ArgumentParser(description="RRM v4.2 Multi-Benchmark + RSI Fetcher")
     parser.add_argument("--output", "-o", type=str, default=None)
     parser.add_argument("--config", "-c", type=str, default=None)
     parser.add_argument("--daily-tail", type=int, default=5)
