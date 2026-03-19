@@ -707,7 +707,7 @@
             symbol: item.symbol, rsr: tf.rsr, rsm: tf.rsm, q: tf.q,
             score: sig.score, light: sig.light, action: sig.action, rsiOk: sig.rsiOk,
             color: LIGHT_MAP[sig.light] || '#444', qColor: Q_COLORS[tf.q] || '#444',
-            tail: (tail || []).slice(-(playing ? playStep : 8)),
+            tail: playing ? (tail || []).slice(0, playStep) : (tail || []).slice(-8),
           };
         });
       }, [enriched, helixTF, playing, playStep]);
