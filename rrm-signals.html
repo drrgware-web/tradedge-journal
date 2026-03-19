@@ -698,6 +698,49 @@
         });
       }, []);
 
+      // Stock-to-sector mapping for positions without direct RRM data
+      const STOCK_SECTOR_MAP = {
+        // Auto
+        MARUTI:'Auto',TATAMOTORS:'Auto','M&M':'Auto','BAJAJ-AUTO':'Auto',HEROMOTOCO:'Auto',EICHERMOT:'Auto',ASHOKLEY:'Auto',TVSMOTOR:'Auto',BOSCHLTD:'Auto',MRF:'Auto',BHARATFORG:'Auto',MOTHERSON:'Auto',BALKRISIND:'Auto',APOLLOTYRE:'Auto',EXIDEIND:'Auto',
+        // Bank
+        HDFCBANK:'Bank',ICICIBANK:'Bank',KOTAKBANK:'Bank',AXISBANK:'Bank',SBIN:'Bank',INDUSINDBK:'Bank',BANDHANBNK:'Bank',FEDERALBNK:'Bank',IDFCFIRSTB:'Bank',PNB:'Bank',BANKBARODA:'Bank',AUBANK:'Bank',CANBK:'Bank',UNIONBANK:'Bank',IOB:'Bank',INDIANB:'Bank',BANKINDIA:'Bank',CENTRALBK:'Bank',MAHABANK:'Bank',UCOBANK:'Bank',
+        // IT
+        TCS:'IT',INFY:'IT',HCLTECH:'IT',WIPRO:'IT',TECHM:'IT',LTIM:'IT',MPHASIS:'IT',COFORGE:'IT',PERSISTENT:'IT',LTTS:'IT',NAUKRI:'IT',
+        // Pharma
+        SUNPHARMA:'Pharma',DRREDDY:'Pharma',CIPLA:'Pharma',DIVISLAB:'Pharma',APOLLOHOSP:'Pharma',TORNTPHARM:'Pharma',LUPIN:'Pharma',AUROPHARMA:'Pharma',BIOCON:'Pharma',ALKEM:'Pharma',ABBOTINDIA:'Pharma',GLENMARK:'Pharma',FORTIS:'Pharma',MAXHEALTH:'Pharma',MEDANTA:'Pharma',
+        // FMCG
+        HINDUNILVR:'FMCG',ITC:'FMCG',NESTLEIND:'FMCG',BRITANNIA:'FMCG',DABUR:'FMCG',MARICO:'FMCG',GODREJCP:'FMCG',COLPAL:'FMCG',TATACONSUM:'FMCG',VBL:'FMCG',EMAMILTD:'FMCG',
+        // Metal
+        TATASTEEL:'Metal',JSWSTEEL:'Metal',HINDALCO:'Metal',VEDL:'Metal',COALINDIA:'Metal',NMDC:'Metal',SAIL:'Metal',NATIONALUM:'Metal',HINDCOPPER:'Metal',APLAPOLLO:'Metal',JINDALSTEL:'Metal',
+        // Energy
+        RELIANCE:'Energy',NTPC:'Energy',POWERGRID:'Energy',ONGC:'Energy',ADANIGREEN:'Energy',TATAPOWER:'Energy',ADANIENT:'Energy',IOC:'Energy',BPCL:'Energy',GAIL:'Energy',NHPC:'Energy',SJVN:'Energy',OIL:'Energy',PETRONET:'Energy',
+        // Realty
+        DLF:'Realty',GODREJPROP:'Realty',OBEROIRLTY:'Realty',PRESTIGE:'Realty',PHOENIXLTD:'Realty',BRIGADE:'Realty',SOBHA:'Realty',LODHA:'Realty',SUNTECK:'Realty',
+        // Infra
+        LT:'Infra',ADANIPORTS:'Infra',ULTRACEMCO:'Infra',GRASIM:'Infra',SHREECEM:'Infra',AMBUJACEM:'Infra',ACC:'Infra',SIEMENS:'Infra',ABB:'Infra',IRCON:'Infra',NBCC:'Infra',NCC:'Infra',
+        // FinService
+        BAJFINANCE:'Fin Service',BAJAJFINSV:'Fin Service',HDFCLIFE:'Fin Service',SBILIFE:'Fin Service',ICICIPRULI:'Fin Service',MUTHOOTFIN:'Fin Service',CHOLAFIN:'Fin Service',PFC:'Fin Service',RECLTD:'Fin Service',
+        // Media
+        ZEEL:'Media',PVR:'Media',SUNTV:'Media',SAREGAMA:'Media',NAZARA:'Media',
+        // PSE/Defence
+        BEL:'PSE',HAL:'PSE',IRFC:'PSE',BHEL:'PSE',
+        // Consumption
+        TITAN:'Consumption',TRENT:'Consumption',DMART:'Consumption',INDIGO:'Consumption',JUBLFOOD:'Consumption',PAGEIND:'Consumption',
+        // MNC
+        HONAUT:'MNC','3MINDIA':'MNC',WHIRLPOOL:'MNC',
+        // Commodities
+        HINDZINC:'Commodities',
+        // Misc / Smallcap (map to broader)
+        TDPOWERSYS:'Energy',MAHLOG:'Infra',ACUTAAS:'IT',QPOWER:'Energy',DATAPATTNS:'IT',ASTRAMICRO:'IT',
+      };
+
+      const SECTOR_SYMBOL_MAP = {
+        'Auto':'^CNXAUTO','Bank':'^NSEBANK','IT':'^CNXIT','Pharma':'^CNXPHARMA','FMCG':'^CNXFMCG',
+        'Metal':'^CNXMETAL','Energy':'^CNXENERGY','Realty':'^CNXREALTY','Infra':'^CNXINFRA',
+        'Fin Service':'^CNXFIN','Media':'^CNXMEDIA','PSE':'^CNXPSE','Consumption':'^CNXCONSUM',
+        'MNC':'^CNXMNC','Commodities':'^CNXCMDT','PSU Bank':'^CNXPSUBANK','Services':'^CNXSERVICE',
+      };
+
       const enriched = useMemo(() => {
         if (!rrmData || !positions.length) return [];
         const allGroups = ['sectors', 'etfs', 'asset_classes', 'market_segments', 'global_indices'];
@@ -708,11 +751,36 @@
         });
 
         return positions.map(pos => {
-          const sym = pos.symbol?.toUpperCase() + (pos.symbol?.includes('.') ? '' : '.NS');
-          const rrmItem = allItems.find(a => a.symbol === sym || a.symbol === pos.symbol);
+          const rawSym = pos.symbol?.toUpperCase() || '';
+          const sym = rawSym + (rawSym.includes('.') ? '' : '.NS');
+
+          // Level 1: Direct match in RRM data (ETFs, indices)
+          let rrmItem = allItems.find(a => a.symbol === sym || a.symbol === rawSym);
+          let matchType = rrmItem ? 'direct' : null;
+
+          // Level 2: Stock-to-sector mapping
+          if (!rrmItem) {
+            const sectorName = STOCK_SECTOR_MAP[rawSym];
+            if (sectorName) {
+              const sectorSym = SECTOR_SYMBOL_MAP[sectorName];
+              if (sectorSym) {
+                rrmItem = allItems.find(a => a.symbol === sectorSym);
+                matchType = rrmItem ? 'sector' : null;
+              }
+            }
+          }
+
+          // Level 3: Try Nifty 500 segment as fallback
+          if (!rrmItem) {
+            rrmItem = allItems.find(a => a.symbol === '^CRSLDX' || a.name?.includes('Nifty 500'));
+            matchType = rrmItem ? 'broad' : null;
+          }
+
           return {
             ...pos,
             rrm: rrmItem ? { ...rrmItem, sig: computeSignals(rrmItem) } : null,
+            _matchType: matchType,
+            _sectorName: STOCK_SECTOR_MAP[rawSym] || null,
           };
         });
       }, [rrmData, benchmark, positions]);
@@ -772,6 +840,11 @@
                 </div>
                 {pos.rrm ? (
                   <>
+                    {pos._matchType !== 'direct' && (
+                      <span style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
+                        {pos._matchType === 'sector' ? `⤷ ${pos._sectorName}` : '⤷ Broad'}
+                      </span>
+                    )}
                     <QBadge q={pos.rrm.weekly.q} />
                     <ScoreBar score={pos.rrm.sig.score} />
                     <span style={{ fontSize: 8, color: LIGHT_MAP[pos.rrm.sig.light], fontWeight: 700, fontFamily: 'var(--mono)' }}>
@@ -779,7 +852,7 @@
                     </span>
                   </>
                 ) : (
-                  <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>No RRM data</span>
+                  <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>No sector data</span>
                 )}
               </div>
             );
@@ -1570,7 +1643,7 @@
                 border: `1px solid ${activeGroup === 'positions' ? '#ff336630' : 'var(--border)'}`,
                 background: activeGroup === 'positions' ? '#ff33660a' : 'transparent',
                 color: activeGroup === 'positions' ? '#ff3366' : 'var(--text2)', fontFamily: 'var(--mono)',
-              }}>📈 Positions ({(() => { try { return JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t=>t.status==='Open').length; } catch(e) { return 0; } })()})</button>
+              }}>📈 Positions ({(() => { try { return JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t=>t.status==='Open'||t.status==='Partial').length; } catch(e) { return 0; } })()})</button>
             <button onClick={() => setShowAddModal(true)} style={{
               padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
               border: '1px solid #00ff8825', background: '#00ff8806', color: 'var(--green)', fontFamily: 'var(--mono)',
