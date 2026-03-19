@@ -1206,6 +1206,9 @@
                 color: filter === 'SWEET' ? '#ffd000' : 'var(--text3)', fontFamily: 'var(--mono)',
               }}>★ Sweet Zone ({enriched.filter(i => i.sig.sz >= 4).length})</button>
             </div>
+          )}
+
+          {/* ── Column headers ── */}
           {activeGroup !== 'positions' && (
             <div style={{
               display: 'grid', gridTemplateColumns: 'minmax(100px,1fr) 80px 65px 45px 35px 60px 80px',
@@ -1261,13 +1264,12 @@
           {/* ══════════════════════════════════════════════════
              HELIX — Multi-Dimensional Rotation Intelligence Graph
              ══════════════════════════════════════════════════ */}
-          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <HelixGraph enriched={enriched} rrmData={rrmData} benchmark={benchmark} activeGroup={activeGroup} />
 
-            <HelixGraph enriched={enriched} rrmData={rrmData} benchmark={benchmark} activeGroup={activeGroup} />
-
-            {/* ══════════════════════════════════════════════════
+          {/* ══════════════════════════════════════════════════
              BLOOMBERG ANALYSIS PANELS (Collapsible below table)
              ══════════════════════════════════════════════════ */}
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
 
             {/* Toggle buttons */}
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
