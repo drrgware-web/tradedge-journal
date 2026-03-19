@@ -1,44 +1,16 @@
-# ═══════════════════════════════════════════════════════════════
-# TradEdge MATRIX — Daily Data Fetcher + Telegram Alerts
-# Runs Mon–Fri at 5:30 PM IST (12:00 UTC) after market close
-# ═══════════════════════════════════════════════════════════════
-
 name: RRM Daily Fetch
-
 on:
   schedule:
-    - cron: '0 12 * * 1-5'
+    - cron: '0 12 * * 1-5'  # 5:30 PM IST (12:00 UTC) Mon-Fri
   workflow_dispatch:
-    inputs:
-      daily_tail:
-        description: 'Daily tail length'
-        required: false
-        default: '10'
-      weekly_tail:
-        description: 'Weekly tail length'
-        required: false
-        default: '8'
-      monthly_tail:
-        description: 'Monthly tail length'
-        required: false
-        default: '5'
-      skip_alerts:
-        description: 'Skip Telegram alerts (true/false)'
-        required: false
-        default: 'false'
-
-permissions:
-  contents: write
 
 jobs:
-  fetch-rrm:
+  fetch:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -46,51 +18,19 @@ jobs:
       - name: Install dependencies
         run: pip install yfinance numpy
 
-      - name: Sync positions → custom_stocks.json
+      - name: Run RRM Fetcher
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: python scripts/rrm_pos_sync.py
-
-      - name: Run RRM Fetcher v4.1
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          python scripts/rrm_fetcher.py \
-            --output data/rrm_data.json \
-            --daily-tail ${{ github.event.inputs.daily_tail || '10' }} \
-            --weekly-tail ${{ github.event.inputs.weekly_tail || '8' }} \
-            --monthly-tail ${{ github.event.inputs.monthly_tail || '5' }}
+          cd scripts
+          python rrm_fetcher.py -o ../data/rrm_data.json \
+            --daily-tail 8 --weekly-tail 8 --monthly-tail 8
 
-      - name: Verify output
-        run: |
-          python -c "
-          import json
-          d = json.load(open('data/rrm_data.json'))
-          m = d['metadata']
-          print(f'Version:  {m[\"version\"]}')
-          print(f'Date:     {m[\"date\"]}')
-          print(f'Sectors:  {m[\"total_sectors\"]}')
-          print(f'ETFs:     {m[\"total_etfs\"]}')
-          print(f'Globals:  {m[\"total_global_indices\"]}')
-          print(f'Custom:   {m[\"total_custom_stocks\"]}')
-          "
-
-      - name: Run MATRIX Alerts
-        if: ${{ github.event.inputs.skip_alerts != 'true' }}
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          python scripts/rrm_alerts.py \
-            --data data/rrm_data.json \
-            --prev data/rrm_signals_prev.json \
-            --benchmark "^NSEI"
-
-      - name: Commit & push data
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/rrm_data.json data/rrm_signals_prev.json data/custom_stocks.json
-          git diff --cached --quiet || git commit -m "MATRIX data update — $(date -u +%Y-%m-%d)"
+          git add data/rrm_data.json
+          DATE=$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M IST')
+          git commit -m "📊 RRM v4.2 EOD ${DATE}" || exit 0
           git push
