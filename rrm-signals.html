@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TradEdge — RRM Signals</title>
+  <title>TradEdge — MATRIX</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
@@ -23,28 +23,27 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     .fade-in { animation: fadeIn 0.3s ease-out both; }
+    @keyframes pulseGlow { 0%,100%{box-shadow:0 0 4px rgba(0,255,136,0.1)} 50%{box-shadow:0 0 12px rgba(0,255,136,0.25)} }
+    .macro-card:hover { transform: translateY(-1px); }
+    .rotation-cell:hover { filter: brightness(1.3); transform: scale(1.05); }
+    .corr-cell:hover { outline: 1px solid rgba(255,255,255,0.3); z-index: 1; }
+    .analysis-toggle { cursor: pointer; user-select: none; transition: all 0.2s; }
+    .analysis-toggle:hover { background: rgba(255,255,255,0.03); }
   </style>
 </head>
 <body>
   <div id="root">
     <div id="loading">
       <div class="spinner"></div>
-      <span style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.25)">Loading RRM data...</span>
+      <span style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.25)">Loading MATRIX data...</span>
     </div>
   </div>
 
   <script type="text/babel">
     const { useState, useMemo, useCallback, useEffect, useRef } = React;
 
-    /* ═══════════════════════════════════════════════════════════
-       CONFIG — adjust this path to match your repo structure
-       ═══════════════════════════════════════════════════════════ */
-    const DATA_URL = './data/rrm_data.json';   // relative to this HTML file
-    // If your HTML is in /pages/ and data in /data/, use: '../data/rrm_data.json'
+    const DATA_URL = './data/rrm_data.json';
 
-    /* ═══════════════════════════════════════════════════════════
-       CONSTANTS
-       ═══════════════════════════════════════════════════════════ */
     const Q_COLORS = { Leading: '#00ff88', Improving: '#00c8ff', Weakening: '#ffd000', Lagging: '#ff3366' };
     const LIGHT_MAP = { GREEN: '#00ff88', YELLOW: '#ffd000', BLUE: '#00c8ff', RED: '#ff3366' };
     const GROUP_META = [
@@ -63,65 +62,46 @@
 
     /* ═══════════════════════════════════════════════════════════
        DATA TRANSFORMER
-       Converts rrm_data.json → flat array per group with D/W/M
        ═══════════════════════════════════════════════════════════ */
     function transformData(raw, benchKey, groupKey) {
       const bm = raw?.benchmarks_data?.[benchKey];
       if (!bm) return [];
-
       const daily   = bm.daily?.[groupKey]   || [];
       const weekly  = bm.weekly?.[groupKey]   || [];
       const monthly = bm.monthly?.[groupKey]  || [];
-
-      // Build lookup maps by symbol
       const wMap = {}; weekly.forEach(s  => { wMap[s.symbol] = s; });
       const mMap = {}; monthly.forEach(s => { mMap[s.symbol] = s; });
-
       return daily.map(d => {
         const w = wMap[d.symbol] || {};
         const m = mMap[d.symbol] || {};
         return {
-          symbol: d.symbol,
-          name:   d.name,
-          color:  d.color,
-          group:  d.group || '',
+          symbol: d.symbol, name: d.name, color: d.color, group: d.group || '',
           daily:   { q: d.quadrant || '', rsr: d.current?.rs_ratio || 100, rsm: d.current?.rs_momentum || 100 },
           weekly:  { q: w.quadrant || '', rsr: w.current?.rs_ratio || 100, rsm: w.current?.rs_momentum || 100 },
           monthly: { q: m.quadrant || '', rsr: m.current?.rs_ratio || 100, rsm: m.current?.rs_momentum || 100 },
-          // Pass tail data through for future mini-chart use
-          dailyTail:   d.tail || [],
-          weeklyTail:  w.tail || [],
-          monthlyTail: m.tail || [],
+          dailyTail: d.tail || [], weeklyTail: w.tail || [], monthlyTail: m.tail || [],
         };
       });
     }
 
     /* ═══════════════════════════════════════════════════════════
-       SIGNAL COMPUTATION (MTF Confluence + RRG-RSI + Actions)
+       SIGNAL COMPUTATION
        ═══════════════════════════════════════════════════════════ */
     function computeSignals(item) {
       const { daily: d, weekly: w, monthly: m } = item;
       const right = q => q === 'Leading' || q === 'Improving';
-
-      // MTF Confluence Score (1–5)
       let score = 0;
-      if (right(m.q)) score += (m.rsr >= 100 && m.rsm >= 100) ? 2 : 1; // Monthly Power Trinity = +2
-      if (right(w.q)) score += (w.rsr >= 100 && w.rsm >= 100) ? 2 : 1; // Weekly Power Trinity = +2
-      if (right(d.q)) score += 1;                                        // Daily right = +1
+      if (right(m.q)) score += (m.rsr >= 100 && m.rsm >= 100) ? 2 : 1;
+      if (right(w.q)) score += (w.rsr >= 100 && w.rsm >= 100) ? 2 : 1;
+      if (right(d.q)) score += 1;
       score = Math.min(score, 5);
-
-      // Traffic Light
       let light;
-      if      (right(m.q) && right(w.q) && right(d.q))  light = 'GREEN';   // All 3 aligned
-      else if (right(m.q) && !right(w.q) && right(d.q)) light = 'YELLOW';  // Hook entry — M strong, W dip, D up
-      else if (!right(m.q) && right(w.q) && right(d.q)) light = 'BLUE';    // Counter-trend — no monthly backing
-      else                                               light = 'RED';     // Structural weakness
-
-      // RRG-RSI Combo (proxy: weekly RS-Momentum in sweet zone 98–106)
+      if      (right(m.q) && right(w.q) && right(d.q))  light = 'GREEN';
+      else if (right(m.q) && !right(w.q) && right(d.q)) light = 'YELLOW';
+      else if (!right(m.q) && right(w.q) && right(d.q)) light = 'BLUE';
+      else                                               light = 'RED';
       const weeklyMomOk = w.rsm >= 98 && w.rsm <= 106;
       const rsiOk = right(w.q) && weeklyMomOk;
-
-      // Action
       let action;
       if      (score >= 4 && rsiOk)    action = 'AGGRESSIVE BUY';
       else if (score >= 3 && rsiOk)    action = 'BUY ON DIP';
@@ -129,19 +109,17 @@
       else if (light === 'BLUE')       action = 'SCALP ONLY';
       else if (score >= 3)             action = 'HOLD';
       else                             action = 'AVOID';
-
       return { score, light, rsiOk, action };
     }
 
     /* ═══════════════════════════════════════════════════════════
-       TINY COMPONENTS
+       TINY COMPONENTS (unchanged from original)
        ═══════════════════════════════════════════════════════════ */
     const Dot = ({ color, active, s = 7 }) => (
       <span style={{
         display: 'inline-block', width: s, height: s, borderRadius: '50%',
         background: active ? color : 'rgba(255,255,255,0.05)',
-        boxShadow: active ? `0 0 8px ${color}50` : 'none',
-        transition: 'all 0.3s',
+        boxShadow: active ? `0 0 8px ${color}50` : 'none', transition: 'all 0.3s',
       }} />
     );
 
@@ -152,9 +130,7 @@
           padding: '1px 6px', borderRadius: 3, border: `1px solid ${c}25`,
           background: `${c}08`, color: c, fontSize: 10, fontWeight: 600,
           fontFamily: 'var(--mono)', letterSpacing: '0.03em',
-        }}>
-          {q || '—'}
-        </span>
+        }}>{q || '—'}</span>
       );
     };
 
@@ -163,19 +139,13 @@
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 70 }}>
           <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
-            <div style={{
-              width: `${(score / 5) * 100}%`, height: '100%', background: c, borderRadius: 2,
-              boxShadow: `0 0 8px ${c}30`, transition: 'width 0.5s ease',
-            }} />
+            <div style={{ width: `${(score / 5) * 100}%`, height: '100%', background: c, borderRadius: 2, boxShadow: `0 0 8px ${c}30`, transition: 'width 0.5s ease' }} />
           </div>
           <span style={{ color: c, fontWeight: 700, fontSize: 12, fontFamily: 'var(--mono)', width: 12, textAlign: 'right' }}>{score}</span>
         </div>
       );
     };
 
-    /* ═══════════════════════════════════════════════════════════
-       MINI SPARKLINE (RS-Ratio trail from tail data)
-       ═══════════════════════════════════════════════════════════ */
     const Sparkline = ({ data, width = 60, height = 20, color = '#00c8ff' }) => {
       if (!data || data.length < 2) return null;
       const vals = data.map(d => d.rs_ratio);
@@ -196,59 +166,42 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
-       ASSET ROW — expandable with D/W/M detail cards
+       ASSET ROW (unchanged)
        ═══════════════════════════════════════════════════════════ */
     const AssetRow = ({ item, sig, expanded, onToggle, idx }) => {
       const lc = LIGHT_MAP[sig.light];
       return (
-        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }} className="fade-in" >
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }} className="fade-in">
           <div onClick={onToggle} style={{
             display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
             alignItems: 'center', gap: 6, padding: '8px 12px', cursor: 'pointer',
-            background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
-            transition: 'background 0.2s',
+            background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent', transition: 'background 0.2s',
           }}>
-            {/* Name */}
             <div>
               <div style={{ color: '#fff', fontWeight: 600, fontSize: 11.5, fontFamily: 'var(--mono)', lineHeight: 1.3 }}>{item.name}</div>
               <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, fontFamily: 'var(--mono)' }}>{item.symbol}</div>
             </div>
-            {/* Signal dots */}
             <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               {['GREEN','YELLOW','BLUE','RED'].map(l => <Dot key={l} color={LIGHT_MAP[l]} active={sig.light === l} />)}
               <span style={{ fontSize: 8, color: lc, fontFamily: 'var(--mono)', fontWeight: 700, marginLeft: 2 }}>{sig.light}</span>
             </div>
-            {/* Score */}
             <ScoreBar score={sig.score} />
-            {/* RSI check */}
-            <span style={{
-              fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center',
-              color: sig.rsiOk ? '#00ff88' : 'rgba(255,255,255,0.1)',
-            }}>
+            <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600, textAlign: 'center', color: sig.rsiOk ? '#00ff88' : 'rgba(255,255,255,0.1)' }}>
               {sig.rsiOk ? '✓' : '✗'}
             </span>
-            {/* Weekly Q */}
             <QBadge q={item.weekly.q} />
-            {/* Action */}
             <span style={{
               padding: '2px 5px', borderRadius: 3, fontSize: 8.5, fontWeight: 700,
               fontFamily: 'var(--mono)', textAlign: 'center', whiteSpace: 'nowrap',
               color: lc, background: `${lc}08`, border: `1px solid ${lc}15`,
-            }}>
-              {sig.action}
-            </span>
+            }}>{sig.action}</span>
           </div>
-
-          {/* Expanded detail */}
           {expanded && (
             <div style={{ padding: '2px 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               {[['DAILY', item.daily, item.dailyTail], ['WEEKLY', item.weekly, item.weeklyTail], ['MONTHLY', item.monthly, item.monthlyTail]].map(([label, tf, tail]) => {
                 const qc = Q_COLORS[tf.q] || '#444';
                 return (
-                  <div key={label} style={{
-                    background: 'rgba(255,255,255,0.012)', borderRadius: 6, padding: '8px 10px',
-                    border: `1px solid ${qc}12`,
-                  }}>
+                  <div key={label} style={{ background: 'rgba(255,255,255,0.012)', borderRadius: 6, padding: '8px 10px', border: `1px solid ${qc}12` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <span style={{ fontSize: 8, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)' }}>{label}</span>
                       <QBadge q={tf.q} />
@@ -276,7 +229,458 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
-       ADD STOCK MODAL
+       BLOOMBERG PANEL 1: MACRO PULSE STRIP
+       Live macro indicators in a compact horizontal bar
+       ═══════════════════════════════════════════════════════════ */
+    const MacroPulse = ({ rrmData, benchmark }) => {
+      // Extract macro data from asset_classes group
+      const macroItems = useMemo(() => {
+        if (!rrmData) return [];
+        const assets = transformData(rrmData, benchmark, 'asset_classes');
+        const globals = transformData(rrmData, benchmark, 'global_indices');
+        const all = [...assets, ...globals];
+
+        // Pick key macro indicators
+        const keys = ['Gold', 'Silver', 'Crude Oil', 'USD/INR', 'Bitcoin', 'US 10Y Yield', 'VIX', 'Dow Jones', 'S&P 500', 'NASDAQ'];
+        const found = [];
+        keys.forEach(k => {
+          const item = all.find(a => a.name?.includes(k) || a.symbol?.includes(k.toUpperCase().replace(/\s/g,'')));
+          if (item) found.push({ ...item, sig: computeSignals(item) });
+        });
+        return found;
+      }, [rrmData, benchmark]);
+
+      if (!macroItems.length) return null;
+
+      return (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--mono)', marginBottom: 5 }}>
+            MACRO PULSE
+          </div>
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
+            {macroItems.map(m => {
+              const qc = Q_COLORS[m.weekly.q] || '#444';
+              const momDir = m.weekly.rsm >= 100 ? '↑' : '↓';
+              return (
+                <div key={m.symbol} className="macro-card" style={{
+                  background: `${qc}06`, border: `1px solid ${qc}15`, borderRadius: 6,
+                  padding: '6px 10px', minWidth: 90, flexShrink: 0, transition: 'all 0.2s', cursor: 'default',
+                }}>
+                  <div style={{ fontSize: 8, color: 'var(--text2)', fontFamily: 'var(--mono)', marginBottom: 2, whiteSpace: 'nowrap' }}>{m.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>{m.weekly.rsr.toFixed(0)}</span>
+                    <span style={{ fontSize: 10, color: m.weekly.rsm >= 100 ? '#00ff88' : '#ff3366', fontWeight: 600 }}>{momDir}</span>
+                  </div>
+                  <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', marginTop: 1 }}>{m.weekly.q}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       BLOOMBERG PANEL 2: SECTOR ROTATION MAP
+       Visual quadrant distribution showing rotation flow
+       ═══════════════════════════════════════════════════════════ */
+    const SectorRotationMap = ({ enriched }) => {
+      const quadrants = useMemo(() => {
+        const q = { Leading: [], Improving: [], Weakening: [], Lagging: [] };
+        enriched.forEach(item => {
+          const wq = item.weekly.q;
+          if (q[wq]) q[wq].push(item);
+        });
+        return q;
+      }, [enriched]);
+
+      const total = enriched.length || 1;
+
+      // Detect rotation: items where daily != weekly quadrant
+      const rotating = useMemo(() => {
+        return enriched.filter(item => item.daily.q !== item.weekly.q).map(item => ({
+          ...item,
+          from: item.weekly.q,
+          to: item.daily.q,
+        }));
+      }, [enriched]);
+
+      const qOrder = ['Leading', 'Improving', 'Weakening', 'Lagging'];
+      const qIcons = { Leading: '◉', Improving: '◈', Weakening: '◆', Lagging: '◇' };
+
+      return (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
+            SECTOR ROTATION MAP — Weekly Quadrants
+          </div>
+
+          {/* Quadrant grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+            {qOrder.map(qName => {
+              const items = quadrants[qName];
+              const qc = Q_COLORS[qName];
+              const pct = ((items.length / total) * 100).toFixed(0);
+              return (
+                <div key={qName} style={{
+                  background: `${qc}04`, border: `1px solid ${qc}12`, borderRadius: 6, padding: '8px 10px',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>
+                      {qIcons[qName]} {qName.toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: qc, fontFamily: 'var(--mono)' }}>
+                      {items.length} <span style={{ fontSize: 8, opacity: 0.5 }}>({pct}%)</span>
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {items.map(item => {
+                      const isRotating = rotating.find(r => r.symbol === item.symbol);
+                      return (
+                        <span key={item.symbol} className="rotation-cell" style={{
+                          fontSize: 8, fontFamily: 'var(--mono)', fontWeight: 600,
+                          padding: '2px 5px', borderRadius: 3,
+                          background: isRotating ? `${Q_COLORS[isRotating.to]}15` : 'rgba(255,255,255,0.03)',
+                          color: isRotating ? Q_COLORS[isRotating.to] : 'var(--text2)',
+                          border: isRotating ? `1px solid ${Q_COLORS[isRotating.to]}25` : '1px solid transparent',
+                          cursor: 'default', transition: 'all 0.2s',
+                        }} title={isRotating ? `Rotating: ${isRotating.from} → ${isRotating.to}` : item.weekly.q}>
+                          {item.name?.replace(/^Nifty\s?/, '').slice(0, 10)}
+                          {isRotating && <span style={{ marginLeft: 2, fontSize: 7 }}>→</span>}
+                        </span>
+                      );
+                    })}
+                    {items.length === 0 && <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>—</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Rotation alerts */}
+          {rotating.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+              <div style={{ fontSize: 7.5, color: 'var(--yellow)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)', marginBottom: 4 }}>
+                ⚡ ROTATION DETECTED ({rotating.length})
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {rotating.map(r => (
+                  <span key={r.symbol} style={{
+                    fontSize: 8.5, fontFamily: 'var(--mono)', fontWeight: 600,
+                    padding: '2px 6px', borderRadius: 3,
+                    background: 'rgba(255,208,0,0.06)', border: '1px solid rgba(255,208,0,0.15)',
+                    color: 'var(--yellow)',
+                  }}>
+                    {r.name?.replace(/^Nifty\s?/, '')}:{' '}
+                    <span style={{ color: Q_COLORS[r.from] }}>{r.from?.slice(0,4)}</span>
+                    {' → '}
+                    <span style={{ color: Q_COLORS[r.to] }}>{r.to?.slice(0,4)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       BLOOMBERG PANEL 3: CORRELATION MATRIX HEATMAP
+       Shows RS-Ratio similarity between sectors
+       ═══════════════════════════════════════════════════════════ */
+    const CorrelationMatrix = ({ enriched }) => {
+      const matrix = useMemo(() => {
+        if (enriched.length < 2) return null;
+        const n = Math.min(enriched.length, 16); // Cap at 16 for readability
+        const items = enriched.slice(0, n);
+
+        // Compute "correlation" based on RS-Ratio + RS-Momentum similarity
+        const corr = [];
+        for (let i = 0; i < n; i++) {
+          corr[i] = [];
+          for (let j = 0; j < n; j++) {
+            if (i === j) { corr[i][j] = 1; continue; }
+            const a = items[i], b = items[j];
+            // Normalized distance in RS-Ratio/Momentum space
+            const dR = Math.abs(a.weekly.rsr - b.weekly.rsr);
+            const dM = Math.abs(a.weekly.rsm - b.weekly.rsm);
+            const dist = Math.sqrt(dR * dR + dM * dM);
+            // Convert to correlation-like score (closer = higher)
+            corr[i][j] = Math.max(0, 1 - dist / 15); // 15 = normalization factor
+          }
+        }
+        return { items, corr, n };
+      }, [enriched]);
+
+      if (!matrix || matrix.n < 2) return null;
+
+      const { items, corr, n } = matrix;
+      const cellSize = Math.min(28, Math.floor(280 / n));
+
+      const getColor = (v) => {
+        if (v >= 0.8) return '#00ff8850';
+        if (v >= 0.6) return '#00ff8830';
+        if (v >= 0.4) return '#00c8ff20';
+        if (v >= 0.2) return '#ffd00015';
+        return '#ff336610';
+      };
+
+      return (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
+            RS CORRELATION MATRIX — Weekly RS-Ratio Proximity
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ display: 'inline-grid', gridTemplateColumns: `30px repeat(${n}, ${cellSize}px)`, gap: 1 }}>
+              {/* Header row */}
+              <div />
+              {items.map((item, j) => (
+                <div key={`h-${j}`} style={{
+                  fontSize: 6.5, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600,
+                  textAlign: 'center', height: 30, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                  paddingBottom: 2, writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+                }}>
+                  {item.name?.replace(/^Nifty\s?/, '').slice(0, 8)}
+                </div>
+              ))}
+              {/* Data rows */}
+              {items.map((rowItem, i) => (
+                <React.Fragment key={`r-${i}`}>
+                  <div style={{
+                    fontSize: 6.5, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 3,
+                    whiteSpace: 'nowrap', overflow: 'hidden',
+                  }}>
+                    {rowItem.name?.replace(/^Nifty\s?/, '').slice(0, 6)}
+                  </div>
+                  {items.map((colItem, j) => (
+                    <div key={`c-${i}-${j}`} className="corr-cell" style={{
+                      width: cellSize, height: cellSize, background: getColor(corr[i][j]),
+                      borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 7, fontFamily: 'var(--mono)', fontWeight: 600,
+                      color: corr[i][j] >= 0.5 ? '#00ff88' : 'rgba(255,255,255,0.15)',
+                      cursor: 'default', transition: 'all 0.15s', position: 'relative',
+                    }} title={`${rowItem.name} ↔ ${colItem.name}: ${(corr[i][j] * 100).toFixed(0)}%`}>
+                      {i === j ? '●' : corr[i][j] >= 0.3 ? (corr[i][j] * 100).toFixed(0) : ''}
+                    </div>
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 8, fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#00ff8850', marginRight: 3, verticalAlign: 'middle' }}/>High sync (80%+)</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#00c8ff20', marginRight: 3, verticalAlign: 'middle' }}/>Moderate</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#ff336610', marginRight: 3, verticalAlign: 'middle' }}/>Divergent</span>
+          </div>
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       BLOOMBERG PANEL 4: ANALYSIS PANEL
+       Market regime, breadth summary, key insights
+       ═══════════════════════════════════════════════════════════ */
+    const AnalysisPanel = ({ enriched, rrmData, benchmark }) => {
+      const analysis = useMemo(() => {
+        if (!enriched.length) return null;
+
+        // Quadrant distribution
+        const qDist = { Leading: 0, Improving: 0, Weakening: 0, Lagging: 0 };
+        enriched.forEach(item => { if (qDist[item.weekly.q] !== undefined) qDist[item.weekly.q]++; });
+        const total = enriched.length;
+
+        // Market regime
+        const rightSide = qDist.Leading + qDist.Improving;
+        const leftSide = qDist.Weakening + qDist.Lagging;
+        const rightPct = ((rightSide / total) * 100).toFixed(0);
+        let regime;
+        if (rightPct >= 70) regime = { label: 'STRONG BULL', color: '#00ff88', icon: '🟢' };
+        else if (rightPct >= 55) regime = { label: 'BULL', color: '#00ff88', icon: '🟢' };
+        else if (rightPct >= 45) regime = { label: 'TRANSITIONAL', color: '#ffd000', icon: '🟡' };
+        else if (rightPct >= 30) regime = { label: 'BEAR', color: '#ff3366', icon: '🔴' };
+        else regime = { label: 'STRONG BEAR', color: '#ff3366', icon: '🔴' };
+
+        // Score distribution
+        const scoreDist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, 0: 0 };
+        enriched.forEach(item => { scoreDist[item.sig.score]++; });
+        const highConviction = scoreDist[5] + scoreDist[4];
+
+        // Top movers (highest RS-Momentum)
+        const topMom = [...enriched].sort((a, b) => b.weekly.rsm - a.weekly.rsm).slice(0, 3);
+        const bottomMom = [...enriched].sort((a, b) => a.weekly.rsm - b.weekly.rsm).slice(0, 3);
+
+        // Insights
+        const insights = [];
+        if (rightPct >= 60) insights.push({ type: 'bull', text: `${rightPct}% sectors on right side — broad-based strength` });
+        if (rightPct <= 35) insights.push({ type: 'bear', text: `Only ${rightPct}% on right side — defensive positioning advised` });
+        if (qDist.Improving > qDist.Leading) insights.push({ type: 'rotation', text: `More Improving (${qDist.Improving}) than Leading (${qDist.Leading}) — early rotation phase` });
+        if (qDist.Weakening > qDist.Lagging) insights.push({ type: 'rotation', text: `More Weakening (${qDist.Weakening}) than Lagging (${qDist.Lagging}) — distribution phase` });
+        if (highConviction >= total * 0.3) insights.push({ type: 'bull', text: `${highConviction} high-conviction setups (Score ≥4) — aggressive deployment` });
+        if (scoreDist[1] + scoreDist[0] >= total * 0.5) insights.push({ type: 'bear', text: `${scoreDist[1] + scoreDist[0]} low-score assets — capital preservation mode` });
+
+        return { qDist, total, rightPct, regime, scoreDist, highConviction, topMom, bottomMom, insights };
+      }, [enriched]);
+
+      if (!analysis) return null;
+
+      const { qDist, total, rightPct, regime, scoreDist, highConviction, topMom, bottomMom, insights } = analysis;
+
+      return (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.12em', fontFamily: 'var(--mono)', marginBottom: 10 }}>
+            MARKET ANALYSIS — {BENCHMARKS.find(b => b.key === benchmark)?.label}
+          </div>
+
+          {/* Regime + Breadth */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+            {/* Regime */}
+            <div style={{ background: `${regime.color}06`, border: `1px solid ${regime.color}15`, borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>REGIME</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: regime.color, fontFamily: 'var(--mono)' }}>{regime.label}</div>
+              <div style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)', marginTop: 2 }}>{rightPct}% right side</div>
+            </div>
+            {/* Breadth bar */}
+            <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px' }}>
+              <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>BREADTH</div>
+              <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 1 }}>
+                <div style={{ width: `${(qDist.Leading / total) * 100}%`, background: '#00ff88', transition: 'width 0.5s' }} />
+                <div style={{ width: `${(qDist.Improving / total) * 100}%`, background: '#00c8ff', transition: 'width 0.5s' }} />
+                <div style={{ width: `${(qDist.Weakening / total) * 100}%`, background: '#ffd000', transition: 'width 0.5s' }} />
+                <div style={{ width: `${(qDist.Lagging / total) * 100}%`, background: '#ff3366', transition: 'width 0.5s' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 8, fontFamily: 'var(--mono)' }}>
+                <span style={{ color: '#00ff88' }}>L:{qDist.Leading}</span>
+                <span style={{ color: '#00c8ff' }}>I:{qDist.Improving}</span>
+                <span style={{ color: '#ffd000' }}>W:{qDist.Weakening}</span>
+                <span style={{ color: '#ff3366' }}>Lg:{qDist.Lagging}</span>
+              </div>
+            </div>
+            {/* High conviction */}
+            <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>HIGH CONVICTION</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: highConviction > 0 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{highConviction}</div>
+              <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Score ≥ 4</div>
+            </div>
+          </div>
+
+          {/* Momentum Leaders & Laggards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+            <div style={{ background: 'rgba(0,255,136,0.03)', border: '1px solid rgba(0,255,136,0.08)', borderRadius: 6, padding: '6px 10px' }}>
+              <div style={{ fontSize: 7, color: '#00ff88', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>▲ MOMENTUM LEADERS</div>
+              {topMom.map(m => (
+                <div key={m.symbol} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                  <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{m.name?.replace(/^Nifty\s?/, '').slice(0, 12)}</span>
+                  <span style={{ fontSize: 10, color: '#00ff88', fontFamily: 'var(--mono)', fontWeight: 700 }}>{m.weekly.rsm.toFixed(1)}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: 'rgba(255,51,102,0.03)', border: '1px solid rgba(255,51,102,0.08)', borderRadius: 6, padding: '6px 10px' }}>
+              <div style={{ fontSize: 7, color: '#ff3366', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>▼ MOMENTUM LAGGARDS</div>
+              {bottomMom.map(m => (
+                <div key={m.symbol} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                  <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{m.name?.replace(/^Nifty\s?/, '').slice(0, 12)}</span>
+                  <span style={{ fontSize: 10, color: '#ff3366', fontFamily: 'var(--mono)', fontWeight: 700 }}>{m.weekly.rsm.toFixed(1)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Insights */}
+          {insights.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+              <div style={{ fontSize: 7.5, color: 'var(--blue)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)', marginBottom: 4 }}>
+                💡 KEY INSIGHTS
+              </div>
+              {insights.map((ins, i) => {
+                const ic = ins.type === 'bull' ? '#00ff88' : ins.type === 'bear' ? '#ff3366' : '#ffd000';
+                return (
+                  <div key={i} style={{ fontSize: 9.5, color: 'var(--text2)', fontFamily: 'var(--mono)', padding: '2px 0', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                    <span style={{ color: ic, flexShrink: 0 }}>●</span>
+                    <span>{ins.text}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       POSITIONS TAB — from journal localStorage
+       ═══════════════════════════════════════════════════════════ */
+    const PositionsTab = ({ rrmData, benchmark }) => {
+      const [positions, setPositions] = useState([]);
+
+      useEffect(() => {
+        try {
+          const raw = localStorage.getItem('tradedge_trades');
+          if (raw) {
+            const trades = JSON.parse(raw).filter(t => t.status === 'Open' || t.status === 'Partial');
+            setPositions(trades);
+          }
+        } catch(e) {}
+      }, []);
+
+      const enriched = useMemo(() => {
+        if (!rrmData || !positions.length) return [];
+        // Try to find RRM data for each position
+        const allGroups = ['sectors', 'etfs', 'asset_classes', 'market_segments', 'global_indices'];
+        const allItems = [];
+        allGroups.forEach(g => {
+          const items = transformData(rrmData, benchmark, g);
+          allItems.push(...items);
+        });
+
+        return positions.map(pos => {
+          const sym = pos.symbol?.toUpperCase() + '.NS';
+          const rrmItem = allItems.find(a => a.symbol === sym || a.symbol === pos.symbol);
+          return {
+            ...pos,
+            rrm: rrmItem ? { ...rrmItem, sig: computeSignals(rrmItem) } : null,
+          };
+        });
+      }, [rrmData, benchmark, positions]);
+
+      if (!positions.length) return (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text3)', fontSize: 10, fontFamily: 'var(--mono)' }}>
+          No open positions in journal
+        </div>
+      );
+
+      return (
+        <div style={{ borderRadius: 6, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          {enriched.map((pos, i) => {
+            const qc = pos.rrm ? Q_COLORS[pos.rrm.weekly.q] : '#444';
+            return (
+              <div key={pos.id || i} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                borderBottom: '1px solid rgba(255,255,255,0.025)',
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'var(--mono)' }}>{pos.symbol}</div>
+                  <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{pos.side} · {pos.status}</div>
+                </div>
+                {pos.rrm ? (
+                  <>
+                    <QBadge q={pos.rrm.weekly.q} />
+                    <ScoreBar score={pos.rrm.sig.score} />
+                    <span style={{ fontSize: 8, color: LIGHT_MAP[pos.rrm.sig.light], fontWeight: 700, fontFamily: 'var(--mono)' }}>
+                      {pos.rrm.sig.action}
+                    </span>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>No RRM data</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       ADD STOCK MODAL (unchanged)
        ═══════════════════════════════════════════════════════════ */
     const AddStockModal = ({ onClose, onAdd }) => {
       const [mode, setMode] = useState('manual');
@@ -284,7 +688,6 @@
       const [name, setName] = useState('');
       const [group, setGroup] = useState('Watchlist');
       const [pasteText, setPasteText] = useState('');
-
       const handleAdd = () => {
         if (mode === 'manual' && ticker.trim()) {
           const sym = ticker.trim().toUpperCase() + (ticker.includes('.') ? '' : '.NS');
@@ -298,20 +701,14 @@
           setPasteText('');
         }
       };
-
       const inputStyle = {
         background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 5, padding: '7px 10px', color: '#fff', fontSize: 12,
         fontFamily: 'var(--mono)', outline: 'none', width: '100%',
       };
-
       return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}
-          onClick={onClose}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background: '#0c0c18', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
-            padding: 22, width: 380, maxWidth: '92vw',
-          }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }} onClick={onClose}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#0c0c18', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 22, width: 380, maxWidth: '92vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--mono)' }}>ADD STOCKS</span>
               <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
@@ -322,11 +719,8 @@
                   padding: '4px 12px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
                   border: `1px solid ${mode === m ? '#00ff8835' : 'rgba(255,255,255,0.05)'}`,
                   background: mode === m ? '#00ff880c' : 'transparent',
-                  color: mode === m ? '#00ff88' : 'rgba(255,255,255,0.3)',
-                  fontFamily: 'var(--mono)',
-                }}>
-                  {m === 'manual' ? 'MANUAL' : 'PASTE LIST'}
-                </button>
+                  color: mode === m ? '#00ff88' : 'rgba(255,255,255,0.3)', fontFamily: 'var(--mono)',
+                }}>{m === 'manual' ? 'MANUAL' : 'PASTE LIST'}</button>
               ))}
             </div>
             {mode === 'manual' ? (
@@ -348,16 +742,14 @@
               marginTop: 14, width: '100%', padding: '9px', borderRadius: 5,
               border: '1px solid #00ff8830', background: '#00ff880a',
               color: '#00ff88', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--mono)',
-            }}>
-              + ADD
-            </button>
+            }}>+ ADD</button>
           </div>
         </div>
       );
     };
 
     /* ═══════════════════════════════════════════════════════════
-       MAIN DASHBOARD
+       MAIN DASHBOARD (upgraded with Bloomberg panels)
        ═══════════════════════════════════════════════════════════ */
     function RRMSignalsDashboard() {
       const [rrmData, setRrmData]       = useState(null);
@@ -369,8 +761,8 @@
       const [expandedIdx, setExpandedIdx] = useState(null);
       const [showAddModal, setShowAddModal] = useState(false);
       const [customStocks, setCustomStocks] = useState([]);
+      const [showAnalysis, setShowAnalysis] = useState({ rotation: true, correlation: false, analysis: true });
 
-      // Fetch rrm_data.json
       useEffect(() => {
         fetch(DATA_URL)
           .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
@@ -378,53 +770,48 @@
           .catch(err => { setError(err.message); setLoading(false); });
       }, []);
 
-      // Transform data for active group + benchmark
       const items = useMemo(() => {
         if (!rrmData) return [];
         if (activeGroup === 'custom_stocks') return customStocks;
         return transformData(rrmData, benchmark, activeGroup);
       }, [rrmData, benchmark, activeGroup, customStocks]);
 
-      // Compute signals
       const enriched = useMemo(() =>
         items.map(item => ({ ...item, sig: computeSignals(item) })),
         [items]
       );
 
-      // Filter + sort
       const filtered = useMemo(() => {
         let list = enriched;
         if (filter !== 'ALL') list = list.filter(i => i.sig.light === filter);
         return list.sort((a, b) => b.sig.score - a.sig.score || a.name.localeCompare(b.name));
       }, [enriched, filter]);
 
-      // Counts
       const counts = useMemo(() => {
         const c = { ALL: enriched.length, GREEN: 0, YELLOW: 0, BLUE: 0, RED: 0 };
         enriched.forEach(i => c[i.sig.light]++);
         return c;
       }, [enriched]);
 
-      // Add stock handler
       const handleAddStock = useCallback(stock => {
         const col = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
         setCustomStocks(prev => [...prev, {
           ...stock, color: col,
-          daily:   { q: 'Improving', rsr: 99.5, rsm: 100.5 },
-          weekly:  { q: 'Improving', rsr: 99.0, rsm: 100.2 },
-          monthly: { q: 'Lagging',   rsr: 98.0, rsm: 99.0 },
+          daily: { q: 'Improving', rsr: 99.5, rsm: 100.5 },
+          weekly: { q: 'Improving', rsr: 99.0, rsm: 100.2 },
+          monthly: { q: 'Lagging', rsr: 98.0, rsm: 99.0 },
           dailyTail: [], weeklyTail: [], monthlyTail: [],
         }]);
       }, []);
 
-      // Metadata
+      const togglePanel = (key) => setShowAnalysis(prev => ({ ...prev, [key]: !prev[key] }));
+
       const meta = rrmData?.metadata;
 
-      // ─── Error state ───
       if (!loading && error) return (
         <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, padding: 20 }}>
           <span style={{ fontSize: 32 }}>⚠</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--red)' }}>Failed to load RRM data</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--red)' }}>Failed to load MATRIX data</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)' }}>{error}</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text2)', textAlign: 'center', maxWidth: 320 }}>
             Make sure <code style={{ color: '#00c8ff' }}>{DATA_URL}</code> exists and the GitHub Actions workflow has run at least once.
@@ -432,8 +819,7 @@
         </div>
       );
 
-      // ─── Loading state ───
-      if (loading) return null; // HTML loading spinner shows
+      if (loading) return null;
 
       return (
         <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '14px 10px 40px' }}>
@@ -442,14 +828,11 @@
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
-                <span style={{ color: 'var(--green)' }}>RRM</span>{' '}
-                <span style={{ color: 'rgba(255,255,255,0.65)' }}>SIGNALS</span>
+                <span style={{ color: 'var(--green)' }}>MATRIX</span>
               </h1>
-              <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>v4.1</span>
+              <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--sans)' }}>Multi-Asset Timeframe Rating & Intelligence X-ray</span>
+              <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>v4.2</span>
               {meta && <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{meta.date}</span>}
-            </div>
-            <div style={{ display: 'flex', gap: 12, fontSize: 8.5, color: 'var(--text3)', marginTop: 2, fontFamily: 'var(--mono)' }}>
-              <span>❶ RRG-RSI</span><span>❷ MTF CONFLUENCE</span><span>❸ SECTOR SYNC</span>
             </div>
           </div>
 
@@ -460,13 +843,13 @@
                 padding: '3px 8px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
                 border: `1px solid ${benchmark === b.key ? '#00c8ff30' : 'var(--border)'}`,
                 background: benchmark === b.key ? '#00c8ff08' : 'transparent',
-                color: benchmark === b.key ? '#00c8ff' : 'var(--text3)',
-                fontFamily: 'var(--mono)',
-              }}>
-                {b.label}
-              </button>
+                color: benchmark === b.key ? '#00c8ff' : 'var(--text3)', fontFamily: 'var(--mono)',
+              }}>{b.label}</button>
             ))}
           </div>
+
+          {/* ══ MACRO PULSE STRIP ══ */}
+          <MacroPulse rrmData={rrmData} benchmark={benchmark} />
 
           {/* ── Group tabs ── */}
           <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -476,75 +859,81 @@
                 : (rrmData?.benchmarks_data?.[benchmark]?.daily?.[g.key]?.length || 0);
               return (
                 <button key={g.key} onClick={() => { setActiveGroup(g.key); setExpandedIdx(null); setFilter('ALL'); }}
-                  title={g.desc}
-                  style={{
+                  title={g.desc} style={{
                     padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
                     border: `1px solid ${active ? 'rgba(255,255,255,0.12)' : 'var(--border)'}`,
                     background: active ? 'rgba(255,255,255,0.05)' : 'transparent',
-                    color: active ? '#fff' : 'var(--text2)',
-                    fontFamily: 'var(--mono)', transition: 'all 0.2s',
-                  }}>
-                  {g.icon} {g.label} <span style={{ opacity: 0.35 }}>({ct})</span>
-                </button>
+                    color: active ? '#fff' : 'var(--text2)', fontFamily: 'var(--mono)', transition: 'all 0.2s',
+                  }}>{g.icon} {g.label} <span style={{ opacity: 0.35 }}>({ct})</span></button>
               );
             })}
+            {/* Positions tab */}
+            <button onClick={() => { setActiveGroup('positions'); setExpandedIdx(null); setFilter('ALL'); }}
+              style={{
+                padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${activeGroup === 'positions' ? '#ff336630' : 'var(--border)'}`,
+                background: activeGroup === 'positions' ? '#ff33660a' : 'transparent',
+                color: activeGroup === 'positions' ? '#ff3366' : 'var(--text2)', fontFamily: 'var(--mono)',
+              }}>📈 Positions ({(() => { try { return JSON.parse(localStorage.getItem('tradedge_trades') || '[]').filter(t=>t.status==='Open').length; } catch(e) { return 0; } })()})</button>
             <button onClick={() => setShowAddModal(true)} style={{
               padding: '4px 9px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-              border: '1px solid #00ff8825', background: '#00ff8806', color: 'var(--green)',
-              fontFamily: 'var(--mono)',
-            }}>
-              + ADD
-            </button>
+              border: '1px solid #00ff8825', background: '#00ff8806', color: 'var(--green)', fontFamily: 'var(--mono)',
+            }}>+ ADD</button>
           </div>
 
           {/* ── Filter pills ── */}
-          <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
-            {['ALL', 'GREEN', 'YELLOW', 'BLUE', 'RED'].map(f => {
-              const active = filter === f;
-              const c = f === 'ALL' ? '#fff' : LIGHT_MAP[f];
-              return (
-                <button key={f} onClick={() => setFilter(f)} style={{
-                  padding: '3px 7px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
-                  border: `1px solid ${active ? c + '30' : 'var(--border)'}`,
-                  background: active ? `${c}08` : 'transparent',
-                  color: active ? c : 'var(--text3)',
-                  fontFamily: 'var(--mono)',
-                }}>
-                  {f} ({counts[f]})
-                </button>
-              );
-            })}
-          </div>
+          {activeGroup !== 'positions' && (
+            <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+              {['ALL', 'GREEN', 'YELLOW', 'BLUE', 'RED'].map(f => {
+                const active = filter === f;
+                const c = f === 'ALL' ? '#fff' : LIGHT_MAP[f];
+                return (
+                  <button key={f} onClick={() => setFilter(f)} style={{
+                    padding: '3px 7px', borderRadius: 3, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                    border: `1px solid ${active ? c + '30' : 'var(--border)'}`,
+                    background: active ? `${c}08` : 'transparent',
+                    color: active ? c : 'var(--text3)', fontFamily: 'var(--mono)',
+                  }}>{f} ({counts[f]})</button>
+                );
+              })}
+            </div>
+          )}
 
           {/* ── Column headers ── */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
-            gap: 6, padding: '4px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 1,
-          }}>
-            {['ASSET', 'SIGNAL', 'SCORE', 'RSI', 'WEEKLY', 'ACTION'].map(h => (
-              <span key={h} style={{
-                fontSize: 7.5, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.1em',
-                fontFamily: 'var(--mono)', textAlign: h === 'RSI' ? 'center' : 'left',
-              }}>{h}</span>
-            ))}
-          </div>
+          {activeGroup !== 'positions' && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
+              gap: 6, padding: '4px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 1,
+            }}>
+              {['ASSET', 'SIGNAL', 'SCORE', 'RSI', 'WEEKLY', 'ACTION'].map(h => (
+                <span key={h} style={{
+                  fontSize: 7.5, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.1em',
+                  fontFamily: 'var(--mono)', textAlign: h === 'RSI' ? 'center' : 'left',
+                }}>{h}</span>
+              ))}
+            </div>
+          )}
 
-          {/* ── Data list ── */}
-          <div style={{ borderRadius: 6, border: '1px solid var(--border)', overflow: 'hidden' }}>
-            {filtered.map((item, i) => (
-              <AssetRow key={item.symbol + i} item={item} sig={item.sig}
-                expanded={expandedIdx === i} onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)} idx={i} />
-            ))}
-            {filtered.length === 0 && (
-              <div style={{ padding: 30, textAlign: 'center', color: 'var(--text3)', fontSize: 11, fontFamily: 'var(--mono)' }}>
-                {activeGroup === 'custom_stocks'
-                  ? 'No custom stocks yet. Click + ADD to start.'
-                  : items.length === 0
-                    ? `No ${activeGroup.replace('_',' ')} data for this benchmark.`
-                    : 'No assets match this filter.'}
-              </div>
-            )}
-          </div>
+          {/* ── Data list or Positions ── */}
+          {activeGroup === 'positions' ? (
+            <PositionsTab rrmData={rrmData} benchmark={benchmark} />
+          ) : (
+            <div style={{ borderRadius: 6, border: '1px solid var(--border)', overflow: 'hidden' }}>
+              {filtered.map((item, i) => (
+                <AssetRow key={item.symbol + i} item={item} sig={item.sig}
+                  expanded={expandedIdx === i} onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)} idx={i} />
+              ))}
+              {filtered.length === 0 && (
+                <div style={{ padding: 30, textAlign: 'center', color: 'var(--text3)', fontSize: 11, fontFamily: 'var(--mono)' }}>
+                  {activeGroup === 'custom_stocks'
+                    ? 'No custom stocks yet. Click + ADD to start.'
+                    : items.length === 0
+                      ? `No ${activeGroup.replace('_',' ')} data for this benchmark.`
+                      : 'No assets match this filter.'}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Legend ── */}
           <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--surface)', borderRadius: 5, border: '1px solid var(--border)' }}>
@@ -560,12 +949,51 @@
             </div>
           </div>
 
+          {/* ══════════════════════════════════════════════════
+             BLOOMBERG ANALYSIS PANELS (Collapsible below table)
+             ══════════════════════════════════════════════════ */}
+          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+            {/* Toggle buttons */}
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {[
+                { key: 'rotation', label: '🔄 Sector Rotation', color: '#ffd000' },
+                { key: 'correlation', label: '🔗 Correlation Matrix', color: '#00c8ff' },
+                { key: 'analysis', label: '📊 Market Analysis', color: '#00ff88' },
+              ].map(panel => (
+                <button key={panel.key} onClick={() => togglePanel(panel.key)} style={{
+                  padding: '5px 10px', borderRadius: 4, fontSize: 9.5, fontWeight: 600, cursor: 'pointer',
+                  border: `1px solid ${showAnalysis[panel.key] ? panel.color + '30' : 'var(--border)'}`,
+                  background: showAnalysis[panel.key] ? `${panel.color}08` : 'transparent',
+                  color: showAnalysis[panel.key] ? panel.color : 'var(--text3)',
+                  fontFamily: 'var(--mono)', transition: 'all 0.2s',
+                }}>
+                  {panel.label} {showAnalysis[panel.key] ? '▾' : '▸'}
+                </button>
+              ))}
+            </div>
+
+            {/* Sector Rotation Map */}
+            {showAnalysis.rotation && activeGroup !== 'positions' && (
+              <SectorRotationMap enriched={enriched} />
+            )}
+
+            {/* Correlation Matrix */}
+            {showAnalysis.correlation && activeGroup !== 'positions' && (
+              <CorrelationMatrix enriched={enriched} />
+            )}
+
+            {/* Market Analysis */}
+            {showAnalysis.analysis && activeGroup !== 'positions' && (
+              <AnalysisPanel enriched={enriched} rrmData={rrmData} benchmark={benchmark} />
+            )}
+          </div>
+
           {showAddModal && <AddStockModal onClose={() => setShowAddModal(false)} onAdd={handleAddStock} />}
         </div>
       );
     }
 
-    // ── MOUNT ──
     ReactDOM.createRoot(document.getElementById('root')).render(<RRMSignalsDashboard />);
   </script>
 </body>
