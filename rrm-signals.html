@@ -270,10 +270,11 @@
         if (!rrmData) return [];
         const assets = transformData(rrmData, benchmark, 'asset_classes');
         const globals = transformData(rrmData, benchmark, 'global_indices');
-        const all = [...assets, ...globals];
+        const segments = transformData(rrmData, benchmark, 'market_segments');
+        const sectors = transformData(rrmData, benchmark, 'sectors');
+        const all = [...segments, ...assets, ...globals, ...sectors];
 
-        // Pick key macro indicators
-        const keys = ['Gold', 'Silver', 'Crude Oil', 'USD/INR', 'Bitcoin', 'US 10Y Yield', 'VIX', 'Dow Jones', 'S&P 500', 'NASDAQ'];
+        const keys = ['Nifty 50', 'Gold', 'Silver', 'Crude Oil', 'USD/INR', 'Bitcoin', 'US 10Y Yield', 'Dow Jones', 'S&P 500', 'NASDAQ'];
         const found = [];
         keys.forEach(k => {
           const item = all.find(a => a.name?.includes(k) || a.symbol?.includes(k.toUpperCase().replace(/\s/g,'')));
@@ -1249,11 +1250,49 @@
       const [name, setName] = useState('');
       const [group, setGroup] = useState('Watchlist');
       const [pasteText, setPasteText] = useState('');
+      const [suggestions, setSuggestions] = useState([]);
+      const [stockDb, setStockDb] = useState([]);
+
+      // Load stock list from repo
+      useEffect(() => {
+        fetch('./data/custom_stocks.json').then(r => r.json()).then(data => {
+          const list = (data.custom_stocks || data.stocks || data || []).map(s => 
+            typeof s === 'string' ? { symbol: s, name: s.replace('.NS','') } : s
+          );
+          if (list.length) { setStockDb(list); return; }
+        }).catch(() => {});
+        // Fallback: try nse_symbols.json
+        fetch('./data/nse_symbols.json').then(r => r.json()).then(data => {
+          const list = (Array.isArray(data) ? data : data.symbols || []).map(s =>
+            typeof s === 'string' ? { symbol: s, name: s.replace('.NS','') } : s
+          );
+          if (list.length) setStockDb(list);
+        }).catch(() => {});
+      }, []);
+
+      const handleTickerChange = (val) => {
+        setTicker(val);
+        const v = val.toUpperCase().trim();
+        if (v.length < 2 || !stockDb.length) { setSuggestions([]); return; }
+        const matches = stockDb.filter(s => {
+          const sym = (s.symbol || '').toUpperCase();
+          const nm = (s.name || '').toUpperCase();
+          return sym.startsWith(v) || nm.includes(v) || sym.includes(v);
+        }).slice(0, 10);
+        setSuggestions(matches);
+      };
+
+      const selectSuggestion = (s) => {
+        setTicker(s.symbol?.replace('.NS', '') || s.symbol);
+        setName(s.name || s.symbol?.replace('.NS', ''));
+        setSuggestions([]);
+      };
+
       const handleAdd = () => {
         if (mode === 'manual' && ticker.trim()) {
           const sym = ticker.trim().toUpperCase() + (ticker.includes('.') ? '' : '.NS');
           onAdd({ symbol: sym, name: name || ticker.toUpperCase(), group });
-          setTicker(''); setName('');
+          setTicker(''); setName(''); setSuggestions([]);
         } else if (mode === 'paste' && pasteText.trim()) {
           pasteText.split('\n').filter(l => l.trim()).forEach(l => {
             const [t, n] = l.split(',').map(s => s.trim());
@@ -1265,13 +1304,14 @@
       const inputStyle = {
         background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 5, padding: '7px 10px', color: '#fff', fontSize: 12,
-        fontFamily: 'var(--mono)', outline: 'none', width: '100%',
+        fontFamily: 'var(--mono)', outline: 'none', width: '100%', boxSizing: 'border-box',
       };
       return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }} onClick={onClose}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#0c0c18', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 22, width: 380, maxWidth: '92vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--mono)' }}>ADD STOCKS</span>
+              <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{stockDb.length} stocks loaded</span>
               <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
             </div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
@@ -1285,8 +1325,25 @@
               ))}
             </div>
             {mode === 'manual' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input value={ticker} onChange={e => setTicker(e.target.value)} placeholder="Ticker (e.g. RELIANCE)" style={inputStyle} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
+                <input value={ticker} onChange={e => handleTickerChange(e.target.value)} placeholder="Type ticker or name..." style={inputStyle} autoComplete="off" />
+                {suggestions.length > 0 && (
+                  <div style={{
+                    position: 'absolute', top: 36, left: 0, right: 0, background: '#12121e',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, zIndex: 10, maxHeight: 200, overflow: 'auto',
+                  }}>
+                    {suggestions.map((s, i) => (
+                      <div key={s.symbol + i} onClick={() => selectSuggestion(s)} style={{
+                        padding: '6px 10px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.03)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.04)'}
+                         onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#00ff88', fontFamily: 'var(--mono)' }}>{(s.symbol || '').replace('.NS', '')}</span>
+                        <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Display name (optional)" style={{...inputStyle, fontFamily: 'var(--sans)'}} />
                 <select value={group} onChange={e => setGroup(e.target.value)} style={inputStyle}>
                   <option value="Watchlist">Watchlist</option>
