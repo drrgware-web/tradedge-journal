@@ -209,27 +209,278 @@ const TrendArrow = ({curr, prev, inverse}) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// TRADINGVIEW ADVANCED CHART
+// TRADEDGE CUSTOM CHART — HLC Bars + 3 EMAs + Volume (No TV)
 // ═══════════════════════════════════════════════════════════════
 
-const TVChart = ({symbol}) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    ref.current.innerHTML = "";
-    const s = document.createElement("script");
-    s.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    s.async = true;
-    s.innerHTML = JSON.stringify({
-      autosize: true, symbol: `NSE:${symbol}`, interval: "D", timezone: "Asia/Kolkata",
-      theme: "dark", style: "1", locale: "en", backgroundColor: "rgba(6,8,12,1)",
-      gridColor: "rgba(0,255,136,0.03)", allow_symbol_change: true,
-      hide_top_toolbar: false, hide_legend: false, save_image: true,
-      calendar: false, support_host: "https://www.tradingview.com",
-    });
-    ref.current.appendChild(s);
-  }, [symbol]);
-  return <div ref={ref} style={{height:450,border:"1px solid var(--border-dim)",borderRadius:8,overflow:"hidden"}}/>;
+function calcEMA(closes, period) {
+  const k = 2 / (period + 1), ema = [closes[0]];
+  for (let i = 1; i < closes.length; i++) ema.push(closes[i] * k + ema[i - 1] * (1 - k));
+  return ema;
+}
+function fmtVol(v) { return v >= 1e7 ? (v/1e7).toFixed(2)+" Cr" : v >= 1e5 ? (v/1e5).toFixed(1)+" L" : v >= 1e3 ? (v/1e3).toFixed(0)+"K" : v+""; }
+
+const TEChart = ({symbol, prices}) => {
+  const canvasRef = useRef(null);
+  const [viewStart, setViewStart] = useState(null);
+  const [viewCount, setViewCount] = useState(120);
+  const [crosshair, setCrosshair] = useState(null);
+  const [isDrag, setIsDrag] = useState(false);
+  const [dragX, setDragX] = useState(null);
+  const [showEMA, setShowEMA] = useState({e20:true,e50:true,e200:true});
+  const [hoverBar, setHoverBar] = useState(null);
+
+  const priceData = useMemo(() => {
+    if (!prices || !prices.length) return [];
+    return prices;
+  }, [prices]);
+
+  const start = viewStart ?? Math.max(0, priceData.length - viewCount);
+  const visible = priceData.slice(start, start + viewCount);
+
+  const closes = useMemo(() => priceData.map(d => d.c), [priceData]);
+  const ema20 = useMemo(() => closes.length >= 20 ? calcEMA(closes, 20) : [], [closes]);
+  const ema50 = useMemo(() => closes.length >= 50 ? calcEMA(closes, 50) : [], [closes]);
+  const ema200 = useMemo(() => closes.length >= 200 ? calcEMA(closes, 200) : [], [closes]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !visible.length) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const W = rect.width, H = 480;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.scale(dpr, dpr);
+
+    const padL = 62, padR = 10, padT = 10, padB = 22;
+    const volH = 72, chartH = H - padT - padB - volH - 8;
+    const chartW = W - padL - padR, barW = chartW / viewCount;
+
+    // Price range with EMAs
+    let allH = visible.map(d => d.h), allL = visible.map(d => d.l);
+    for (let i = 0; i < visible.length; i++) {
+      const gi = start + i;
+      if (showEMA.e20 && gi < ema20.length) { allH.push(ema20[gi]); allL.push(ema20[gi]); }
+      if (showEMA.e50 && gi < ema50.length) { allH.push(ema50[gi]); allL.push(ema50[gi]); }
+      if (showEMA.e200 && gi < ema200.length) { allH.push(ema200[gi]); allL.push(ema200[gi]); }
+    }
+    const pMax = Math.max(...allH) * 1.005, pMin = Math.min(...allL) * 0.995, pRng = pMax - pMin || 1;
+    const toY = (p) => padT + (1 - (p - pMin) / pRng) * chartH;
+    const toX = (i) => padL + i * barW + barW / 2;
+    const maxVol = Math.max(...visible.map(d => d.v)) || 1;
+    const volTop = padT + chartH + 8;
+    const toVolY = (v) => volTop + volH - (v / maxVol) * volH;
+
+    // Clear
+    ctx.fillStyle = "#06080c"; ctx.fillRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = "rgba(0,255,136,0.04)"; ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 6; i++) {
+      const p = pMin + pRng * i / 6, y = toY(p);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+      ctx.fillStyle = "#334"; ctx.font = "10px 'JetBrains Mono',monospace"; ctx.textAlign = "right";
+      ctx.fillText(p.toFixed(1), padL - 6, y + 3);
+    }
+
+    // Date labels
+    ctx.fillStyle = "#334"; ctx.font = "9px 'JetBrains Mono',monospace"; ctx.textAlign = "center";
+    const dStep = Math.max(1, Math.floor(viewCount / 8));
+    for (let i = 0; i < visible.length; i += dStep) {
+      const x = toX(i), dt = visible[i].date || "";
+      if (dt) { const p = dt.split("-"); ctx.fillText(p[2]+"/"+p[1], x, H - 4); }
+      ctx.strokeStyle = "rgba(0,255,136,0.02)";
+      ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
+    }
+
+    // Volume
+    for (let i = 0; i < visible.length; i++) {
+      const b = visible[i], x = toX(i), bull = b.c >= b.o;
+      ctx.fillStyle = bull ? "rgba(0,204,102,0.25)" : "rgba(238,51,68,0.25)";
+      ctx.fillRect(x - barW * 0.35, toVolY(b.v), barW * 0.7, volTop + volH - toVolY(b.v));
+    }
+    ctx.fillStyle = "#223"; ctx.font = "8px monospace"; ctx.textAlign = "right";
+    ctx.fillText(fmtVol(maxVol), padL - 6, volTop + 8);
+
+    // EMAs
+    const drawEMA = (ed, col) => {
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath(); let s = false;
+      for (let i = 0; i < visible.length; i++) {
+        const gi = start + i; if (gi >= ed.length) break;
+        const x = toX(i), y = toY(ed[gi]);
+        if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
+      } ctx.stroke();
+    };
+    if (showEMA.e200 && ema200.length) drawEMA(ema200, "#ff6644");
+    if (showEMA.e50 && ema50.length) drawEMA(ema50, "#ffaa00");
+    if (showEMA.e20 && ema20.length) drawEMA(ema20, "#00bbff");
+
+    // HLC Bars
+    for (let i = 0; i < visible.length; i++) {
+      const b = visible[i], x = toX(i), bull = b.c >= b.o;
+      const col = bull ? "#00cc66" : "#ee3344";
+      // H-L line
+      ctx.strokeStyle = col; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, toY(b.h)); ctx.lineTo(x, toY(b.l)); ctx.stroke();
+      // Close tick right
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, toY(b.c)); ctx.lineTo(x + barW * 0.35, toY(b.c)); ctx.stroke();
+    }
+
+    // Crosshair
+    if (crosshair) {
+      const {x: mx, y: my} = crosshair;
+      if (mx >= padL && mx <= W - padR) {
+        ctx.strokeStyle = "rgba(0,255,136,0.2)"; ctx.lineWidth = 0.5; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(mx, padT); ctx.lineTo(mx, H - padB); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(padL, my); ctx.lineTo(W - padR, my); ctx.stroke();
+        ctx.setLineDash([]);
+        // Price label
+        if (my >= padT && my <= padT + chartH) {
+          const pr = pMax - ((my - padT) / chartH) * pRng;
+          ctx.fillStyle = "#0a1520"; ctx.fillRect(0, my - 9, padL - 2, 18);
+          ctx.strokeStyle = "#00ff88"; ctx.lineWidth = 0.5; ctx.strokeRect(0, my - 9, padL - 2, 18);
+          ctx.fillStyle = "#00ff88"; ctx.font = "bold 9px 'JetBrains Mono',monospace"; ctx.textAlign = "right";
+          ctx.fillText(pr.toFixed(2), padL - 6, my + 3);
+        }
+        // Date label
+        const bi = Math.round((mx - padL) / barW - 0.5);
+        if (bi >= 0 && bi < visible.length) {
+          const dx = toX(bi), ds = visible[bi].date || "";
+          ctx.fillStyle = "#0a1520"; ctx.fillRect(dx - 32, H - padB, 64, padB);
+          ctx.strokeStyle = "#00ff88"; ctx.strokeRect(dx - 32, H - padB, 64, padB);
+          ctx.fillStyle = "#00ff88"; ctx.font = "bold 8px 'JetBrains Mono',monospace"; ctx.textAlign = "center";
+          ctx.fillText(ds, dx, H - 8);
+        }
+      }
+    }
+
+    // Legend
+    ctx.fillStyle = "#ddd"; ctx.font = "bold 13px 'Outfit',sans-serif"; ctx.textAlign = "left";
+    ctx.fillText("NSE:" + symbol, padL + 4, padT + 16);
+
+    const hb = hoverBar || visible[visible.length - 1];
+    if (hb) {
+      const iy = padT + 32; const bc = hb.c >= hb.o ? "#00cc66" : "#ee3344";
+      ctx.font = "11px 'JetBrains Mono',monospace";
+      ctx.fillStyle = "#667"; ctx.fillText("O ", padL + 4, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.o?.toFixed(2), padL + 20, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("H ", padL + 88, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.h?.toFixed(2), padL + 104, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("L ", padL + 172, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.l?.toFixed(2), padL + 186, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("C ", padL + 254, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.c?.toFixed(2), padL + 268, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("V ", padL + 340, iy);
+      ctx.fillStyle = "#aaa"; ctx.fillText(fmtVol(hb.v || 0), padL + 354, iy);
+    }
+
+    const ey = padT + 48;
+    if (showEMA.e20 && ema20.length) { ctx.fillStyle = "#00bbff"; ctx.font = "10px 'JetBrains Mono',monospace"; ctx.fillText("EMA20: " + (ema20[start + visible.length - 1]?.toFixed(2)||"—"), padL + 4, ey); }
+    if (showEMA.e50 && ema50.length) { ctx.fillStyle = "#ffaa00"; ctx.fillText("EMA50: " + (ema50[start + visible.length - 1]?.toFixed(2)||"—"), padL + 140, ey); }
+    if (showEMA.e200 && ema200.length) { ctx.fillStyle = "#ff6644"; ctx.fillText("EMA200: " + (ema200[start + visible.length - 1]?.toFixed(2)||"—"), padL + 280, ey); }
+
+    // Separator
+    ctx.strokeStyle = "rgba(0,255,136,0.06)"; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(padL, volTop - 4); ctx.lineTo(W - padR, volTop - 4); ctx.stroke();
+  }, [visible, viewCount, start, crosshair, showEMA, hoverBar, symbol, ema20, ema50, ema200, priceData]);
+
+  useEffect(() => { draw(); }, [draw]);
+  useEffect(() => { const h = () => draw(); window.addEventListener("resize", h); return () => window.removeEventListener("resize", h); }, [draw]);
+
+  const handleMouseMove = (e) => {
+    const rect = canvasRef.current?.getBoundingClientRect(); if (!rect) return;
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    setCrosshair({x: mx, y: my});
+    const padL = 62, chartW = rect.width - padL - 10, bw = chartW / viewCount;
+    const idx = Math.round((mx - padL) / bw - 0.5);
+    setHoverBar(idx >= 0 && idx < visible.length ? visible[idx] : null);
+    if (isDrag && dragX != null) {
+      const delta = e.clientX - dragX, bDelta = Math.round(delta / bw);
+      if (Math.abs(bDelta) >= 1) {
+        setViewStart(pv => { const s = (pv ?? Math.max(0, priceData.length - viewCount)) - bDelta; return Math.max(0, Math.min(priceData.length - viewCount, s)); });
+        setDragX(e.clientX);
+      }
+    }
+  };
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    setViewCount(pv => { const n = pv + (e.deltaY > 0 ? 1 : -1) * Math.max(3, Math.floor(pv * 0.1)); return Math.max(20, Math.min(priceData.length, n)); });
+  };
+
+  if (!priceData.length) {
+    return (
+      <div style={{background:"var(--bg-card)",border:"1px solid var(--border-low)",borderRadius:8,padding:40,textAlign:"center"}}>
+        <div style={{color:"var(--text-muted)",fontSize:12,marginBottom:8}}>No price data available for chart</div>
+        <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+          <button onClick={() => window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${symbol}&interval=D`, 'tradedge_tv')}
+            style={{padding:"6px 14px",borderRadius:4,fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(0,200,255,0.3)",background:"rgba(0,200,255,0.08)",color:"#00c8ff"}}>
+            ⭐ Open in TradingView Pro
+          </button>
+          <button onClick={() => window.open(`https://zone.definedge.com/chart/NSE/${symbol}/pf`, '_blank')}
+            style={{padding:"6px 14px",borderRadius:4,fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.3)",background:"rgba(136,68,255,0.08)",color:"#8844ff"}}>
+            🔷 Definedge P&F
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{background:"var(--bg-card)",borderRadius:10,border:"1px solid var(--border-low)",overflow:"hidden"}}>
+      {/* Toolbar */}
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:"var(--bg-secondary)",borderBottom:"1px solid var(--border-dim)",flexWrap:"wrap"}}>
+        <span style={{fontFamily:"var(--font-display)",fontWeight:800,fontSize:12,color:"#fff",letterSpacing:1}}>◈ TRADEDGE</span>
+        <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>HLC + Volume</span>
+
+        {/* EMA toggles */}
+        {[{k:"e20",l:"EMA 20",c:"#00bbff"},{k:"e50",l:"EMA 50",c:"#ffaa00"},{k:"e200",l:"EMA 200",c:"#ff6644"}].map(em => (
+          <button key={em.k} onClick={() => setShowEMA(p => ({...p,[em.k]:!p[em.k]}))}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",
+              border:`1px solid ${showEMA[em.k]?em.c+"55":"var(--border-dim)"}`,
+              background:showEMA[em.k]?em.c+"15":"transparent",color:showEMA[em.k]?em.c:"var(--text-muted)"}}>
+            {em.l}
+          </button>
+        ))}
+
+        {/* External links */}
+        <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+          <button onClick={() => window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${symbol}&interval=D`, 'tradedge_tv')}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(0,200,255,0.2)",background:"transparent",color:"#00c8ff"}}>
+            ⭐ TV Pro
+          </button>
+          <button onClick={() => window.open(`https://zone.definedge.com/chart/NSE/${symbol}/pf`, '_blank')}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.2)",background:"transparent",color:"#8844ff"}}>
+            🔷 P&F
+          </button>
+          <button onClick={() => window.open(`https://zone.definedge.com/chart/NSE/${symbol}/renko`, '_blank')}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.2)",background:"transparent",color:"#8844ff"}}>
+            🔷 Renko
+          </button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div style={{cursor:isDrag?"grabbing":"crosshair"}}>
+        <canvas ref={canvasRef}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => { setCrosshair(null); setHoverBar(null); setIsDrag(false); }}
+          onMouseDown={(e) => { setIsDrag(true); setDragX(e.clientX); }}
+          onMouseUp={() => { setIsDrag(false); setDragX(null); }}
+          onWheel={handleWheel}
+          style={{display:"block",width:"100%"}}/>
+      </div>
+
+      {/* Bottom bar */}
+      <div style={{display:"flex",justifyContent:"space-between",padding:"3px 12px",background:"var(--bg-secondary)",
+        borderTop:"1px solid var(--border-dim)",fontSize:8,fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>
+        <span>Bars: {viewCount} | Visible: {visible.length} | Total: {priceData.length} | Scroll: Zoom | Drag: Pan</span>
+        <span style={{color:"var(--accent)"}}>◈ TradEdge — Zero External Dependencies</span>
+      </div>
+    </div>
+  );
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -596,9 +847,9 @@ const StockPage = () => {
           </div>
         </div>
 
-        {/* ── TRADINGVIEW CHART ── */}
+        {/* ── TRADEDGE CHART (HLC + EMA + Volume) ── */}
         <div style={{marginBottom:16}} className="fade-in">
-          <TVChart symbol={d.symbol}/>
+          <TEChart symbol={d.symbol} prices={d.price_history || []}/>
         </div>
 
         {/* ── FUNDAMENTAL OVERVIEW GRID ── */}
