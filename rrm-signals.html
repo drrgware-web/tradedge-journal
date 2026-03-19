@@ -641,8 +641,174 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
-       POSITIONS TAB — from journal localStorage
+       AI EOD MARKET RESEARCH NOTE
+       Bloomberg-style analysis from Groq llama-3.3-70b
        ═══════════════════════════════════════════════════════════ */
+    const AIResearchNote = ({ rrmData, enriched, benchmark }) => {
+      const [note, setNote] = useState(null);
+      const [generating, setGenerating] = useState(false);
+      const [expanded, setExpanded] = useState(true);
+
+      // Load pre-generated note from rrm_data.json
+      useEffect(() => {
+        if (rrmData?.ai_analysis?.note) {
+          setNote({
+            text: rrmData.ai_analysis.note,
+            time: rrmData.ai_analysis.generated_at,
+            model: rrmData.ai_analysis.model || 'Backend',
+            source: 'backend',
+          });
+        }
+      }, [rrmData]);
+
+      // On-demand generation
+      const generateNote = async () => {
+        const groqKey = localStorage.getItem('groq_api_key');
+        if (!groqKey) {
+          alert('Groq API key not found in localStorage (groq_api_key). Set it in TradEdge Journal settings.');
+          return;
+        }
+        setGenerating(true);
+
+        try {
+          // Build context from enriched data
+          const qDist = { Leading: 0, Improving: 0, Weakening: 0, Lagging: 0 };
+          enriched.forEach(i => { if (qDist[i.weekly.q] !== undefined) qDist[i.weekly.q]++; });
+          const total = enriched.length || 1;
+          const rightPct = Math.round((qDist.Leading + qDist.Improving) / total * 100);
+          let regime = rightPct >= 70 ? 'STRONG BULL' : rightPct >= 55 ? 'BULL' : rightPct >= 45 ? 'TRANSITIONAL' : rightPct >= 30 ? 'BEAR' : 'STRONG BEAR';
+
+          const sorted = [...enriched].sort((a, b) => b.weekly.rsm - a.weekly.rsm);
+          const top3 = sorted.slice(0, 3).map(s => `${s.name}: RS=${s.weekly.rsr.toFixed(1)}, Mom=${s.weekly.rsm.toFixed(1)}, Q=${s.weekly.q}`);
+          const bot3 = sorted.slice(-3).map(s => `${s.name}: RS=${s.weekly.rsr.toFixed(1)}, Mom=${s.weekly.rsm.toFixed(1)}, Q=${s.weekly.q}`);
+          const rotating = enriched.filter(i => i.daily.q !== i.weekly.q).map(i => `${i.name}: ${i.weekly.q} → ${i.daily.q}`);
+          const allDetail = enriched.map(s => `${s.name}: RS=${s.weekly.rsr.toFixed(1)}, Mom=${s.weekly.rsm.toFixed(1)}, Q=${s.weekly.q}, SZ=${s.sig.sz}/5, Signal=${s.sig.light}`);
+
+          // Also get global/asset data
+          const globals = (rrmData?.benchmarks_data?.[benchmark]?.weekly?.global_indices || []).map(g =>
+            `${g.name}: RS=${g.current?.rs_ratio?.toFixed(1)}, Mom=${g.current?.rs_momentum?.toFixed(1)}, Q=${g.quadrant}`
+          );
+          const assets = (rrmData?.benchmarks_data?.[benchmark]?.weekly?.asset_classes || []).map(a =>
+            `${a.name}: RS=${a.current?.rs_ratio?.toFixed(1)}, Mom=${a.current?.rs_momentum?.toFixed(1)}, Q=${a.quadrant}`
+          );
+
+          const benchLabel = rrmData?.available_benchmarks?.[benchmark] || benchmark;
+          const date = rrmData?.metadata?.date || new Date().toISOString().split('T')[0];
+
+          const context = `DATE: ${date}\nBENCHMARK: ${benchLabel}\n\nSECTOR QUADRANT (Weekly):\nLeading: ${qDist.Leading} | Improving: ${qDist.Improving} | Weakening: ${qDist.Weakening} | Lagging: ${qDist.Lagging}\nRight side: ${rightPct}% | Regime: ${regime}\n\nTOP 3 MOMENTUM:\n${top3.join('\n')}\n\nBOTTOM 3 MOMENTUM:\n${bot3.join('\n')}\n\nROTATION ALERTS:\n${rotating.length ? rotating.join('\n') : 'None'}\n\nGLOBAL INDICES:\n${globals.join('\n')}\n\nASSET CLASSES:\n${assets.join('\n')}\n\nALL SECTORS:\n${allDetail.join('\n')}`;
+
+          const prompt = `You are a senior equity research analyst at a top-tier institutional brokerage (Goldman Sachs / Morgan Stanley / Kotak Institutional). Write an EOD market research note for Indian equity markets.
+
+RULES:
+- Bloomberg terminal / institutional research note style
+- Be opinionated, take clear directional positions — no hedging
+- Use specific numbers from the data
+- Identify 2-3 most important themes
+- Give explicit sector recommendations: Overweight / Underweight / Neutral
+- Flag rotation shifts and regime changes
+- If regime is bullish but momentum leaders are defensive/commodities, flag the divergence
+- End with 3 specific actionable calls for swing traders
+- Keep under 600 words
+- Use markdown ## headers
+
+DATA:\n${context}\n\nWrite the research note. Start with date and one-line headline.`;
+
+          const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'llama-3.3-70b-versatile',
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.4,
+              max_tokens: 1500,
+            }),
+          });
+
+          const data = await resp.json();
+          const text = data?.choices?.[0]?.message?.content || '';
+          if (text) {
+            setNote({ text, time: new Date().toISOString(), model: 'llama-3.3-70b (on-demand)', source: 'frontend' });
+          }
+        } catch (err) {
+          console.error('AI generation failed:', err);
+          alert('AI generation failed: ' + err.message);
+        }
+        setGenerating(false);
+      };
+
+      // Simple markdown renderer
+      const renderMarkdown = (md) => {
+        if (!md) return null;
+        return md.split('\n').map((line, i) => {
+          if (line.startsWith('## ')) return <div key={i} style={{ fontSize: 12, fontWeight: 700, color: '#00c8ff', fontFamily: 'var(--mono)', margin: '10px 0 4px', letterSpacing: '0.03em' }}>{line.replace('## ', '')}</div>;
+          if (line.startsWith('### ')) return <div key={i} style={{ fontSize: 11, fontWeight: 700, color: '#ffd000', fontFamily: 'var(--mono)', margin: '8px 0 3px' }}>{line.replace('### ', '')}</div>;
+          if (line.startsWith('# ')) return <div key={i} style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'var(--mono)', margin: '10px 0 4px' }}>{line.replace('# ', '')}</div>;
+          if (line.startsWith('- **') || line.startsWith('* **')) {
+            const parts = line.replace(/^[-*]\s*/, '');
+            return <div key={i} style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)', padding: '1px 0 1px 12px', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: parts.replace(/\*\*(.*?)\*\*/g, '<span style="color:#fff;font-weight:700">$1</span>') }} />;
+          }
+          if (line.startsWith('- ') || line.startsWith('* ')) return <div key={i} style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)', padding: '1px 0 1px 12px', lineHeight: 1.5 }}>• {line.replace(/^[-*]\s*/, '')}</div>;
+          if (line.trim() === '') return <div key={i} style={{ height: 4 }} />;
+          // Bold text
+          const html = line.replace(/\*\*(.*?)\*\*/g, '<span style="color:#fff;font-weight:700">$1</span>');
+          return <div key={i} style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)', lineHeight: 1.5, padding: '1px 0' }} dangerouslySetInnerHTML={{ __html: html }} />;
+        });
+      };
+
+      return (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          {/* Header */}
+          <div onClick={() => setExpanded(!expanded)} className="analysis-toggle" style={{
+            padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            borderBottom: expanded ? '1px solid var(--border)' : 'none',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', background: 'linear-gradient(135deg, #ffd000, #ff3366)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>🧠 AI RESEARCH NOTE</span>
+              {note && <span style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+                {note.source === 'backend' ? '📡 Auto-generated' : '⚡ On-demand'} · {note.model}
+              </span>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button onClick={(e) => { e.stopPropagation(); generateNote(); }} disabled={generating} style={{
+                padding: '2px 8px', borderRadius: 3, fontSize: 8, fontWeight: 600, cursor: generating ? 'wait' : 'pointer',
+                border: '1px solid rgba(255,208,0,0.2)', background: 'rgba(255,208,0,0.05)',
+                color: '#ffd000', fontFamily: 'var(--mono)',
+              }}>{generating ? '⏳ Generating...' : '🔄 Regenerate'}</button>
+              <span style={{ fontSize: 10, color: 'var(--text3)' }}>{expanded ? '▾' : '▸'}</span>
+            </div>
+          </div>
+
+          {/* Content */}
+          {expanded && (
+            <div style={{ padding: '10px 14px', maxHeight: 500, overflow: 'auto' }}>
+              {note ? (
+                <>
+                  {renderMarkdown(note.text)}
+                  <div style={{ marginTop: 10, paddingTop: 6, borderTop: '1px solid var(--border)', fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Generated: {new Date(note.time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
+                    <span>Model: {note.model} · For educational purposes only</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: 20, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 8 }}>
+                    No AI analysis available yet
+                  </div>
+                  <button onClick={generateNote} disabled={generating} style={{
+                    padding: '6px 16px', borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                    border: '1px solid rgba(255,208,0,0.3)', background: 'rgba(255,208,0,0.08)',
+                    color: '#ffd000', fontFamily: 'var(--mono)',
+                  }}>{generating ? '⏳ Generating...' : '🧠 Generate AI Research Note'}</button>
+                  <div style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)', marginTop: 6 }}>
+                    Requires Groq API key in localStorage (groq_api_key)
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
     const PositionsTab = ({ rrmData, benchmark }) => {
       const [positions, setPositions] = useState([]);
       const [source, setSource] = useState('loading'); // 'local', 'cloud', 'both', 'loading'
@@ -1777,6 +1943,11 @@
             {/* Market Analysis */}
             {showAnalysis.analysis && activeGroup !== 'positions' && (
               <AnalysisPanel enriched={enriched} rrmData={rrmData} benchmark={benchmark} />
+            )}
+
+            {/* AI Research Note */}
+            {activeGroup !== 'positions' && (
+              <AIResearchNote rrmData={rrmData} enriched={enriched} benchmark={benchmark} />
             )}
           </div>
 
