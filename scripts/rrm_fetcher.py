@@ -342,8 +342,38 @@ def resample_monthly(closes, dates):
     return mc, md
 
 # =============================================================================
-# SECTOR CONSTITUENTS (unchanged)
+# SECTOR CONSTITUENTS — loads from sector_constituents.json
 # =============================================================================
+_SECTOR_CONSTITUENTS_CACHE = None
+
+def load_sector_constituents():
+    """Load sector constituent stocks from sector_constituents.json"""
+    global _SECTOR_CONSTITUENTS_CACHE
+    if _SECTOR_CONSTITUENTS_CACHE is not None:
+        return _SECTOR_CONSTITUENTS_CACHE
+
+    search_paths = [
+        "data/sector_constituents.json",
+        "../data/sector_constituents.json",
+        "sector_constituents.json",
+    ]
+    for path in search_paths:
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                # Filter out comment keys
+                result = {k: v for k, v in data.items() if not k.startswith("_")}
+                total = sum(len(v) for v in result.values())
+                log.info(f"Sector constituents: loaded {len(result)} sectors, {total} stocks from {path}")
+                _SECTOR_CONSTITUENTS_CACHE = result
+                return result
+            except Exception as e:
+                log.warning(f"Sector constituents load failed ({path}): {e}")
+    log.info("Sector constituents: no file found, will try auto-fetch from Yahoo")
+    _SECTOR_CONSTITUENTS_CACHE = {}
+    return {}
+
 def auto_fetch_constituents(sector_symbol):
     try:
         t = yf.Ticker(sector_symbol)
@@ -355,14 +385,26 @@ def auto_fetch_constituents(sector_symbol):
     return None
 
 def get_constituents(sector_symbol, config):
+    # 1. Check sector_constituents.json first
+    sc_data = load_sector_constituents()
+    if sector_symbol in sc_data and sc_data[sector_symbol]:
+        stocks = sc_data[sector_symbol]
+        log.info(f"  JSON constituents: {len(stocks)} stocks for {sector_symbol}")
+        return stocks
+
+    # 2. Try auto-fetch from Yahoo Finance
     auto = auto_fetch_constituents(sector_symbol)
     if auto and len(auto) >= 3:
         log.info(f"  Auto-fetched {len(auto)} constituents for {sector_symbol}")
         return auto
+
+    # 3. Fall back to config
     static = config.get("sector_constituents", {}).get(sector_symbol, [])
     if static:
         log.info(f"  Static config: {len(static)} constituents for {sector_symbol}")
         return static
+
+    log.info(f"  No constituents found for {sector_symbol}")
     return []
 
 PALETTE = [
