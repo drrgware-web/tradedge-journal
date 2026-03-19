@@ -1,0 +1,68 @@
+name: "TradEdge Scanner - Daily Scan"
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"  # 5:30 PM IST Mon-Fri
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: false
+        type: choice
+        options: [full, quick, alerts-only, digest-only]
+        default: full
+      stock:
+        description: "Single stock to process (leave empty for all)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: Install dependencies
+        run: pip install yfinance pandas numpy requests
+
+      - name: Build symbol list (if missing)
+        run: |
+          [ -f scripts/nse_symbols.json ] || python scripts/build_symbol_list.py
+
+      - name: Run Data Pipeline
+        if: inputs.mode != 'alerts-only' && inputs.mode != 'digest-only'
+        run: |
+          ARGS=""
+          [ "${{ inputs.mode }}" = "quick" ] && ARGS="--quick"
+          [ -n "${{ inputs.stock }}" ] && ARGS="$ARGS --stock ${{ inputs.stock }}"
+          python scripts/generate_data.py $ARGS
+        env: { PYTHONUNBUFFERED: "1" }
+
+      - name: Send Telegram Alerts
+        if: inputs.mode != 'digest-only'
+        run: python scripts/scanner_alerts.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Send Daily Digest Only
+        if: inputs.mode == 'digest-only'
+        run: python scripts/scanner_alerts.py --digest
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit and push
+        run: |
+          git config user.name "TradEdge Scanner Bot"
+          git config user.email "scanner@tradedge.bot"
+          git add data/ scripts/nse_symbols.json scripts/scan_config.json 2>/dev/null || true
+          git diff --staged --quiet && echo "No changes" && exit 0
+          git commit -m "📊 Scanner update — $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
