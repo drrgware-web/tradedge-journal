@@ -171,10 +171,10 @@
     const AssetRow = ({ item, sig, expanded, onToggle, idx }) => {
       const lc = LIGHT_MAP[sig.light];
       return (
-        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }} className="fade-in">
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }} className="fade-in">
           <div onClick={onToggle} style={{
             display: 'grid', gridTemplateColumns: 'minmax(110px,1.2fr) 85px 80px 50px 70px 90px',
-            alignItems: 'center', gap: 6, padding: '5px 12px', cursor: 'pointer',
+            alignItems: 'center', gap: 6, padding: '4px 12px', cursor: 'pointer',
             background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent', transition: 'background 0.2s',
           }}>
             <div>
@@ -197,27 +197,27 @@
             }}>{sig.action}</span>
           </div>
           {expanded && (
-            <div style={{ padding: '2px 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+            <div style={{ padding: '2px 12px 8px', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 6 }}>
               {[['DAILY', item.daily, item.dailyTail], ['WEEKLY', item.weekly, item.weeklyTail], ['MONTHLY', item.monthly, item.monthlyTail]].map(([label, tf, tail]) => {
                 const qc = Q_COLORS[tf.q] || '#444';
                 return (
-                  <div key={label} style={{ background: 'rgba(255,255,255,0.012)', borderRadius: 6, padding: '8px 10px', border: `1px solid ${qc}12` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div key={label} style={{ background: 'rgba(255,255,255,0.012)', borderRadius: 6, padding: '6px 8px', border: `1px solid ${qc}12`, minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <span style={{ fontSize: 8, color: 'var(--text3)', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'var(--mono)' }}>{label}</span>
                       <QBadge q={tf.q} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                      <div style={{ display: 'flex', gap: 14 }}>
+                      <div style={{ display: 'flex', gap: 10 }}>
                         <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-RATIO</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: tf.rsr >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsr.toFixed(1)}</div>
+                          <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-R</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: tf.rsr >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsr.toFixed(1)}</div>
                         </div>
                         <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-MOM</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: tf.rsm >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsm.toFixed(1)}</div>
+                          <div style={{ fontSize: 7, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 1 }}>RS-M</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: tf.rsm >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{tf.rsm.toFixed(1)}</div>
                         </div>
                       </div>
-                      <Sparkline data={tail} color={qc} />
+                      <Sparkline data={tail} color={qc} width={50} height={18} />
                     </div>
                   </div>
                 );
@@ -710,7 +710,7 @@
             tail: (tail || []).slice(-(playing ? playStep : 8)),
           };
         });
-      }, [enriched, helixTF]);
+      }, [enriched, helixTF, playing, playStep]);
 
       useEffect(() => {
         const c = canvasRef.current;
