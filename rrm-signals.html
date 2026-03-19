@@ -712,6 +712,135 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
+       DRILLDOWN RRG — Mini chart for sector constituents
+       ═══════════════════════════════════════════════════════════ */
+    const DrilldownRRG = ({ stocks, sectorName }) => {
+      const canvasRef = useRef(null);
+
+      useEffect(() => {
+        const c = canvasRef.current;
+        if (!c || !stocks.length) return;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = c.getBoundingClientRect();
+        const W = rect.width, H = 300;
+        c.style.height = H + 'px';
+        c.width = W * dpr; c.height = H * dpr;
+        const ctx = c.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        let rMin = 94, rMax = 106, mMin = 94, mMax = 106;
+        stocks.forEach(s => {
+          rMin = Math.min(rMin, s.rsr - 1); rMax = Math.max(rMax, s.rsr + 1);
+          mMin = Math.min(mMin, s.rsm - 1); mMax = Math.max(mMax, s.rsm + 1);
+          if (s.tail) s.tail.forEach(t => {
+            rMin = Math.min(rMin, t.rs_ratio - 0.5); rMax = Math.max(rMax, t.rs_ratio + 0.5);
+            mMin = Math.min(mMin, t.rs_momentum - 0.5); mMax = Math.max(mMax, t.rs_momentum + 0.5);
+          });
+        });
+        rMin -= 1; rMax += 1; mMin -= 1; mMax += 1;
+
+        const mg = { l: 45, r: 15, t: 15, b: 30 };
+        const cw = W - mg.l - mg.r, ch = H - mg.t - mg.b;
+        const tX = v => mg.l + (v - rMin) / (rMax - rMin) * cw;
+        const tY = v => mg.t + (1 - (v - mMin) / (mMax - mMin)) * ch;
+        const cx = tX(100), cy = tY(100);
+
+        // Background
+        ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+
+        // Quadrant fills
+        ctx.fillStyle = 'rgba(0,255,136,0.03)'; ctx.fillRect(cx, mg.t, W - mg.r - cx, cy - mg.t);
+        ctx.fillStyle = 'rgba(0,200,255,0.025)'; ctx.fillRect(mg.l, mg.t, cx - mg.l, cy - mg.t);
+        ctx.fillStyle = 'rgba(255,208,0,0.02)'; ctx.fillRect(cx, cy, W - mg.r - cx, H - mg.b - cy);
+        ctx.fillStyle = 'rgba(255,51,102,0.025)'; ctx.fillRect(mg.l, cy, cx - mg.l, H - mg.b - cy);
+
+        // Cross
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(cx, mg.t); ctx.lineTo(cx, H - mg.b); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(mg.l, cy); ctx.lineTo(W - mg.r, cy); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Quadrant labels
+        ctx.font = '600 8px JetBrains Mono'; ctx.globalAlpha = 0.2;
+        ctx.fillStyle = '#00ff88'; ctx.fillText('LEADING', cx + 4, mg.t + 12);
+        ctx.fillStyle = '#00c8ff'; ctx.fillText('IMPROVING', mg.l + 4, mg.t + 12);
+        ctx.fillStyle = '#ffd000'; ctx.fillText('WEAKENING', cx + 4, H - mg.b - 4);
+        ctx.fillStyle = '#ff3366'; ctx.fillText('LAGGING', mg.l + 4, H - mg.b - 4);
+        ctx.globalAlpha = 1;
+
+        // Axes
+        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '500 7px JetBrains Mono';
+        ctx.save(); ctx.translate(10, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('RS-MOM', 0, 0); ctx.restore();
+        ctx.fillText('RS-RATIO', W / 2 - 18, H - 5);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.font = '500 7px JetBrains Mono';
+        for (let v = Math.ceil(rMin); v <= Math.floor(rMax); v += 2) ctx.fillText(v.toString(), tX(v) - 5, H - mg.b + 10);
+
+        // Draw stocks
+        stocks.forEach(s => {
+          const x = tX(s.rsr), y = tY(s.rsm);
+          const qc = Q_COLORS[s.q] || '#666';
+
+          // Trail
+          if (s.tail && s.tail.length >= 2) {
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            s.tail.forEach((t, i) => {
+              const tx = tX(t.rs_ratio), ty = tY(t.rs_momentum);
+              i === 0 ? ctx.moveTo(tx, ty) : ctx.lineTo(tx, ty);
+            });
+            ctx.strokeStyle = qc; ctx.lineWidth = 1.2; ctx.lineCap = 'round'; ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+
+          // Bubble
+          ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = qc; ctx.globalAlpha = 0.8; ctx.fill();
+          ctx.strokeStyle = qc; ctx.lineWidth = 1; ctx.stroke();
+          ctx.globalAlpha = 1;
+
+          // Pulse
+          const pulse = Math.sin(Date.now() / 400 + s.rsr) * 0.3 + 0.5;
+          ctx.globalAlpha = 0.15 * pulse;
+          ctx.beginPath(); ctx.arc(x, y, 8 + 2 * pulse, 0, Math.PI * 2);
+          ctx.strokeStyle = qc; ctx.lineWidth = 1; ctx.stroke();
+          ctx.globalAlpha = 1;
+
+          // Label
+          ctx.font = '600 8px JetBrains Mono';
+          ctx.fillStyle = qc; ctx.globalAlpha = 0.8;
+          ctx.fillText(s.name?.replace('.NS', '').slice(0, 10), x + 8, y - 4);
+          ctx.globalAlpha = 1;
+        });
+
+        // Sector name watermark
+        ctx.font = '700 10px JetBrains Mono'; ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        ctx.textAlign = 'right'; ctx.fillText(sectorName, W - mg.r - 4, H - 8); ctx.textAlign = 'start';
+
+        // Animate
+        const animId = requestAnimationFrame(() => {});
+        return () => cancelAnimationFrame(animId);
+      }, [stocks, sectorName]);
+
+      if (!stocks.length) return null;
+
+      // Quadrant counts
+      const qC = { Leading: 0, Improving: 0, Weakening: 0, Lagging: 0 };
+      stocks.forEach(s => { if (qC[s.q] !== undefined) qC[s.q]++; });
+
+      return (
+        <div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 6, fontSize: 9, fontFamily: 'var(--mono)' }}>
+            <span style={{ color: '#00ff88' }}>Leading: {qC.Leading}</span>
+            <span style={{ color: '#00c8ff' }}>Improving: {qC.Improving}</span>
+            <span style={{ color: '#ffd000' }}>Weakening: {qC.Weakening}</span>
+            <span style={{ color: '#ff3366' }}>Lagging: {qC.Lagging}</span>
+          </div>
+          <canvas ref={canvasRef} style={{ width: '100%', borderRadius: 6, border: '1px solid rgba(255,255,255,0.04)' }} />
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
        HELIX — Hybrid ELement Intelligence X-ray
        Multi-Dimensional Rotation Intelligence Graph
        ═══════════════════════════════════════════════════════════ */
@@ -728,6 +857,7 @@
       const playRef = useRef(null);
       const hoverRef = useRef(null);
       const [hoveredItem, setHoveredItem] = useState(null);
+      const [drilldown, setDrilldown] = useState(null); // { symbol, name, stocks[] }
 
       const points = useMemo(() => {
         return enriched.map(item => {
@@ -953,6 +1083,43 @@
 
       const handleMouseLeave = useCallback(() => { hoverRef.current = null; setHoveredItem(null); }, []);
 
+      // ── Double-click: Drill into sector constituents ──
+      const handleDoubleClick = useCallback((e) => {
+        if (!hoverRef.current || !rrmData) return;
+        const sym = hoverRef.current;
+        const item = enriched.find(i => i.symbol === sym);
+        if (!item) return;
+
+        // Look up drilldown data from rrm_data.json
+        const bm = rrmData?.benchmarks_data?.[benchmark];
+        if (!bm?.drilldown?.[sym]) {
+          // No drilldown data for this symbol — might not be a sector
+          setDrilldown({ symbol: sym, name: item.name, stocks: [], noData: true });
+          return;
+        }
+
+        const dd = bm.drilldown[sym];
+        const tfKey = helixTF; // daily/weekly/monthly
+        const stocks = (dd[tfKey] || dd.daily || []).map(s => ({
+          symbol: s.symbol,
+          name: s.name,
+          color: s.color,
+          rsr: s.current?.rs_ratio || 100,
+          rsm: s.current?.rs_momentum || 100,
+          q: s.quadrant || '',
+          tail: s.tail || [],
+          rsi: s.current?.rsi || null,
+        }));
+
+        setDrilldown({
+          symbol: sym,
+          name: item.name || dd.sector_name || sym,
+          sectorQuadrant: item[helixTF]?.q || item.weekly?.q || '',
+          stocks,
+          noData: false,
+        });
+      }, [enriched, rrmData, benchmark, helixTF]);
+
       if (activeGroup === 'positions' || !enriched.length) return null;
 
       return (
@@ -979,14 +1146,96 @@
               <button onClick={() => setExpanded(!expanded)} style={{ padding: '2px 8px', borderRadius: 3, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.06)', background: expanded ? 'rgba(255,255,255,0.04)' : 'transparent', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--mono)' }}>{expanded ? '⊖ Compact' : '⊕ Expand'}</button>
             </div>
           </div>
-          <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} style={{ width: '100%', cursor: 'crosshair', display: 'block' }} />
+          <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onDoubleClick={handleDoubleClick} style={{ width: '100%', cursor: 'crosshair', display: 'block' }} />
           <div style={{ padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 14, fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--mono)', flexWrap: 'wrap' }}>
             <span>Bubble size = MTF Score (1–5)</span>
             <span>Color = Signal (<span style={{ color: '#00ff88' }}>G</span>/<span style={{ color: '#ffd000' }}>Y</span>/<span style={{ color: '#00c8ff' }}>B</span>/<span style={{ color: '#ff3366' }}>R</span>)</span>
             {showRSI && <span><span style={{ color: '#00ff88' }}>◌</span> = RSM sweet zone (98–106)</span>}
             <span>TF: {helixTF.toUpperCase()}</span>
             <span>{points.length} assets</span>
+            <span style={{ color: 'var(--text3)' }}>Double-click bubble to drill down</span>
           </div>
+
+          {/* ── Drilldown Modal ── */}
+          {drilldown && (
+            <div style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', zIndex: 999,
+            }} onClick={() => setDrilldown(null)}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: '#0a0a16', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12,
+                width: Math.min(700, window.innerWidth - 40), maxHeight: '85vh', overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                {/* Header */}
+                <div style={{
+                  padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: 'var(--mono)' }}>
+                      {drilldown.name} <span style={{ fontSize: 10, color: Q_COLORS[drilldown.sectorQuadrant] || '#444' }}>({drilldown.sectorQuadrant})</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+                      {drilldown.symbol} · {drilldown.stocks.length} constituents · {helixTF.toUpperCase()} · Benchmark: Sector Index
+                    </div>
+                  </div>
+                  <button onClick={() => setDrilldown(null)} style={{
+                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+                    cursor: 'pointer', fontSize: 18, fontFamily: 'var(--mono)',
+                  }}>✕</button>
+                </div>
+
+                {/* Content */}
+                <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px' }}>
+                  {drilldown.noData ? (
+                    <div style={{ padding: 30, textAlign: 'center', color: 'var(--text3)', fontSize: 11, fontFamily: 'var(--mono)' }}>
+                      No drilldown data available for {drilldown.name}.<br/>
+                      Drilldown works for sector indices only (requires constituent stock data).
+                    </div>
+                  ) : drilldown.stocks.length === 0 ? (
+                    <div style={{ padding: 30, textAlign: 'center', color: 'var(--text3)', fontSize: 11, fontFamily: 'var(--mono)' }}>
+                      No constituent stocks found for this sector on {helixTF} timeframe.
+                    </div>
+                  ) : (
+                    <>
+                      {/* Mini RRG for stocks */}
+                      <DrilldownRRG stocks={drilldown.stocks} sectorName={drilldown.name} />
+
+                      {/* Stock list table */}
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{
+                          display: 'grid', gridTemplateColumns: '1fr 65px 65px 60px',
+                          gap: 4, padding: '4px 8px', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        }}>
+                          {['STOCK', 'RS-RATIO', 'RS-MOM', 'QUADRANT'].map(h => (
+                            <span key={h} style={{ fontSize: 7, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.1em', fontFamily: 'var(--mono)' }}>{h}</span>
+                          ))}
+                        </div>
+                        {drilldown.stocks.sort((a, b) => b.rsr - a.rsr).map((s, i) => {
+                          const qc = Q_COLORS[s.q] || '#444';
+                          return (
+                            <div key={s.symbol + i} style={{
+                              display: 'grid', gridTemplateColumns: '1fr 65px 65px 60px',
+                              gap: 4, padding: '4px 8px', borderBottom: '1px solid rgba(255,255,255,0.02)',
+                            }}>
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', fontFamily: 'var(--mono)' }}>{s.name}</div>
+                                <div style={{ fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{s.symbol}</div>
+                              </div>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: s.rsr >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{s.rsr.toFixed(1)}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: s.rsm >= 100 ? '#00ff88' : '#ff3366', fontFamily: 'var(--mono)' }}>{s.rsm.toFixed(1)}</span>
+                              <span style={{ fontSize: 9, color: qc, fontWeight: 600, fontFamily: 'var(--mono)' }}>{s.q}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     };
