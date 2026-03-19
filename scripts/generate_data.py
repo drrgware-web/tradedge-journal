@@ -289,7 +289,16 @@ def run_full_pipeline(quick=False, single_stock=None):
 
         # Download OHLCV
         try:
-            data = yf.download(yf_symbols, period="1y", group_by="ticker", auto_adjust=True, threads=True, progress=False)
+            if len(yf_symbols) == 1:
+                # Single stock — use Ticker directly (more reliable)
+                print(f"    Fetching {yf_symbols[0]}...")
+                ticker = yf.Ticker(yf_symbols[0])
+                data = ticker.history(period="1y")
+                if data.empty:
+                    print(f"    ✗ No data for {yf_symbols[0]}")
+                    continue
+            else:
+                data = yf.download(yf_symbols, period="1y", group_by="ticker", auto_adjust=True, threads=True, progress=False)
         except Exception as e:
             print(f"    ✗ Batch failed: {e}")
             continue
@@ -306,10 +315,14 @@ def run_full_pipeline(quick=False, single_stock=None):
                     if yf_sym in data.columns.get_level_values(0):
                         stock_df = data[yf_sym].dropna(how="all")
                     else:
+                        print(f"    ✗ {symbol}: not in download results")
                         continue
 
-                if stock_df.empty or len(stock_df) < 50:
+                if stock_df.empty or len(stock_df) < 20:
+                    print(f"    ✗ {symbol}: insufficient data ({len(stock_df)} bars)")
                     continue
+                
+                print(f"    ✓ {symbol}: {len(stock_df)} bars, last close ₹{float(stock_df['Close'].iloc[-1]):.2f}")
 
                 # Technicals
                 tech = compute_technicals(stock_df)
@@ -364,29 +377,45 @@ def run_full_pipeline(quick=False, single_stock=None):
                 all_stocks.append(stock_record)
 
                 # Generate detailed stock JSON (for stock.html)
-                if not quick and info:
-                    try:
-                        oneil_result = oneil_scorer.score(stock_df, info)
-                        guru_ratings = guru_engine.rate_all(stock_df, info)
-                        surv_result = surveillance.check(symbol, stock_df, info)
+                # Generate for ALL modes (not just full) — price_history is essential for charts
+                try:
+                    # Price history for HLC chart + P&F/Renko
+                    price_hist = []
+                    for idx, row in stock_df.tail(250).iterrows():
+                        dt = str(idx)[:10] if hasattr(idx, 'strftime') else str(idx)[:10]
+                        price_hist.append({
+                            "date": dt,
+                            "o": safe_float(row.get("Open", row.get("open"))),
+                            "h": safe_float(row.get("High", row.get("high"))),
+                            "l": safe_float(row.get("Low", row.get("low"))),
+                            "c": safe_float(row.get("Close", row.get("close"))),
+                            "v": safe_float(row.get("Volume", row.get("volume"))),
+                        })
 
-                        # Price history for P&F/Renko
-                        price_hist = []
-                        for _, row in stock_df.tail(200).iterrows():
-                            price_hist.append({
-                                "o": safe_float(row["Open"]),
-                                "h": safe_float(row["High"]),
-                                "l": safe_float(row["Low"]),
-                                "c": safe_float(row["Close"]),
-                                "v": safe_float(row["Volume"]),
-                            })
+                    # O'Neil, Guru, Surveillance — only in full mode
+                    oneil_data = {}
+                    guru_data = []
+                    surv_data = {}
+                    if not quick and info:
+                        try:
+                            oneil_result = oneil_scorer.score(stock_df, info)
+                            oneil_data = oneil_result.to_dict()
+                        except: pass
+                        try:
+                            guru_ratings = guru_engine.rate_all(stock_df, info)
+                            guru_data = [r.to_dict() for r in guru_ratings]
+                        except: pass
+                        try:
+                            surv_result = surveillance.check(symbol, stock_df, info)
+                            surv_data = surv_result.to_dict()
+                        except: pass
 
-                        detail = {
-                            **stock_record,
-                            "oneil": oneil_result.to_dict(),
-                            "guru_ratings": [r.to_dict() for r in guru_ratings],
-                            "surveillance": surv_result.to_dict(),
-                            "price_history": price_hist,
+                    detail = {
+                        **stock_record,
+                        "oneil": oneil_data,
+                        "guru_ratings": guru_data,
+                        "surveillance": surv_data,
+                        "price_history": price_hist,
                             "prev_fundamentals": {},  # Populated when historical data available
                             "yoy_fundamentals": {},   # Populated when historical data available
                             "management": [],  # Would need separate data source
