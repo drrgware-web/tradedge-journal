@@ -194,10 +194,17 @@ def DEFAULT_CONFIG():
         # 4 MARKET SEGMENTS (v4.0 — unchanged)
         # ═══════════════════════════════════════════════════════
         "market_segments": {
-            "^NSMIDCP":           {"name": "Nifty Next 50",   "color": "#6366f1"},
-            "NIFTYMIDCAP150.NS":  {"name": "Midcap 150",      "color": "#a855f7"},
-            "^NSEMDCP50":         {"name": "Midcap 50",        "color": "#d946ef"},
-            "^NSEBANK":           {"name": "Bank Index",       "color": "#0ea5e9"},
+            "^NSEI":              {"name": "Nifty 50",            "color": "#22d3ee"},
+            "^NSMIDCP":           {"name": "Nifty Next 50",       "color": "#6366f1"},
+            "^CRSLDX":            {"name": "Nifty 500",           "color": "#3b82f6"},
+            "NIFTYMIDCAP150.NS":  {"name": "Midcap 150",          "color": "#a855f7"},
+            "^NSEMDCP50":         {"name": "Midcap 50",            "color": "#d946ef"},
+            "NIFTYSMLCAP250.NS":  {"name": "Smallcap 250",         "color": "#f43f5e"},
+            "NIFTYMSML400.NS":    {"name": "MidSmallcap 400",      "color": "#fb923c"},
+            "NIFTYMICRO250.NS":   {"name": "Microcap 250",         "color": "#fbbf24"},
+            "NIFTYTOTALMARKET.NS":{"name": "Total Market 750",     "color": "#14b8a6"},
+            "NIFTYLARGEMID250.NS":{"name": "LargeMidcap 250",      "color": "#84cc16"},
+            "^NSEBANK":           {"name": "Bank Index",           "color": "#0ea5e9"},
         },
         # ═══════════════════════════════════════════════════════
         # 25 GLOBAL INDICES (v4.1 — unchanged)
