@@ -680,6 +680,242 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
+       HELIX — Hybrid ELement Intelligence X-ray
+       Multi-Dimensional Rotation Intelligence Graph
+       ═══════════════════════════════════════════════════════════ */
+    const HelixGraph = ({ enriched, rrmData, benchmark, activeGroup }) => {
+      const canvasRef = useRef(null);
+      const animRef = useRef(null);
+      const [expanded, setExpanded] = useState(false);
+      const [helixTF, setHelixTF] = useState('weekly');
+      const [showRSI, setShowRSI] = useState(true);
+      const [showMTF, setShowMTF] = useState(true);
+      const [showTrails, setShowTrails] = useState(true);
+      const hoverRef = useRef(null);
+      const [hoveredItem, setHoveredItem] = useState(null);
+
+      const points = useMemo(() => {
+        return enriched.map(item => {
+          const tf = item[helixTF] || item.weekly;
+          const sig = item.sig;
+          const tail = helixTF === 'daily' ? item.dailyTail : helixTF === 'monthly' ? item.monthlyTail : item.weeklyTail;
+          return {
+            name: item.name?.replace(/^Nifty\s?/, '') || item.symbol,
+            symbol: item.symbol, rsr: tf.rsr, rsm: tf.rsm, q: tf.q,
+            score: sig.score, light: sig.light, action: sig.action, rsiOk: sig.rsiOk,
+            color: LIGHT_MAP[sig.light] || '#444', qColor: Q_COLORS[tf.q] || '#444',
+            tail: (tail || []).slice(-8),
+          };
+        });
+      }, [enriched, helixTF]);
+
+      useEffect(() => {
+        const c = canvasRef.current;
+        if (!c || !points.length) return;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = c.getBoundingClientRect();
+        const W = rect.width;
+        const H = expanded ? Math.min(window.innerHeight - 120, 650) : 380;
+        c.style.height = H + 'px';
+        c.width = W * dpr; c.height = H * dpr;
+        const ctx = c.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        let rMin = 94, rMax = 106, mMin = 94, mMax = 106;
+        points.forEach(p => { rMin = Math.min(rMin, p.rsr - 1); rMax = Math.max(rMax, p.rsr + 1); mMin = Math.min(mMin, p.rsm - 1); mMax = Math.max(mMax, p.rsm + 1); });
+        rMin -= 1; rMax += 1; mMin -= 1; mMax += 1;
+        const mg = { l: 50, r: 20, t: 20, b: 36 };
+        const cw = W - mg.l - mg.r, ch = H - mg.t - mg.b;
+        const tX = v => mg.l + (v - rMin) / (rMax - rMin) * cw;
+        const tY = v => mg.t + (1 - (v - mMin) / (mMax - mMin)) * ch;
+        const cx = tX(100), cy = tY(100);
+
+        function draw() {
+          ctx.clearRect(0, 0, W, H);
+          ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+
+          // Grid
+          ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 0.5;
+          for (let v = Math.ceil(rMin); v <= Math.floor(rMax); v += 2) { ctx.beginPath(); ctx.moveTo(tX(v), mg.t); ctx.lineTo(tX(v), H - mg.b); ctx.stroke(); }
+          for (let v = Math.ceil(mMin); v <= Math.floor(mMax); v += 2) { ctx.beginPath(); ctx.moveTo(mg.l, tY(v)); ctx.lineTo(W - mg.r, tY(v)); ctx.stroke(); }
+
+          // Quadrant fills
+          ctx.fillStyle = 'rgba(0,255,136,0.025)'; ctx.fillRect(cx, mg.t, W - mg.r - cx, cy - mg.t);
+          ctx.fillStyle = 'rgba(0,200,255,0.02)';  ctx.fillRect(mg.l, mg.t, cx - mg.l, cy - mg.t);
+          ctx.fillStyle = 'rgba(255,208,0,0.015)';  ctx.fillRect(cx, cy, W - mg.r - cx, H - mg.b - cy);
+          ctx.fillStyle = 'rgba(255,51,102,0.02)';  ctx.fillRect(mg.l, cy, cx - mg.l, H - mg.b - cy);
+
+          // Cross
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(cx, mg.t); ctx.lineTo(cx, H - mg.b); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(mg.l, cy); ctx.lineTo(W - mg.r, cy); ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Quadrant labels
+          ctx.font = '600 9px JetBrains Mono'; ctx.globalAlpha = 0.12;
+          ctx.fillStyle = '#00ff88'; ctx.fillText('LEADING', cx + 6, mg.t + 14);
+          ctx.fillStyle = '#00c8ff'; ctx.fillText('IMPROVING', mg.l + 4, mg.t + 14);
+          ctx.fillStyle = '#ffd000'; ctx.fillText('WEAKENING', cx + 6, H - mg.b - 6);
+          ctx.fillStyle = '#ff3366'; ctx.fillText('LAGGING', mg.l + 4, H - mg.b - 6);
+          ctx.globalAlpha = 1;
+
+          // Axes
+          ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.font = '500 8px JetBrains Mono';
+          ctx.save(); ctx.translate(12, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('RS-MOMENTUM →', 0, 0); ctx.restore();
+          ctx.fillText('RS-RATIO →', W / 2 - 25, H - 6);
+          ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = '500 7px JetBrains Mono';
+          for (let v = Math.ceil(rMin); v <= Math.floor(rMax); v += 2) ctx.fillText(v.toString(), tX(v) - 5, H - mg.b + 12);
+          for (let v = Math.ceil(mMin); v <= Math.floor(mMax); v += 2) ctx.fillText(v.toString(), 2, tY(v) + 3);
+
+          const hovered = hoverRef.current;
+
+          // Trails
+          if (showTrails) {
+            points.forEach(p => {
+              if (!p.tail || p.tail.length < 2) return;
+              const isH = hovered === p.symbol;
+              const alpha = hovered ? (isH ? 0.7 : 0.05) : 0.25;
+              ctx.globalAlpha = alpha;
+              ctx.beginPath();
+              p.tail.forEach((t, i) => { const x = tX(t.rs_ratio), y = tY(t.rs_momentum); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+              ctx.strokeStyle = p.color; ctx.lineWidth = isH ? 2.5 : 1.2; ctx.lineCap = 'round'; ctx.stroke();
+              p.tail.forEach((t, i) => {
+                ctx.globalAlpha = alpha * (0.3 + 0.7 * (i / Math.max(p.tail.length - 1, 1)));
+                ctx.beginPath(); ctx.arc(tX(t.rs_ratio), tY(t.rs_momentum), i === p.tail.length - 1 ? 2.5 : 1.5, 0, Math.PI * 2);
+                ctx.fillStyle = p.color; ctx.fill();
+              });
+              ctx.globalAlpha = 1;
+            });
+          }
+
+          // Bubbles
+          points.forEach(p => {
+            const x = tX(p.rsr), y = tY(p.rsm);
+            const isH = hovered === p.symbol;
+            const r = showMTF ? 3 + p.score * 2.5 : 6;
+            const alpha = hovered ? (isH ? 1 : 0.12) : 0.85;
+            ctx.globalAlpha = alpha;
+
+            // RSI glow
+            if (showRSI && p.rsiOk) {
+              const pulse = Math.sin(Date.now() / 600 + p.rsr) * 0.3 + 0.7;
+              ctx.globalAlpha = alpha * 0.3 * pulse;
+              ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2);
+              ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 1.5; ctx.stroke();
+              ctx.globalAlpha = alpha * 0.08 * pulse;
+              ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2);
+              ctx.fillStyle = '#00ff88'; ctx.fill();
+            }
+
+            ctx.globalAlpha = alpha;
+            if (isH) { ctx.shadowColor = p.color; ctx.shadowBlur = 20; }
+
+            // Bubble
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+            const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+            grad.addColorStop(0, p.color + 'cc'); grad.addColorStop(1, p.color + '55');
+            ctx.fillStyle = grad; ctx.fill();
+            ctx.strokeStyle = p.color; ctx.lineWidth = isH ? 2 : 0.8; ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Score inside
+            if (showMTF && r >= 8) {
+              ctx.font = `700 ${Math.max(8, r * 0.7)}px JetBrains Mono`;
+              ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+              ctx.fillText(p.score.toString(), x, y + 0.5);
+              ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+            }
+
+            // Label
+            if (isH || points.length <= 20 || p.score >= 4) {
+              ctx.font = isH ? '700 10px JetBrains Mono' : '600 8px JetBrains Mono';
+              ctx.fillStyle = isH ? '#fff' : p.color;
+              ctx.globalAlpha = isH ? 1 : alpha * 0.7;
+              const lx = x + r + 4, ly = y - r - 2;
+              ctx.fillText(p.name.slice(0, 12), lx, ly);
+              if (isH) {
+                ctx.font = '600 7px JetBrains Mono'; ctx.fillStyle = p.color;
+                ctx.fillText(p.action, lx, ly + 11);
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillText(`R:${p.rsr.toFixed(1)} M:${p.rsm.toFixed(1)} S:${p.score}`, lx, ly + 20);
+              }
+            }
+            ctx.globalAlpha = 1;
+          });
+
+          // Quadrant counts
+          const qC = { Leading: 0, Improving: 0, Weakening: 0, Lagging: 0 };
+          points.forEach(p => { if (qC[p.q] !== undefined) qC[p.q]++; });
+          ctx.font = '700 10px JetBrains Mono'; ctx.globalAlpha = 0.25;
+          ctx.fillStyle = '#00ff88'; ctx.textAlign = 'right'; ctx.fillText(qC.Leading.toString(), W - mg.r - 6, mg.t + 14);
+          ctx.fillStyle = '#00c8ff'; ctx.textAlign = 'left'; ctx.fillText(qC.Improving.toString(), mg.l + 4, mg.t + 26);
+          ctx.fillStyle = '#ffd000'; ctx.textAlign = 'right'; ctx.fillText(qC.Weakening.toString(), W - mg.r - 6, H - mg.b - 6);
+          ctx.fillStyle = '#ff3366'; ctx.textAlign = 'left'; ctx.fillText(qC.Lagging.toString(), mg.l + 4, H - mg.b - 18);
+          ctx.textAlign = 'start'; ctx.globalAlpha = 1;
+
+          // Watermark
+          ctx.font = '700 11px JetBrains Mono'; ctx.fillStyle = 'rgba(255,255,255,0.04)';
+          ctx.textAlign = 'right'; ctx.fillText('HELIX', W - mg.r - 4, H - 8); ctx.textAlign = 'start';
+
+          animRef.current = requestAnimationFrame(draw);
+        }
+        draw();
+        return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+      }, [points, expanded, showRSI, showMTF, showTrails]);
+
+      const handleMouseMove = useCallback((e) => {
+        const c = canvasRef.current; if (!c) return;
+        const rect = c.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        const W = rect.width, H = rect.height;
+        let rMin = 94, rMax = 106, mMin = 94, mMax = 106;
+        points.forEach(p => { rMin = Math.min(rMin, p.rsr - 1); rMax = Math.max(rMax, p.rsr + 1); mMin = Math.min(mMin, p.rsm - 1); mMax = Math.max(mMax, p.rsm + 1); });
+        rMin -= 1; rMax += 1; mMin -= 1; mMax += 1;
+        const mg = { l: 50, r: 20, t: 20, b: 36 };
+        const cw = W - mg.l - mg.r, ch = H - mg.t - mg.b;
+        const tX = v => mg.l + (v - rMin) / (rMax - rMin) * cw;
+        const tY = v => mg.t + (1 - (v - mMin) / (mMax - mMin)) * ch;
+        let found = null;
+        points.forEach(p => { const dist = Math.sqrt((mx - tX(p.rsr)) ** 2 + (my - tY(p.rsm)) ** 2); if (dist < 20) found = p.symbol; });
+        hoverRef.current = found; setHoveredItem(found);
+      }, [points]);
+
+      const handleMouseLeave = useCallback(() => { hoverRef.current = null; setHoveredItem(null); }, []);
+
+      if (activeGroup === 'positions' || !enriched.length) return null;
+
+      return (
+        <div style={{ background: '#06060e', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', marginBottom: 8, transition: 'all 0.3s' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', background: 'linear-gradient(135deg, #00ff88, #00c8ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '0.08em' }}>✦ HELIX</span>
+              <span style={{ fontSize: 8, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Hybrid ELement Intelligence X-ray</span>
+            </div>
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {['daily', 'weekly', 'monthly'].map(tf => (
+                <button key={tf} onClick={() => setHelixTF(tf)} style={{ padding: '2px 7px', borderRadius: 3, fontSize: 8, fontWeight: 700, cursor: 'pointer', border: `1px solid ${helixTF === tf ? '#00c8ff30' : 'rgba(255,255,255,0.04)'}`, background: helixTF === tf ? '#00c8ff08' : 'transparent', color: helixTF === tf ? '#00c8ff' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>{tf.charAt(0).toUpperCase()}</button>
+              ))}
+              <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.06)', margin: '0 2px' }} />
+              <button onClick={() => setShowRSI(!showRSI)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showRSI ? '#00ff8830' : 'rgba(255,255,255,0.04)'}`, background: showRSI ? '#00ff8808' : 'transparent', color: showRSI ? '#00ff88' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>RSI</button>
+              <button onClick={() => setShowMTF(!showMTF)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showMTF ? '#ffd00030' : 'rgba(255,255,255,0.04)'}`, background: showMTF ? '#ffd00008' : 'transparent', color: showMTF ? '#ffd000' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>MTF</button>
+              <button onClick={() => setShowTrails(!showTrails)} style={{ padding: '2px 6px', borderRadius: 3, fontSize: 7.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${showTrails ? '#00c8ff30' : 'rgba(255,255,255,0.04)'}`, background: showTrails ? '#00c8ff08' : 'transparent', color: showTrails ? '#00c8ff' : 'rgba(255,255,255,0.2)', fontFamily: 'var(--mono)' }}>TRAIL</button>
+              <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.06)', margin: '0 2px' }} />
+              <button onClick={() => setExpanded(!expanded)} style={{ padding: '2px 8px', borderRadius: 3, fontSize: 8, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.06)', background: expanded ? 'rgba(255,255,255,0.04)' : 'transparent', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--mono)' }}>{expanded ? '⊖ Compact' : '⊕ Expand'}</button>
+            </div>
+          </div>
+          <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} style={{ width: '100%', cursor: 'crosshair', display: 'block' }} />
+          <div style={{ padding: '5px 12px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: 12, fontSize: 7.5, color: 'var(--text3)', fontFamily: 'var(--mono)', flexWrap: 'wrap' }}>
+            <span>Bubble size = MTF Score (1–5)</span>
+            <span>Color = Signal (<span style={{ color: '#00ff88' }}>G</span>/<span style={{ color: '#ffd000' }}>Y</span>/<span style={{ color: '#00c8ff' }}>B</span>/<span style={{ color: '#ff3366' }}>R</span>)</span>
+            {showRSI && <span><span style={{ color: '#00ff88' }}>◌</span> = RSI sweet zone</span>}
+            <span>TF: {helixTF.toUpperCase()}</span>
+            <span>{points.length} assets</span>
+          </div>
+        </div>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
        ADD STOCK MODAL (unchanged)
        ═══════════════════════════════════════════════════════════ */
     const AddStockModal = ({ onClose, onAdd }) => {
@@ -950,9 +1186,15 @@
           </div>
 
           {/* ══════════════════════════════════════════════════
-             BLOOMBERG ANALYSIS PANELS (Collapsible below table)
+             HELIX — Multi-Dimensional Rotation Intelligence Graph
              ══════════════════════════════════════════════════ */}
           <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+            <HelixGraph enriched={enriched} rrmData={rrmData} benchmark={benchmark} activeGroup={activeGroup} />
+
+            {/* ══════════════════════════════════════════════════
+             BLOOMBERG ANALYSIS PANELS (Collapsible below table)
+             ══════════════════════════════════════════════════ */}
 
             {/* Toggle buttons */}
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
