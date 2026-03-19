@@ -649,7 +649,181 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     log.info(f"Timeframes: daily, weekly, monthly")
     log.info(f"NEW: RSI(14) computed per instrument per timeframe")
 
+    # ── AI EOD MARKET RESEARCH NOTE ──
+    ai_note = generate_ai_analysis(output)
+    if ai_note:
+        output["ai_analysis"] = ai_note
+
     return output
+
+
+# =============================================================================
+# AI EOD MARKET RESEARCH NOTE (Groq llama-3.3-70b)
+# =============================================================================
+def generate_ai_analysis(rrm_output):
+    """Generate Bloomberg-style EOD market research note using Groq API"""
+    api_key = os.environ.get("GROQ_API_KEY", "")
+    if not api_key:
+        log.warning("GROQ_API_KEY not set, skipping AI analysis")
+        return None
+
+    try:
+        import urllib.request, urllib.error
+
+        # Build context from RRM data
+        bm_data = rrm_output.get("benchmarks_data", {})
+        nifty = bm_data.get("^NSEI", {})
+        today = rrm_output.get("metadata", {}).get("date", "")
+
+        if not nifty:
+            log.warning("No Nifty 50 benchmark data, skipping AI analysis")
+            return None
+
+        # Extract key metrics
+        w_sectors = nifty.get("weekly", {}).get("sectors", [])
+        d_sectors = nifty.get("daily", {}).get("sectors", [])
+        w_globals = nifty.get("weekly", {}).get("global_indices", [])
+        w_assets = nifty.get("weekly", {}).get("asset_classes", [])
+
+        # Quadrant distribution
+        q_dist = {"Leading": 0, "Improving": 0, "Weakening": 0, "Lagging": 0}
+        for s in w_sectors:
+            q = s.get("quadrant", "")
+            if q in q_dist: q_dist[q] += 1
+        total = sum(q_dist.values()) or 1
+        right_pct = round((q_dist["Leading"] + q_dist["Improving"]) / total * 100)
+
+        # Regime
+        if right_pct >= 70: regime = "STRONG BULL"
+        elif right_pct >= 55: regime = "BULL"
+        elif right_pct >= 45: regime = "TRANSITIONAL"
+        elif right_pct >= 30: regime = "BEAR"
+        else: regime = "STRONG BEAR"
+
+        # Top/bottom sectors by RS-Momentum
+        sorted_by_mom = sorted(w_sectors, key=lambda s: s.get("current", {}).get("rs_momentum", 100), reverse=True)
+        top3 = sorted_by_mom[:3]
+        bot3 = sorted_by_mom[-3:]
+
+        # Sectors rotating (daily != weekly quadrant)
+        rotating = []
+        d_map = {s["symbol"]: s.get("quadrant", "") for s in d_sectors}
+        for s in w_sectors:
+            dq = d_map.get(s["symbol"], "")
+            wq = s.get("quadrant", "")
+            if dq and wq and dq != wq:
+                rotating.append(f"{s['name']}: {wq} → {dq}")
+
+        # Global macro context
+        global_summary = []
+        for g in w_globals[:10]:
+            cur = g.get("current", {})
+            global_summary.append(f"{g['name']}: RS={cur.get('rs_ratio',100):.1f}, Mom={cur.get('rs_momentum',100):.1f}, Q={g.get('quadrant','?')}, RSI={cur.get('rsi','N/A')}")
+
+        # Asset classes
+        asset_summary = []
+        for a in w_assets:
+            cur = a.get("current", {})
+            asset_summary.append(f"{a['name']}: RS={cur.get('rs_ratio',100):.1f}, Mom={cur.get('rs_momentum',100):.1f}, Q={a.get('quadrant','?')}")
+
+        # Score distribution
+        score_dist = {5:0, 4:0, 3:0, 2:0, 1:0}
+        for s in w_sectors:
+            cur = s.get("current", {})
+            rsr, rsm = cur.get("rs_ratio", 100), cur.get("rs_momentum", 100)
+            # Simplified MTF score estimate
+            score = 0
+            if s.get("quadrant","") in ("Leading","Improving"): score += 2
+            # Check daily
+            ds = d_map.get(s["symbol"], "")
+            if ds in ("Leading","Improving"): score += 1
+            score = min(score, 5)
+            if score in score_dist: score_dist[score] += 1
+
+        context = f"""
+DATE: {today}
+BENCHMARK: Nifty 50
+
+SECTOR QUADRANT DISTRIBUTION (Weekly):
+Leading: {q_dist['Leading']} | Improving: {q_dist['Improving']} | Weakening: {q_dist['Weakening']} | Lagging: {q_dist['Lagging']}
+Right side: {right_pct}% | Regime: {regime}
+
+TOP 3 MOMENTUM SECTORS:
+{chr(10).join([f"  {s['name']}: RS-Ratio={s['current']['rs_ratio']:.1f}, RS-Mom={s['current']['rs_momentum']:.1f}, Q={s['quadrant']}, RSI={s['current'].get('rsi','N/A')}" for s in top3])}
+
+BOTTOM 3 MOMENTUM SECTORS:
+{chr(10).join([f"  {s['name']}: RS-Ratio={s['current']['rs_ratio']:.1f}, RS-Mom={s['current']['rs_momentum']:.1f}, Q={s['quadrant']}, RSI={s['current'].get('rsi','N/A')}" for s in bot3])}
+
+ROTATION ALERTS (Daily ≠ Weekly quadrant):
+{chr(10).join(rotating) if rotating else 'None detected'}
+
+GLOBAL INDICES (Weekly RRM vs Nifty 50):
+{chr(10).join(global_summary)}
+
+ASSET CLASSES (Weekly RRM vs Nifty 50):
+{chr(10).join(asset_summary)}
+
+ALL SECTORS DETAIL:
+{chr(10).join([f"  {s['name']}: RS={s['current']['rs_ratio']:.1f}, Mom={s['current']['rs_momentum']:.1f}, Q={s['quadrant']}, RSI={s['current'].get('rsi','N/A')}" for s in w_sectors])}
+"""
+
+        prompt = f"""You are a senior equity research analyst at a top-tier institutional brokerage (like Goldman Sachs, Morgan Stanley, or Kotak Institutional Equities). Write an EOD market research note for Indian equity markets.
+
+IMPORTANT RULES:
+- Write in Bloomberg terminal / institutional research note style
+- Be opinionated, take clear positions — no hedging or wishy-washy language
+- Use specific numbers from the data
+- Identify the 2-3 most important themes of the day
+- Give explicit sector allocation recommendations (Overweight/Underweight/Neutral)
+- Flag any rotation shifts or regime changes
+- If regime is BULL/STRONG BULL but momentum leaders are commodities/energy and laggards are IT/Banks, flag the divergence
+- End with 3 specific actionable calls for swing traders
+- Keep it under 600 words
+- Use markdown formatting with ## headers
+
+DATA:
+{context}
+
+Write the research note now. Start with the date and a one-line market summary headline."""
+
+        # Call Groq API
+        payload = json.dumps({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.4,
+            "max_tokens": 1500,
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.groq.com/openai/v1/chat/completions",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            note = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        if note:
+            log.info(f"✅ AI Analysis generated ({len(note)} chars)")
+            return {
+                "note": note,
+                "generated_at": datetime.now().isoformat(),
+                "model": "llama-3.3-70b-versatile",
+                "regime": regime,
+                "right_pct": right_pct,
+            }
+        else:
+            log.warning("AI Analysis: empty response from Groq")
+            return None
+
+    except Exception as e:
+        log.error(f"AI Analysis failed: {e}")
+        return None
 
 
 def main():
