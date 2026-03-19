@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Sector Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{--bg-primary:#06080c;--bg-secondary:#0c1018;--bg-tertiary:#121820;--bg-card:#0f1520;--bg-hover:#141d2a;--border-dim:rgba(0,255,136,0.06);--border-low:rgba(0,255,136,0.1);--border-med:rgba(0,255,136,0.2);--accent:#00ff88;--accent-dim:rgba(0,255,136,0.15);--accent2:#00c8ff;--accent3:#8844ff;--red:#ff4455;--amber:#ffaa00;--text-primary:#e8e8e8;--text-secondary:#8899aa;--text-muted:#556677;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-display);min-height:100vh}
+body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.008) 2px,rgba(0,255,136,.008) 4px);pointer-events:none;z-index:9999}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(0,255,136,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.2);border-radius:3px}
+#root{position:relative;z-index:1}
+.nav{display:flex;align-items:center;gap:4px;padding:8px 20px;background:var(--bg-secondary);border-bottom:1px solid var(--border-dim);position:sticky;top:0;z-index:100}
+.nav-brand{font-weight:900;font-size:16px;letter-spacing:2px;background:linear-gradient(135deg,#00ff88,#00c8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:16px}
+.nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-decoration:none;border-radius:4px;font-family:var(--font-mono)}
+.nav-link:hover{color:var(--text-primary);background:var(--bg-hover)}
+.nav-link.active{color:var(--accent);background:var(--accent-dim)}
+.card{background:var(--bg-card);border:1px solid var(--border-low);border-radius:8px;overflow:hidden}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .3s ease-out}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState, useEffect, useMemo, useRef} = React;
+
+// ═══════════════════════════════════════════════════════════
+// DATA LOADER
+// ═══════════════════════════════════════════════════════════
+
+function useSectorData() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [heatRes, analysisRes] = await Promise.allSettled([
+          fetch("data/sector_heatmap.json"),
+          fetch("data/sector_analysis.json"),
+        ]);
+        let heatmap = null, analysis = null;
+        if (heatRes.status === "fulfilled" && heatRes.value.ok) heatmap = await heatRes.value.json();
+        if (analysisRes.status === "fulfilled" && analysisRes.value.ok) analysis = await analysisRes.value.json();
+
+        if (heatmap || analysis) {
+          setData({ heatmap: heatmap || analysis?.sector_data, ai: analysis?.ai_insights });
+        } else {
+          setData(MOCK_SECTOR_DATA);
+        }
+      } catch (e) {
+        console.warn("Using mock sector data:", e);
+        setData(MOCK_SECTOR_DATA);
+      }
+      setLoading(false);
+    }
+    load();
+  }, []);
+  return { data, loading };
+}
+
+// Mock data for offline
+const MOCK_SECTOR_DATA = {
+  heatmap: {
+    total_sectors: 12,
+    treemaps: {
+      "3m": [
+        {name:"Banks - PSU",value:45,rs:88,return:18.5,quadrant:"leading"},
+        {name:"Defence",value:12,rs:82,return:22.1,quadrant:"leading"},
+        {name:"Power",value:30,rs:78,return:15.3,quadrant:"leading"},
+        {name:"Industrials",value:55,rs:72,return:12.8,quadrant:"weakening"},
+        {name:"Automobiles",value:35,rs:65,return:8.4,quadrant:"weakening"},
+        {name:"Pharma",value:40,rs:58,return:5.2,quadrant:"improving"},
+        {name:"Consumer...",value:38,rs:52,return:2.1,quadrant:"neutral"},
+        {name:"Chemicals",value:25,rs:45,return:-3.2,quadrant:"improving"},
+        {name:"Metals & Mining",value:28,rs:38,return:-8.5,quadrant:"lagging"},
+        {name:"Realty",value:15,rs:32,return:-12.1,quadrant:"lagging"},
+        {name:"IT",value:50,rs:22,return:-18.4,quadrant:"lagging"},
+        {name:"Telecom",value:8,rs:55,return:4.8,quadrant:"neutral"},
+      ],
+      "1m": [
+        {name:"Power",value:30,rs:85,return:8.9,quadrant:"leading"},
+        {name:"Defence",value:12,rs:80,return:10.2,quadrant:"leading"},
+        {name:"Banks - PSU",value:45,rs:75,return:6.5,quadrant:"weakening"},
+        {name:"Pharma",value:40,rs:68,return:5.8,quadrant:"improving"},
+        {name:"Automobiles",value:35,rs:55,return:2.1,quadrant:"neutral"},
+        {name:"Consumer...",value:38,rs:50,return:0.5,quadrant:"neutral"},
+        {name:"Industrials",value:55,rs:48,return:-1.2,quadrant:"weakening"},
+        {name:"Chemicals",value:25,rs:42,return:-4.5,quadrant:"improving"},
+        {name:"Telecom",value:8,rs:38,return:-5.2,quadrant:"lagging"},
+        {name:"Metals & Mining",value:28,rs:30,return:-9.8,quadrant:"lagging"},
+        {name:"Realty",value:15,rs:25,return:-11.5,quadrant:"lagging"},
+        {name:"IT",value:50,rs:18,return:-15.2,quadrant:"lagging"},
+      ],
+      "1w": [
+        {name:"Defence",value:12,rs:92,return:5.8,quadrant:"leading"},
+        {name:"Power",value:30,rs:88,return:4.2,quadrant:"leading"},
+        {name:"Pharma",value:40,rs:72,return:3.1,quadrant:"improving"},
+        {name:"Banks - PSU",value:45,rs:65,return:2.0,quadrant:"weakening"},
+        {name:"Consumer...",value:38,rs:58,return:1.2,quadrant:"neutral"},
+        {name:"Automobiles",value:35,rs:52,return:0.5,quadrant:"neutral"},
+        {name:"Chemicals",value:25,rs:48,return:-0.8,quadrant:"improving"},
+        {name:"Industrials",value:55,rs:42,return:-2.1,quadrant:"weakening"},
+        {name:"Telecom",value:8,rs:35,return:-3.5,quadrant:"lagging"},
+        {name:"Realty",value:15,rs:28,return:-4.2,quadrant:"lagging"},
+        {name:"Metals & Mining",value:28,rs:22,return:-5.8,quadrant:"lagging"},
+        {name:"IT",value:50,rs:15,return:-7.2,quadrant:"lagging"},
+      ],
+    },
+    matrix: {
+      leading:["Power","Defence"],
+      weakening:["Banks - PSU","Industrials"],
+      improving:["Pharma","Chemicals"],
+      lagging:["IT","Realty","Metals & Mining"],
+    },
+    hot_themes:[
+      {name:"PSU Pack",avg_momentum:78,is_hot:true,sector_count:3},
+      {name:"Infra Boom",avg_momentum:55,is_hot:false,sector_count:4},
+      {name:"Digital India",avg_momentum:25,is_hot:false,sector_count:2},
+    ],
+    rotation_signals:[
+      {sector:"Defence",signal:"ROTATING IN",detail:"RS accelerating: 3M=82 → 1M=80 → 1W=92"},
+      {sector:"Pharma",signal:"ROTATING IN",detail:"RS accelerating: 3M=58 → 1M=68 → 1W=72"},
+      {sector:"Banks - PSU",signal:"ROTATING OUT",detail:"RS decelerating: 3M=88 → 1M=75 → 1W=65"},
+      {sector:"IT",signal:"ROTATING OUT",detail:"RS decelerating: 3M=22 → 1M=18 → 1W=15"},
+    ],
+  },
+  ai: {
+    market_mood:"cautious",
+    mood_score:55,
+    narrative:"Market shows selective strength with Defence and Power sectors leading while IT continues to underperform. PSU banks show signs of rotation out after a strong 3-month run. Pharma is the emerging leader with improving RS across all timeframes.",
+    sector_calls:[
+      {sector:"Defence",call:"BUY",reason:"Strongest RS acceleration across all timeframes with order book visibility"},
+      {sector:"Power",call:"HOLD",reason:"Strong but showing signs of extended move, wait for pullback"},
+      {sector:"IT",call:"AVOID",reason:"Weakest sector with deteriorating RS, no reversal signs yet"},
+      {sector:"Pharma",call:"BUY",reason:"Classic rotation candidate — RS improving on all timeframes"},
+    ],
+    theme_insight:"PSU theme losing steam after 3-month outperformance. Rotation towards quality Pharma and Defence names. Watch for China+1 beneficiaries in Chemicals sector as RS bottoms.",
+    risk_flag:"IT sector weakness could drag Nifty if TCS/Infy earnings disappoint. Q4 earnings season is the key catalyst.",
+    action_items:["Accumulate Defence names on dips (HAL, BEL)","Book partial profits in PSU Banks","Add Pharma exposure — sector rotation underway"],
+  },
+};
+
+// ═══════════════════════════════════════════════════════════
+// TREEMAP COMPONENT (Canvas-drawn)
+// ═══════════════════════════════════════════════════════════
+
+const Treemap = ({data, title, timeframe}) => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !data?.length) return;
+    const canvas = canvasRef.current;
+    const W = canvas.width = canvas.parentElement.offsetWidth;
+    const H = canvas.height = 280;
+    const ctx = canvas.getContext("2d");
+
+    // Sort by value (size) descending
+    const sorted = [...data].sort((a,b) => b.value - a.value);
+    const totalValue = sorted.reduce((sum, d) => sum + d.value, 0);
+
+    // Simple squarified treemap layout
+    const rects = [];
+    let x = 0, y = 0, rowH = H, remainW = W;
+    let remaining = [...sorted];
+
+    function layoutRow(row, x, y, w, h) {
+      const rowTotal = row.reduce((s, d) => s + d.value, 0);
+      let cx = x;
+      for (const item of row) {
+        const itemW = (item.value / rowTotal) * w;
+        rects.push({...item, x: cx, y, w: itemW, h});
+        cx += itemW;
+      }
+    }
+
+    // Simple row-based layout
+    let rowItems = [];
+    let rowValue = 0;
+    const rowLimit = totalValue * 0.35;
+
+    for (const item of remaining) {
+      rowItems.push(item);
+      rowValue += item.value;
+      if (rowValue >= rowLimit || item === remaining[remaining.length - 1]) {
+        const rH = (rowValue / totalValue) * H;
+        layoutRow(rowItems, 0, y, W, rH);
+        y += rH;
+        rowItems = [];
+        rowValue = 0;
+      }
+    }
+
+    // Draw
+    ctx.clearRect(0, 0, W, H);
+
+    for (const r of rects) {
+      // Color based on RS rating
+      const rs = r.rs || 50;
+      let bgColor;
+      if (rs >= 75) bgColor = "rgba(0,180,80,0.7)";       // Deep green
+      else if (rs >= 60) bgColor = "rgba(100,200,80,0.6)"; // Light green
+      else if (rs >= 45) bgColor = "rgba(200,200,100,0.5)";// Yellow
+      else if (rs >= 30) bgColor = "rgba(220,150,80,0.5)"; // Orange
+      else bgColor = "rgba(200,80,80,0.6)";                // Red
+
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+
+      // Border
+      ctx.strokeStyle = "rgba(0,0,0,0.3)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+
+      // Text
+      if (r.w > 50 && r.h > 25) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `bold ${Math.min(13, r.w / 8)}px 'Outfit'`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const name = r.name.length > r.w / 8 ? r.name.substring(0, Math.floor(r.w / 8)) + "..." : r.name;
+        ctx.fillText(name, r.x + r.w / 2, r.y + r.h / 2 - 6);
+
+        ctx.font = `600 ${Math.min(11, r.w / 10)}px 'JetBrains Mono'`;
+        const retStr = `${r.return > 0 ? "+" : ""}${r.return.toFixed(1)}%`;
+        ctx.fillText(retStr, r.x + r.w / 2, r.y + r.h / 2 + 10);
+      }
+    }
+
+    // Title overlay
+    ctx.fillStyle = "rgba(6,8,12,0.6)";
+    ctx.fillRect(0, 0, W, 22);
+    ctx.fillStyle = "#889";
+    ctx.font = "11px 'JetBrains Mono'";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(`Sectoral Heatmap: ${timeframe} RS Rating`, 8, 5);
+
+  }, [data, title]);
+
+  return <canvas ref={canvasRef} style={{width:"100%",height:280,borderRadius:6,cursor:"pointer"}}/>;
+};
+
+// ═══════════════════════════════════════════════════════════
+// RRM MATRIX COMPONENT
+// ═══════════════════════════════════════════════════════════
+
+const RRMMatrix = ({matrix}) => {
+  const quadrants = [
+    {key:"leading", label:"LEADING", color:"#00ff88", bg:"rgba(0,255,136,0.06)", icon:"▲"},
+    {key:"weakening", label:"WEAKENING", color:"#ffaa00", bg:"rgba(255,170,0,0.06)", icon:"▼"},
+    {key:"improving", label:"IMPROVING", color:"#00c8ff", bg:"rgba(0,200,255,0.06)", icon:"↗"},
+    {key:"lagging", label:"LAGGING", color:"#ff4455", bg:"rgba(255,68,85,0.06)", icon:"↘"},
+  ];
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2}}>
+      {quadrants.map(q => (
+        <div key={q.key} style={{background:q.bg,border:`1px solid ${q.color}22`,borderRadius:6,padding:12}}>
+          <div style={{fontSize:10,fontWeight:700,color:q.color,fontFamily:"var(--font-mono)",letterSpacing:1,marginBottom:6}}>
+            {q.icon} {q.label}
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {(matrix[q.key] || []).map((sec,i) => (
+              <span key={i} style={{fontSize:10,padding:"2px 6px",borderRadius:3,
+                background:`${q.color}15`,color:q.color,border:`1px solid ${q.color}25`,
+                fontFamily:"var(--font-mono)",fontWeight:600}}>{sec}</span>
+            ))}
+            {!(matrix[q.key]?.length) && <span style={{fontSize:10,color:"var(--text-muted)"}}>—</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// AI INSIGHTS CARD
+// ═══════════════════════════════════════════════════════════
+
+const AIInsights = ({ai}) => {
+  if (!ai) return null;
+  const moodColors = {bullish:"#00ff88",bearish:"#ff4455",cautious:"#ffaa00",neutral:"#889",unknown:"#556"};
+  const moodColor = moodColors[ai.market_mood] || "#889";
+
+  return (
+    <div className="card fade-in" style={{marginBottom:16}}>
+      <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>🤖 AI MARKET INSIGHT <span style={{color:"var(--accent3)",fontSize:9}}>powered by Groq</span></span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:22,fontWeight:900,color:moodColor,fontFamily:"var(--font-display)"}}>{ai.mood_score || "—"}</span>
+          <span style={{fontSize:10,fontWeight:700,color:moodColor,fontFamily:"var(--font-mono)",textTransform:"uppercase"}}>{ai.market_mood}</span>
+        </div>
+      </div>
+      <div style={{padding:16}}>
+        {/* Narrative */}
+        <div style={{fontSize:13,lineHeight:1.7,color:"var(--text-primary)",marginBottom:16,
+          borderLeft:"3px solid var(--accent3)",paddingLeft:12}}>
+          {ai.narrative}
+        </div>
+
+        {/* Sector Calls */}
+        {ai.sector_calls?.length > 0 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:10,fontWeight:700,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6,letterSpacing:1}}>SECTOR CALLS</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:8}}>
+              {ai.sector_calls.map((sc,i) => {
+                const callColors = {BUY:"#00ff88",HOLD:"#ffaa00",AVOID:"#ff4455"};
+                return (
+                  <div key={i} style={{background:"var(--bg-tertiary)",borderRadius:6,padding:"8px 12px",
+                    borderLeft:`3px solid ${callColors[sc.call]||"#889"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                      <span style={{fontWeight:700,fontSize:12}}>{sc.sector}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:callColors[sc.call],fontFamily:"var(--font-mono)"}}>{sc.call}</span>
+                    </div>
+                    <div style={{fontSize:10,color:"var(--text-secondary)"}}>{sc.reason}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Theme + Risk */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+          {ai.theme_insight && (
+            <div style={{background:"rgba(136,68,255,0.06)",border:"1px solid rgba(136,68,255,0.15)",borderRadius:6,padding:10}}>
+              <div style={{fontSize:9,fontWeight:700,color:"var(--accent3)",fontFamily:"var(--font-mono)",marginBottom:4}}>THEME ROTATION</div>
+              <div style={{fontSize:11,color:"var(--text-secondary)",lineHeight:1.5}}>{ai.theme_insight}</div>
+            </div>
+          )}
+          {ai.risk_flag && (
+            <div style={{background:"rgba(255,68,85,0.06)",border:"1px solid rgba(255,68,85,0.15)",borderRadius:6,padding:10}}>
+              <div style={{fontSize:9,fontWeight:700,color:"var(--red)",fontFamily:"var(--font-mono)",marginBottom:4}}>⚠ RISK FLAG</div>
+              <div style={{fontSize:11,color:"var(--text-secondary)",lineHeight:1.5}}>{ai.risk_flag}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Action Items */}
+        {ai.action_items?.length > 0 && (
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6,letterSpacing:1}}>ACTION ITEMS</div>
+            {ai.action_items.map((item,i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",fontSize:12,color:"var(--text-primary)"}}>
+                <span style={{color:"var(--accent)",fontSize:8}}>◈</span> {item}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════════════
+
+const SectorPage = () => {
+  const {data, loading} = useSectorData();
+  const [treemapTF, setTreemapTF] = useState("1m");
+
+  if (loading) return (
+    <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"80vh",flexDirection:"column",gap:12}}>
+      <div style={{width:40,height:40,border:"3px solid var(--border-low)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  const h = data?.heatmap || {};
+  const ai = data?.ai;
+  const treemaps = h.treemaps || {};
+
+  return (
+    <div>
+      <nav className="nav">
+        <span className="nav-brand">◈ TRADEDGE</span>
+        <a href="index.html" className="nav-link">Journal</a>
+        <a href="rrg.html" className="nav-link">RRG</a>
+        <a href="mps.html" className="nav-link">MPS</a>
+        <a href="matrix.html" className="nav-link">Matrix</a>
+        <a href="scanner.html" className="nav-link">Scanner</a>
+        <a href="#" className="nav-link active">Sectors</a>
+      </nav>
+
+      <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 20px"}}>
+
+        <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,marginBottom:4,
+          background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",
+          WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ SECTOR INTELLIGENCE</h1>
+        <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:16,letterSpacing:1}}>
+          SECTORAL RS HEATMAPS • RRM MATRIX • AI INSIGHTS
+        </div>
+
+        {/* AI Insights */}
+        <AIInsights ai={ai}/>
+
+        {/* Treemap Row */}
+        <div className="card fade-in" style={{marginBottom:16}}>
+          <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>SECTORAL RS HEATMAPS</span>
+            <div style={{display:"flex",gap:2,background:"var(--bg-secondary)",padding:2,borderRadius:4,border:"1px solid var(--border-dim)"}}>
+              {[["3m","3 Month"],["1m","1 Month"],["1w","1 Week"]].map(([k,label]) => (
+                <button key={k} onClick={()=>setTreemapTF(k)}
+                  style={{padding:"3px 10px",border:"none",borderRadius:3,fontSize:10,fontWeight:600,
+                    fontFamily:"var(--font-mono)",cursor:"pointer",
+                    background:treemapTF===k?"var(--accent-dim)":"transparent",
+                    color:treemapTF===k?"var(--accent)":"var(--text-muted)"}}>{label}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{padding:12}}>
+            <Treemap data={treemaps[treemapTF] || []} title={`${treemapTF} RS`} timeframe={treemapTF === "3m" ? "3 Months" : treemapTF === "1m" ? "Monthly" : "Weekly"}/>
+          </div>
+          {/* Color legend */}
+          <div style={{padding:"0 16px 12px",display:"flex",gap:12,alignItems:"center",fontSize:9,fontFamily:"var(--font-mono)"}}>
+            {[["rgba(0,180,80,0.7)","RS 75+"],["rgba(100,200,80,0.6)","RS 60-75"],["rgba(200,200,100,0.5)","RS 45-60"],["rgba(220,150,80,0.5)","RS 30-45"],["rgba(200,80,80,0.6)","RS <30"]].map(([c,l],i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
+                <div style={{width:12,height:12,borderRadius:2,background:c}}/><span style={{color:"var(--text-muted)"}}>{l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* RRM Matrix + Rotation Signals */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+          <div className="card fade-in">
+            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
+              fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>📊 RRM SECTOR MATRIX</div>
+            <div style={{padding:12}}>
+              <RRMMatrix matrix={h.matrix || {}}/>
+            </div>
+          </div>
+
+          <div className="card fade-in">
+            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
+              fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>🔄 ROTATION SIGNALS</div>
+            <div style={{padding:12}}>
+              {(h.rotation_signals || []).map((sig,i) => (
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",
+                  borderBottom:"1px solid var(--border-dim)"}}>
+                  <span style={{fontSize:16}}>{sig.signal === "ROTATING IN" ? "🟢" : "🔴"}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:12}}>{sig.sector}
+                      <span style={{fontSize:10,fontWeight:600,marginLeft:8,
+                        color:sig.signal==="ROTATING IN"?"#00ff88":"#ff4455"}}>{sig.signal}</span>
+                    </div>
+                    <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{sig.detail}</div>
+                  </div>
+                </div>
+              ))}
+              {!(h.rotation_signals?.length) && <div style={{color:"var(--text-muted)",fontSize:11}}>No rotation signals detected</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Hot Themes */}
+        <div className="card fade-in" style={{marginBottom:16}}>
+          <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
+            fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>🔥 THEME MOMENTUM</div>
+          <div style={{padding:12,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
+            {(h.hot_themes || []).map((theme,i) => (
+              <div key={i} style={{background:theme.is_hot?"rgba(255,170,0,0.06)":"var(--bg-tertiary)",
+                border:`1px solid ${theme.is_hot?"rgba(255,170,0,0.2)":"var(--border-dim)"}`,
+                borderRadius:6,padding:"10px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <span style={{fontWeight:700,fontSize:12}}>{theme.is_hot ? "🔥 " : ""}{theme.name}</span>
+                  <span style={{fontFamily:"var(--font-mono)",fontWeight:700,fontSize:14,
+                    color:theme.avg_momentum>60?"#00ff88":theme.avg_momentum>40?"#ffaa00":"#ff4455"}}>
+                    {theme.avg_momentum.toFixed(0)}
+                  </span>
+                </div>
+                <div style={{height:4,borderRadius:2,background:"rgba(255,255,255,0.05)"}}>
+                  <div style={{height:"100%",borderRadius:2,width:`${theme.avg_momentum}%`,
+                    background:theme.avg_momentum>60?"#00ff88":theme.avg_momentum>40?"#ffaa00":"#ff4455"}}/>
+                </div>
+                <div style={{fontSize:9,color:"var(--text-muted)",marginTop:4,fontFamily:"var(--font-mono)"}}>
+                  {theme.sector_count} sectors tracked
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* All Treemaps Side by Side */}
+        <div className="card fade-in" style={{marginBottom:16}}>
+          <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
+            fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>MULTI-TIMEFRAME COMPARISON</div>
+          <div style={{padding:12,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <Treemap data={treemaps["3m"]||[]} title="3M RS" timeframe="3 Months"/>
+            <Treemap data={treemaps["1m"]||[]} title="1M RS" timeframe="Monthly"/>
+            <Treemap data={treemaps["1w"]||[]} title="1W RS" timeframe="Weekly"/>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",
+          fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>
+          <span>TRADEDGE SECTOR INTELLIGENCE • AI BY GROQ • DATA VIA YFINANCE</span>
+          <span>⚡ CYBERPUNK EDITION</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<SectorPage/>);
+</script>
+</body>
+</html>
