@@ -42,7 +42,9 @@ jobs:
           [ "${{ inputs.mode }}" = "quick" ] && ARGS="--quick"
           [ -n "${{ inputs.stock }}" ] && ARGS="$ARGS --stock ${{ inputs.stock }}"
           python scripts/generate_data.py $ARGS
-        env: { PYTHONUNBUFFERED: "1" }
+        env:
+          PYTHONUNBUFFERED: "1"
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
       - name: Send Telegram Alerts
         if: inputs.mode != 'digest-only'
@@ -58,11 +60,45 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
+      - name: Debug - List generated files
+        run: |
+          echo "=== Files in data/ ==="
+          ls -la data/ 2>/dev/null || echo "data/ folder not found"
+          echo ""
+          echo "=== JSON files ==="
+          find data/ -name "*.json" -not -name ".gitkeep*" 2>/dev/null | head -20
+          echo ""
+          echo "=== Stock details count ==="
+          ls data/stock_details/*.json 2>/dev/null | wc -l || echo "0"
+          echo ""
+          echo "=== scanner_results.json size ==="
+          wc -c data/scanner_results.json 2>/dev/null || echo "File not found!"
+
       - name: Commit and push
         run: |
           git config user.name "TradEdge Scanner Bot"
           git config user.email "scanner@tradedge.bot"
-          git add data/ scripts/nse_symbols.json scripts/scan_config.json 2>/dev/null || true
-          git diff --staged --quiet && echo "No changes" && exit 0
-          git commit -m "📊 Scanner update — $(date -u +'%Y-%m-%d %H:%M UTC')"
-          git push
+          
+          # Force add all data files (in case .gitignore blocks them)
+          git add -f data/scanner_results.json 2>/dev/null || true
+          git add -f data/scan_runs.json 2>/dev/null || true
+          git add -f data/sector_heatmap.json 2>/dev/null || true
+          git add -f data/sector_analysis.json 2>/dev/null || true
+          git add -f data/circuit_limits.json 2>/dev/null || true
+          git add -f data/earnings_calendar.json 2>/dev/null || true
+          git add -f data/alert_state.json 2>/dev/null || true
+          git add -f data/stock_details/ 2>/dev/null || true
+          git add -f scripts/nse_symbols.json 2>/dev/null || true
+          
+          # Show what's staged
+          echo "=== Staged changes ==="
+          git diff --staged --stat
+          
+          # Commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "📊 Scanner update — $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+            echo "✅ Pushed successfully"
+          fi
