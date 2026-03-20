@@ -1067,6 +1067,18 @@ const StockPage = () => {
     roce: d.fundamentals?.roce || si.roce,
     eps: d.fundamentals?.eps || (si.currentPrice && si.pe ? (si.currentPrice / si.pe).toFixed(2) : null),
   };
+  
+  // Calculate U/D Volume Ratio from price_history (last 50 days)
+  if (!f.ud_vol_ratio && d.price_history?.length > 10) {
+    const ph = d.price_history.slice(-50);
+    let upVol = 0, downVol = 0;
+    for (let i = 1; i < ph.length; i++) {
+      const prev = ph[i-1], curr = ph[i];
+      if (curr.close > prev.close) upVol += (curr.volume || 0);
+      else if (curr.close < prev.close) downVol += (curr.volume || 0);
+    }
+    if (downVol > 0) f.ud_vol_ratio = (upVol / downVol).toFixed(2);
+  }
   if (!d.price && si.currentPrice) d.price = si.currentPrice;
   if (!d.name && si.name) d.name = si.name;
   const pq = d.prev_fundamentals || {};
