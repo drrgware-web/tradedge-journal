@@ -540,6 +540,8 @@ const ScanBuilder = ({onApplyFilter}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("scans");
   const [clauseText, setClauseText] = useState("");
+  const [scanRunning, setScanRunning] = useState(false);
+  const [scanResults, setScanResults] = useState(null);
   const [filters, setFilters] = useState({
     priceMin:"", priceMax:"", mcapMin:"300", mcapMax:"5000000",
     excludeCircuit: true, volumeMA50Min:"100000",
@@ -643,10 +645,67 @@ const ScanBuilder = ({onApplyFilter}) => {
               <textarea rows={4} style={{width:"100%",resize:"vertical",fontSize:11}}
                 placeholder='( cash ( latest close > latest sma( latest close, 200 ) and latest rsi( 14 ) > 50 ) )'
                 value={clauseText} onChange={e=>setClauseText(e.target.value)}/>
-              <div style={{marginTop:8,display:"flex",gap:8}}>
-                <button className="btn btn-accent">▶ Run Scan</button>
+              <div style={{marginTop:8,display:"flex",gap:8,alignItems:"center"}}>
+                <button className="btn btn-accent" onClick={async () => {
+                  if (!clauseText.trim()) return;
+                  const workerUrl = localStorage.getItem('zd_worker_url');
+                  if (!workerUrl) { alert('Set zd_worker_url in localStorage first'); return; }
+                  setScanRunning(true); setScanResults(null);
+                  try {
+                    const r = await fetch(workerUrl, {
+                      method: 'POST',
+                      headers: { 'X-Kite-Action': 'chartink-scan', 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ scan_clause: clauseText.trim() }),
+                    });
+                    const data = await r.json();
+                    if (data.error) { setScanResults({ error: data.error }); }
+                    else { setScanResults(data); }
+                  } catch(e) { setScanResults({ error: e.message }); }
+                  setScanRunning(false);
+                }}>
+                  {scanRunning ? "⏳ Scanning..." : "▶ Run Scan"}
+                </button>
                 <button className="btn">Save Preset</button>
+                {scanResults?.count != null && (
+                  <span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>
+                    {scanResults.count} stocks found
+                  </span>
+                )}
+                {scanResults?.error && (
+                  <span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--red)"}}>
+                    Error: {scanResults.error}
+                  </span>
+                )}
               </div>
+              {/* ChartInk Scan Results */}
+              {scanResults?.stocks?.length > 0 && (
+                <div style={{marginTop:12,maxHeight:300,overflowY:"auto",border:"1px solid var(--border-low)",borderRadius:6}}>
+                  <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
+                    <thead>
+                      <tr style={{background:"rgba(0,255,136,0.05)"}}>
+                        {["#","SYMBOL","NAME","CLOSE","CHG%","VOL"].map(h => (
+                          <th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:9,fontWeight:700,
+                            fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)"}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scanResults.stocks.map((s, i) => (
+                        <tr key={i} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}}
+                          onClick={() => window.open(`stock.html?s=${s.symbol}`, '_blank')}>
+                          <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>{i+1}</td>
+                          <td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{s.symbol}</td>
+                          <td style={{padding:"5px 8px",color:"var(--text-secondary)"}}>{s.name}</td>
+                          <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>₹{s.close}</td>
+                          <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontWeight:600,
+                            color:s.change_pct >= 0 ? "#00ff88" : "#ff4455"}}>{s.change_pct >= 0 ? "+" : ""}{s.change_pct.toFixed(2)}%</td>
+                          <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>{(s.volume/1000).toFixed(0)}K</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
