@@ -1074,8 +1074,9 @@ const StockPage = () => {
     let upVol = 0, downVol = 0;
     for (let i = 1; i < ph.length; i++) {
       const prev = ph[i-1], curr = ph[i];
-      if (curr.close > prev.close) upVol += (curr.volume || 0);
-      else if (curr.close < prev.close) downVol += (curr.volume || 0);
+      const pc = curr.c ?? curr.close, pp = prev.c ?? prev.close, vol = curr.v ?? curr.volume ?? 0;
+      if (pc > pp) upVol += vol;
+      else if (pc < pp) downVol += vol;
     }
     if (downVol > 0) f.ud_vol_ratio = (upVol / downVol).toFixed(2);
   }
