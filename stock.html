@@ -739,6 +739,34 @@ const StockPage = () => {
   const [loading, setLoading] = useState(true);
   const [chartBoxPct, setChartBoxPct] = useState(1);
   const [chartType, setChartType] = useState("pnf");
+  const [screenerData, setScreenerData] = useState(null);
+  const [screenerLoading, setScreenerLoading] = useState(true);
+
+  // ── Screener.in fetch (same as Journal page) ──
+  const FUND_PROXIES = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ];
+
+  async function fundFetchScreener(symbol) {
+    const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
+    const workerUrl = localStorage.getItem('zd_worker_url') || '';
+    if (workerUrl) {
+      try {
+        const r = await fetch(workerUrl, {
+          method: 'GET',
+          headers: { 'X-Kite-Action': 'screener', 'X-Screener-Symbol': sym },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.quarters?.length) return data;
+        }
+      } catch(e) { console.warn('[FUND] Worker fetch failed for', sym, e.message); }
+    }
+    return null;
+  }
 
   useEffect(() => {
     async function loadStock() {
@@ -786,6 +814,19 @@ const StockPage = () => {
     loadStock();
   }, []);
 
+  // Fetch screener.in data (quarterly results, info)
+  useEffect(() => {
+    if (!SYMBOL) return;
+    setScreenerLoading(true);
+    fundFetchScreener(SYMBOL).then(sData => {
+      if (sData) {
+        console.log("[SCREENER] Loaded for", SYMBOL, sData.quarters?.length, "quarters");
+        setScreenerData(sData);
+      }
+      setScreenerLoading(false);
+    }).catch(() => setScreenerLoading(false));
+  }, []);
+
   if (loading) {
     return (
       <div>
@@ -806,7 +847,20 @@ const StockPage = () => {
   if (!data) return <div style={{padding:40,textAlign:"center",color:"var(--text-muted)"}}>Stock not found</div>;
 
   const d = data;
-  const f = d.fundamentals || {};
+  // Merge screener.in info as fallback for fundamentals
+  const si = screenerData?.info || {};
+  const f = {
+    ...d.fundamentals,
+    market_cap_cr: d.fundamentals?.market_cap_cr || si.mcapCr,
+    pe_ratio: d.fundamentals?.pe_ratio || si.pe,
+    roe: d.fundamentals?.roe || si.roe,
+    book_value: d.fundamentals?.book_value || si.bookValue,
+    dividend_yield: d.fundamentals?.dividend_yield || si.dividendYield,
+    roce: d.fundamentals?.roce || si.roce,
+    eps: d.fundamentals?.eps || (si.currentPrice && si.pe ? (si.currentPrice / si.pe).toFixed(2) : null),
+  };
+  if (!d.price && si.currentPrice) d.price = si.currentPrice;
+  if (!d.name && si.name) d.name = si.name;
   const pq = d.prev_fundamentals || {};
   const py = d.yoy_fundamentals || {};
   const fh = d.fund_holdings || {};
@@ -1034,38 +1088,59 @@ const StockPage = () => {
         {/* ── QUARTERLY RESULTS + OWNERSHIP ── */}
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16,marginBottom:16}}>
 
-          {/* Quarterly Results */}
+          {/* Quarterly Results — powered by screener.in */}
           <div className="card fade-in">
             <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>📊 FUNDAMENTAL SCORECARDS</span>
-              <span style={{fontSize:18,fontWeight:900,color:"#00ff88",fontFamily:"var(--font-display)"}}>{d.quarterly_results[0]?.fund_score}<span style={{fontSize:10,color:"var(--text-muted)",fontWeight:400}}> FUND SCORE</span></span>
+              {screenerData?.info && (
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:10,fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>
+                    MCap: ₹{screenerData.info.mcapCr?.toLocaleString()} Cr | P/E: {screenerData.info.pe} | ROE: {screenerData.info.roe}%
+                  </span>
+                </div>
+              )}
             </div>
             <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead>
-                  <tr style={{background:"rgba(0,255,136,0.03)"}}>
-                    {["FQ","EPS","YOY","QOQ","SALES","YOY","QOQ","OPM%","P/E"].map(h=>(
-                      <th key={h} style={{padding:"6px 8px",textAlign:"right",color:"var(--text-muted)",fontSize:9,
-                        fontFamily:"var(--font-mono)",fontWeight:700,borderBottom:"1px solid var(--border-dim)"}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.quarterly_results.map((q,i) => (
-                    <tr key={i} style={{borderBottom:"1px solid var(--border-dim)"}}>
-                      <td style={{padding:"6px 8px",fontWeight:600,fontSize:11,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{q.fq}</td>
-                      <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{q.eps}</td>
-                      <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.yoy}/></td>
-                      <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.qoq}/></td>
-                      <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{q.sales}</td>
-                      <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.sales_yoy}/></td>
-                      <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.sales_qoq}/></td>
-                      <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{q.opm}</td>
-                      <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--accent2)"}}>{q.pe}</td>
+              {screenerLoading ? (
+                <div style={{padding:20,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>Loading quarterly data from screener.in...</div>
+              ) : screenerData?.quarters?.length ? (
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead>
+                    <tr style={{background:"rgba(0,255,136,0.03)"}}>
+                      {["FQ","EPS","YOY","QOQ","SALES","YOY","QOQ","OPM%","P/E"].map((h,i)=>(
+                        <th key={i} style={{padding:"6px 8px",textAlign:i===0?"left":"right",color:"var(--text-muted)",fontSize:9,
+                          fontFamily:"var(--font-mono)",fontWeight:700,borderBottom:"1px solid var(--border-dim)"}}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {screenerData.quarters.slice(0,8).map((q,i) => {
+                      const fmtPct = (v) => {
+                        if (v == null) return "—";
+                        const s = (v > 0 ? "+" : "") + v.toFixed(1) + "%";
+                        return s;
+                      };
+                      return (
+                        <tr key={i} style={{borderBottom:"1px solid var(--border-dim)"}}>
+                          <td style={{padding:"6px 8px",fontWeight:600,fontSize:11,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{q.label}</td>
+                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--text-primary)"}}>{q.eps?.toFixed(1)}</td>
+                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.epsYoY != null ? fmtPct(q.epsYoY) : "—"}/></td>
+                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.epsQoQ != null ? fmtPct(q.epsQoQ) : "—"}/></td>
+                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--text-primary)"}}>{q.sales?.toLocaleString()}</td>
+                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.salesYoY != null ? fmtPct(q.salesYoY) : "—"}/></td>
+                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.salesQoQ != null ? fmtPct(q.salesQoQ) : "—"}/></td>
+                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:q.opm>=0?"var(--text-primary)":"#ff4455"}}>{q.opm != null ? q.opm + "%" : "—"}</td>
+                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--accent2)"}}>{screenerData.info?.pe || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{padding:20,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>
+                  {screenerData === null ? "Set zd_worker_url in localStorage for quarterly data" : "No quarterly data available"}
+                </div>
+              )}
             </div>
           </div>
 
