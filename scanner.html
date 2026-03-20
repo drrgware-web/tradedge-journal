@@ -197,6 +197,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* Animations */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes logoPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.03); } }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 .fade-in { animation: fadeIn 0.3s ease-out; }
@@ -719,7 +720,7 @@ const ScannerDashboard = () => {
     return (
       <div>
         <nav className="nav">
-          <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:56,marginRight:14}}/></a>
+          <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
           <a href="scanner.html" className="nav-link active">Scanner</a>
           <a href="sectors.html" className="nav-link">Sectors</a>
           <a href="rrg.html" className="nav-link">RRG</a>
@@ -741,7 +742,7 @@ const ScannerDashboard = () => {
     <div>
       {/* Navigation */}
       <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:56,marginRight:14}}/></a>
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
         <a href="scanner.html" className="nav-link active">Scanner</a>
         <a href="sectors.html" className="nav-link">Sectors</a>
         <a href="rrg.html" className="nav-link">RRG</a>
