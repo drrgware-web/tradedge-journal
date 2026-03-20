@@ -207,6 +207,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 <body>
 <div id="root"></div>
 
+<script src="scripts/tradedge-watchlist.js"></script>
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback, useRef, Fragment } = React;
 
@@ -856,8 +857,9 @@ const ScannerDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStock, setSelectedStock] = useState(null);
   const [excludeCircuit, setExcludeCircuit] = useState(true);
-  const [showTV, setShowTV] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState({ funda: null, chartink: null });
+  const [wlSidebar, setWlSidebar] = useState(false);
+  const [wlRefresh, setWlRefresh] = useState(0);
 
   const filteredStocks = useMemo(() => {
     let list = [...stocks];
@@ -937,6 +939,7 @@ const ScannerDashboard = () => {
           <a href="matrix.html" className="nav-link">Matrix</a>
           <a href="mps.html" className="nav-link">MPS</a>
           <a href="index.html" className="nav-link">Journal</a>
+          <a href="watchlist.html" className="nav-link">Watchlist</a>
         </nav>
         <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"60vh",flexDirection:"column",gap:12}}>
           <div style={{width:40,height:40,border:"3px solid var(--border-low)",borderTop:"3px solid var(--accent)",
@@ -959,6 +962,7 @@ const ScannerDashboard = () => {
         <a href="matrix.html" className="nav-link">Matrix</a>
         <a href="mps.html" className="nav-link">MPS</a>
         <a href="index.html" className="nav-link">Journal</a>
+          <a href="watchlist.html" className="nav-link">Watchlist</a>
       </nav>
 
       <div style={{maxWidth:1440,margin:"0 auto",padding:"12px 16px"}}>
@@ -991,12 +995,31 @@ const ScannerDashboard = () => {
                 style={{accentColor:"var(--accent)"}}/>
               Exclude 2%/5%
             </label>
-            <label style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)",
-              fontFamily:"var(--font-mono)",cursor:"pointer"}}>
-              <input type="checkbox" checked={showTV} onChange={e=>setShowTV(e.target.checked)}
-                style={{accentColor:"var(--accent)"}}/>
-              TE Charts
-            </label>
+            <button style={{padding:"3px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,
+              background:"rgba(0,255,136,0.1)",border:"1px solid var(--accent)",color:"var(--accent)",
+              borderRadius:4,cursor:"pointer"}} onClick={() => {
+                const name = prompt("Save current " + filteredStocks.length + " stocks as watchlist:", 
+                  "Scan " + new Date().toLocaleDateString("en-IN"));
+                if (!name) return;
+                const wl = window.teWatchlist;
+                const stockData = filteredStocks.slice(0, 200).map(s => ({
+                  symbol: s.symbol, name: s.name, sector: s.sector, 
+                  source: appliedFilters.chartink ? "chartink" : "scanner:" + activePreset,
+                }));
+                wl.createList(name, stockData);
+                wl.sync();
+                setWlRefresh(r => r + 1);
+                alert(`Saved "${name}" with ${stockData.length} stocks`);
+              }}>
+              💾 Save Scan
+            </button>
+            <button style={{padding:"3px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,
+              background:wlSidebar ? "rgba(136,68,255,0.2)" : "transparent",
+              border:"1px solid " + (wlSidebar ? "#8844ff" : "rgba(255,255,255,0.1)"),
+              color:wlSidebar ? "#8844ff" : "var(--text-muted)",
+              borderRadius:4,cursor:"pointer"}} onClick={() => setWlSidebar(!wlSidebar)}>
+              📋 Watchlists {window.teWatchlist?.getLists().length > 0 ? `(${window.teWatchlist.getLists().length})` : ""}
+            </button>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
@@ -1113,14 +1136,6 @@ const ScannerDashboard = () => {
                       <td style={{padding:"8px"}}><PctCell val={stock.returns?.["1m"]}/></td>
                       <td style={{padding:"8px"}}><PctCell val={stock.returns?.["3m"]}/></td>
                     </tr>
-                    {/* TE Mini Chart Row */}
-                    {showTV && (
-                      <tr>
-                        <td colSpan={13} style={{padding:"4px 8px 8px",borderBottom:"1px solid var(--border-dim)"}}>
-                          <TVMiniChart symbol={stock.symbol}/>
-                        </td>
-                      </tr>
-                    )}
                   </Fragment>
                 ))}
               </tbody>
@@ -1133,6 +1148,100 @@ const ScannerDashboard = () => {
             </div>
           )}
         </div>
+
+        {/* ═══ WATCHLIST SIDEBAR ═══ */}
+        {wlSidebar && (
+          <div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",background:"#0a0e14",
+            borderLeft:"1px solid var(--border-med)",zIndex:200,display:"flex",flexDirection:"column",
+            boxShadow:"-10px 0 40px rgba(0,0,0,0.5)"}}>
+            {/* Header */}
+            <div style={{padding:"12px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:13,fontWeight:800,fontFamily:"var(--font-mono)",color:"#fff",letterSpacing:1}}>📋 WATCHLISTS</span>
+              <div style={{display:"flex",gap:6}}>
+                <button style={{padding:"2px 8px",fontSize:9,fontFamily:"var(--font-mono)",background:"rgba(0,255,136,0.1)",
+                  border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:3,cursor:"pointer"}}
+                  onClick={() => {
+                    const name = prompt("New watchlist name:");
+                    if (name) { window.teWatchlist.createList(name); window.teWatchlist.sync(); setWlRefresh(r=>r+1); }
+                  }}>+ New</button>
+                <button style={{padding:"2px 8px",fontSize:9,fontFamily:"var(--font-mono)",background:"rgba(0,200,255,0.1)",
+                  border:"1px solid var(--accent2)",color:"var(--accent2)",borderRadius:3,cursor:"pointer"}}
+                  onClick={async () => { await window.teWatchlist.sync(); alert("Synced to cloud"); }}>☁ Sync</button>
+                <button style={{padding:"2px 8px",fontSize:12,background:"transparent",border:"1px solid rgba(255,255,255,0.1)",
+                  color:"var(--text-muted)",borderRadius:3,cursor:"pointer"}} onClick={() => setWlSidebar(false)}>✕</button>
+              </div>
+            </div>
+            {/* Lists */}
+            <div style={{flex:1,overflowY:"auto",padding:8}}>
+              {(() => {
+                const lists = window.teWatchlist?.getLists() || [];
+                if (!lists.length) return (
+                  <div style={{textAlign:"center",padding:40,color:"var(--text-muted)",fontSize:11,fontFamily:"var(--font-mono)"}}>
+                    No watchlists yet.<br/>Use "Save Scan" or "+ New" to create one.
+                  </div>
+                );
+                return lists.map((list, li) => (
+                  <div key={list.id} style={{marginBottom:8,border:"1px solid var(--border-low)",borderRadius:6,overflow:"hidden"}}>
+                    {/* List header */}
+                    <div style={{padding:"8px 10px",background:"rgba(0,255,136,0.03)",display:"flex",justifyContent:"space-between",
+                      alignItems:"center",borderBottom:"1px solid var(--border-dim)"}}>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{list.name}</div>
+                        <div style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>
+                          {list.stocks.length} stocks • {new Date(list.updatedAt).toLocaleDateString("en-IN")}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:4}}>
+                        <button style={{fontSize:8,padding:"2px 6px",border:"1px solid var(--border-low)",background:"transparent",
+                          color:"var(--accent)",borderRadius:3,cursor:"pointer",fontFamily:"var(--font-mono)"}}
+                          onClick={() => {
+                            setSearchQuery("");
+                            const syms = list.stocks.map(s=>s.symbol.toUpperCase());
+                            setAppliedFilters(prev => ({...prev, chartink: syms}));
+                            setWlSidebar(false);
+                          }}>Filter ▶</button>
+                        <button style={{fontSize:8,padding:"2px 6px",border:"1px solid rgba(255,68,85,0.3)",background:"transparent",
+                          color:"var(--red)",borderRadius:3,cursor:"pointer",fontFamily:"var(--font-mono)"}}
+                          onClick={() => {
+                            if (confirm(`Delete "${list.name}"?`)) {
+                              window.teWatchlist.deleteList(list.id); window.teWatchlist.sync(); setWlRefresh(r=>r+1);
+                            }
+                          }}>🗑</button>
+                      </div>
+                    </div>
+                    {/* Stock list */}
+                    <div style={{maxHeight:200,overflowY:"auto"}}>
+                      {list.stocks.map((s, si) => (
+                        <div key={si} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                          padding:"4px 10px",borderBottom:"1px solid rgba(255,255,255,0.02)",fontSize:10,cursor:"pointer"}}
+                          onClick={() => window.open(`stock.html?s=${s.symbol}`, '_blank')}>
+                          <div>
+                            <span style={{fontWeight:700,color:"#fff",marginRight:6}}>{s.symbol}</span>
+                            <span style={{color:"var(--text-muted)",fontSize:9}}>{s.sector}</span>
+                          </div>
+                          <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                            <span style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{s.source}</span>
+                            <button style={{fontSize:10,background:"transparent",border:"none",color:"var(--text-muted)",
+                              cursor:"pointer",padding:"0 2px"}} onClick={(e) => {
+                                e.stopPropagation();
+                                window.teWatchlist.removeStock(list.id, s.symbol);
+                                window.teWatchlist.sync(); setWlRefresh(r=>r+1);
+                              }}>×</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+            {/* Footer */}
+            <div style={{padding:"8px 12px",borderTop:"1px solid var(--border-dim)",fontSize:8,color:"var(--text-muted)",
+              fontFamily:"var(--font-mono)",textAlign:"center"}}>
+              <a href="watchlist.html" style={{color:"var(--accent)",textDecoration:"none"}}>Open Full Watchlist Dashboard →</a>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",
