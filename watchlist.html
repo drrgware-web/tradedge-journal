@@ -301,7 +301,9 @@ function renkoSMA(bricks, period) {
   return sma;
 }
 
-// Renko Vertical Count — count bricks in a swing × brick size
+// Renko Vertical Count — Definedge method
+// Count consecutive bricks in current swing direction
+// Target = base + (count × brick_size) for up, base - (count × brick_size) for down
 function renkoVerticalCount(bricks, swingStartIdx, brickSize) {
   if (swingStartIdx < 0 || swingStartIdx >= bricks.length) return null;
   const dir = bricks[swingStartIdx].type;
@@ -310,9 +312,13 @@ function renkoVerticalCount(bricks, swingStartIdx, brickSize) {
     if (bricks[i].type !== dir) break;
     count++;
   }
-  const base = dir === 'up' ? bricks[swingStartIdx].low : bricks[swingStartIdx].high;
-  const target = dir === 'up' ? base + count * brickSize * 2 : base - count * brickSize * 2;
-  return { target, dir, count, base };
+  if (dir === 'up') {
+    const base = bricks[swingStartIdx].low;
+    return { target: base + count * brickSize, dir: 'up', count, base };
+  } else {
+    const base = bricks[swingStartIdx].high;
+    return { target: base - count * brickSize, dir: 'down', count, base };
+  }
 }
 
 // Renko Horizontal Count — count bricks in congestion zone
@@ -757,18 +763,22 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
       else if(hit.type==='alert')setAlerts(p=>p.filter((_,i)=>i!==hit.idx));
       else if(hit.type==='drawing')setDrawings(p=>p.filter((_,i)=>i!==hit.idx));
       else if(hit.type==='count')setCountTargets(p=>p.filter((_,i)=>i!==hit.idx))}
-    else if(action==='vcount'){// Vertical count on last column/swing
-      if(chartType==='pnf'&&pnfData.columns.length>0){const r=pnfVerticalCount(pnfData.columns,pnfData.columns.length-1,pnfData.boxSize,pnfReversal);
-        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:"V.Count(P&F)"}])}
-      else if(chartType==='renko'&&renkoData.bricks.length>0){let swStart=renkoData.bricks.length-1;const d=renkoData.bricks[swStart].type;while(swStart>0&&renkoData.bricks[swStart-1].type===d)swStart--;
-        const r=renkoVerticalCount(renkoData.bricks,swStart,renkoData.brickSize);if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:"V.Count(Renko)"}])}}
-    else if(action==='hcount'){// Horizontal count (simplified: last 10 columns/bricks as congestion)
+    else if(action==='vcount'){
+      if(chartType==='pnf'&&pnfData.columns.length>0){
+        const r=pnfVerticalCount(pnfData.columns,pnfData.columns.length-1,pnfData.boxSize,pnfReversal);
+        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`V.Count P&F (${r.boxes}box×${pnfReversal}rev)`}])}
+      else if(chartType==='renko'&&renkoData.bricks.length>0){
+        let swStart=renkoData.bricks.length-1;const d=renkoData.bricks[swStart].type;
+        while(swStart>0&&renkoData.bricks[swStart-1].type===d)swStart--;
+        const r=renkoVerticalCount(renkoData.bricks,swStart,renkoData.brickSize);
+        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`V.Count Renko (${r.count}bricks)`}])}}
+    else if(action==='hcount'){
       if(chartType==='pnf'&&pnfData.columns.length>=5){const end=pnfData.columns.length-1,start=Math.max(0,end-9);
         const r=pnfHorizontalCount(pnfData.columns,start,end,pnfData.boxSize,pnfReversal);
-        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:"H.Count(P&F)"}])}
+        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`H.Count P&F (${r.width}cols)`}])}
       else if(chartType==='renko'&&renkoData.bricks.length>=5){const end=renkoData.bricks.length-1,start=Math.max(0,end-9);
         const r=renkoHorizontalCount(renkoData.bricks,start,end,renkoData.brickSize);
-        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:"H.Count(Renko)"}])}}
+        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`H.Count Renko (${r.width}bricks)`}])}}
   };
 
   useEffect(()=>{const h=e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;const k=e.key.toLowerCase();
