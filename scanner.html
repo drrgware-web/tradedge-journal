@@ -787,8 +787,15 @@ const ScanBuilder = ({onApplyFilter}) => {
 
           {/* Apply / Reset */}
           <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}}>Reset</button>
-            <button className="btn btn-accent">Apply Filters</button>
+            <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={() => {
+              setClauseText(""); setScanResults(null); setScanRunning(false);
+              setActiveTab("scans");
+            }}>Reset</button>
+            <button className="btn btn-accent" onClick={() => {
+              if (clauseText.trim() && activeTab === "clause") {
+                document.querySelector('.btn.btn-accent')?.click();
+              }
+            }}>Apply Filters</button>
           </div>
         </div>
       )}
