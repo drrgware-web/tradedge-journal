@@ -867,6 +867,51 @@ const StockPage = () => {
     return null;
   }
 
+  // Fetch MF holdings data from Trendlyne (No of Funds + Shares held)
+  async function fetchMFData(symbol) {
+    const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
+    
+    for (const proxyFn of FUND_PROXIES) {
+      try {
+        // Try Trendlyne shareholding page via CORS proxy
+        const targetUrl = `https://trendlyne.com/equity/share-holding-all/${sym}/latest/`;
+        const url = proxyFn(targetUrl);
+        const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!r.ok) continue;
+        const html = await r.text();
+        
+        const result = { no_of_funds: null, mf_holding_pct: null, mf_prev_pct: null };
+        
+        // Pattern: "Number of MF schemes increased from 71 to 76"
+        const mfCountMatch = html.match(/Number of MF schemes?\s*(?:increased|decreased|changed)\s*from\s*(\d+)\s*to\s*(\d+)/i);
+        if (mfCountMatch) result.no_of_funds = parseInt(mfCountMatch[2]);
+        
+        // Fallback patterns
+        if (!result.no_of_funds) {
+          const m2 = html.match(/(\d{2,4})\s*(?:MF|mutual fund)\s*schemes?/i);
+          if (m2) result.no_of_funds = parseInt(m2[1]);
+        }
+        if (!result.no_of_funds) {
+          const m3 = html.match(/MF\s*schemes?\s*(?:increased|decreased)\s*from\s*\d+\s*to\s*(\d+)/i);
+          if (m3) result.no_of_funds = parseInt(m3[1]);
+        }
+        
+        // Pattern: "Mutual Funds have decreased holdings from 14.23% to 13.76%"
+        const mfPctMatch = html.match(/Mutual Funds?\s*have\s*(?:increased|decreased|maintained)\s*holdings?\s*(?:from\s*([\d.]+)%\s*to\s*)?([\d.]+)%/i);
+        if (mfPctMatch) {
+          result.mf_holding_pct = parseFloat(mfPctMatch[2]);
+          if (mfPctMatch[1]) result.mf_prev_pct = parseFloat(mfPctMatch[1]);
+        }
+        
+        if (result.no_of_funds || result.mf_holding_pct) {
+          console.log("[TRENDLYNE MF]", sym, "funds:", result.no_of_funds, "holding:", result.mf_holding_pct + "%");
+          return result;
+        }
+      } catch(e) { continue; }
+    }
+    return null;
+  }
+
   useEffect(() => {
     async function loadStock() {
       try {
@@ -987,6 +1032,23 @@ const StockPage = () => {
         });
       }
     }).catch(e => console.warn("[SHAREHOLDING] Failed:", e.message));
+
+    // Fetch MF data from Trendlyne (No of Funds + MF holding %)
+    fetchMFData(SYMBOL).then(mfData => {
+      if (mfData) {
+        setData(prev => {
+          if (!prev) return prev;
+          const updated = {...prev};
+          updated.fund_holdings = {
+            ...updated.fund_holdings,
+            no_of_funds: mfData.no_of_funds || updated.fund_holdings?.no_of_funds,
+            mf_holding_pct: mfData.mf_holding_pct || updated.fund_holdings?.mf_holding_pct,
+            mf_prev_pct: mfData.mf_prev_pct || null,
+          };
+          return updated;
+        });
+      }
+    }).catch(e => console.warn("[TRENDLYNE] Failed:", e.message));
   }, []);
 
   if (loading) {
@@ -1127,29 +1189,30 @@ const StockPage = () => {
                 // Special: No of Funds
                 if (label === "No of Funds") {
                   const nf = fh.no_of_funds;
-                  const chg = fh.fund_shares_change_pct;
                   const mfPct = fh.mf_holding_pct;
+                  const mfPrev = fh.mf_prev_pct;
+                  const mfChg = (mfPct && mfPrev) ? (mfPct - mfPrev).toFixed(2) : null;
                   return (
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
                       <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
                         <span style={{fontSize:13,fontWeight:600,color: nf ? "var(--accent)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{nf != null ? nf : "—"}</span>
                         {mfPct != null && <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>({mfPct}%)</span>}
-                        {chg != null && <PctVal str={`(${chg>0?"+":""}${chg}%)`}/>}
+                        {mfChg != null && <span style={{fontSize:9,color:parseFloat(mfChg)>=0?"#00cc66":"#ff4455",fontFamily:"var(--font-mono)",fontWeight:700}}>{parseFloat(mfChg)>=0?"+":""}{mfChg}%</span>}
                       </div>
                     </div>
                   );
                 }
                 // Special: Shares by Funds
                 if (label === "Shares by Funds") {
-                  const sh = fh.shares_held_cr;
-                  const chg = fh.shares_held_change_pct;
+                  const mfPct = fh.mf_holding_pct;
+                  const mfPrev = fh.mf_prev_pct;
                   return (
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
-                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
+                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>MF Holding %</div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{fontSize:13,fontWeight:600,color: sh ? "var(--text-primary)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{sh != null ? `${sh} Cr` : "—"}</span>
-                        {chg != null && <PctVal str={`(${chg>0?"+":""}${chg}%)`}/>}
+                        <span style={{fontSize:13,fontWeight:600,color: mfPct ? "var(--text-primary)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{mfPct != null ? `${mfPct}%` : "—"}</span>
+                        {mfPrev != null && <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>prev: {mfPrev}%</span>}
                       </div>
                     </div>
                   );
