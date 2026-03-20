@@ -1149,8 +1149,8 @@ const StockPage = () => {
                 ["Market Cap", f.market_cap_cr ? `INR ${f.market_cap_cr.toLocaleString()} Cr` : "N/A", f.market_cap_cr, pq.market_cap_cr, py.market_cap_cr, false],
                 ["Sales", f.sales_cr ? `INR ${f.sales_cr.toLocaleString()} Cr` : "N/A", f.sales_cr, pq.sales_cr, py.sales_cr, false],
                 ["Shares in Float", f.shares_float_cr ? `${f.shares_float_cr} Cr` : "N/A", null, null, null, false],
-                ["No of Funds", null, null, null, null, false],  // special render
-                ["Shares by Funds", null, null, null, null, false],  // special render
+                ["No of Funds", null, null, null, null, false],  // special render — DII holding
+                ["FII Holding", null, null, null, null, false],  // special render — FII holding
                 ["Yield", f.dividend_yield != null ? `${f.dividend_yield}%` : "N/A", null, null, null, false],
                 ["Book Value", f.book_value ? `${f.book_value}` : "N/A", null, null, null, false],
                 ["U/D Vol Ratio", sv(f.ud_vol_ratio), f.ud_vol_ratio, pq.ud_vol_ratio, py.ud_vol_ratio, false],
@@ -1165,31 +1165,42 @@ const StockPage = () => {
               return items.map(([label, display, curr, prevQv, prevYv, inv], i) => {
                 // Special: No of Funds
                 if (label === "No of Funds") {
+                  // Show DII Holding % (includes MF + Insurance + others)
+                  const sh = screenerData?.shareholding;
                   const nf = fh.no_of_funds;
-                  const mfPct = fh.mf_holding_pct;
-                  const mfPrev = fh.mf_prev_pct;
-                  const mfChg = (mfPct && mfPrev) ? (mfPct - mfPrev).toFixed(2) : null;
+                  const diiArr = sh?.dii || [];
+                  const diiCurr = diiArr[diiArr.length - 1];
+                  const diiPrev = diiArr.length >= 2 ? diiArr[diiArr.length - 2] : null;
+                  const diiChg = (diiCurr != null && diiPrev != null) ? (diiCurr - diiPrev).toFixed(2) : null;
                   return (
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
-                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
+                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{nf ? "No of Funds" : "DII Holding"}</div>
                       <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                        <span style={{fontSize:13,fontWeight:600,color: nf ? "var(--accent)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{nf != null ? nf : "—"}</span>
-                        {mfPct != null && <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>({mfPct}%)</span>}
-                        {mfChg != null && <span style={{fontSize:9,color:parseFloat(mfChg)>=0?"#00cc66":"#ff4455",fontFamily:"var(--font-mono)",fontWeight:700}}>{parseFloat(mfChg)>=0?"+":""}{mfChg}%</span>}
+                        {nf != null ? (
+                          <span style={{fontSize:13,fontWeight:600,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>{nf}</span>
+                        ) : diiCurr != null ? (
+                          <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{diiCurr}%</span>
+                        ) : (
+                          <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>—</span>
+                        )}
+                        {diiChg != null && <span style={{fontSize:9,color:parseFloat(diiChg)>=0?"#00cc66":"#ff4455",fontFamily:"var(--font-mono)",fontWeight:700}}>{parseFloat(diiChg)>=0?"+":""}{diiChg}%</span>}
                       </div>
                     </div>
                   );
                 }
-                // Special: Shares by Funds
-                if (label === "Shares by Funds") {
-                  const mfPct = fh.mf_holding_pct;
-                  const mfPrev = fh.mf_prev_pct;
+                // Special: FII Holding
+                if (label === "FII Holding") {
+                  const sh = screenerData?.shareholding;
+                  const fiiArr = sh?.fii || [];
+                  const fiiCurr = fiiArr[fiiArr.length - 1];
+                  const fiiPrev = fiiArr.length >= 2 ? fiiArr[fiiArr.length - 2] : null;
+                  const fiiChg = (fiiCurr != null && fiiPrev != null) ? (fiiCurr - fiiPrev).toFixed(2) : null;
                   return (
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
-                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>MF Holding %</div>
+                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>FII Holding</div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{fontSize:13,fontWeight:600,color: mfPct ? "var(--text-primary)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{mfPct != null ? `${mfPct}%` : "—"}</span>
-                        {mfPrev != null && <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>prev: {mfPrev}%</span>}
+                        <span style={{fontSize:13,fontWeight:600,color: fiiCurr ? "var(--text-primary)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{fiiCurr != null ? `${fiiCurr}%` : "—"}</span>
+                        {fiiChg != null && <span style={{fontSize:9,color:parseFloat(fiiChg)>=0?"#00cc66":"#ff4455",fontFamily:"var(--font-mono)",fontWeight:700}}>{parseFloat(fiiChg)>=0?"+":""}{fiiChg}%</span>}
                       </div>
                     </div>
                   );
