@@ -578,6 +578,7 @@ const ScanBuilder = ({onApplyFilter, onScanResults}) => {
     setChartinkSymbols(null);
     setFundaFilters({pe_on:false,pe_min:0,pe_max:50,pb_on:false,pb_min:0,pb_max:5,roe_on:false,roe_min:10,de_on:false,de_max:1,eps_growth_on:false,eps_growth_min:15,rev_growth_on:false,rev_growth_min:10});
     if (onApplyFilter) onApplyFilter({funda:null,chartink:null});
+    if (onScanResults) onScanResults(null);
     setActiveTab("scans");
   };
   const [filters, setFilters] = useState({

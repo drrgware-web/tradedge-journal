@@ -515,16 +515,8 @@ const WatchlistDashboard = () => {
                           </div>
                         </td>
                       </tr>
-                      {isExp && <tr><td colSpan={10} style={{padding:"8px 12px",background:"rgba(0,0,0,0.3)",borderBottom:"2px solid var(--accent)"}}>
-                        {chartData[s.symbol] ? <TEChart symbol={s.symbol} prices={chartData[s.symbol]}/> : (
-                          <div style={{padding:24,textAlign:"center",color:"var(--text-muted)",fontSize:10,fontFamily:"var(--font-mono)"}}>
-                            Loading {s.symbol} chart...
-                            <div style={{marginTop:8,display:"flex",gap:6,justifyContent:"center"}}>
-                              <button className="ob ob-i" onClick={()=>window.open("stock.html?s="+s.symbol,"_blank")}>Stock Page</button>
-                              <button className="ob ob-b" onClick={()=>window.open("https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A"+s.symbol+"&interval=D","tradedge_tv")}>TV Pro</button>
-                            </div>
-                          </div>
-                        )}
+                      {isExp && <tr><td colSpan={10} style={{padding:0,background:"rgba(0,0,0,0.3)",borderBottom:"2px solid var(--accent)"}}>
+                        <iframe src={"stock.html?s="+s.symbol+"&embed=1"} style={{width:"100%",height:600,border:"none",borderRadius:4}} title={s.symbol}/>
                       </td></tr>}
                     </Fragment>
                   );
