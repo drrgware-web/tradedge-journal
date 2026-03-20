@@ -56,6 +56,66 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
 const {useState, useEffect, useMemo, useRef, useCallback, Fragment} = React;
 
 // ═══════════════════════════════════════════════════════════
+// UTILITY FUNCTIONS — fallback if tradedge-watchlist.js
+// doesn't expose them globally
+// ═══════════════════════════════════════════════════════════
+if (typeof calcEMA === 'undefined') {
+  window.calcEMA = function(closes, period) {
+    if (!closes || closes.length < period) return [];
+    const k = 2 / (period + 1);
+    const ema = new Array(closes.length).fill(0);
+    let sum = 0;
+    for (let i = 0; i < period; i++) sum += closes[i];
+    ema[period - 1] = sum / period;
+    for (let i = period; i < closes.length; i++) {
+      ema[i] = closes[i] * k + ema[i - 1] * (1 - k);
+    }
+    // Fill initial values with first EMA value
+    for (let i = 0; i < period - 1; i++) ema[i] = ema[period - 1];
+    return ema;
+  };
+}
+if (typeof fmtVol === 'undefined') {
+  window.fmtVol = function(v) {
+    if (!v || v === 0) return "0";
+    if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+    if (v >= 1e7) return (v / 1e7).toFixed(1) + "Cr";
+    if (v >= 1e5) return (v / 1e5).toFixed(1) + "L";
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+    return v.toString();
+  };
+}
+
+// Simple error boundary for chart crashes
+class ChartErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err.message }; }
+  render() {
+    if (this.state.error) {
+      return React.createElement('div', {
+        style: { padding: 24, textAlign: 'center', background: 'rgba(255,68,85,0.05)', border: '1px solid rgba(255,68,85,0.2)', borderRadius: 8, margin: 8 }
+      },
+        React.createElement('div', { style: { fontSize: 12, color: '#ff4455', fontFamily: 'var(--font-mono)', marginBottom: 8 } }, '⚠ Chart Error'),
+        React.createElement('div', { style: { fontSize: 9, color: '#889', fontFamily: 'var(--font-mono)', marginBottom: 10 } }, this.state.error),
+        React.createElement('div', { style: { display: 'flex', gap: 6, justifyContent: 'center' } },
+          React.createElement('button', {
+            className: 'ob ob-i',
+            style: { padding: '5px 12px', fontSize: 10 },
+            onClick: () => this.setState({ error: null })
+          }, 'Retry'),
+          React.createElement('button', {
+            className: 'ob ob-b',
+            style: { padding: '5px 12px', fontSize: 10 },
+            onClick: () => window.open('https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A' + (this.props.symbol || '') + '&interval=D', 'tradedge_tv')
+          }, 'Open TV Pro')
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // CHART DATA STORAGE — localStorage with te_chart_ prefix
 // Mirrors teWatchlist pattern for future Supabase sync
 // ═══════════════════════════════════════════════════════════
@@ -993,13 +1053,17 @@ const WatchlistDashboard = () => {
 
   useEffect(() => {
     if (!expandedStock || chartData[expandedStock] || chartFailed[expandedStock]) return;
-    fetch("./data/stock_details/" + expandedStock + ".json?t=" + Date.now())
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    fetch("./data/stock_details/" + expandedStock + ".json?t=" + Date.now(), { signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
+        clearTimeout(timeout);
         if (d && d.price_history && d.price_history.length) setChartData(prev => ({...prev, [expandedStock]: d.price_history}));
         else setChartFailed(prev => ({...prev, [expandedStock]: true}));
       })
-      .catch(() => { setChartFailed(prev => ({...prev, [expandedStock]: true})); });
+      .catch(() => { clearTimeout(timeout); setChartFailed(prev => ({...prev, [expandedStock]: true})); });
+    return () => { clearTimeout(timeout); controller.abort(); };
   }, [expandedStock]);
 
   const active = activeList ? lists.find(l => l.id === activeList) : lists[0];
@@ -1007,7 +1071,7 @@ const WatchlistDashboard = () => {
   return (
     <div>
       <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:40,marginRight:12,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
         <a href="scanner.html" className="nav-link">Scanner</a>
         <a href="sectors.html" className="nav-link">Sectors</a>
         <a href="rrg.html" className="nav-link">RRG</a>
@@ -1097,7 +1161,9 @@ const WatchlistDashboard = () => {
                       {isExp && <tr><td colSpan={10} style={{padding:0,background:"rgba(0,0,0,0.3)",borderBottom:"2px solid var(--accent)"}}>
                         <div style={{padding:"8px 12px"}}>
                           {chartData[s.symbol] ? (
-                            <TEChart symbol={s.symbol} prices={chartData[s.symbol]} onOrder={(o) => setOrderDialog(o)}/>
+                            <ChartErrorBoundary symbol={s.symbol}>
+                              <TEChart symbol={s.symbol} prices={chartData[s.symbol]} onOrder={(o) => setOrderDialog(o)}/>
+                            </ChartErrorBoundary>
                           ) : (
                             <div style={{padding:24,textAlign:"center"}}>
                               {!chartFailed[s.symbol] && (
