@@ -1,97 +1,97 @@
 {
   "current": {
-    "date": "2026-03-19",
+    "date": "2026-03-20",
     "version": "3.2",
     "pillar_scores": [
       {
         "name": "Structural",
-        "raw_value": 19.400000000000002,
-        "raw_score": 16.166666666666668,
+        "raw_value": 22.0,
+        "raw_score": 18.333333333333332,
         "weight": 0.18,
-        "weighted_score": 2.91,
-        "description": "19.4% of Nifty 500 above 200 SMA",
+        "weighted_score": 3.3,
+        "description": "22.0% of Nifty 500 above 200 SMA",
         "sub_components": {}
       },
       {
         "name": "Breadth",
-        "raw_value": 14.2,
-        "raw_score": 6.816,
+        "raw_value": 17.8,
+        "raw_score": 8.544,
         "weight": 0.18,
-        "weighted_score": 1.22688,
-        "description": "Composite: 14.2% > 50 SMA (score 11.4) + A/D 0.11 (score 0.0)",
+        "weighted_score": 1.53792,
+        "description": "Composite: 17.8% > 50 SMA (score 14.2) + A/D 0.18 (score 0.0)",
         "sub_components": {
-          "positional_pct": 14.2,
-          "positional_score": 11.4,
-          "ad_ratio": 0.11,
+          "positional_pct": 17.8,
+          "positional_score": 14.2,
+          "ad_ratio": 0.18,
           "ad_score": 0.0,
-          "advances": 50,
-          "declines": 450
+          "advances": 78,
+          "declines": 422
         }
       },
       {
         "name": "Spark",
-        "raw_value": 2.0,
-        "raw_score": 3.5999999999999996,
+        "raw_value": 5.0,
+        "raw_score": 49.0,
         "weight": 0.13,
-        "weighted_score": 0.46799999999999997,
-        "description": "Stockbee 4%+: 2 (score 6.0) + Burst 3 [Distribution] (score 0.0)",
+        "weighted_score": 6.37,
+        "description": "Stockbee 4%+: 5 (score 15.0) + Burst 1300 [Super Trend] (score 100.0)",
         "sub_components": {
-          "stockbee_count": 2,
-          "stockbee_score": 6.0,
-          "burst_gainers": 2,
-          "burst_losers": 63,
-          "burst_ratio": 3.2,
-          "burst_label": "Distribution",
-          "burst_score": 0
+          "stockbee_count": 5,
+          "stockbee_score": 15.0,
+          "burst_gainers": 13,
+          "burst_losers": 0,
+          "burst_ratio": 1300.0,
+          "burst_label": "Super Trend",
+          "burst_score": 100
         }
       },
       {
         "name": "Quality",
-        "raw_value": -200.0,
+        "raw_value": -175.0,
         "raw_score": 0.0,
         "weight": 0.13,
         "weighted_score": 0.0,
-        "description": "Net New Highs: -200 (0H - 200L)",
+        "description": "Net New Highs: -175 (0H - 175L)",
         "sub_components": {}
       },
       {
         "name": "Sentiment",
-        "raw_value": 22.8,
-        "raw_score": 66.16666666666666,
+        "raw_value": 22.44,
+        "raw_score": 66.76666666666667,
         "weight": 0.13,
-        "weighted_score": 8.601666666666667,
-        "description": "VIX: 22.80 (score 32.3), PCR: 1.00 (score 100.0)",
+        "weighted_score": 8.679666666666666,
+        "description": "VIX: 22.44 (score 33.5), PCR: 1.00 (score 100.0)",
         "sub_components": {
-          "vix_score": 32.3,
+          "vix_score": 33.5,
           "pcr_score": 100.0
         }
       },
       {
         "name": "Momentum",
-        "raw_value": 8.799999999999999,
-        "raw_score": 8.799999999999999,
+        "raw_value": 10.8,
+        "raw_score": 10.8,
         "weight": 0.13,
-        "weighted_score": 1.144,
-        "description": "8.8% of Nifty 500 with RSI(14) > 50",
+        "weighted_score": 1.4040000000000001,
+        "description": "10.8% of Nifty 500 with RSI(14) > 50",
         "sub_components": {}
       },
       {
         "name": "Volatility",
-        "raw_value": 49.2,
+        "raw_value": 47.599999999999994,
         "raw_score": 10,
         "weight": 0.12,
         "weighted_score": 1.2,
-        "description": "ATR Breadth: 49.2% of stocks with ATR% > 4% — [Panic]",
+        "description": "ATR Breadth: 47.6% of stocks with ATR% > 4% — [Panic]",
         "sub_components": {}
       }
     ],
-    "base_score": 15.55,
+    "base_score": 22.49,
     "modifiers": [
       {
         "name": "Exhaustion Penalty",
         "triggered": false,
         "adjustment": 0.0,
-        "reason": "0.2% stocks with RSI>70 — within normal range"
+        "reason": "0.0% stocks with RSI>70 — within normal range"
       },
       {
         "name": "Persistence Boost",
@@ -109,25 +109,25 @@
         "name": "FII Flow Warning",
         "triggered": true,
         "adjustment": -7.0,
-        "reason": "FII net sellers for 10 consecutive days — significant FII pressure + heavy outflow (₹30,252 Cr in 5 days) [Last 5d: -7,050 | -10,717 | -9,366 | -4,741 | -2,714]"
+        "reason": "FII net sellers for 10 consecutive days — significant FII pressure + heavy outflow (₹31,937 Cr in 5 days) [Last 5d: -10,717 | -9,366 | -4,741 | -2,714 | -7,558]"
       },
       {
         "name": "Warning Day",
         "triggered": true,
         "adjustment": -10.0,
-        "reason": "6 pillars weak (<40%): Structural, Breadth, Spark, Quality, Momentum, Volatility"
+        "reason": "5 pillars weak (<40%): Structural, Breadth, Quality, Momentum, Volatility"
       },
       {
         "name": "Volatility Regime",
         "triggered": true,
         "adjustment": -10.0,
-        "reason": "ATR Breadth 49.2% — erratic, reduce position sizes"
+        "reason": "ATR Breadth 47.6% — erratic, reduce position sizes"
       },
       {
         "name": "Crude Oil Stress",
         "triggered": true,
         "adjustment": -5.0,
-        "reason": "Brent $104.2 — high stress, imported inflation risk"
+        "reason": "Brent $103.7 — high stress, imported inflation risk"
       },
       {
         "name": "Global Yield Pressure",
@@ -139,7 +139,7 @@
         "name": "Rupee Stress",
         "triggered": true,
         "adjustment": -3.0,
-        "reason": "INR ₹93.00 — rapid weakening (+2.4% in 20d), FII headwind"
+        "reason": "INR ₹93.36 — rapid weakening (+2.5% in 20d), FII headwind"
       }
     ],
     "total_modifier": -38.0,
@@ -150,55 +150,62 @@
     "risk_per_trade": "0% exposure",
     "state": "WARNING",
     "state_message": "3+ pillars weak. Stop new entries. Tighten existing stops.",
-    "burst_ratio": 3.2,
-    "burst_label": "Distribution",
-    "rsi_breadth_pct": 8.8,
-    "atr_breadth_pct": 49.2,
+    "burst_ratio": 1300.0,
+    "burst_label": "Super Trend",
+    "rsi_breadth_pct": 10.8,
+    "atr_breadth_pct": 47.6,
     "atr_regime": "Panic",
     "macro_summary": "Macro headwind (-11): Crude Oil Stress (-5), Global Yield Pressure (-3), Rupee Stress (-3)",
     "paradox_alerts": [
       {
+        "name": "Stock Picker's Market",
+        "emoji": "🎯",
+        "severity": "opportunity",
+        "description": "Burst 1300 [Super Trend] but MPS 0. Pockets of explosive momentum in specific stocks while broad market bleeds.",
+        "action": "Don't take broad exposure. If already in the right stocks, they're moving well. Focus on momentum leaders only."
+      },
+      {
         "name": "Bull Trap",
         "emoji": "🪤",
         "severity": "danger",
-        "description": "Sentiment 66 (calm VIX/healthy PCR) but Structural 16, Breadth 7, Quality 0. Market feels calm but internals are rotting.",
+        "description": "Sentiment 67 (calm VIX/healthy PCR) but Structural 18, Breadth 9, Quality 0. Market feels calm but internals are rotting.",
         "action": "Don't trust the calm surface. Smart money distributing quietly. Avoid new longs. Tighten all stops."
       }
     ]
   },
   "history": [
     {
-      "date": "2026-03-19",
+      "date": "2026-03-20",
       "mps": 0.0,
       "zone": "No Money Zone"
     }
   ],
   "raw_inputs": {
     "chartink": {
-      "above_200sma": 97,
-      "above_50sma": 71,
-      "spark_4pct": 2,
-      "rsi_above_70": 1,
-      "rsi_above_50": 44,
-      "burst_4_5pct_gainers": 2,
-      "burst_4_5pct_losers": 63,
-      "atr_pct_above_4": 246
+      "above_200sma": 110,
+      "above_50sma": 89,
+      "spark_4pct": 5,
+      "rsi_above_70": 0,
+      "rsi_above_50": 54,
+      "burst_4_5pct_gainers": 13,
+      "burst_4_5pct_losers": 0,
+      "atr_pct_above_4": 238
     },
     "nse": {
-      "advances": 50,
-      "declines": 450,
+      "advances": 78,
+      "declines": 422,
       "new_52w_highs": 0,
-      "new_52w_lows": 200,
-      "india_vix": 22.8,
+      "new_52w_lows": 175,
+      "india_vix": 22.44,
       "pcr": 1.0,
-      "fii_net": -2714.35,
+      "fii_net": -7558.19,
       "nifty_52w_high": false
     },
     "macro": {
-      "brent_crude": 104.19,
+      "brent_crude": 103.73,
       "us10y_yield": 4.28,
-      "usd_inr": 93.0,
-      "usd_inr_20d_ago": 90.79
+      "usd_inr": 93.36,
+      "usd_inr_20d_ago": 91.04
     },
     "data_sources": {
       "breadth": "yahoo_finance_498_nifty500",
@@ -214,11 +221,11 @@
   "state": {
     "structural_bull_streak": 0,
     "fii_consecutive_sell_days": 11,
-    "fii_5day_net": -30252.079999999998
+    "fii_5day_net": -31937.469999999998
   },
   "metadata": {
     "version": "3.1.2",
-    "generated_at": "2026-03-19T17:58:37.372529",
+    "generated_at": "2026-03-20T07:33:38.412625",
     "universe": "Nifty 500",
     "pillars": 7,
     "modifiers": 9,
