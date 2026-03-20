@@ -457,20 +457,23 @@ def run_full_pipeline(quick=False, single_stock=None):
     # ── Sort results ──
     all_stocks.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
 
-    # ── Save scanner_results.json ──
+    # ── Save scanner_results.json (skip in single-stock mode) ──
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    scanner_output = {
-        "meta": {
-            "generated_at": datetime.now().isoformat(),
-            "total_scanned": len(all_stocks),
-            "version": "1.0",
-            "elapsed_seconds": round(time.time() - scan_start, 1),
-        },
-        "stocks": all_stocks,
-    }
-    with open(DATA_DIR / "scanner_results.json", "w") as f:
-        json.dump(sanitize_for_json(scanner_output), f, indent=2, default=str)
+    if not single_stock:
+        scanner_output = {
+            "meta": {
+                "generated_at": datetime.now().isoformat(),
+                "total_scanned": len(all_stocks),
+                "version": "1.0",
+                "elapsed_seconds": round(time.time() - scan_start, 1),
+            },
+            "stocks": all_stocks,
+        }
+        with open(DATA_DIR / "scanner_results.json", "w") as f:
+            json.dump(sanitize_for_json(scanner_output), f, indent=2, default=str)
+    else:
+        print(f"  ℹ Single-stock mode — scanner_results.json NOT overwritten")
 
     # ── Save scan_runs.json ──
     scan_output = {
