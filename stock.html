@@ -871,18 +871,19 @@ const StockPage = () => {
     async function loadStock() {
       try {
         // Try per-stock detail file first
-        const res = await fetch(`data/stock_details/${SYMBOL}.json`);
+        const res = await fetch(`./data/stock_details/${SYMBOL}.json?t=${Date.now()}`);
         if (res.ok) {
           const json = await res.json();
+          console.log("[STOCK] Loaded from stock_details/", SYMBOL, "keys:", Object.keys(json).join(","));
           setData(json);
           setLoading(false);
           return;
         }
-      } catch (e) {}
+      } catch (e) { console.warn("[STOCK] stock_details fetch failed:", e.message); }
 
       try {
         // Fallback: find stock in scanner_results.json
-        const res = await fetch("data/scanner_results.json");
+        const res = await fetch("./data/scanner_results.json?t=" + Date.now());
         if (res.ok) {
           const json = await res.json();
           const stock = (json.stocks || []).find(s => s.symbol === SYMBOL);
