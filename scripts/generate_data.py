@@ -442,8 +442,25 @@ def run_full_pipeline(quick=False, single_stock=None):
 
                     # Save per-stock JSON
                     STOCK_DETAIL_DIR.mkdir(parents=True, exist_ok=True)
-                    with open(STOCK_DETAIL_DIR / f"{symbol}.json", "w") as sf:
-                        json.dump(sanitize_for_json(detail), sf, indent=2, default=str)
+                    detail_path = STOCK_DETAIL_DIR / f"{symbol}.json"
+                    
+                    if quick and detail_path.exists():
+                        # Quick mode: only update price_history in existing file, preserve full data
+                        try:
+                            existing = json.load(open(detail_path))
+                            existing["price_history"] = price_hist
+                            existing["price"] = stock_record.get("price")
+                            existing["change_pct"] = stock_record.get("change_pct")
+                            existing["composite_score"] = stock_record.get("composite_score")
+                            with open(detail_path, "w") as sf:
+                                json.dump(sanitize_for_json(existing), sf, indent=2, default=str)
+                        except:
+                            with open(detail_path, "w") as sf:
+                                json.dump(sanitize_for_json(detail), sf, indent=2, default=str)
+                    else:
+                        # Full mode or new file: write everything
+                        with open(detail_path, "w") as sf:
+                            json.dump(sanitize_for_json(detail), sf, indent=2, default=str)
 
                 except Exception as e:
                     pass
