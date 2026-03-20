@@ -922,8 +922,42 @@ const StockPage = () => {
     // Fetch quarterly data from worker
     fundFetchScreener(SYMBOL).then(sData => {
       if (sData) {
-        console.log("[SCREENER] Loaded for", SYMBOL, sData.quarters?.length, "quarters");
+        console.log("[SCREENER] Loaded for", SYMBOL, sData.quarters?.length, "quarters", 
+          sData.shareholding ? "WITH shareholding" : "no shareholding");
         setScreenerData(sData);
+        
+        // If worker returned shareholding data, use it (more reliable than CORS proxy scrape)
+        if (sData.shareholding) {
+          const sh = sData.shareholding;
+          setData(prev => {
+            if (!prev) return prev;
+            const updated = {...prev};
+            
+            // Build ownership from shareholding percentages
+            if (sh.promoter?.length || sh.fii?.length) {
+              const qtrs = sh.quarters || [];
+              updated.ownership = {
+                promoter: qtrs.map((q, i) => ({ qtr: q, pct: sh.promoter?.[i] || 0 })),
+                fii: qtrs.map((q, i) => ({ qtr: q, pct: sh.fii?.[i] || 0 })),
+                dii: qtrs.map((q, i) => ({ qtr: q, pct: sh.dii?.[i] || 0 })),
+                public: qtrs.map((q, i) => ({ qtr: q, pct: sh.public?.[i] || 0 })),
+                mutual_funds: [],
+              };
+            }
+            
+            // MF count and shares
+            if (sh.mf_count || sh.mf_holding_pct) {
+              updated.fund_holdings = {
+                ...updated.fund_holdings,
+                no_of_funds: sh.mf_count || null,
+                mf_holding_pct: sh.mf_holding_pct || null,
+                shares_held_cr: sh.mf_shares_cr || null,
+              };
+            }
+            
+            return updated;
+          });
+        }
       }
       setScreenerLoading(false);
     }).catch(() => setScreenerLoading(false));
@@ -1094,11 +1128,13 @@ const StockPage = () => {
                 if (label === "No of Funds") {
                   const nf = fh.no_of_funds;
                   const chg = fh.fund_shares_change_pct;
+                  const mfPct = fh.mf_holding_pct;
                   return (
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
                       <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{nf != null ? nf : "—"}</span>
+                        <span style={{fontSize:13,fontWeight:600,color: nf ? "var(--accent)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{nf != null ? nf : "—"}</span>
+                        {mfPct != null && <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>({mfPct}%)</span>}
                         {chg != null && <PctVal str={`(${chg>0?"+":""}${chg}%)`}/>}
                       </div>
                     </div>
@@ -1112,7 +1148,7 @@ const StockPage = () => {
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
                       <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{sh != null ? `${sh} Cr` : "—"}</span>
+                        <span style={{fontSize:13,fontWeight:600,color: sh ? "var(--text-primary)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{sh != null ? `${sh} Cr` : "—"}</span>
                         {chg != null && <PctVal str={`(${chg>0?"+":""}${chg}%)`}/>}
                       </div>
                     </div>
