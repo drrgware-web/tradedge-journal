@@ -537,7 +537,7 @@ const StockDrilldown = ({stock, onClose}) => {
 // SCAN BUILDER PANEL
 // ═══════════════════════════════════════════════════════════════
 
-const ScanBuilder = ({onApplyFilter}) => {
+const ScanBuilder = ({onApplyFilter, onScanResults}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("scans");
   const [clauseText, setClauseText] = useState("");
@@ -697,7 +697,7 @@ const ScanBuilder = ({onApplyFilter}) => {
                     });
                     const data = await r.json();
                     if (data.error) { setScanResults({ error: data.error }); }
-                    else { setScanResults(data); }
+                    else { setScanResults(data); if (onScanResults) onScanResults(data); }
                   } catch(e) { setScanResults({ error: e.message }); }
                   setScanRunning(false);
                 }}>
@@ -858,6 +858,7 @@ const ScannerDashboard = () => {
   const [selectedStock, setSelectedStock] = useState(null);
   const [excludeCircuit, setExcludeCircuit] = useState(true);
   const [appliedFilters, setAppliedFilters] = useState({ funda: null, chartink: null });
+  const [chartinkResults, setChartinkResults] = useState(null);
   const [wlSidebar, setWlSidebar] = useState(false);
   const [wlRefresh, setWlRefresh] = useState(0);
 
@@ -998,18 +999,22 @@ const ScannerDashboard = () => {
             <button style={{padding:"3px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,
               background:"rgba(0,255,136,0.1)",border:"1px solid var(--accent)",color:"var(--accent)",
               borderRadius:4,cursor:"pointer"}} onClick={() => {
-                const name = prompt("Save current " + filteredStocks.length + " stocks as watchlist:", 
+                // Use ChartInk results if available, otherwise filtered stocks
+                const useChartink = chartinkResults?.stocks?.length > 0;
+                const sourceStocks = useChartink ? chartinkResults.stocks : filteredStocks;
+                const count = sourceStocks.length;
+                const name = prompt("Save " + count + " stocks as watchlist:", 
                   "Scan " + new Date().toLocaleDateString("en-IN"));
                 if (!name) return;
                 const wl = window.teWatchlist;
-                const stockData = filteredStocks.slice(0, 200).map(s => ({
-                  symbol: s.symbol, name: s.name, sector: s.sector, 
-                  source: appliedFilters.chartink ? "chartink" : "scanner:" + activePreset,
+                const stockData = sourceStocks.slice(0, 200).map(s => ({
+                  symbol: s.symbol, name: s.name || "", sector: s.sector || "", 
+                  source: useChartink ? "chartink" : "scanner:" + activePreset,
                 }));
                 wl.createList(name, stockData);
                 wl.sync();
                 setWlRefresh(r => r + 1);
-                alert(`Saved "${name}" with ${stockData.length} stocks`);
+                alert("Saved \"" + name + "\" with " + stockData.length + " stocks");
               }}>
               💾 Save Scan
             </button>
@@ -1043,7 +1048,7 @@ const ScannerDashboard = () => {
         </div>
 
         {/* Scan Builder */}
-        <ScanBuilder onApplyFilter={setAppliedFilters}/>
+        <ScanBuilder onApplyFilter={setAppliedFilters} onScanResults={setChartinkResults}/>
 
         {/* Preset Tabs */}
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10,padding:"8px 0",
