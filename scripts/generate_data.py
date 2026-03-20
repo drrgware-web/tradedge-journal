@@ -234,11 +234,29 @@ def compute_fundamentals(info: dict) -> dict:
     }
 
 
-def compute_fund_holdings(info: dict) -> dict:
+def compute_fund_holdings(info: dict, ticker_obj=None) -> dict:
     inst = info.get("heldPercentInstitutions")
     insider = info.get("heldPercentInsiders")
+    no_of_funds = None
+    mf_holding_pct = None
+    
+    # Try to get mutual fund holder count from yfinance
+    if ticker_obj:
+        try:
+            mf_holders = ticker_obj.mutualfund_holders
+            if mf_holders is not None and not mf_holders.empty:
+                no_of_funds = len(mf_holders)
+                # Sum pctHeld column if available
+                if 'pctHeld' in mf_holders.columns:
+                    mf_holding_pct = round(mf_holders['pctHeld'].sum() * 100, 2)
+                elif '% Out' in mf_holders.columns:
+                    mf_holding_pct = round(mf_holders['% Out'].sum(), 2)
+        except Exception:
+            pass
+    
     return {
-        "no_of_funds": None,  # Not available from yfinance directly
+        "no_of_funds": no_of_funds,
+        "mf_holding_pct": mf_holding_pct,
         "fund_shares_change_pct": None,
         "institutional_pct": round(inst * 100, 2) if inst else None,
         "promoter_pct": round(insider * 100, 2) if insider else None,
@@ -354,7 +372,7 @@ def run_full_pipeline(quick=False, single_stock=None):
                         ticker = yf.Ticker(yf_sym)
                         info = ticker.info or {}
                         funda = compute_fundamentals(info)
-                        fund_data = compute_fund_holdings(info)
+                        fund_data = compute_fund_holdings(info, ticker)
                     except Exception:
                         pass
 
