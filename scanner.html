@@ -556,8 +556,29 @@ const ScanBuilder = ({onApplyFilter}) => {
     eps_growth_on: false, eps_growth_min: 15,
     rev_growth_on: false, rev_growth_min: 10,
   });
-  const [chartinkSymbols, setChartinkSymbols] = useState(null); // null = no ChartInk filter, [] = empty, [...] = filtered
-  const [appliedFilters, setAppliedFilters] = useState({ funda: null, chartink: null }); // applied state
+  const [chartinkSymbols, setChartinkSymbols] = useState(null);
+  
+  const applyAllFilters = () => {
+    const newApplied = { funda: null, chartink: null };
+    const ff = fundaFilters;
+    if (ff.pe_on || ff.pb_on || ff.roe_on || ff.de_on || ff.eps_growth_on || ff.rev_growth_on) {
+      newApplied.funda = {...ff};
+    }
+    if (scanResults?.stocks?.length > 0) {
+      const syms = scanResults.stocks.map(s => s.symbol.toUpperCase());
+      setChartinkSymbols(syms);
+      newApplied.chartink = syms;
+    }
+    if (onApplyFilter) onApplyFilter(newApplied);
+  };
+  
+  const resetAllFilters = () => {
+    setClauseText(""); setScanResults(null); setScanRunning(false);
+    setChartinkSymbols(null);
+    setFundaFilters({pe_on:false,pe_min:0,pe_max:50,pb_on:false,pb_min:0,pb_max:5,roe_on:false,roe_min:10,de_on:false,de_max:1,eps_growth_on:false,eps_growth_min:15,rev_growth_on:false,rev_growth_min:10});
+    if (onApplyFilter) onApplyFilter({funda:null,chartink:null});
+    setActiveTab("scans");
+  };
   const [filters, setFilters] = useState({
     priceMin:"", priceMax:"", mcapMin:"300", mcapMax:"5000000",
     excludeCircuit: true, volumeMA50Min:"100000",
@@ -814,34 +835,9 @@ const ScanBuilder = ({onApplyFilter}) => {
 
           {/* Apply / Reset */}
           <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center"}}>
-            {appliedFilters.funda && <span style={{fontSize:9,color:"var(--accent2)",fontFamily:"var(--font-mono)"}}>FUNDA ✓</span>}
-            {appliedFilters.chartink && <span style={{fontSize:9,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>CHARTINK ✓ ({chartinkSymbols?.length})</span>}
-            <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={() => {
-              setClauseText(""); setScanResults(null); setScanRunning(false);
-              setChartinkSymbols(null);
-              setFundaFilters({pe_on:false,pe_min:0,pe_max:50,pb_on:false,pb_min:0,pb_max:5,roe_on:false,roe_min:10,de_on:false,de_max:1,eps_growth_on:false,eps_growth_min:15,rev_growth_on:false,rev_growth_min:10});
-              setAppliedFilters({funda:null,chartink:null});
-              setActiveTab("scans");
-            }}>Reset</button>
-            <button className="btn btn-accent" onClick={() => {
-              // Build applied filters
-              const newApplied = { funda: null, chartink: null };
-              
-              // Check if any funda filter is active
-              const ff = fundaFilters;
-              if (ff.pe_on || ff.pb_on || ff.roe_on || ff.de_on || ff.eps_growth_on || ff.rev_growth_on) {
-                newApplied.funda = {...ff};
-              }
-              
-              // Check if ChartInk scan has results
-              if (scanResults?.stocks?.length > 0) {
-                const syms = scanResults.stocks.map(s => s.symbol.toUpperCase());
-                setChartinkSymbols(syms);
-                newApplied.chartink = syms;
-              }
-              
-              setAppliedFilters(newApplied);
-            }}>Apply Filters</button>
+            {chartinkSymbols?.length > 0 && <span style={{fontSize:9,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>CHARTINK: {chartinkSymbols.length} stocks</span>}
+            <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={resetAllFilters}>Reset</button>
+            <button className="btn btn-accent" onClick={applyAllFilters}>Apply Filters</button>
           </div>
         </div>
       )}
@@ -861,6 +857,7 @@ const ScannerDashboard = () => {
   const [selectedStock, setSelectedStock] = useState(null);
   const [excludeCircuit, setExcludeCircuit] = useState(true);
   const [showTV, setShowTV] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState({ funda: null, chartink: null });
 
   const filteredStocks = useMemo(() => {
     let list = [...stocks];
@@ -1023,7 +1020,7 @@ const ScannerDashboard = () => {
         </div>
 
         {/* Scan Builder */}
-        <ScanBuilder/>
+        <ScanBuilder onApplyFilter={setAppliedFilters}/>
 
         {/* Preset Tabs */}
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10,padding:"8px 0",
