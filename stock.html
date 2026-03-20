@@ -855,7 +855,7 @@ const StockPage = () => {
     pe_ratio: d.fundamentals?.pe_ratio || si.pe,
     roe: d.fundamentals?.roe || si.roe,
     book_value: d.fundamentals?.book_value || si.bookValue,
-    dividend_yield: d.fundamentals?.dividend_yield || si.dividendYield,
+    dividend_yield: d.fundamentals?.dividend_yield || si.dividendYield || null,
     roce: d.fundamentals?.roce || si.roce,
     eps: d.fundamentals?.eps || (si.currentPrice && si.pe ? (si.currentPrice / si.pe).toFixed(2) : null),
   };
@@ -934,56 +934,51 @@ const StockPage = () => {
           </div>
           <div style={{padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:1,background:"var(--border-dim)"}}>
             {(() => {
+              // Helper to safely display values
+              const sv = (v, suffix="") => (v != null && v !== undefined && v !== "undefined") ? `${v}${suffix}` : "N/A";
+              
               const items = [
-                ["Market Cap",`INR ${f.market_cap_cr?.toLocaleString()} Cr`, f.market_cap_cr, pq.market_cap_cr, py.market_cap_cr, false],
-                ["Sales",`INR ${f.sales_cr?.toLocaleString()} Cr`, f.sales_cr, pq.sales_cr, py.sales_cr, false],
-                ["Shares in Float",`${f.shares_float_cr} Cr`, null, null, null, false],
-                ["No of Funds",null, fh.no_of_funds, 122, 105, false],
-                ["Shares by Funds",null, null, null, null, false],
-                ["Yield",f.dividend_yield?`${f.dividend_yield}%`:"N/A", null, null, null, false],
-                ["Book Value",f.book_value?`${f.pb_ratio}x`:"N/A", f.pb_ratio, pq.pb_ratio, py.pb_ratio, false],
-                ["U/D Vol Ratio",`${f.ud_vol_ratio||"N/A"}`, f.ud_vol_ratio, pq.ud_vol_ratio, py.ud_vol_ratio, false],
-                ["LTDebt/Equity",f.lt_debt_equity||"N.A", f.lt_debt_equity, pq.lt_debt_equity, py.lt_debt_equity, true],
-                ["Alpha",`${f.alpha}`, f.alpha, pq.alpha, py.alpha, false],
-                ["Beta",`${f.beta}`, f.beta, pq.beta, py.beta, true],
-                ["P/E",`${f.pe_ratio}`, f.pe_ratio, pq.pe_ratio, py.pe_ratio, true],
-                ["ROE",f.roe?`${f.roe}%`:"N/A", f.roe, pq.roe, py.roe, false],
-                ["OPM",f.profit_margin?`${f.profit_margin}%`:"N/A", f.profit_margin, pq.profit_margin, py.profit_margin, false],
-                ["Rev Growth",f.revenue_growth?`${f.revenue_growth}%`:"N/A", f.revenue_growth, pq.revenue_growth, py.revenue_growth, false],
+                ["Market Cap", f.market_cap_cr ? `INR ${f.market_cap_cr.toLocaleString()} Cr` : "N/A", f.market_cap_cr, pq.market_cap_cr, py.market_cap_cr, false],
+                ["Sales", f.sales_cr ? `INR ${f.sales_cr.toLocaleString()} Cr` : "N/A", f.sales_cr, pq.sales_cr, py.sales_cr, false],
+                ["Shares in Float", f.shares_float_cr ? `${f.shares_float_cr} Cr` : "N/A", null, null, null, false],
+                ["No of Funds", null, null, null, null, false],  // special render
+                ["Shares by Funds", null, null, null, null, false],  // special render
+                ["Yield", f.dividend_yield != null ? `${f.dividend_yield}%` : "N/A", null, null, null, false],
+                ["Book Value", f.book_value ? `${f.book_value}` : "N/A", null, null, null, false],
+                ["U/D Vol Ratio", sv(f.ud_vol_ratio), f.ud_vol_ratio, pq.ud_vol_ratio, py.ud_vol_ratio, false],
+                ["LTDebt/Equity", f.lt_debt_equity != null ? `${f.lt_debt_equity}` : "N.A", f.lt_debt_equity, pq.lt_debt_equity, py.lt_debt_equity, true],
+                ["Alpha", f.alpha != null ? `${f.alpha}` : "N/A", f.alpha, pq.alpha, py.alpha, false],
+                ["Beta", f.beta != null ? `${f.beta}` : "N/A", f.beta, pq.beta, py.beta, true],
+                ["P/E", f.pe_ratio != null ? `${f.pe_ratio}` : "N/A", f.pe_ratio, pq.pe_ratio, py.pe_ratio, true],
+                ["ROE", f.roe != null ? `${f.roe}%` : "N/A", f.roe, pq.roe, py.roe, false],
+                ["OPM", f.profit_margin != null ? `${f.profit_margin}%` : "N/A", f.profit_margin, pq.profit_margin, py.profit_margin, false],
+                ["Rev Growth", f.revenue_growth != null ? `${f.revenue_growth}%` : "N/A", f.revenue_growth, pq.revenue_growth, py.revenue_growth, false],
               ];
               return items.map(([label, display, curr, prevQv, prevYv, inv], i) => {
                 // Special: No of Funds
                 if (label === "No of Funds") {
+                  const nf = fh.no_of_funds;
+                  const chg = fh.fund_shares_change_pct;
                   return (
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
                       <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{fh.no_of_funds}</span>
-                        <PctVal str={`(${fh.fund_shares_change_pct>0?"+":""}${fh.fund_shares_change_pct}%)`}/>
-                        <span style={{display:"flex",alignItems:"center",gap:1,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700}}>
-                          <TrendArrow curr={119} prev={122} inverse={false}/><span style={{color:"#556"}}>Q</span>
-                        </span>
-                        <span style={{display:"flex",alignItems:"center",gap:1,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700}}>
-                          <TrendArrow curr={119} prev={105} inverse={false}/><span style={{color:"#556"}}>Y</span>
-                        </span>
+                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{nf != null ? nf : "—"}</span>
+                        {chg != null && <PctVal str={`(${chg>0?"+":""}${chg}%)`}/>}
                       </div>
                     </div>
                   );
                 }
                 // Special: Shares by Funds
                 if (label === "Shares by Funds") {
+                  const sh = fh.shares_held_cr;
+                  const chg = fh.shares_held_change_pct;
                   return (
                     <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
                       <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{fh.shares_held_cr} Cr</span>
-                        <PctVal str={`(${fh.shares_held_change_pct>0?"+":""}${fh.shares_held_change_pct}%)`}/>
-                        <span style={{display:"flex",alignItems:"center",gap:1,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700}}>
-                          <TrendArrow curr={5.64} prev={5.98} inverse={false}/><span style={{color:"#556"}}>Q</span>
-                        </span>
-                        <span style={{display:"flex",alignItems:"center",gap:1,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700}}>
-                          <TrendArrow curr={5.64} prev={4.2} inverse={false}/><span style={{color:"#556"}}>Y</span>
-                        </span>
+                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{sh != null ? `${sh} Cr` : "—"}</span>
+                        {chg != null && <PctVal str={`(${chg>0?"+":""}${chg}%)`}/>}
                       </div>
                     </div>
                   );
