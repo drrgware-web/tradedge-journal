@@ -542,6 +542,10 @@ const ScanBuilder = ({onApplyFilter}) => {
   const [clauseText, setClauseText] = useState("");
   const [scanRunning, setScanRunning] = useState(false);
   const [scanResults, setScanResults] = useState(null);
+  const [savedPresets, setSavedPresets] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('te_chartink_presets') || '[]'); } catch { return []; }
+  });
+  const savePresetsToLS = (p) => { setSavedPresets(p); try { localStorage.setItem('te_chartink_presets', JSON.stringify(p)); } catch {} };
   const [filters, setFilters] = useState({
     priceMin:"", priceMax:"", mcapMin:"300", mcapMax:"5000000",
     excludeCircuit: true, volumeMA50Min:"100000",
@@ -665,7 +669,13 @@ const ScanBuilder = ({onApplyFilter}) => {
                 }}>
                   {scanRunning ? "⏳ Scanning..." : "▶ Run Scan"}
                 </button>
-                <button className="btn">Save Preset</button>
+                <button className="btn" onClick={() => {
+                  if (!clauseText.trim()) return;
+                  const name = prompt("Name this preset:", "My Scan " + (savedPresets.length + 1));
+                  if (!name) return;
+                  const newPresets = [...savedPresets, { name, clause: clauseText.trim(), date: new Date().toLocaleDateString("en-IN") }];
+                  savePresetsToLS(newPresets);
+                }}>💾 Save Preset</button>
                 {scanResults?.count != null && (
                   <span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>
                     {scanResults.count} stocks found
@@ -706,10 +716,31 @@ const ScanBuilder = ({onApplyFilter}) => {
                   </table>
                 </div>
               )}
+              {/* Saved Presets */}
+              {savedPresets.length > 0 && (
+                <div style={{marginTop:12}}>
+                  <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6,letterSpacing:1}}>SAVED PRESETS ({savedPresets.length})</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {savedPresets.map((p, i) => (
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"var(--bg-hover)",
+                        border:"1px solid var(--border-low)",borderRadius:4,cursor:"pointer",fontSize:10,fontFamily:"var(--font-mono)"}}
+                        onClick={() => { setClauseText(p.clause); setScanResults(null); }}>
+                        <span style={{color:"var(--accent)",fontWeight:700}}>{p.name}</span>
+                        <span style={{color:"var(--text-muted)",fontSize:8}}>{p.date}</span>
+                        <span style={{color:"var(--red)",cursor:"pointer",marginLeft:4,fontSize:12,lineHeight:1}} onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete "${p.name}"?`)) {
+                            const updated = savedPresets.filter((_, j) => j !== i);
+                            savePresetsToLS(updated);
+                          }
+                        }}>×</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-          {/* Fundamentals Tab */}
           {activeTab === "fundamentals" && (
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {[
