@@ -867,48 +867,25 @@ const StockPage = () => {
     return null;
   }
 
-  // Fetch MF holdings data from Trendlyne (No of Funds + Shares held)
+  // Fetch MF holdings data via worker (Trendlyne)
   async function fetchMFData(symbol) {
     const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
+    const workerUrl = localStorage.getItem('zd_worker_url') || '';
+    if (!workerUrl) return null;
     
-    for (const proxyFn of FUND_PROXIES) {
-      try {
-        // Try Trendlyne shareholding page via CORS proxy
-        const targetUrl = `https://trendlyne.com/equity/share-holding-all/${sym}/latest/`;
-        const url = proxyFn(targetUrl);
-        const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!r.ok) continue;
-        const html = await r.text();
-        
-        const result = { no_of_funds: null, mf_holding_pct: null, mf_prev_pct: null };
-        
-        // Pattern: "Number of MF schemes increased from 71 to 76"
-        const mfCountMatch = html.match(/Number of MF schemes?\s*(?:increased|decreased|changed)\s*from\s*(\d+)\s*to\s*(\d+)/i);
-        if (mfCountMatch) result.no_of_funds = parseInt(mfCountMatch[2]);
-        
-        // Fallback patterns
-        if (!result.no_of_funds) {
-          const m2 = html.match(/(\d{2,4})\s*(?:MF|mutual fund)\s*schemes?/i);
-          if (m2) result.no_of_funds = parseInt(m2[1]);
-        }
-        if (!result.no_of_funds) {
-          const m3 = html.match(/MF\s*schemes?\s*(?:increased|decreased)\s*from\s*\d+\s*to\s*(\d+)/i);
-          if (m3) result.no_of_funds = parseInt(m3[1]);
-        }
-        
-        // Pattern: "Mutual Funds have decreased holdings from 14.23% to 13.76%"
-        const mfPctMatch = html.match(/Mutual Funds?\s*have\s*(?:increased|decreased|maintained)\s*holdings?\s*(?:from\s*([\d.]+)%\s*to\s*)?([\d.]+)%/i);
-        if (mfPctMatch) {
-          result.mf_holding_pct = parseFloat(mfPctMatch[2]);
-          if (mfPctMatch[1]) result.mf_prev_pct = parseFloat(mfPctMatch[1]);
-        }
-        
-        if (result.no_of_funds || result.mf_holding_pct) {
-          console.log("[TRENDLYNE MF]", sym, "funds:", result.no_of_funds, "holding:", result.mf_holding_pct + "%");
-          return result;
-        }
-      } catch(e) { continue; }
-    }
+    try {
+      const r = await fetch(workerUrl, {
+        method: 'GET',
+        headers: { 'X-Kite-Action': 'trendlyne-mf', 'X-Screener-Symbol': sym },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (data.no_of_funds || data.mf_holding_pct) {
+        console.log("[TRENDLYNE MF]", sym, "funds:", data.no_of_funds, "holding:", data.mf_holding_pct + "%");
+        return data;
+      }
+    } catch(e) { console.warn('[TRENDLYNE MF] Failed:', e.message); }
     return null;
   }
 
