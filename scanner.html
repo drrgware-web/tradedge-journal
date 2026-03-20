@@ -755,28 +755,32 @@ const ScanBuilder = ({onApplyFilter}) => {
           )}
           {activeTab === "fundamentals" && (
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              {[
-                {key:"pe",label:"P/E Range",range:true},
-                {key:"pb",label:"P/B Range",range:true},
-                {key:"roe",label:"ROE > (%)",range:false},
-                {key:"de",label:"Debt/Equity <",range:false,isMax:true},
-                {key:"eps_growth",label:"EPS Growth > (%)",range:false},
-                {key:"rev_growth",label:"Rev Growth > (%)",range:false},
-              ].map((f,i) => (
-                <label key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
-                  <input type="checkbox" checked={fundaFilters[f.key+"_on"]} 
-                    onChange={e => setFundaFilters(p => ({...p, [f.key+"_on"]: e.target.checked}))}
-                    style={{accentColor:"var(--accent)"}}/> {f.label}
-                  <input type="number" 
-                    value={f.isMax ? fundaFilters[f.key+"_max"] : fundaFilters[f.key+"_min"]}
-                    onChange={e => setFundaFilters(p => ({...p, [f.isMax ? f.key+"_max" : f.key+"_min"]: parseFloat(e.target.value)||0}))}
-                    style={{width:50}}/>
-                  {f.range && <Fragment>- <input type="number" 
-                    value={fundaFilters[f.key+"_max"]}
-                    onChange={e => setFundaFilters(p => ({...p, [f.key+"_max"]: parseFloat(e.target.value)||0}))}
-                    style={{width:50}}/></Fragment>}
-                </label>
-              ))}
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" checked={fundaFilters.pe_on} onChange={e => setFundaFilters(p => ({...p, pe_on: e.target.checked}))} style={{accentColor:"var(--accent)"}}/> P/E Range
+                <input type="number" value={fundaFilters.pe_min} onChange={e => setFundaFilters(p => ({...p, pe_min: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+                - <input type="number" value={fundaFilters.pe_max} onChange={e => setFundaFilters(p => ({...p, pe_max: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" checked={fundaFilters.pb_on} onChange={e => setFundaFilters(p => ({...p, pb_on: e.target.checked}))} style={{accentColor:"var(--accent)"}}/> P/B Range
+                <input type="number" value={fundaFilters.pb_min} onChange={e => setFundaFilters(p => ({...p, pb_min: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+                - <input type="number" value={fundaFilters.pb_max} onChange={e => setFundaFilters(p => ({...p, pb_max: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" checked={fundaFilters.roe_on} onChange={e => setFundaFilters(p => ({...p, roe_on: e.target.checked}))} style={{accentColor:"var(--accent)"}}/> ROE {">"}  (%)
+                <input type="number" value={fundaFilters.roe_min} onChange={e => setFundaFilters(p => ({...p, roe_min: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" checked={fundaFilters.de_on} onChange={e => setFundaFilters(p => ({...p, de_on: e.target.checked}))} style={{accentColor:"var(--accent)"}}/> Debt/Equity {"<"}
+                <input type="number" value={fundaFilters.de_max} onChange={e => setFundaFilters(p => ({...p, de_max: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" checked={fundaFilters.eps_growth_on} onChange={e => setFundaFilters(p => ({...p, eps_growth_on: e.target.checked}))} style={{accentColor:"var(--accent)"}}/> EPS Growth {">"} (%)
+                <input type="number" value={fundaFilters.eps_growth_min} onChange={e => setFundaFilters(p => ({...p, eps_growth_min: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" checked={fundaFilters.rev_growth_on} onChange={e => setFundaFilters(p => ({...p, rev_growth_on: e.target.checked}))} style={{accentColor:"var(--accent)"}}/> Rev Growth {">"} (%)
+                <input type="number" value={fundaFilters.rev_growth_min} onChange={e => setFundaFilters(p => ({...p, rev_growth_min: parseFloat(e.target.value)||0}))} style={{width:50}}/>
+              </label>
             </div>
           )}
 
