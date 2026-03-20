@@ -11,7 +11,7 @@
 <style>
 :root{--bg-primary:#06080c;--bg-secondary:#0c1018;--bg-tertiary:#121820;--bg-card:#0f1520;--bg-hover:#141d2a;--border-dim:rgba(0,255,136,0.06);--border-low:rgba(0,255,136,0.1);--border-med:rgba(0,255,136,0.2);--accent:#00ff88;--accent-dim:rgba(0,255,136,0.15);--accent2:#00c8ff;--accent3:#8844ff;--red:#ff4455;--amber:#ffaa00;--text-primary:#e8e8e8;--text-secondary:#8899aa;--text-muted:#556677;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-display);min-height:100vh}
+body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-display);min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.008) 2px,rgba(0,255,136,.008) 4px);pointer-events:none;z-index:9999}
 body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(0,255,136,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.2);border-radius:3px}
@@ -158,9 +158,17 @@ const Treemap = ({data, title, timeframe}) => {
   useEffect(() => {
     if (!canvasRef.current || !data?.length) return;
     const canvas = canvasRef.current;
-    const W = canvas.width = canvas.parentElement.offsetWidth;
-    const H = canvas.height = 280;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.parentElement.offsetWidth;
+    const cssH = 280;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
     const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    const W = cssW;
+    const H = cssH;
 
     // Sort by value (size) descending
     const sorted = [...data].sort((a,b) => b.value - a.value);
@@ -246,7 +254,7 @@ const Treemap = ({data, title, timeframe}) => {
 
   }, [data, title]);
 
-  return <canvas ref={canvasRef} style={{width:"100%",height:280,borderRadius:6,cursor:"pointer"}}/>;
+  return <canvas ref={canvasRef} style={{width:"100%",borderRadius:6,cursor:"pointer"}}/>;
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -383,7 +391,7 @@ const SectorPage = () => {
   return (
     <div>
       <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:80,marginRight:16}}/></a>
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:40,marginRight:12}}/></a>
         <a href="scanner.html" className="nav-link">Scanner</a>
         <a href="sectors.html" className="nav-link active">Sectors</a>
         <a href="rrg.html" className="nav-link">RRG</a>
