@@ -59,11 +59,27 @@ def load_symbols() -> list[dict]:
 
 def safe_float(val, default=None):
     try:
-        if val is not None and not (isinstance(val, float) and np.isnan(val)):
-            return round(float(val), 2)
+        if val is not None:
+            f = float(val)
+            if np.isnan(f) or np.isinf(f):
+                return default
+            return round(f, 2)
     except (TypeError, ValueError):
         pass
     return default
+
+
+def sanitize_for_json(obj):
+    """Recursively replace Infinity/NaN with None so JSON is valid."""
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(v) for v in obj]
+    elif isinstance(obj, float):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return obj
+    return obj
 
 
 def compute_technicals(df: pd.DataFrame) -> dict:
@@ -427,7 +443,7 @@ def run_full_pipeline(quick=False, single_stock=None):
                     # Save per-stock JSON
                     STOCK_DETAIL_DIR.mkdir(parents=True, exist_ok=True)
                     with open(STOCK_DETAIL_DIR / f"{symbol}.json", "w") as sf:
-                        json.dump(detail, sf, indent=2, default=str)
+                        json.dump(sanitize_for_json(detail), sf, indent=2, default=str)
 
                 except Exception as e:
                     pass
@@ -454,7 +470,7 @@ def run_full_pipeline(quick=False, single_stock=None):
         "stocks": all_stocks,
     }
     with open(DATA_DIR / "scanner_results.json", "w") as f:
-        json.dump(scanner_output, f, indent=2, default=str)
+        json.dump(sanitize_for_json(scanner_output), f, indent=2, default=str)
 
     # ── Save scan_runs.json ──
     scan_output = {
@@ -472,7 +488,7 @@ def run_full_pipeline(quick=False, single_stock=None):
                 "symbols": scan["matches"],
             }
     with open(DATA_DIR / "scan_runs.json", "w") as f:
-        json.dump(scan_output, f, indent=2, default=str)
+        json.dump(sanitize_for_json(scan_output), f, indent=2, default=str)
 
     # ── Save circuit + earnings ──
     circuit_tracker.save()
