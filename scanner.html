@@ -546,6 +546,18 @@ const ScanBuilder = ({onApplyFilter}) => {
     try { return JSON.parse(localStorage.getItem('te_chartink_presets') || '[]'); } catch { return []; }
   });
   const savePresetsToLS = (p) => { setSavedPresets(p); try { localStorage.setItem('te_chartink_presets', JSON.stringify(p)); } catch {} };
+  
+  // ── Techno-Funda Filter State ──
+  const [fundaFilters, setFundaFilters] = useState({
+    pe_on: false, pe_min: 0, pe_max: 50,
+    pb_on: false, pb_min: 0, pb_max: 5,
+    roe_on: false, roe_min: 10,
+    de_on: false, de_max: 1,
+    eps_growth_on: false, eps_growth_min: 15,
+    rev_growth_on: false, rev_growth_min: 10,
+  });
+  const [chartinkSymbols, setChartinkSymbols] = useState(null); // null = no ChartInk filter, [] = empty, [...] = filtered
+  const [appliedFilters, setAppliedFilters] = useState({ funda: null, chartink: null }); // applied state
   const [filters, setFilters] = useState({
     priceMin:"", priceMax:"", mcapMin:"300", mcapMax:"5000000",
     excludeCircuit: true, volumeMA50Min:"100000",
@@ -744,14 +756,25 @@ const ScanBuilder = ({onApplyFilter}) => {
           {activeTab === "fundamentals" && (
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {[
-                ["P/E Range","0","50"],["P/B Range","0","5"],
-                ["ROE > (%)","10",""],["Debt/Equity <","100",""],
-                ["EPS Growth > (%)","15",""],["Revenue Growth > (%)","10",""],
-              ].map(([label,min,max],i) => (
+                {key:"pe",label:"P/E Range",range:true},
+                {key:"pb",label:"P/B Range",range:true},
+                {key:"roe",label:"ROE > (%)",range:false},
+                {key:"de",label:"Debt/Equity <",range:false,isMax:true},
+                {key:"eps_growth",label:"EPS Growth > (%)",range:false},
+                {key:"rev_growth",label:"Rev Growth > (%)",range:false},
+              ].map((f,i) => (
                 <label key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
-                  <input type="checkbox" style={{accentColor:"var(--accent)"}}/> {label}
-                  <input type="number" placeholder={min} style={{width:50}}/>
-                  {max && <Fragment>- <input type="number" placeholder={max} style={{width:50}}/></Fragment>}
+                  <input type="checkbox" checked={fundaFilters[f.key+"_on"]} 
+                    onChange={e => setFundaFilters(p => ({...p, [f.key+"_on"]: e.target.checked}))}
+                    style={{accentColor:"var(--accent)"}}/> {f.label}
+                  <input type="number" 
+                    value={f.isMax ? fundaFilters[f.key+"_max"] : fundaFilters[f.key+"_min"]}
+                    onChange={e => setFundaFilters(p => ({...p, [f.isMax ? f.key+"_max" : f.key+"_min"]: parseFloat(e.target.value)||0}))}
+                    style={{width:50}}/>
+                  {f.range && <Fragment>- <input type="number" 
+                    value={fundaFilters[f.key+"_max"]}
+                    onChange={e => setFundaFilters(p => ({...p, [f.key+"_max"]: parseFloat(e.target.value)||0}))}
+                    style={{width:50}}/></Fragment>}
                 </label>
               ))}
             </div>
@@ -786,15 +809,34 @@ const ScanBuilder = ({onApplyFilter}) => {
           )}
 
           {/* Apply / Reset */}
-          <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center"}}>
+            {appliedFilters.funda && <span style={{fontSize:9,color:"var(--accent2)",fontFamily:"var(--font-mono)"}}>FUNDA ✓</span>}
+            {appliedFilters.chartink && <span style={{fontSize:9,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>CHARTINK ✓ ({chartinkSymbols?.length})</span>}
             <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={() => {
               setClauseText(""); setScanResults(null); setScanRunning(false);
+              setChartinkSymbols(null);
+              setFundaFilters({pe_on:false,pe_min:0,pe_max:50,pb_on:false,pb_min:0,pb_max:5,roe_on:false,roe_min:10,de_on:false,de_max:1,eps_growth_on:false,eps_growth_min:15,rev_growth_on:false,rev_growth_min:10});
+              setAppliedFilters({funda:null,chartink:null});
               setActiveTab("scans");
             }}>Reset</button>
             <button className="btn btn-accent" onClick={() => {
-              if (clauseText.trim() && activeTab === "clause") {
-                document.querySelector('.btn.btn-accent')?.click();
+              // Build applied filters
+              const newApplied = { funda: null, chartink: null };
+              
+              // Check if any funda filter is active
+              const ff = fundaFilters;
+              if (ff.pe_on || ff.pb_on || ff.roe_on || ff.de_on || ff.eps_growth_on || ff.rev_growth_on) {
+                newApplied.funda = {...ff};
               }
+              
+              // Check if ChartInk scan has results
+              if (scanResults?.stocks?.length > 0) {
+                const syms = scanResults.stocks.map(s => s.symbol.toUpperCase());
+                setChartinkSymbols(syms);
+                newApplied.chartink = syms;
+              }
+              
+              setAppliedFilters(newApplied);
             }}>Apply Filters</button>
           </div>
         </div>
@@ -824,6 +866,27 @@ const ScannerDashboard = () => {
       list = list.filter(s => !s.circuit?.is_restricted);
     }
     
+    // ── ChartInk Technical Filter (from scan results) ──
+    if (appliedFilters.chartink?.length > 0) {
+      const syms = new Set(appliedFilters.chartink);
+      list = list.filter(s => syms.has(s.symbol.toUpperCase()));
+    }
+    
+    // ── Fundamental Filters ──
+    if (appliedFilters.funda) {
+      const ff = appliedFilters.funda;
+      list = list.filter(s => {
+        const f = s.fundamentals || {};
+        if (ff.pe_on && f.pe_ratio != null) { if (f.pe_ratio < ff.pe_min || f.pe_ratio > ff.pe_max) return false; }
+        if (ff.pb_on && f.pb_ratio != null) { if (f.pb_ratio < ff.pb_min || f.pb_ratio > ff.pb_max) return false; }
+        if (ff.roe_on) { if (f.roe == null || f.roe < ff.roe_min) return false; }
+        if (ff.de_on) { if (f.debt_to_equity != null && f.debt_to_equity > ff.de_max) return false; }
+        if (ff.eps_growth_on) { if (f.eps_growth == null || f.eps_growth < ff.eps_growth_min) return false; }
+        if (ff.rev_growth_on) { if (f.revenue_growth == null || f.revenue_growth < ff.rev_growth_min) return false; }
+        return true;
+      });
+    }
+    
     // Preset filter
     if (activePreset === "catalyst") list = list.filter(s => s.catalysts?.length > 0);
     else if (activePreset === "bullish") list = list.filter(s => s.composite_score >= 3);
@@ -851,7 +914,7 @@ const ScannerDashboard = () => {
     list.sort(sorters[sortBy] || sorters.score_desc);
     
     return list;
-  }, [stocks, activePreset, sortBy, searchQuery, excludeCircuit]);
+  }, [stocks, activePreset, sortBy, searchQuery, excludeCircuit, appliedFilters]);
 
   const summary = useMemo(() => ({
     bullish: stocks.filter(s=>s.composite_score>=3).length,
