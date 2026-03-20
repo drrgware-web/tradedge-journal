@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root {
+  --bg-primary: #06080c;
+  --bg-secondary: #0c1018;
+  --bg-tertiary: #121820;
+  --bg-card: #0f1520;
+  --bg-hover: #141d2a;
+  --border-dim: rgba(0,255,136,0.06);
+  --border-low: rgba(0,255,136,0.1);
+  --border-med: rgba(0,255,136,0.2);
+  --border-hi: rgba(0,255,136,0.4);
+  --accent: #00ff88;
+  --accent-dim: rgba(0,255,136,0.15);
+  --accent2: #00c8ff;
+  --accent3: #8844ff;
+  --red: #ff4455;
+  --red-dim: rgba(255,68,85,0.12);
+  --amber: #ffaa00;
+  --amber-dim: rgba(255,170,0,0.12);
+  --text-primary: #e8e8e8;
+  --text-secondary: #8899aa;
+  --text-muted: #556677;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+/* Scanline overlay */
+body::after {
+  content: '';
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,136,0.008) 2px, rgba(0,255,136,0.008) 4px);
+  pointer-events: none; z-index: 9999;
+}
+/* Grid background */
+body::before {
+  content: '';
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background-image: linear-gradient(rgba(0,255,136,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,0.02) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: rgba(0,255,136,0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,255,136,0.4); }
+#root { position: relative; z-index: 1; }
+
+/* Shared component styles */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-low);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.card:hover { border-color: var(--border-med); }
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.badge-bullish { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+.badge-bearish { background: rgba(255,68,85,0.12); color: #ff4455; border: 1px solid rgba(255,68,85,0.3); }
+.badge-neutral { background: rgba(136,153,170,0.1); color: #889; border: 1px solid rgba(136,153,170,0.15); }
+.badge-warning { background: rgba(255,170,0,0.12); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
+.badge-info { background: rgba(0,200,255,0.12); color: #00c8ff; border: 1px solid rgba(0,200,255,0.3); }
+.badge-purple { background: rgba(136,68,255,0.12); color: #8844ff; border: 1px solid rgba(136,68,255,0.3); }
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid var(--border-med);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-accent {
+  background: rgba(0,255,136,0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-accent:hover { background: rgba(0,255,136,0.2); }
+
+input[type="text"], input[type="number"], select, textarea {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-low);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+select option { background: var(--bg-secondary); color: var(--text-primary); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+
+/* Nav bar */
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-dim);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-brand {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #00ff88, #00c8ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-right: 16px;
+}
+.nav-link {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all 0.15s;
+  font-family: var(--font-mono);
+}
+.nav-link:hover { color: var(--text-primary); background: var(--bg-hover); }
+.nav-link.active { color: var(--accent); background: var(--accent-dim); }
+
+/* Tab system */
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-secondary);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--border-dim);
+}
+.tab {
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+  background: transparent;
+}
+.tab:hover { color: var(--text-primary); }
+.tab.active { color: var(--accent); background: var(--accent-dim); }
+
+/* TradingView widget container */
+.tv-widget {
+  width: 100%;
+  height: 180px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-dim);
+}
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.fade-in { animation: fadeIn 0.3s ease-out; }
+.pulse { animation: pulse 2s infinite; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback, useRef, Fragment } = React;
+
+// ═══════════════════════════════════════════════════════════════
+// DATA LAYER — Fetches from data/scanner_results.json
+// Falls back to embedded mock data if fetch fails (local dev)
+// ═══════════════════════════════════════════════════════════════
+
+const DATA_URL = "./data/scanner_results.json?t=" + Date.now();
+const SCAN_RUNS_URL = "./data/scan_runs.json?t=" + Date.now();
+
+function useStockData() {
+  const [stocks, setStocks] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [meta, setMeta] = React.useState({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch(DATA_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (!cancelled) {
+          setStocks(json.stocks || []);
+          setMeta(json.meta || {});
+          setLoading(false);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch scanner data, using mock:", e.message);
+        if (!cancelled) {
+          setStocks(FALLBACK_MOCK);
+          setMeta({generated_at: new Date().toISOString(), total_scanned: FALLBACK_MOCK.length, version: "mock"});
+          setLoading(false);
+          setError("Using offline data — run generate_data.py to update");
+        }
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { stocks, loading, error, meta };
+}
+
+// Fallback mock data (used when data/scanner_results.json not available)
+const FALLBACK_MOCK = [
+  { symbol:"NTPC", name:"NTPC Ltd", sector:"Power", price:382.4, change_pct:2.15, rsi:68.5, composite_score:5, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[{type:"52w_high_volume",priority:9,title:"52W High with Volume",direction:"bullish"}], fundamentals:{pe_ratio:15.02,market_cap_cr:370800,mcap_category:"large_cap",eps:22.08,roe:12.31,debt_to_equity:145}, fund_holdings:{no_of_funds:245,fund_shares_change_pct:-0.83}, macd:{crossover:"bullish"}, ema:{cross_9_21:"bullish",cross_50_200:"golden_cross"}, breakout:{signal:"new_52w_high"}, volume:{ratio:1.8,signal:"above_avg"}, bollinger:{signal:"upper_breakout"}, returns:{"1d":2.15,"1w":3.2,"1m":5.34,"3m":17.64} },
+  { symbol:"HAL", name:"Hindustan Aeronautics", sector:"Defence", price:4850, change_pct:3.1, rsi:72.3, composite_score:5, circuit:{band:"No Band",is_restricted:false}, earnings_alert:"📅 Reports Q4 in 5 days", catalysts:[{type:"earnings_blockbuster",priority:10,title:"Blockbuster EPS +62%",direction:"bullish"},{type:"volume_explosion",priority:9,title:"Volume 3.2x avg",direction:"bullish"}], fundamentals:{pe_ratio:38.5,market_cap_cr:324000,mcap_category:"large_cap",eps:126,roe:28.5,debt_to_equity:0}, fund_holdings:{no_of_funds:189,fund_shares_change_pct:2.4}, macd:{crossover:"bullish"}, ema:{cross_9_21:"golden_cross",cross_50_200:"golden_cross"}, breakout:{signal:"new_52w_high"}, volume:{ratio:3.2,signal:"extreme_spike"}, bollinger:{signal:"upper_breakout"}, returns:{"1d":3.1,"1w":5.8,"1m":12.4,"3m":28.7} },
+  { symbol:"COALINDIA", name:"Coal India", sector:"Mining", price:485, change_pct:1.2, rsi:65.8, composite_score:4, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[{type:"institutional_accumulation",priority:8,title:"Fund Holding +3.2%",direction:"bullish"}], fundamentals:{pe_ratio:8.2,market_cap_cr:298500,mcap_category:"large_cap",eps:59,roe:52,debt_to_equity:8}, fund_holdings:{no_of_funds:312,fund_shares_change_pct:3.2}, macd:{crossover:"bullish"}, ema:{cross_9_21:"bullish",cross_50_200:"golden_cross"}, breakout:{signal:"near_52w_high"}, volume:{ratio:2.1,signal:"spike"}, bollinger:{signal:"upper_breakout"}, returns:{"1d":1.2,"1w":2.8,"1m":6.1,"3m":15.3} },
+  { symbol:"SBIN", name:"State Bank of India", sector:"Banking", price:1066.7, change_pct:1.88, rsi:48.2, composite_score:3, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[], fundamentals:{pe_ratio:11.17,market_cap_cr:984630,mcap_category:"mega_cap",eps:81.94,roe:15.83,debt_to_equity:null}, fund_holdings:{no_of_funds:410,fund_shares_change_pct:0.5}, macd:{crossover:"bullish_crossover"}, ema:{cross_9_21:"golden_cross",cross_50_200:"bullish"}, breakout:{signal:"none"}, volume:{ratio:2.4,signal:"spike"}, bollinger:{signal:"neutral"}, returns:{"1d":1.88,"1w":3.5,"1m":-11.0,"3m":10.75} },
+  { symbol:"ZOMATO", name:"Zomato", sector:"Tech", price:245, change_pct:4.2, rsi:55.1, composite_score:3, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[{type:"volume_explosion",priority:9,title:"Volume 3.5x spike",direction:"bullish"},{type:"gap_up",priority:9,title:"Gap Up 4.2% held",direction:"bullish"}], fundamentals:{pe_ratio:320,market_cap_cr:215000,mcap_category:"large_cap",eps:0.77,roe:3.2,debt_to_equity:5}, fund_holdings:{no_of_funds:156,fund_shares_change_pct:5.1}, macd:{crossover:"bullish_crossover"}, ema:{cross_9_21:"golden_cross",cross_50_200:"bullish"}, breakout:{signal:"none"}, volume:{ratio:3.5,signal:"extreme_spike"}, bollinger:{signal:"neutral"}, returns:{"1d":4.2,"1w":8.1,"1m":-5.3,"3m":12.4} },
+  { symbol:"TCS", name:"TCS", sector:"IT", price:2409.2, change_pct:-0.05, rsi:18.5, composite_score:-5, circuit:{band:"No Band",is_restricted:false}, earnings_alert:"⚠️ Reports Q4 TODAY", catalysts:[{type:"earnings_decline",priority:8,title:"EPS Decline -15%",direction:"bearish"}], fundamentals:{pe_ratio:18.18,market_cap_cr:871670,mcap_category:"mega_cap",eps:131.54,roe:50.48,debt_to_equity:8}, fund_holdings:{no_of_funds:520,fund_shares_change_pct:-2.1}, macd:{crossover:"bearish_crossover"}, ema:{cross_9_21:"death_cross",cross_50_200:"death_cross"}, breakout:{signal:"near_52w_low"}, volume:{ratio:0.8,signal:"normal"}, bollinger:{signal:"lower_breakout"}, returns:{"1d":-0.05,"1w":-3.2,"1m":-10.51,"3m":-25.19} },
+  { symbol:"DLF", name:"DLF Ltd", sector:"Real Estate", price:720, change_pct:3.8, rsi:50.2, composite_score:2, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[{type:"volume_explosion",priority:9,title:"Volume 3.1x",direction:"bullish"}], fundamentals:{pe_ratio:42.1,market_cap_cr:178000,mcap_category:"large_cap",eps:17.1,roe:8.5,debt_to_equity:28}, fund_holdings:{no_of_funds:134,fund_shares_change_pct:1.8}, macd:{crossover:"bullish_crossover"}, ema:{cross_9_21:"golden_cross",cross_50_200:"bearish"}, breakout:{signal:"none"}, volume:{ratio:3.1,signal:"extreme_spike"}, bollinger:{signal:"neutral"}, returns:{"1d":3.8,"1w":6.2,"1m":-8.1,"3m":-15.4} },
+  { symbol:"YESBANK", name:"Yes Bank", sector:"Banking", price:20, change_pct:0.5, rsi:42, composite_score:-2, circuit:{band:"5%",is_restricted:true}, earnings_alert:null, catalysts:[], fundamentals:{pe_ratio:45,market_cap_cr:63000,mcap_category:"mid_cap",eps:0.44,roe:2.1,debt_to_equity:null}, fund_holdings:{no_of_funds:85,fund_shares_change_pct:-8.2}, macd:{crossover:"bearish"}, ema:{cross_9_21:"bearish",cross_50_200:"bearish"}, breakout:{signal:"none"}, volume:{ratio:1.2,signal:"normal"}, bollinger:{signal:"neutral"}, returns:{"1d":0.5,"1w":-1.2,"1m":-5.8,"3m":-12.3} },
+  { symbol:"SUZLON", name:"Suzlon Energy", sector:"Energy", price:60, change_pct:2.5, rsi:58, composite_score:2, circuit:{band:"20%",is_restricted:false}, earnings_alert:null, catalysts:[{type:"revenue_acceleration",priority:7,title:"Revenue +38%",direction:"bullish"}], fundamentals:{pe_ratio:85,market_cap_cr:82000,mcap_category:"mid_cap",eps:0.71,roe:18,debt_to_equity:22}, fund_holdings:{no_of_funds:98,fund_shares_change_pct:4.5}, macd:{crossover:"bullish"}, ema:{cross_9_21:"bullish",cross_50_200:"bullish"}, breakout:{signal:"none"}, volume:{ratio:1.6,signal:"above_avg"}, bollinger:{signal:"neutral"}, returns:{"1d":2.5,"1w":4.1,"1m":8.2,"3m":22.5} },
+];
+
+const SCAN_CATEGORIES = [
+  { id:"all", label:"ALL", icon:"◉" },
+  { id:"catalyst", label:"CATALYSTS", icon:"⚡" },
+  { id:"bullish", label:"BULLISH", icon:"▲" },
+  { id:"bearish", label:"BEARISH", icon:"▼" },
+  { id:"earnings", label:"EARNINGS", icon:"📊" },
+  { id:"volume", label:"VOLUME", icon:"📈" },
+  { id:"breakout", label:"BREAKOUT", icon:"💥" },
+  { id:"pattern", label:"PATTERNS", icon:"◈" },
+  { id:"momentum", label:"MOMENTUM", icon:"🚀" },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+
+const SignalBadge = ({signal}) => {
+  const map = {
+    bullish_crossover:"badge-bullish", bullish:"badge-bullish", golden_cross:"badge-warning",
+    new_52w_high:"badge-bullish", near_52w_high:"badge-bullish", spike:"badge-info",
+    extreme_spike:"badge-purple", upper_breakout:"badge-bullish", squeeze:"badge-warning",
+    bearish_crossover:"badge-bearish", bearish:"badge-bearish", death_cross:"badge-bearish",
+    new_52w_low:"badge-bearish", near_52w_low:"badge-bearish", lower_breakout:"badge-bearish",
+    above_avg:"badge-info", normal:"badge-neutral", none:"badge-neutral", neutral:"badge-neutral",
+    dry:"badge-neutral",
+  };
+  const cls = map[signal] || "badge-neutral";
+  return <span className={`badge ${cls}`}>{(signal||"—").replace(/_/g," ").toUpperCase()}</span>;
+};
+
+const ScoreBar = ({score}) => {
+  const pct = Math.min(Math.abs(score)/7*100, 100);
+  const isPos = score >= 0;
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <div style={{width:56,height:7,borderRadius:4,background:"rgba(255,255,255,0.04)",overflow:"hidden",position:"relative"}}>
+        <div style={{
+          position:"absolute", [isPos?"left":"right"]:0, top:0, height:"100%",
+          width:`${pct}%`, borderRadius:4,
+          background:isPos?"linear-gradient(90deg,#00ff8855,#00ff88)":"linear-gradient(90deg,#ff4455,#ff445555)",
+          boxShadow:isPos?"0 0 8px #00ff8833":"0 0 8px #ff445533",
+        }}/>
+      </div>
+      <span style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,
+        color:score>0?"#00ff88":score<0?"#ff4455":"#556",minWidth:22,textAlign:"right"}}>
+        {score>0?`+${score}`:score}
+      </span>
+    </div>
+  );
+};
+
+const FundBadge = ({funds, changePct}) => {
+  if (!funds) return <span style={{color:"var(--text-muted)",fontSize:10}}>—</span>;
+  const color = changePct > 0 ? "#00ff88" : changePct < 0 ? "#ff4455" : "#889";
+  return (
+    <div style={{fontFamily:"var(--font-mono)",fontSize:10,lineHeight:1.4}}>
+      <div style={{color:"#ddd",fontWeight:600}}>{funds}</div>
+      <div style={{color}}>{changePct > 0 ? "+" : ""}{changePct?.toFixed(1)}%</div>
+    </div>
+  );
+};
+
+const PctCell = ({val}) => {
+  if (val == null) return <span style={{color:"var(--text-muted)"}}>—</span>;
+  const c = val > 0 ? "#00ff88" : val < 0 ? "#ff4455" : "#889";
+  return <span style={{color:c,fontWeight:600,fontFamily:"var(--font-mono)",fontSize:11}}>{val>0?"+":""}{val.toFixed(2)}%</span>;
+};
+
+const CatalystPill = ({catalyst}) => {
+  const colors = {
+    bullish: {bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"},
+    bearish: {bg:"rgba(255,68,85,0.08)",border:"rgba(255,68,85,0.25)",color:"#ff4455"},
+    neutral: {bg:"rgba(136,153,170,0.08)",border:"rgba(136,153,170,0.15)",color:"#889"},
+  };
+  const c = colors[catalyst.direction] || colors.neutral;
+  return (
+    <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:4,
+      background:c.bg,border:`1px solid ${c.border}`,fontSize:9,fontFamily:"var(--font-mono)",
+      fontWeight:600,color:c.color,whiteSpace:"nowrap"}}>
+      <span style={{fontSize:7}}>P{catalyst.priority}</span> {catalyst.title}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TRADINGVIEW MINI CHART (embedded widget)
+// ═══════════════════════════════════════════════════════════════
+
+const TVMiniChart = ({symbol}) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.innerHTML = "";
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      symbol: `NSE:${symbol}`,
+      width: "100%",
+      height: "180",
+      locale: "en",
+      dateRange: "3M",
+      colorTheme: "dark",
+      isTransparent: true,
+      autosize: false,
+      largeChartUrl: "",
+      noTimeScale: false,
+    });
+    ref.current.appendChild(script);
+  }, [symbol]);
+  return <div ref={ref} className="tv-widget"/>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STOCK DRILLDOWN MODAL
+// ═══════════════════════════════════════════════════════════════
+
+const StockDrilldown = ({stock, onClose}) => {
+  if (!stock) return null;
+  const f = stock.fundamentals || {};
+  const fh = stock.fund_holdings || {};
+
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",
+      zIndex:1000,display:"flex",justifyContent:"center",alignItems:"flex-start",
+      overflowY:"auto",padding:"40px 20px"}} onClick={onClose}>
+      <div style={{maxWidth:1100,width:"100%",background:"var(--bg-secondary)",
+        border:"1px solid var(--border-med)",borderRadius:10}} onClick={e=>e.stopPropagation()} className="fade-in">
+        
+        {/* Header */}
+        <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border-dim)",
+          display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <span style={{fontSize:22,fontWeight:800,color:"#fff"}}>{stock.symbol}</span>
+            <span style={{fontSize:13,color:"var(--text-secondary)",marginLeft:10}}>{stock.name}</span>
+            <span className="badge badge-info" style={{marginLeft:8}}>{stock.sector}</span>
+            {stock.circuit?.is_restricted && <span className="badge badge-bearish" style={{marginLeft:6}}>CIRCUIT {stock.circuit.band}</span>}
+            {stock.earnings_alert && <span className="badge badge-warning" style={{marginLeft:6}}>{stock.earnings_alert}</span>}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:22,fontWeight:700,color:"#fff",fontFamily:"var(--font-mono)"}}>₹{stock.price.toLocaleString()}</div>
+              <PctCell val={stock.change_pct}/>
+            </div>
+            <button onClick={onClose} style={{background:"none",border:"1px solid var(--border-low)",
+              borderRadius:4,width:32,height:32,color:"var(--text-muted)",cursor:"pointer",fontSize:16}}>✕</button>
+          </div>
+        </div>
+
+        {/* TradingView Chart */}
+        <div style={{padding:"12px 20px"}}>
+          <TVMiniChart symbol={stock.symbol}/>
+        </div>
+
+        {/* Fundamental Overview Grid */}
+        <div style={{padding:"0 20px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
+          {[
+            ["Market Cap",f.market_cap_cr?`₹${(f.market_cap_cr/100).toFixed(0)}K Cr`:"—"],
+            ["P/E Ratio",f.pe_ratio||"—"],
+            ["EPS",f.eps?`₹${f.eps}`:"—"],
+            ["ROE",f.roe?`${f.roe}%`:"—"],
+            ["Debt/Equity",f.debt_to_equity!=null?f.debt_to_equity+"%" :"N/A"],
+            ["RSI(14)",stock.rsi?.toFixed(1)],
+            ["No. of Funds",fh.no_of_funds||"—"],
+            ["Fund Holding Chg",fh.fund_shares_change_pct!=null?`${fh.fund_shares_change_pct>0?"+":""}${fh.fund_shares_change_pct}%`:"—"],
+          ].map(([label,val],i)=>(
+            <div key={i} style={{background:"var(--bg-tertiary)",borderRadius:6,padding:"10px 12px",
+              border:"1px solid var(--border-dim)"}}>
+              <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
+              <div style={{fontSize:15,fontWeight:600,color:
+                typeof val==="string"&&val.includes("-")?"#ff4455":
+                typeof val==="string"&&val.includes("+")?"#00ff88":"#ddd",
+                fontFamily:"var(--font-mono)"}}>{val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Catalysts */}
+        {stock.catalysts?.length > 0 && (
+          <div style={{padding:"0 20px 16px"}}>
+            <div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6,letterSpacing:1}}>⚡ CATALYSTS</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {stock.catalysts.map((c,i) => <CatalystPill key={i} catalyst={c}/>)}
+            </div>
+          </div>
+        )}
+
+        {/* Signal Summary */}
+        <div style={{padding:"0 20px 16px"}}>
+          <div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6,letterSpacing:1}}>SIGNALS</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            <div><span style={{fontSize:9,color:"var(--text-muted)"}}>MACD</span> <SignalBadge signal={stock.macd?.crossover}/></div>
+            <div><span style={{fontSize:9,color:"var(--text-muted)"}}>EMA 9/21</span> <SignalBadge signal={stock.ema?.cross_9_21}/></div>
+            <div><span style={{fontSize:9,color:"var(--text-muted)"}}>EMA 50/200</span> <SignalBadge signal={stock.ema?.cross_50_200}/></div>
+            <div><span style={{fontSize:9,color:"var(--text-muted)"}}>52W</span> <SignalBadge signal={stock.breakout?.signal}/></div>
+            <div><span style={{fontSize:9,color:"var(--text-muted)"}}>VOL</span> <SignalBadge signal={stock.volume?.signal}/></div>
+            <div><span style={{fontSize:9,color:"var(--text-muted)"}}>BB</span> <SignalBadge signal={stock.bollinger?.signal}/></div>
+          </div>
+        </div>
+
+        {/* Returns */}
+        <div style={{padding:"0 20px 20px"}}>
+          <div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6,letterSpacing:1}}>RETURNS</div>
+          <div style={{display:"flex",gap:16}}>
+            {[["1D",stock.returns?.["1d"]],["1W",stock.returns?.["1w"]],["1M",stock.returns?.["1m"]],["3M",stock.returns?.["3m"]]].map(([p,v],i)=>(
+              <div key={i} style={{textAlign:"center"}}>
+                <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{p}</div>
+                <PctCell val={v}/>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SCAN BUILDER PANEL
+// ═══════════════════════════════════════════════════════════════
+
+const ScanBuilder = ({onApplyFilter}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("scans");
+  const [clauseText, setClauseText] = useState("");
+  const [filters, setFilters] = useState({
+    priceMin:"", priceMax:"", mcapMin:"300", mcapMax:"5000000",
+    excludeCircuit: true, volumeMA50Min:"100000",
+    return1mMin:"", return1mMax:"", return3mMin:"", return3mMax:"",
+  });
+
+  const tabs = [
+    {id:"scans", label:"Scans", icon:"📋"},
+    {id:"technicals", label:"Technicals", icon:"📈"},
+    {id:"fundamentals", label:"Fundamentals", icon:"📊"},
+    {id:"misc", label:"Misc", icon:"⚙"},
+    {id:"clause", label:"ChartInk Clause", icon:"⌨"},
+  ];
+
+  return (
+    <div className="card" style={{marginBottom:12}}>
+      <div style={{padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",
+        cursor:"pointer",borderBottom:isOpen?"1px solid var(--border-dim)":"none"}} onClick={()=>setIsOpen(!isOpen)}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{color:"var(--accent)",fontSize:14}}>◈</span>
+          <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600,color:"var(--text-primary)"}}>SCAN BUILDER</span>
+        </div>
+        <span style={{color:"var(--text-muted)",fontSize:14,transform:isOpen?"rotate(180deg)":"",transition:"transform 0.2s"}}>▾</span>
+      </div>
+
+      {isOpen && (
+        <div className="fade-in" style={{padding:16}}>
+          {/* Tabs */}
+          <div className="tabs" style={{marginBottom:12}}>
+            {tabs.map(t=>(
+              <button key={t.id} className={`tab ${activeTab===t.id?"active":""}`}
+                onClick={()=>setActiveTab(t.id)}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Scans Tab */}
+          {activeTab === "scans" && (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[
+                {label:"Inside Bar (D)",checked:true},{label:"NR7",checked:true},
+                {label:"VCP",checked:false},{label:"Tight Setup",checked:false},
+                {label:"Volume Breakout",checked:true},{label:"Gap Up > 3%",checked:false},
+                {label:"Earnings Gap Up",checked:true},{label:"Positive Earnings Reaction",checked:true},
+                {label:"Momentum Scanner",checked:false},{label:"200MA Turnaround",checked:false},
+                {label:"SuperTrend Buy",checked:false},{label:"Pocket Pivot",checked:false},
+              ].map((s,i) => (
+                <label key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--text-primary)",cursor:"pointer"}}>
+                  <input type="checkbox" defaultChecked={s.checked} style={{accentColor:"var(--accent)"}}/>
+                  {s.label}
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/* Technicals Tab */}
+          {activeTab === "technicals" && (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" defaultChecked style={{accentColor:"var(--accent)"}}/> Price(₹):
+                <input type="number" placeholder="25" defaultValue="25" style={{width:60}}/>-
+                <input type="number" placeholder="10000" defaultValue="10000" style={{width:70}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" defaultChecked style={{accentColor:"var(--accent)"}}/> MCap(Cr):
+                <input type="number" placeholder="300" defaultValue="300" style={{width:60}}/>-
+                <input type="number" placeholder="5000000" defaultValue="5000000" style={{width:80}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" defaultChecked style={{accentColor:"var(--accent)"}}/> MA 50 Vol &gt;
+                <input type="number" placeholder="100000" defaultValue="100000" style={{width:80}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" defaultChecked style={{accentColor:"var(--accent)"}}/> Exclude Circuit:
+                <select defaultValue="5%" style={{width:100}}>
+                  <option value="2%">2% Circuit</option>
+                  <option value="5%">5% Circuit, ...</option>
+                  <option value="10%">10% Circuit, ...</option>
+                </select>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> 1M Return(%):
+                <input type="number" placeholder="20" style={{width:50}}/>-
+                <input type="number" placeholder="100" style={{width:50}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> 3M Return(%):
+                <input type="number" placeholder="30" style={{width:50}}/>-
+                <input type="number" placeholder="300" style={{width:50}}/>
+              </label>
+            </div>
+          )}
+
+          {/* ChartInk Clause Tab */}
+          {activeTab === "clause" && (
+            <div>
+              <div style={{fontSize:10,color:"var(--text-muted)",marginBottom:6,fontFamily:"var(--font-mono)"}}>
+                Paste your ChartInk scan clause directly:
+              </div>
+              <textarea rows={4} style={{width:"100%",resize:"vertical",fontSize:11}}
+                placeholder='( cash ( latest close > latest sma( latest close, 200 ) and latest rsi( 14 ) > 50 ) )'
+                value={clauseText} onChange={e=>setClauseText(e.target.value)}/>
+              <div style={{marginTop:8,display:"flex",gap:8}}>
+                <button className="btn btn-accent">▶ Run Scan</button>
+                <button className="btn">Save Preset</button>
+              </div>
+            </div>
+          )}
+
+          {/* Fundamentals Tab */}
+          {activeTab === "fundamentals" && (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {[
+                ["P/E Range","0","50"],["P/B Range","0","5"],
+                ["ROE > (%)","10",""],["Debt/Equity <","100",""],
+                ["EPS Growth > (%)","15",""],["Revenue Growth > (%)","10",""],
+              ].map(([label,min,max],i) => (
+                <label key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                  <input type="checkbox" style={{accentColor:"var(--accent)"}}/> {label}
+                  <input type="number" placeholder={min} style={{width:50}}/>
+                  {max && <Fragment>- <input type="number" placeholder={max} style={{width:50}}/></Fragment>}
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/* Misc Tab */}
+          {activeTab === "misc" && (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> Volume Gainers
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> Gap Up Today
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> Near New Highs
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> Listing Date &gt;
+                <input type="text" placeholder="2024/01/01" style={{width:90}}/>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> Sector:
+                <select style={{width:120}}><option>All</option><option>IT</option><option>Banking</option><option>Pharma</option><option>Auto</option><option>FMCG</option><option>Power</option><option>Defence</option></select>
+              </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <input type="checkbox" style={{accentColor:"var(--accent)"}}/> RS Range:
+                <input type="number" placeholder="70" style={{width:45}}/>-
+                <input type="number" placeholder="100" style={{width:45}}/>
+              </label>
+            </div>
+          )}
+
+          {/* Apply / Reset */}
+          <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}}>Reset</button>
+            <button className="btn btn-accent">Apply Filters</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN SCANNER DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+
+const ScannerDashboard = () => {
+  const { stocks, loading, error, meta } = useStockData();
+  const [activePreset, setActivePreset] = useState("all");
+  const [sortBy, setSortBy] = useState("score_desc");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [excludeCircuit, setExcludeCircuit] = useState(true);
+  const [showTV, setShowTV] = useState(false);
+
+  const filteredStocks = useMemo(() => {
+    let list = [...stocks];
+    
+    // Circuit limit filter
+    if (excludeCircuit) {
+      list = list.filter(s => !s.circuit?.is_restricted);
+    }
+    
+    // Preset filter
+    if (activePreset === "catalyst") list = list.filter(s => s.catalysts?.length > 0);
+    else if (activePreset === "bullish") list = list.filter(s => s.composite_score >= 3);
+    else if (activePreset === "bearish") list = list.filter(s => s.composite_score <= -3);
+    else if (activePreset === "earnings") list = list.filter(s => s.earnings_alert);
+    else if (activePreset === "volume") list = list.filter(s => ["spike","extreme_spike"].includes(s.volume?.signal));
+    else if (activePreset === "breakout") list = list.filter(s => ["new_52w_high","near_52w_high"].includes(s.breakout?.signal));
+    else if (activePreset === "momentum") list = list.filter(s => s.rsi > 55 && s.rsi < 80 && s.composite_score > 0);
+    
+    // Search
+    if (searchQuery) {
+      const q = searchQuery.toUpperCase();
+      list = list.filter(s => s.symbol.includes(q) || s.name.toUpperCase().includes(q) || s.sector.toUpperCase().includes(q));
+    }
+    
+    // Sort
+    const sorters = {
+      score_desc: (a,b) => b.composite_score - a.composite_score,
+      score_asc: (a,b) => a.composite_score - b.composite_score,
+      change_desc: (a,b) => b.change_pct - a.change_pct,
+      rsi_desc: (a,b) => (b.rsi||0) - (a.rsi||0),
+      funds_desc: (a,b) => (b.fund_holdings?.no_of_funds||0) - (a.fund_holdings?.no_of_funds||0),
+      mcap_desc: (a,b) => (b.fundamentals?.market_cap_cr||0) - (a.fundamentals?.market_cap_cr||0),
+    };
+    list.sort(sorters[sortBy] || sorters.score_desc);
+    
+    return list;
+  }, [stocks, activePreset, sortBy, searchQuery, excludeCircuit]);
+
+  const summary = useMemo(() => ({
+    bullish: stocks.filter(s=>s.composite_score>=3).length,
+    bearish: stocks.filter(s=>s.composite_score<=-3).length,
+    catalysts: stocks.filter(s=>s.catalysts?.length>0).length,
+    volume: stocks.filter(s=>["spike","extreme_spike"].includes(s.volume?.signal)).length,
+    earnings: stocks.filter(s=>s.earnings_alert).length,
+    restricted: stocks.filter(s=>s.circuit?.is_restricted).length,
+  }), [stocks]);
+
+  if (loading) {
+    return (
+      <div>
+        <nav className="nav">
+          <span className="nav-brand">◈ TRADEDGE</span>
+          <a href="index.html" className="nav-link">Journal</a>
+          <a href="rrg.html" className="nav-link">RRG</a>
+          <a href="mps.html" className="nav-link">MPS</a>
+          <a href="matrix.html" className="nav-link">Matrix</a>
+          <a href="scanner.html" className="nav-link active">Scanner</a>
+        </nav>
+        <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"60vh",flexDirection:"column",gap:12}}>
+          <div style={{width:40,height:40,border:"3px solid var(--border-low)",borderTop:"3px solid var(--accent)",
+            borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+          <div style={{color:"var(--text-muted)",fontSize:12,fontFamily:"var(--font-mono)"}}>Loading scanner data...</div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Navigation */}
+      <nav className="nav">
+        <span className="nav-brand">◈ TRADEDGE</span>
+        <a href="index.html" className="nav-link">Journal</a>
+        <a href="rrg.html" className="nav-link">RRG</a>
+        <a href="mps.html" className="nav-link">MPS</a>
+        <a href="matrix.html" className="nav-link">Matrix</a>
+        <a href="scanner.html" className="nav-link active">Scanner</a>
+      </nav>
+
+      <div style={{maxWidth:1440,margin:"0 auto",padding:"12px 16px"}}>
+
+        {/* Error banner */}
+        {error && (
+          <div style={{padding:"6px 12px",marginBottom:8,borderRadius:4,background:"rgba(255,170,0,0.08)",
+            border:"1px solid rgba(255,170,0,0.2)",fontSize:10,color:"#ffaa00",fontFamily:"var(--font-mono)"}}>
+            ⚠ {error}
+          </div>
+        )}
+        
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+          <div>
+            <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,
+              background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",
+              WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ SCANNER</h1>
+            <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>
+              {meta.total_scanned || stocks.length} STOCKS • {meta.generated_at ? new Date(meta.generated_at).toLocaleString("en-IN") : "OFFLINE"} • v{meta.version || "1.0"}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input type="text" placeholder="⌕ Search symbol, name, sector..."
+              value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
+              style={{width:220}}/>
+            <label style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)",
+              fontFamily:"var(--font-mono)",cursor:"pointer"}}>
+              <input type="checkbox" checked={excludeCircuit} onChange={e=>setExcludeCircuit(e.target.checked)}
+                style={{accentColor:"var(--accent)"}}/>
+              Exclude 2%/5%
+            </label>
+            <label style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)",
+              fontFamily:"var(--font-mono)",cursor:"pointer"}}>
+              <input type="checkbox" checked={showTV} onChange={e=>setShowTV(e.target.checked)}
+                style={{accentColor:"var(--accent)"}}/> TV Charts
+            </label>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
+          {[
+            {label:"BULLISH",count:summary.bullish,color:"#00ff88",icon:"▲"},
+            {label:"BEARISH",count:summary.bearish,color:"#ff4455",icon:"▼"},
+            {label:"CATALYSTS",count:summary.catalysts,color:"#ffaa00",icon:"⚡"},
+            {label:"VOL SPIKE",count:summary.volume,color:"#ff00ff",icon:"📊"},
+            {label:"EARNINGS",count:summary.earnings,color:"#00c8ff",icon:"📅"},
+            {label:"RESTRICTED",count:summary.restricted,color:"#ff4455",icon:"🚫"},
+          ].map((c,i) => (
+            <div key={i} style={{background:`linear-gradient(135deg,${c.color}06,${c.color}03)`,
+              border:`1px solid ${c.color}18`,borderRadius:6,padding:"8px 10px",cursor:"pointer",
+              transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=c.color+"44";e.currentTarget.style.transform="translateY(-1px)"}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=c.color+"18";e.currentTarget.style.transform=""}}>
+              <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>{c.icon} {c.label}</div>
+              <div style={{fontSize:20,fontWeight:800,color:c.color,fontFamily:"var(--font-display)"}}>{c.count}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Scan Builder */}
+        <ScanBuilder/>
+
+        {/* Preset Tabs */}
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10,padding:"8px 0",
+          borderTop:"1px solid var(--border-dim)",borderBottom:"1px solid var(--border-dim)"}}>
+          {SCAN_CATEGORIES.map(p => (
+            <button key={p.id} onClick={() => setActivePreset(activePreset===p.id?"all":p.id)}
+              style={{
+                background:activePreset===p.id?"var(--accent-dim)":"rgba(255,255,255,0.02)",
+                border:`1px solid ${activePreset===p.id?"var(--accent)":"rgba(255,255,255,0.06)"}`,
+                borderRadius:4,padding:"4px 10px",color:activePreset===p.id?"var(--accent)":"var(--text-muted)",
+                fontSize:10,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",letterSpacing:0.5}}>
+              {p.icon} {p.label}
+            </button>
+          ))}
+          <div style={{marginLeft:"auto",display:"flex",gap:4,alignItems:"center"}}>
+            <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>SORT:</span>
+            <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
+              style={{fontSize:10,padding:"3px 6px"}}>
+              <option value="score_desc">Score ↓</option>
+              <option value="score_asc">Score ↑</option>
+              <option value="change_desc">Change% ↓</option>
+              <option value="rsi_desc">RSI ↓</option>
+              <option value="funds_desc">Funds ↓</option>
+              <option value="mcap_desc">MCap ↓</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Count */}
+        <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:8,fontFamily:"var(--font-mono)"}}>
+          Showing <span style={{color:"var(--accent)",fontWeight:700}}>{filteredStocks.length}</span> stocks
+        </div>
+
+        {/* Results Table */}
+        <div className="card">
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead>
+                <tr style={{background:"rgba(0,255,136,0.03)"}}>
+                  {["STOCK","PRICE","CHG%","SCORE","RSI","FUNDS","MACD","EMA 9/21","52W","VOL","CATALYSTS","1M","3M"].map(h=>(
+                    <th key={h} style={{padding:"8px 8px",textAlign:"left",color:"var(--text-muted)",
+                      fontSize:9,fontWeight:700,letterSpacing:1,borderBottom:"1px solid var(--border-dim)",
+                      fontFamily:"var(--font-mono)",whiteSpace:"nowrap"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStocks.map((stock,i) => (
+                  <Fragment key={stock.symbol}>
+                    <tr style={{
+                      background:i%2===0?"transparent":"rgba(255,255,255,0.008)",
+                      cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.02)",
+                      transition:"background 0.1s"}}
+                      onClick={(e) => {
+                        if (e.shiftKey || e.ctrlKey) {
+                          setSelectedStock(stock); // Inline modal on shift/ctrl-click
+                        } else {
+                          window.open(`stock.html?s=${stock.symbol}`, '_blank'); // Full page drilldown
+                        }
+                      }}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(0,255,136,0.03)"}
+                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.008)"}>
+                      <td style={{padding:"8px",whiteSpace:"nowrap"}}>
+                        <div style={{fontWeight:700,color:"#fff",fontSize:12}}>{stock.symbol}</div>
+                        <div style={{fontSize:9,color:"var(--text-muted)"}}>{stock.sector}</div>
+                        {stock.circuit?.is_restricted && <span className="badge badge-bearish" style={{fontSize:8}}>⊘ {stock.circuit.band}</span>}
+                        {stock.earnings_alert && <div style={{fontSize:8,color:"var(--amber)",marginTop:1}}>{stock.earnings_alert}</div>}
+                      </td>
+                      <td style={{padding:"8px",fontWeight:600,color:"#ddd",fontFamily:"var(--font-mono)"}}>₹{stock.price.toLocaleString()}</td>
+                      <td style={{padding:"8px"}}><PctCell val={stock.change_pct}/></td>
+                      <td style={{padding:"8px"}}><ScoreBar score={stock.composite_score}/></td>
+                      <td style={{padding:"8px"}}>
+                        <span style={{color:stock.rsi>=70?"#ff4455":stock.rsi<=30?"#00ff88":"#889",
+                          fontWeight:600,fontFamily:"var(--font-mono)"}}>{stock.rsi?.toFixed(1)}</span>
+                      </td>
+                      <td style={{padding:"8px"}}><FundBadge funds={stock.fund_holdings?.no_of_funds} changePct={stock.fund_holdings?.fund_shares_change_pct}/></td>
+                      <td style={{padding:"8px"}}><SignalBadge signal={stock.macd?.crossover}/></td>
+                      <td style={{padding:"8px"}}><SignalBadge signal={stock.ema?.cross_9_21}/></td>
+                      <td style={{padding:"8px"}}><SignalBadge signal={stock.breakout?.signal}/></td>
+                      <td style={{padding:"8px"}}>
+                        <span style={{color:stock.volume?.ratio>=2?"#ff00ff":"#667",fontWeight:600,
+                          fontFamily:"var(--font-mono)",fontSize:11}}>{stock.volume?.ratio}x</span>
+                      </td>
+                      <td style={{padding:"8px",maxWidth:200}}>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                          {stock.catalysts?.slice(0,2).map((c,j) => <CatalystPill key={j} catalyst={c}/>)}
+                          {stock.catalysts?.length > 2 && <span style={{fontSize:9,color:"var(--text-muted)"}}>+{stock.catalysts.length-2}</span>}
+                        </div>
+                      </td>
+                      <td style={{padding:"8px"}}><PctCell val={stock.returns?.["1m"]}/></td>
+                      <td style={{padding:"8px"}}><PctCell val={stock.returns?.["3m"]}/></td>
+                    </tr>
+                    {/* TradingView Mini Chart Row */}
+                    {showTV && (
+                      <tr>
+                        <td colSpan={13} style={{padding:"4px 8px 8px",borderBottom:"1px solid var(--border-dim)"}}>
+                          <TVMiniChart symbol={stock.symbol}/>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filteredStocks.length === 0 && (
+            <div style={{padding:40,textAlign:"center",color:"var(--text-muted)"}}>
+              <div style={{fontSize:28,marginBottom:8}}>◇</div>
+              <div style={{fontSize:12}}>No stocks match filters</div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",
+          display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--text-muted)",
+          fontFamily:"var(--font-mono)",letterSpacing:1}}>
+          <span>TRADEDGE SCANNER v1.0 • 2803 NSE STOCKS • GITHUB PAGES</span>
+          <span>⚡ CYBERPUNK EDITION</span>
+        </div>
+      </div>
+
+      {/* Stock Drilldown Modal */}
+      <StockDrilldown stock={selectedStock} onClose={() => setSelectedStock(null)}/>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MOUNT
+// ═══════════════════════════════════════════════════════════════
+ReactDOM.createRoot(document.getElementById("root")).render(<ScannerDashboard/>);
+</script>
+</body>
+</html>
