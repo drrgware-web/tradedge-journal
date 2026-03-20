@@ -16,7 +16,7 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
 body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(0,255,136,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.2);border-radius:3px}
 #root{position:relative;z-index:1}
-.nav{display:flex;align-items:center;gap:4px;padding:8px 20px;background:var(--bg-secondary);border-bottom:1px solid var(--border-dim);position:sticky;top:0;z-index:100}
+.nav{display:flex;align-items:center;gap:4px;padding:4px 20px;background:var(--bg-secondary);border-bottom:1px solid var(--border-dim);position:sticky;top:0;z-index:100}
 .nav-brand{font-weight:900;font-size:16px;letter-spacing:2px;background:linear-gradient(135deg,#00ff88,#00c8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:16px}
 .nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-decoration:none;border-radius:4px;font-family:var(--font-mono)}
 .nav-link:hover{color:var(--text-primary);background:var(--bg-hover)}
@@ -169,6 +169,7 @@ const Treemap = ({data, title, timeframe}) => {
     ctx.scale(dpr, dpr);
     const W = cssW;
     const H = cssH;
+    const titleH = 24; // Reserve space for title bar
 
     // Sort by value (size) descending
     const sorted = [...data].sort((a,b) => b.value - a.value);
@@ -176,7 +177,7 @@ const Treemap = ({data, title, timeframe}) => {
 
     // Simple squarified treemap layout
     const rects = [];
-    let x = 0, y = 0, rowH = H, remainW = W;
+    let x = 0, y = titleH, rowH = H - titleH, remainW = W;
     let remaining = [...sorted];
 
     function layoutRow(row, x, y, w, h) {
@@ -198,7 +199,7 @@ const Treemap = ({data, title, timeframe}) => {
       rowItems.push(item);
       rowValue += item.value;
       if (rowValue >= rowLimit || item === remaining[remaining.length - 1]) {
-        const rH = (rowValue / totalValue) * H;
+        const rH = (rowValue / totalValue) * (H - titleH);
         layoutRow(rowItems, 0, y, W, rH);
         y += rH;
         rowItems = [];
@@ -243,14 +244,14 @@ const Treemap = ({data, title, timeframe}) => {
       }
     }
 
-    // Title overlay
-    ctx.fillStyle = "rgba(6,8,12,0.6)";
-    ctx.fillRect(0, 0, W, 22);
+    // Title bar (drawn in reserved space at top)
+    ctx.fillStyle = "rgba(12,16,24,0.95)";
+    ctx.fillRect(0, 0, W, titleH);
     ctx.fillStyle = "#889";
     ctx.font = "11px 'JetBrains Mono'";
     ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.fillText(`Sectoral Heatmap: ${timeframe} RS Rating`, 8, 5);
+    ctx.textBaseline = "middle";
+    ctx.fillText(`Sectoral Heatmap: ${timeframe} RS Rating`, 8, titleH / 2);
 
   }, [data, title]);
 
@@ -391,7 +392,7 @@ const SectorPage = () => {
   return (
     <div>
       <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:40,marginRight:12}}/></a>
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:56,marginRight:14}}/></a>
         <a href="scanner.html" className="nav-link">Scanner</a>
         <a href="sectors.html" className="nav-link active">Sectors</a>
         <a href="rrg.html" className="nav-link">RRG</a>
