@@ -355,28 +355,77 @@ const CatalystPill = ({catalyst}) => {
 // ═══════════════════════════════════════════════════════════════
 
 const TVMiniChart = ({symbol}) => {
-  const ref = useRef(null);
+  const canvasRef = useRef(null);
+  const [prices, setPrices] = useState(null);
+  
   useEffect(() => {
-    if (!ref.current) return;
-    ref.current.innerHTML = "";
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      symbol: `NSE:${symbol}`,
-      width: "100%",
-      height: "180",
-      locale: "en",
-      dateRange: "3M",
-      colorTheme: "dark",
-      isTransparent: true,
-      autosize: false,
-      largeChartUrl: "",
-      noTimeScale: false,
-    });
-    ref.current.appendChild(script);
+    fetch(`./data/stock_details/${symbol}.json?t=${Date.now()}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.price_history?.length) setPrices(d.price_history.slice(-60)); })
+      .catch(() => {});
   }, [symbol]);
-  return <div ref={ref} className="tv-widget"/>;
+  
+  useEffect(() => {
+    if (!canvasRef.current || !prices?.length) return;
+    const canvas = canvasRef.current;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.parentElement.offsetWidth;
+    const H = 80;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    
+    const closes = prices.map(p => p.c || p.close || 0).filter(v => v > 0);
+    const vols = prices.map(p => p.v || p.volume || 0);
+    if (closes.length < 2) return;
+    
+    const mn = Math.min(...closes), mx = Math.max(...closes);
+    const range = mx - mn || 1;
+    const pad = 4, chartW = W - pad * 2, chartH = H - 20;
+    const step = chartW / (closes.length - 1);
+    
+    ctx.clearRect(0, 0, W, H);
+    
+    // Volume bars
+    const maxVol = Math.max(...vols) || 1;
+    vols.forEach((v, i) => {
+      const x = pad + i * step;
+      const bh = (v / maxVol) * 16;
+      const bull = i > 0 ? closes[i] >= closes[i-1] : true;
+      ctx.fillStyle = bull ? "rgba(0,255,136,0.15)" : "rgba(255,68,85,0.15)";
+      ctx.fillRect(x - step/3, H - bh, step * 0.6, bh);
+    });
+    
+    // Price line
+    const first = closes[0], last = closes[closes.length - 1];
+    const lineColor = last >= first ? "#00ff88" : "#ff4455";
+    ctx.beginPath();
+    closes.forEach((c, i) => {
+      const x = pad + i * step;
+      const y = pad + (1 - (c - mn) / range) * chartH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = lineColor; ctx.lineWidth = 1.5; ctx.stroke();
+    
+    // Fill gradient
+    ctx.lineTo(pad + (closes.length - 1) * step, H);
+    ctx.lineTo(pad, H); ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, last >= first ? "rgba(0,255,136,0.12)" : "rgba(255,68,85,0.12)");
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad; ctx.fill();
+    
+    // Price label
+    ctx.fillStyle = "#889"; ctx.font = "9px 'JetBrains Mono'"; ctx.textAlign = "right";
+    ctx.fillText(`₹${last.toFixed(1)}`, W - 4, 12);
+    const chg = ((last - first) / first * 100).toFixed(1);
+    ctx.fillStyle = last >= first ? "#00ff88" : "#ff4455";
+    ctx.fillText(`${last >= first ? "+" : ""}${chg}%`, W - 4, 24);
+  }, [prices]);
+  
+  if (!prices) return <div style={{height:80,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-muted)",fontSize:9,fontFamily:"var(--font-mono)"}}>Loading chart...</div>;
+  return <canvas ref={canvasRef} style={{width:"100%",borderRadius:4,cursor:"pointer"}} onClick={() => window.open(`stock.html?s=${symbol}`, '_blank')}/>;
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -781,10 +830,14 @@ const ScannerDashboard = () => {
                 style={{accentColor:"var(--accent)"}}/>
               Exclude 2%/5%
             </label>
+            <label style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)",
+              fontFamily:"var(--font-mono)",cursor:"pointer"}}>
+              <input type="checkbox" checked={showTV} onChange={e=>setShowTV(e.target.checked)}
+                style={{accentColor:"var(--accent)"}}/>
+              TE Charts
+            </label>
           </div>
         </div>
-
-        {/* Summary Cards */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
           {[
             {label:"BULLISH",count:summary.bullish,color:"#00ff88",icon:"▲"},
@@ -899,7 +952,7 @@ const ScannerDashboard = () => {
                       <td style={{padding:"8px"}}><PctCell val={stock.returns?.["1m"]}/></td>
                       <td style={{padding:"8px"}}><PctCell val={stock.returns?.["3m"]}/></td>
                     </tr>
-                    {/* TradingView Mini Chart Row */}
+                    {/* TE Mini Chart Row */}
                     {showTV && (
                       <tr>
                         <td colSpan={13} style={{padding:"4px 8px 8px",borderBottom:"1px solid var(--border-dim)"}}>
