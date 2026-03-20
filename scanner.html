@@ -211,8 +211,8 @@ const { useState, useEffect, useMemo, useCallback, useRef, Fragment } = React;
 // Falls back to embedded mock data if fetch fails (local dev)
 // ═══════════════════════════════════════════════════════════════
 
-const DATA_URL = "data/scanner_results.json";
-const SCAN_RUNS_URL = "data/scan_runs.json";
+const DATA_URL = "./data/scanner_results.json?t=" + Date.now();
+const SCAN_RUNS_URL = "./data/scan_runs.json?t=" + Date.now();
 
 function useStockData() {
   const [stocks, setStocks] = React.useState([]);
