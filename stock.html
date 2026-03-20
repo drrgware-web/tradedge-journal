@@ -768,6 +768,79 @@ const StockPage = () => {
     return null;
   }
 
+  // Fetch shareholding + No of Funds from screener.in HTML page
+  async function fetchShareholding(symbol) {
+    const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
+    const targetUrl = `https://www.screener.in/company/${sym}/consolidated/`;
+    
+    for (const proxyFn of FUND_PROXIES) {
+      try {
+        const url = proxyFn(targetUrl);
+        const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+        if (!r.ok) continue;
+        const html = await r.text();
+        
+        // Parse shareholding table from HTML
+        const result = { promoter: [], fii: [], dii: [], public: [], mutual_funds: [], no_of_funds: null };
+        
+        // Find shareholding table — look for "Shareholding Pattern"
+        const shMatch = html.match(/Shareholding Pattern[\s\S]*?<table[\s\S]*?<\/table>/i);
+        if (shMatch) {
+          const table = shMatch[0];
+          // Extract rows
+          const rows = table.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+          
+          // Find header row to get quarter labels
+          const quarters = [];
+          const headerMatch = rows[0]?.match(/<th[^>]*>([\s\S]*?)<\/th>/gi) || [];
+          headerMatch.forEach(th => {
+            const txt = th.replace(/<[^>]+>/g, '').trim();
+            if (txt.match(/\w{3}\s+\d{4}|20\d{2}/)) quarters.push(txt);
+          });
+          
+          // Parse data rows
+          rows.forEach(row => {
+            const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+            const values = cells.map(td => td.replace(/<[^>]+>/g, '').trim());
+            if (!values.length) return;
+            
+            const label = values[0]?.toLowerCase() || "";
+            const nums = values.slice(1).map(v => parseFloat(v) || 0);
+            
+            if (label.includes("promoter")) {
+              result.promoter = quarters.map((q, i) => ({ qtr: q, pct: nums[i] || 0 }));
+            } else if (label.includes("fii") || label.includes("foreign")) {
+              result.fii = quarters.map((q, i) => ({ qtr: q, pct: nums[i] || 0 }));
+            } else if (label.includes("dii") || label.includes("domestic inst")) {
+              result.dii = quarters.map((q, i) => ({ qtr: q, pct: nums[i] || 0 }));
+            } else if (label.includes("public") || label.includes("retail")) {
+              result.public = quarters.map((q, i) => ({ qtr: q, pct: nums[i] || 0 }));
+            } else if (label.includes("mutual fund")) {
+              result.mutual_funds = quarters.map((q, i) => ({ qtr: q, pct: nums[i] || 0 }));
+            }
+          });
+        }
+        
+        // Find "No. of Mutual Funds" or fund count
+        const fundMatch = html.match(/(\d+)\s*(?:mutual funds?|schemes?)\s*(?:hold|holding)/i);
+        if (fundMatch) result.no_of_funds = parseInt(fundMatch[1]);
+        
+        // Also try to find it in a different pattern
+        const fundMatch2 = html.match(/Number of (?:Mutual Fund|MF) (?:Schemes?|Holders?)[\s\S]*?(\d+)/i);
+        if (!result.no_of_funds && fundMatch2) result.no_of_funds = parseInt(fundMatch2[1]);
+        
+        if (result.promoter.length > 0 || result.no_of_funds) {
+          console.log("[SHAREHOLDING] Loaded for", sym, result);
+          return result;
+        }
+      } catch(e) { 
+        console.warn('[SHAREHOLDING] Proxy failed:', e.message);
+        continue;
+      }
+    }
+    return null;
+  }
+
   useEffect(() => {
     async function loadStock() {
       try {
@@ -818,6 +891,8 @@ const StockPage = () => {
   useEffect(() => {
     if (!SYMBOL) return;
     setScreenerLoading(true);
+    
+    // Fetch quarterly data from worker
     fundFetchScreener(SYMBOL).then(sData => {
       if (sData) {
         console.log("[SCREENER] Loaded for", SYMBOL, sData.quarters?.length, "quarters");
@@ -825,6 +900,32 @@ const StockPage = () => {
       }
       setScreenerLoading(false);
     }).catch(() => setScreenerLoading(false));
+
+    // Fetch shareholding from screener.in HTML
+    fetchShareholding(SYMBOL).then(shData => {
+      if (shData) {
+        setData(prev => {
+          if (!prev) return prev;
+          const updated = {...prev};
+          if (shData.promoter?.length) {
+            updated.ownership = {
+              promoter: shData.promoter,
+              mutual_funds: shData.mutual_funds || [],
+              fii: shData.fii || [],
+              public: shData.public || [],
+              dii: shData.dii || [],
+            };
+          }
+          if (shData.no_of_funds) {
+            updated.fund_holdings = {
+              ...updated.fund_holdings,
+              no_of_funds: shData.no_of_funds,
+            };
+          }
+          return updated;
+        });
+      }
+    }).catch(e => console.warn("[SHAREHOLDING] Failed:", e.message));
   }, []);
 
   if (loading) {
@@ -855,7 +956,14 @@ const StockPage = () => {
     pe_ratio: d.fundamentals?.pe_ratio || si.pe,
     roe: d.fundamentals?.roe || si.roe,
     book_value: d.fundamentals?.book_value || si.bookValue,
-    dividend_yield: d.fundamentals?.dividend_yield || si.dividendYield || null,
+    dividend_yield: (() => {
+      const yf = d.fundamentals?.dividend_yield;
+      const sc = si.dividendYield;
+      // Prefer screener (already %) > yfinance (may be wrong)
+      if (sc != null && sc > 0 && sc < 30) return sc;
+      if (yf != null && yf > 0 && yf < 30) return yf;
+      return null;
+    })(),
     roce: d.fundamentals?.roce || si.roce,
     eps: d.fundamentals?.eps || (si.currentPrice && si.pe ? (si.currentPrice / si.pe).toFixed(2) : null),
   };
@@ -1139,44 +1247,52 @@ const StockPage = () => {
             </div>
           </div>
 
-          {/* Ownership + Shareholders */}
+          {/* Ownership + Shareholders — only show if data exists */}
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
-            <div className="card fade-in">
-              <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
-                fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>OWNERSHIP PATTERN</div>
-              <div style={{padding:12}}>
-                <OwnershipBar ownership={d.ownership}/>
-                <div style={{marginTop:12}}>
-                  <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
-                    <thead><tr>{["","Dec-25","Sep-25","Jun-25","Mar-25"].map(h=><th key={h} style={{padding:"4px 6px",color:"var(--text-muted)",textAlign:"right",fontFamily:"var(--font-mono)"}}>{h}</th>)}</tr></thead>
-                    <tbody>
-                      {[["Promoters",d.ownership.promoter,"#8844ff"],["Mutual Funds",d.ownership.mutual_funds,"#ff8800"]].map(([label,data,color],i) => (
-                        <tr key={i} style={{borderTop:"1px solid var(--border-dim)"}}>
-                          <td style={{padding:"4px 6px",display:"flex",alignItems:"center",gap:4}}>
-                            <div style={{width:6,height:6,borderRadius:1,background:color}}/>{label}
-                          </td>
-                          {data.map((d,j)=><td key={j} style={{padding:"4px 6px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{d.pct}%</td>)}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {d.ownership.promoter.length > 0 ? (
+              <div className="card fade-in">
+                <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
+                  fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>OWNERSHIP PATTERN</div>
+                <div style={{padding:12}}>
+                  <OwnershipBar ownership={d.ownership}/>
+                  <div style={{marginTop:12}}>
+                    <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
+                      <thead><tr>{["","Dec-25","Sep-25","Jun-25","Mar-25"].map(h=><th key={h} style={{padding:"4px 6px",color:"var(--text-muted)",textAlign:"right",fontFamily:"var(--font-mono)"}}>{h}</th>)}</tr></thead>
+                      <tbody>
+                        {[["Promoters",d.ownership.promoter,"#8844ff"],["Mutual Funds",d.ownership.mutual_funds,"#ff8800"]].map(([label,data,color],i) => (
+                          <tr key={i} style={{borderTop:"1px solid var(--border-dim)"}}>
+                            <td style={{padding:"4px 6px",display:"flex",alignItems:"center",gap:4}}>
+                              <div style={{width:6,height:6,borderRadius:1,background:color}}/>{label}
+                            </td>
+                            {data.map((d,j)=><td key={j} style={{padding:"4px 6px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{d.pct}%</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="card fade-in">
-              <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
-                fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>MAJOR SHAREHOLDERS</div>
-              <div style={{padding:8}}>
-                {d.major_shareholders.map((s,i) => (
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",
-                    borderBottom:"1px solid var(--border-dim)",fontSize:11}}>
-                    <span style={{color:"var(--text-secondary)"}}>{s.name}</span>
-                    <span style={{fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-primary)"}}>{s.pct}%</span>
-                  </div>
-                ))}
+            ) : (
+              <div className="card fade-in" style={{padding:16,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>
+                Ownership data not available from current data sources
               </div>
-            </div>
+            )}
+
+            {d.major_shareholders.length > 0 ? (
+              <div className="card fade-in">
+                <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
+                  fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>MAJOR SHAREHOLDERS</div>
+                <div style={{padding:8}}>
+                  {d.major_shareholders.map((s,i) => (
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",
+                      borderBottom:"1px solid var(--border-dim)",fontSize:11}}>
+                      <span style={{color:"var(--text-secondary)"}}>{s.name}</span>
+                      <span style={{fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-primary)"}}>{s.pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
