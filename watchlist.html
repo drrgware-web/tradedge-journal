@@ -125,6 +125,7 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
   // Drawings
 const[drawings,setDrawings]=useState(()=>DrawingStore.load(symbol));
   const[drawStart,setDrawStart]=useState(null);const[drawPreview,setDrawPreview]=useState(null);
+  const[drawPoints,setDrawPoints]=useState([]);const[selectedId,setSelectedId]=useState(null);const[dragHandle,setDragHandle]=useState(null);const[showDrawings,setShowDrawings]=useState(true);const[magnetMode,setMagnetMode]=useState(true);const[textInput,setTextInput]=useState(null);const[cloudSynced,setCloudSynced]=useState(false);
   // Trade plan + alerts
   const[alerts,setAlerts]=useState(()=>CS.alerts(symbol));const[plan,setPlan]=useState(()=>CS.plan(symbol));
   const[posCfg,setPosCfg]=useState(()=>CS.posConfig());const[showPos,setShowPos]=useState(false);
@@ -135,7 +136,7 @@ const[drawings,setDrawings]=useState(()=>DrawingStore.load(symbol));
   useEffect(()=>{CS.saveAlerts(symbol,alerts)},[alerts,symbol]);
   useEffect(()=>{CS.savePlan(symbol,plan)},[plan,symbol]);
   useEffect(()=>{CS.savePosConfig(posCfg)},[posCfg]);
-  (()=>{setDrawings(DrawingStore.load(symbol));setAlerts(CS.alerts(symbol));...
+  useEffect(()=>{setDrawings(DrawingStore.load(symbol));setAlerts(CS.alerts(symbol));setPlan(CS.plan(symbol));setDrawMode(null);setDrawStart(null);setDrawPoints([]);setSelectedId(null);setCtx(null);setMeasureResult(null);setDragLine(null);setCloudSynced(false);DrawingStore.syncFromCloud(symbol).then(m=>{if(m)setDrawings(m);setCloudSynced(true)})},[symbol]);
 
   const priceData=useMemo(()=>prices?.length?prices:[],[prices]);
   const closes=useMemo(()=>priceData.map(d=>d.c),[priceData]);
@@ -145,7 +146,14 @@ const[drawings,setDrawings]=useState(()=>DrawingStore.load(symbol));
 
   const si=viewStart??Math.max(0,priceData.length-viewCount);
   const vis=priceData.slice(si,si+viewCount);
-
+  const snapToOHLC=useCallback((mx,my,L)=>{if(!magnetMode||!L)return{x:mx,y:my,price:L.toP(my),bi:L.toBi(mx)+si};const bi=L.toBi(mx);if(bi<0||bi>=vis.length)return{x:mx,y:my,price:L.toP(my),bi:L.toBi(mx)+si};const bar=vis[bi];const prices=[bar.o,bar.h,bar.l,bar.c];let closest=null,minD=12;for(const p of prices){const d=Math.abs(L.toY(p)-my);if(d<minD){minD=d;closest=p}}if(closest)return{x:L.toX(bi),y:L.toY(closest),price:closest,bi:bi+si};return{x:mx,y:my,price:L.toP(my),bi:L.toBi(mx)+si}},[magnetMode,vis,si]);
+  const hitTestDrawing=useCallback((mx,my,L)=>{if(!L||!showDrawings)return null;const t=8;for(let i=drawings.length-1;i>=0;i--){const d=drawings[i];if(d.hidden)continue;if(d.type==='hline'){const y=L.toY(d.price);if(Math.abs(my-y)<t)return{id:d.id,type:'hline',handle:null}}else if(d.type==='trendline'||d.type==='ray'){const x1=L.toX(d.bi1-si),y1=L.toY(d.p1),x2=L.toX(d.bi2-si),y2=L.toY(d.p2);if(Math.hypot(mx-x1,my-y1)<t)return{id:d.id,type:d.type,handle:'p1'};if(Math.hypot(mx-x2,my-y2)<t)return{id:d.id,type:d.type,handle:'p2'};const A=mx-x1,B=my-y1,C=x2-x1,D=y2-y1,dot=A*C+B*D,len=C*C+D*D;let p=len?dot/len:-1;p=Math.max(0,Math.min(1,p));if(Math.hypot(mx-(x1+p*C),my-(y1+p*D))<t)return{id:d.id,type:d.type,handle:null}}else if(d.type==='fib'){if(Math.abs(my-L.toY(d.p1))<t)return{id:d.id,type:'fib',handle:'p1'};if(Math.abs(my-L.toY(d.p2))<t)return{id:d.id,type:'fib',handle:'p2'}}else if(d.type==='rect'){const x1=L.toX(d.bi1-si),y1=L.toY(d.p1),x2=L.toX(d.bi2-si),y2=L.toY(d.p2);if(Math.hypot(mx-x1,my-y1)<t)return{id:d.id,type:'rect',handle:'p1'};if(Math.hypot(mx-x2,my-y2)<t)return{id:d.id,type:'rect',handle:'p2'}}else if(d.type==='text'&&Math.abs(mx-L.toX(d.bi-si))<40&&Math.abs(my-L.toY(d.price))<12)return{id:d.id,type:'text',handle:null}}return null},[drawings,si,showDrawings]);
+  const saveUndo=useCallback(()=>{DrawingStore.pushUndo(symbol,drawings)},[symbol,drawings]);
+  const undo=useCallback(()=>{const prev=DrawingStore.popUndo(symbol);if(prev){DrawingStore.pushRedo(symbol,drawings);setDrawings(prev)}},[symbol,drawings]);
+  const redo=useCallback(()=>{const next=DrawingStore.popRedo(symbol);if(next){DrawingStore.pushUndo(symbol,drawings);setDrawings(next)}},[symbol,drawings]);
+  const addDrawing=(d)=>{saveUndo();setDrawings(prev=>[...prev,{...d,id:genDrawingId(),ts:Date.now()}])};
+  const updateDrawing=(id,upd)=>{setDrawings(prev=>prev.map(d=>d.id===id?{...d,...upd,ts:Date.now()}:d))};
+  const deleteDrawing=(id)=>{saveUndo();setDrawings(prev=>prev.filter(d=>d.id!==id));if(selectedId===id)setSelectedId(null)};
   const PAD={L:62,R:10,T:10,B:22};const VH=72;
 
   const getL=useCallback(()=>{
