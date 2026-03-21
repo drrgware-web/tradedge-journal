@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEchart · P&F Engine · TradEdge</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- React + Babel -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #07090d;
+    --bg-card: #0c0f15;
+    --bg-panel: #10141c;
+    --bg-hover: #161b27;
+    --border: #1a2030;
+    --border-active: #253040;
+    --text-1: #e4e9f2;
+    --text-2: #7a8699;
+    --text-3: #3d4a5e;
+    --green: #00e676;
+    --green-dim: rgba(0,230,118,0.25);
+    --green-bg: rgba(0,230,118,0.06);
+    --red: #ff1744;
+    --red-dim: rgba(255,23,68,0.25);
+    --red-bg: rgba(255,23,68,0.06);
+    --cyan: #00bcd4;
+    --cyan-dim: rgba(0,188,212,0.25);
+    --amber: #ffc107;
+    --amber-dim: rgba(255,193,7,0.25);
+    --purple: #b388ff;
+    --purple-dim: rgba(179,136,255,0.25);
+  }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text-1);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-active); }
+
+  /* TradEdge Global Nav */
+  .te-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 40px;
+    background: linear-gradient(180deg, #0e1119 0%, #0a0d14 100%);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+  .te-nav-left { display: flex; align-items: center; gap: 14px; }
+  .te-logo {
+    display: flex; align-items: center; gap: 7px;
+    text-decoration: none; color: var(--text-1);
+  }
+  .te-logo-icon {
+    width: 24px; height: 24px; border-radius: 5px;
+    background: linear-gradient(135deg, var(--green), var(--cyan));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 900; color: var(--bg);
+  }
+  .te-logo-text { font-size: 13px; font-weight: 800; letter-spacing: 0.04em; }
+  .te-logo-sub { font-size: 8px; color: var(--text-3); letter-spacing: 0.1em; margin-left: 6px; }
+
+  .te-nav-links { display: flex; gap: 2px; }
+  .te-nav-link {
+    padding: 6px 12px; border-radius: 4px; font-size: 9px; font-weight: 700;
+    letter-spacing: 0.07em; color: var(--text-2); text-decoration: none;
+    transition: all 0.15s; cursor: pointer; border: none; background: transparent;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .te-nav-link:hover { color: var(--text-1); background: var(--bg-hover); }
+  .te-nav-link.active { color: var(--cyan); background: var(--bg-panel); }
+
+  .te-nav-right { display: flex; align-items: center; gap: 10px; }
+  .te-sync-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .te-sync-label { font-size: 8px; color: var(--text-3); letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+
+<!-- TradEdge Navigation Bar -->
+<nav class="te-nav">
+  <div class="te-nav-left">
+    <a class="te-logo" href="index.html">
+      <div class="te-logo-icon">TE</div>
+      <span class="te-logo-text">TradEdge</span>
+    </a>
+    <span class="te-logo-sub">JOURNAL · SCANNER · RRM</span>
+    <div class="te-nav-links">
+      <a class="te-nav-link" href="index.html">JOURNAL</a>
+      <a class="te-nav-link" href="matrix.html">MATRIX</a>
+      <a class="te-nav-link" href="scanner.html">SCANNER</a>
+      <a class="te-nav-link active" href="techart.html">TEchart</a>
+    </div>
+  </div>
+  <div class="te-nav-right" id="sync-status">
+    <div class="te-sync-dot" style="background: var(--text-3);" id="sync-dot"></div>
+    <span class="te-sync-label" id="sync-label">INITIALIZING...</span>
+  </div>
+</nav>
+
+<div id="root"></div>
+
+<script type="text/babel" data-type="module">
+// ============================================================
+// TEchart — TradEdge P&F Chart Engine
+// localStorage (te_trades) + Supabase Cloud Sync
+// ============================================================
+
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+// ── Supabase Config ──
+const SUPABASE_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2OTI0NTAsImV4cCI6MjA1OTI2ODQ1MH0.LB1cVIO3RMtSuaLCsFbNr-8dnLJ80Ok43Gmf5cPrbdw';
+const LS_KEY = 'te_trades';
+const LS_PNF_KEY = 'te_pnf_state';
+
+let supabase = null;
+try {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch(e) {
+  console.warn('Supabase init failed:', e);
+}
+
+// ── Sync Engine ──
+class TradeSync {
+  constructor() {
+    this.listeners = [];
+    this.syncStatus = 'offline'; // offline | syncing | synced | error
+  }
+
+  subscribe(fn) {
+    this.listeners.push(fn);
+    return () => { this.listeners = this.listeners.filter(l => l !== fn); };
+  }
+
+  notify(status, msg) {
+    this.syncStatus = status;
+    this.listeners.forEach(fn => fn(status, msg));
+  }
+
+  // ── localStorage ──
+  getLocal() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return [];
+      const data = JSON.parse(raw);
+      // te_trades can be array of trades or object with trades key
+      return Array.isArray(data) ? data : (data.trades || []);
+    } catch { return []; }
+  }
+
+  saveLocal(trades) {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(trades));
+    } catch(e) {
+      console.error('localStorage save failed:', e);
+    }
+  }
+
+  // P&F state persistence
+  getPnFState() {
+    try {
+      const raw = localStorage.getItem(LS_PNF_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  savePnFState(state) {
+    try {
+      localStorage.setItem(LS_PNF_KEY, JSON.stringify(state));
+    } catch(e) {}
+  }
+
+  // ── Supabase Cloud ──
+  async pushToCloud(trades) {
+    if (!supabase) return;
+    this.notify('syncing', 'Pushing to cloud...');
+    try {
+      // Upsert trades into te_pnf_trades table
+      // If table doesn't exist, we use the generic key-value approach
+      const payload = {
+        key: 'te_pnf_trades',
+        value: JSON.stringify(trades),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('te_store')
+        .upsert(payload, { onConflict: 'key' });
+
+      if (error) {
+        // Table might not exist - try creating via insert
+        console.warn('Supabase upsert error:', error.message);
+        // Fallback: store in localStorage only
+        this.notify('error', 'Cloud sync failed');
+        return;
+      }
+
+      this.notify('synced', `Synced ${trades.length} trades`);
+    } catch(e) {
+      console.error('Cloud push error:', e);
+      this.notify('error', 'Cloud unreachable');
+    }
+  }
+
+  async pullFromCloud() {
+    if (!supabase) return null;
+    this.notify('syncing', 'Pulling from cloud...');
+    try {
+      const { data, error } = await supabase
+        .from('te_store')
+        .select('value')
+        .eq('key', 'te_pnf_trades')
+        .single();
+
+      if (error || !data) {
+        this.notify('synced', 'No cloud data');
+        return null;
+      }
+
+      const trades = JSON.parse(data.value);
+      this.notify('synced', `Loaded ${trades.length} trades from cloud`);
+      return trades;
+    } catch(e) {
+      console.error('Cloud pull error:', e);
+      this.notify('error', 'Cloud pull failed');
+      return null;
+    }
+  }
+
+  // ── Merge Strategy: cloud wins on conflict, union otherwise ──
+  async syncAll() {
+    const localTrades = this.getLocal();
+    const cloudTrades = await this.pullFromCloud();
+
+    if (!cloudTrades) {
+      // No cloud data - push local up
+      if (localTrades.length > 0) {
+        await this.pushToCloud(localTrades);
+      }
+      return localTrades;
+    }
+
+    // Merge: use id as key, cloud wins on conflict
+    const merged = new Map();
+    localTrades.forEach(t => merged.set(t.id, t));
+    cloudTrades.forEach(t => merged.set(t.id, t)); // cloud overwrites
+
+    const result = Array.from(merged.values())
+      .sort((a, b) => (b.timestamp || b.id) - (a.timestamp || a.id));
+
+    this.saveLocal(result);
+    await this.pushToCloud(result);
+    return result;
+  }
+
+  // Push matrix scores to cloud
+  async pushMatrixToCloud(matrixData) {
+    if (!supabase) return;
+    try {
+      await supabase
+        .from('te_store')
+        .upsert({
+          key: 'te_pnf_matrix',
+          value: JSON.stringify(matrixData),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    } catch(e) {
+      console.warn('Matrix cloud push failed:', e);
+    }
+  }
+}
+
+const syncEngine = new TradeSync();
+
+// ── Color Constants ──
+const C = {
+  bg: '#07090d', bgCard: '#0c0f15', bgPanel: '#10141c',
+  bgHover: '#161b27', border: '#1a2030', borderActive: '#253040',
+  text1: '#e4e9f2', text2: '#7a8699', text3: '#3d4a5e',
+  green: '#00e676', greenDim: 'rgba(0,230,118,0.25)', greenBg: 'rgba(0,230,118,0.06)',
+  red: '#ff1744', redDim: 'rgba(255,23,68,0.25)', redBg: 'rgba(255,23,68,0.06)',
+  cyan: '#00bcd4', cyanDim: 'rgba(0,188,212,0.25)',
+  amber: '#ffc107', amberDim: 'rgba(255,193,7,0.25)',
+  purple: '#b388ff', purpleDim: 'rgba(179,136,255,0.25)',
+};
+
+// ── P&F Construction Engine ──
+function buildPnFChart(prices, boxValue, reversalValue = 3, isLog = true, method = 'close') {
+  if (!prices || prices.length < 2) return { columns: [], signals: [] };
+
+  const columns = [];
+  let currentCol = null;
+
+  const norm = prices.map(p =>
+    typeof p === 'number' ? { close: p, high: p, low: p } : p
+  );
+
+  // Find initial price
+  let basePrice = norm[0].close || norm[0].price || 100;
+
+  const getBoxSize = (price) => isLog ? price * (boxValue / 100) : boxValue;
+
+  const getPrice = (bar, colType, phase) => {
+    if (method === 'close') return bar.close || bar.price;
+    if (colType === 'X') return phase === 'cont' ? (bar.high || bar.close) : (bar.low || bar.close);
+    return phase === 'cont' ? (bar.low || bar.close) : (bar.high || bar.close);
+  };
+
+  let boxPrice = basePrice;
+
+  for (let i = 1; i < norm.length; i++) {
+    const bar = norm[i];
+    const bs = getBoxSize(boxPrice);
+    if (bs <= 0) continue;
+
+    if (!currentCol) {
+      const price = bar.close || bar.price;
+      if (price >= boxPrice + bs) {
+        currentCol = { type: 'X', boxes: [], startIdx: i, startDate: bar.date };
+        let p = boxPrice;
+        while (p + bs <= price) { p += bs; currentCol.boxes.push(Math.round(p * 100) / 100); }
+        if (currentCol.boxes.length > 0) {
+          boxPrice = currentCol.boxes[currentCol.boxes.length - 1];
+          columns.push(currentCol);
+        } else { currentCol = null; }
+      } else if (price <= boxPrice - bs) {
+        currentCol = { type: 'O', boxes: [], startIdx: i, startDate: bar.date };
+        let p = boxPrice;
+        while (p - bs >= price) { p -= bs; currentCol.boxes.push(Math.round(p * 100) / 100); }
+        if (currentCol.boxes.length > 0) {
+          boxPrice = currentCol.boxes[currentCol.boxes.length - 1];
+          columns.push(currentCol);
+        } else { currentCol = null; }
+      }
+      continue;
+    }
+
+    const contP = getPrice(bar, currentCol.type, 'cont');
+    const revP = getPrice(bar, currentCol.type, 'rev');
+
+    if (currentCol.type === 'X') {
+      if (contP >= boxPrice + bs) {
+        let p = boxPrice;
+        while (p + bs <= contP) { p += bs; currentCol.boxes.push(Math.round(p * 100) / 100); }
+        boxPrice = currentCol.boxes[currentCol.boxes.length - 1];
+        currentCol.endDate = bar.date;
+      } else if (revP <= boxPrice - bs * reversalValue) {
+        const newCol = { type: 'O', boxes: [], startIdx: i, startDate: bar.date };
+        let p = boxPrice;
+        while (p - bs >= revP) { p -= bs; newCol.boxes.push(Math.round(p * 100) / 100); }
+        if (newCol.boxes.length >= reversalValue) {
+          boxPrice = newCol.boxes[newCol.boxes.length - 1];
+          currentCol = newCol;
+          columns.push(currentCol);
+        }
+      }
+    } else {
+      if (contP <= boxPrice - bs) {
+        let p = boxPrice;
+        while (p - bs >= contP) { p -= bs; currentCol.boxes.push(Math.round(p * 100) / 100); }
+        boxPrice = currentCol.boxes[currentCol.boxes.length - 1];
+        currentCol.endDate = bar.date;
+      } else if (revP >= boxPrice + bs * reversalValue) {
+        const newCol = { type: 'X', boxes: [], startIdx: i, startDate: bar.date };
+        let p = boxPrice;
+        while (p + bs <= revP) { p += bs; newCol.boxes.push(Math.round(p * 100) / 100); }
+        if (newCol.boxes.length >= reversalValue) {
+          boxPrice = newCol.boxes[newCol.boxes.length - 1];
+          currentCol = newCol;
+          columns.push(currentCol);
+        }
+      }
+    }
+  }
+
+  const signals = detectSignals(columns);
+  return { columns, signals };
+}
+
+// ── Pattern Detection (All Major P&F Patterns) ──
+function detectSignals(columns) {
+  const signals = [];
+  if (columns.length < 3) return signals;
+
+  const colHigh = (c) => c.boxes.length ? Math.max(...c.boxes) : 0;
+  const colLow = (c) => c.boxes.length ? Math.min(...c.boxes) : Infinity;
+  const colMid = (c) => (colHigh(c) + colLow(c)) / 2;
+
+  for (let i = 2; i < columns.length; i++) {
+    const c0 = columns[i], c1 = columns[i-1], c2 = columns[i-2];
+    const h0 = colHigh(c0), l0 = colLow(c0);
+    const h2 = colHigh(c2), l2 = colLow(c2);
+
+    // Double Top Buy
+    if (c0.type === 'X' && h0 > h2) {
+      signals.push({ type: 'DT_BUY', label: 'Double Top Buy', colIdx: i, price: h2, bullish: true });
+    }
+    // Double Bottom Sell
+    if (c0.type === 'O' && l0 < l2) {
+      signals.push({ type: 'DB_SELL', label: 'Double Bottom Sell', colIdx: i, price: l2, bullish: false });
+    }
+
+    // Triple Top Buy (5-col)
+    if (i >= 4) {
+      const c4 = columns[i-4];
+      const h4 = colHigh(c4);
+      if (c0.type === 'X' && c2.type === 'X' && c4.type === 'X'
+          && Math.abs(h2 - h4) / h4 < 0.015 && h0 > h2) {
+        signals.push({ type: 'TT_BUY', label: 'Triple Top Buy', colIdx: i, price: h2, bullish: true });
+      }
+      const l4 = colLow(c4);
+      if (c0.type === 'O' && c2.type === 'O' && c4.type === 'O'
+          && Math.abs(l2 - l4) / l4 < 0.015 && l0 < l2) {
+        signals.push({ type: 'TB_SELL', label: 'Triple Bottom Sell', colIdx: i, price: l2, bullish: false });
+      }
+    }
+
+    // Traps (4-col: immediate reversal after signal)
+    if (i >= 3) {
+      const c3 = columns[i-3];
+      const h3 = colHigh(c3);
+      const l3 = colLow(c3);
+      // Bull Trap: DT Buy at col i-1, then DB Sell at col i
+      if (c0.type === 'O' && columns[i-1].type === 'X' && colHigh(columns[i-1]) > h3 && l0 < colLow(columns[i-2])) {
+        signals.push({ type: 'BULL_TRAP', label: 'Bull Trap', colIdx: i, price: l0, bullish: false });
+      }
+      // Bear Trap: DB Sell at col i-1, then DT Buy at col i
+      if (c0.type === 'X' && columns[i-1].type === 'O' && colLow(columns[i-1]) < l3 && h0 > colHigh(columns[i-2])) {
+        signals.push({ type: 'BEAR_TRAP', label: 'Bear Trap', colIdx: i, price: h0, bullish: true });
+      }
+    }
+
+    // High Pole: breakout + 5+ boxes + 50% retracement
+    if (c0.type === 'O' && c1.type === 'X' && c1.boxes.length >= 8) {
+      const hasBreakout = i >= 3 ? colHigh(c1) > colHigh(columns[i-3]) : true;
+      const mid1 = colMid(c1);
+      if (hasBreakout && c1.boxes.length >= 5 && l0 < mid1) {
+        signals.push({ type: 'HIGH_POLE', label: 'High Pole', colIdx: i, price: mid1, bullish: false });
+      }
+    }
+
+    // Low Pole
+    if (c0.type === 'X' && c1.type === 'O' && c1.boxes.length >= 8) {
+      const hasBreakout = i >= 3 ? colLow(c1) < colLow(columns[i-3]) : true;
+      const mid1 = colMid(c1);
+      if (hasBreakout && c1.boxes.length >= 5 && h0 > mid1) {
+        signals.push({ type: 'LOW_POLE', label: 'Low Pole', colIdx: i, price: mid1, bullish: true });
+      }
+    }
+
+    // Triangle (3 or 4 col inside columns)
+    if (i >= 3) {
+      const c3 = columns[i-3];
+      const isInside1 = colHigh(c1) < colHigh(c2) && colLow(c1) > colLow(c2);
+      const isInside2 = colHigh(c2) < colHigh(c3) && colLow(c2) > colLow(c3);
+      if (isInside1 && isInside2) {
+        signals.push({ type: 'TRIANGLE', label: 'Triangle', colIdx: i, price: colMid(c1), bullish: null });
+      }
+    }
+
+    // Broadening (trap of a trap)
+    if (i >= 4) {
+      const sigAtI = signals.filter(s => s.colIdx === i);
+      const sigAtI1 = signals.filter(s => s.colIdx === i-1);
+      const hasTrapI1 = sigAtI1.some(s => s.type === 'BULL_TRAP');
+      const hasBuyI = sigAtI.some(s => s.bullish === true);
+      if (hasTrapI1 && hasBuyI) {
+        signals.push({ type: 'BULL_BROAD', label: 'Bullish Broadening', colIdx: i, price: h0, bullish: true });
+      }
+      const hasBearTrapI1 = sigAtI1.some(s => s.type === 'BEAR_TRAP');
+      const hasSellI = sigAtI.some(s => s.bullish === false);
+      if (hasBearTrapI1 && hasSellI) {
+        signals.push({ type: 'BEAR_BROAD', label: 'Bearish Broadening', colIdx: i, price: l0, bullish: false });
+      }
+    }
+  }
+
+  // Fresh vs Continuation
+  let lastDir = null;
+  signals.forEach(s => {
+    if (s.bullish === null) { s.fresh = false; return; }
+    const dir = s.bullish ? 'BUY' : 'SELL';
+    s.fresh = dir !== lastDir;
+    if (s.fresh) lastDir = dir;
+  });
+
+  return signals;
+}
+
+// ── Matrix Scoring ──
+function matrixScore(columns, signals) {
+  if (columns.length < 2) return 0;
+  const last = columns[columns.length - 1];
+  const sig = signals.filter(s => s.bullish !== null).slice(-1)[0];
+  if (!sig) return 0;
+  if (sig.bullish && last.type === 'X') return 2;
+  if (sig.bullish && last.type === 'O') return 1;
+  if (!sig.bullish && last.type === 'O') return -2;
+  if (!sig.bullish && last.type === 'X') return -1;
+  return 0;
+}
+
+// ── Demo Data ──
+function genData(sym, days = 250) {
+  const seed = sym.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  let r = seed;
+  const rand = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
+  const base = 80 + rand() * 3000;
+  const trend = rand() > 0.45 ? 1 : -1;
+  const data = [];
+  let p = base;
+  for (let i = 0; i < days; i++) {
+    p = Math.max(5, p * (1 + trend * 0.0008 + (rand() - 0.48) * 0.028));
+    const v = p * (0.004 + rand() * 0.022);
+    const d = new Date(2024, 8, 1);
+    d.setDate(d.getDate() + i);
+    data.push({
+      date: d.toISOString().slice(0, 10),
+      open: +(p - v * (rand() - 0.5)).toFixed(2),
+      high: +(p + v * rand()).toFixed(2),
+      low: +(p - v * rand()).toFixed(2),
+      close: +(p + v * (rand() - 0.5)).toFixed(2),
+      price: +p.toFixed(2),
+    });
+  }
+  return data;
+}
+
+// ── Watchlist ──
+const WATCHLIST = [
+  { symbol: 'RELIANCE', name: 'Reliance Industries', sector: 'Energy' },
+  { symbol: 'TCS', name: 'Tata Consultancy', sector: 'IT' },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank', sector: 'Banking' },
+  { symbol: 'INFY', name: 'Infosys', sector: 'IT' },
+  { symbol: 'ICICIBANK', name: 'ICICI Bank', sector: 'Banking' },
+  { symbol: 'HINDUNILVR', name: 'Hindustan Unilever', sector: 'FMCG' },
+  { symbol: 'SBIN', name: 'State Bank of India', sector: 'Banking' },
+  { symbol: 'BHARTIARTL', name: 'Bharti Airtel', sector: 'Telecom' },
+  { symbol: 'BAJFINANCE', name: 'Bajaj Finance', sector: 'Finance' },
+  { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank', sector: 'Banking' },
+  { symbol: 'LT', name: 'Larsen & Toubro', sector: 'Infra' },
+  { symbol: 'TATAMOTORS', name: 'Tata Motors', sector: 'Auto' },
+  { symbol: 'MARUTI', name: 'Maruti Suzuki', sector: 'Auto' },
+  { symbol: 'SUNPHARMA', name: 'Sun Pharma', sector: 'Pharma' },
+  { symbol: 'TITAN', name: 'Titan Company', sector: 'Consumer' },
+  { symbol: 'AXISBANK', name: 'Axis Bank', sector: 'Banking' },
+  { symbol: 'WIPRO', name: 'Wipro', sector: 'IT' },
+  { symbol: 'BAJAJFINSV', name: 'Bajaj Finserv', sector: 'Finance' },
+  { symbol: 'ADANIENT', name: 'Adani Enterprises', sector: 'Diversified' },
+  { symbol: 'DRREDDY', name: "Dr Reddy's Labs", sector: 'Pharma' },
+];
+
+const BOX_VALUES = [
+  { label: '0.25%', value: 0.25, slot: 1 },
+  { label: '0.50%', value: 0.5, slot: 1 },
+  { label: '1%', value: 1, slot: 2 },
+  { label: '1.5%', value: 1.5, slot: 2 },
+  { label: '3%', value: 3, slot: 3 },
+  { label: '5%', value: 5, slot: 4 },
+];
+
+// ── Canvas Renderer ──
+function PnFCanvas({ columns, signals, width, height, symbol }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const cvs = ref.current;
+    if (!cvs || !columns.length) return;
+    const ctx = cvs.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = width * dpr; cvs.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, width, height);
+
+    let allP = [];
+    columns.forEach(c => allP.push(...c.boxes));
+    if (!allP.length) return;
+
+    const mn = Math.min(...allP), mx = Math.max(...allP);
+    const range = mx - mn || 1;
+    const pad = { t: 28, b: 32, l: 58, r: 14 };
+    const cW = width - pad.l - pad.r;
+    const cH = height - pad.t - pad.b;
+    const colW = Math.max(5, Math.min(18, cW / columns.length));
+    const xOf = (ci) => pad.l + ci * colW + colW / 2;
+    const yOf = (price) => pad.t + cH - ((price - mn) / range) * cH;
+
+    // Grid
+    ctx.strokeStyle = C.border; ctx.lineWidth = 0.4;
+    const step = range / 5;
+    for (let i = 0; i <= 5; i++) {
+      const p = mn + step * i;
+      const y = yOf(p);
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(width - pad.r, y); ctx.stroke();
+      ctx.fillStyle = C.text3; ctx.font = '9px JetBrains Mono';
+      ctx.textAlign = 'right'; ctx.fillText(p.toFixed(p > 100 ? 0 : 2), pad.l - 4, y + 3);
+    }
+
+    // Columns
+    columns.forEach((col, ci) => {
+      const x = xOf(ci);
+      const sz = Math.max(2.5, colW * 0.55);
+      col.boxes.forEach(bp => {
+        const y = yOf(bp);
+        if (col.type === 'X') {
+          ctx.strokeStyle = C.green; ctx.lineWidth = 1.3;
+          const h = sz / 2;
+          ctx.beginPath();
+          ctx.moveTo(x - h, y - h); ctx.lineTo(x + h, y + h);
+          ctx.moveTo(x + h, y - h); ctx.lineTo(x - h, y + h);
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = C.red; ctx.lineWidth = 1.3;
+          ctx.beginPath(); ctx.arc(x, y, sz / 2, 0, Math.PI * 2); ctx.stroke();
+        }
+      });
+    });
+
+    // Signal markers
+    const abbrs = { TT_BUY: 'TT', TB_SELL: 'TB', HIGH_POLE: 'HP', LOW_POLE: 'LP',
+      TRIANGLE: '△', BULL_TRAP: 'BuT', BEAR_TRAP: 'BrT', BULL_BROAD: 'BB', BEAR_BROAD: 'Bb' };
+
+    signals.forEach(sig => {
+      if (sig.colIdx >= columns.length) return;
+      const x = xOf(sig.colIdx), y = yOf(sig.price);
+
+      // Fresh arrow
+      if (sig.fresh) {
+        ctx.fillStyle = sig.bullish ? C.green : C.red;
+        ctx.beginPath();
+        if (sig.bullish) {
+          ctx.moveTo(x, y - 11); ctx.lineTo(x + 5, y - 3); ctx.lineTo(x - 5, y - 3);
+        } else {
+          ctx.moveTo(x, y + 11); ctx.lineTo(x + 5, y + 3); ctx.lineTo(x - 5, y + 3);
+        }
+        ctx.fill();
+      }
+
+      // Pattern abbreviation
+      if (abbrs[sig.type]) {
+        ctx.fillStyle = sig.bullish === false ? C.red : sig.bullish ? C.green : C.amber;
+        ctx.font = 'bold 7px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText(abbrs[sig.type], x, sig.bullish === false ? y + 17 : y - 14);
+      }
+    });
+
+    // Watermark
+    ctx.fillStyle = C.text3 + '22';
+    ctx.font = 'bold 26px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(symbol, width / 2, height / 2);
+
+  }, [columns, signals, width, height, symbol]);
+
+  return <canvas ref={ref} style={{ width, height, display: 'block', borderRadius: 6 }} />;
+}
+
+// ── Signal Badge ──
+function SigBadge({ signal }) {
+  const clr = { DT_BUY: C.green, DB_SELL: C.red, TT_BUY: C.green, TB_SELL: C.red,
+    BULL_TRAP: C.red, BEAR_TRAP: C.green, HIGH_POLE: C.red, LOW_POLE: C.green,
+    TRIANGLE: C.amber, BULL_BROAD: C.green, BEAR_BROAD: C.red }[signal.type] || C.text2;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3,
+      padding: '2px 7px', borderRadius: 3, fontSize: 9, fontWeight: 700,
+      color: clr, background: clr + '12', border: `1px solid ${clr}25` }}>
+      {signal.fresh && <span style={{ width: 4, height: 4, borderRadius: '50%',
+        background: clr, boxShadow: `0 0 5px ${clr}` }} />}
+      {signal.label}
+    </span>
+  );
+}
+
+// ── Trade Panel ──
+function TradePanel({ symbol, signals, lastPrice, onExecute, trades }) {
+  const lastSig = signals.filter(s => s.bullish !== null).slice(-1)[0];
+  const isBull = lastSig?.bullish;
+  const lastFresh = signals.filter(s => s.fresh).slice(-1)[0];
+
+  const sl = lastSig ? (lastSig.bullish ? lastSig.price * 0.97 : lastSig.price * 1.03) : null;
+  const risk = sl ? Math.abs(lastPrice - sl) : 0;
+  const riskPct = lastPrice ? ((risk / lastPrice) * 100).toFixed(2) : '0';
+  const boxes = Math.ceil(risk / (lastPrice * 0.01));
+
+  return (
+    <div style={{ background: C.bgPanel, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 9, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Trade Execution
+        </span>
+        <span style={{ fontSize: 9, fontWeight: 700,
+          color: isBull ? C.green : isBull === false ? C.red : C.text3 }}>
+          {isBull ? '▲ BULLISH' : isBull === false ? '▼ BEARISH' : '— NEUTRAL'}
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+        {[
+          ['SIGNAL', lastSig?.label || 'None', C.text1],
+          ['TYPE', lastFresh ? 'FRESH' : 'CONT', lastFresh ? C.cyan : C.text2],
+          ['STOP', sl ? '₹' + sl.toFixed(1) : '—', C.amber],
+          ['RISK', `${riskPct}% (${boxes}b)`, boxes <= 5 ? C.green : boxes <= 8 ? C.amber : C.red],
+        ].map(([lbl, val, clr]) => (
+          <div key={lbl} style={{ background: C.bg, borderRadius: 5, padding: '6px 8px' }}>
+            <div style={{ fontSize: 8, color: C.text3, marginBottom: 1 }}>{lbl}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: clr }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Affordability */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10,
+        padding: '5px 8px', borderRadius: 5,
+        background: boxes <= 5 ? C.greenBg : boxes <= 8 ? C.amberDim + '08' : C.redBg,
+        border: `1px solid ${boxes <= 5 ? C.greenDim : boxes <= 8 ? C.amberDim : C.redDim}` }}>
+        <span style={{ fontSize: 12 }}>{boxes <= 5 ? '✓' : boxes <= 8 ? '⚠' : '✕'}</span>
+        <span style={{ fontSize: 9, fontWeight: 600,
+          color: boxes <= 5 ? C.green : boxes <= 8 ? C.amber : C.red }}>
+          {boxes <= 5 ? 'AFFORDABLE' : boxes <= 8 ? 'MODERATE RISK' : 'UNAFFORDABLE — Wait'}
+        </span>
+      </div>
+
+      {/* Buttons */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {['BUY', 'SELL'].map(action => {
+          const enabled = action === 'BUY' ? isBull : isBull === false;
+          const clr = action === 'BUY' ? C.green : C.red;
+          return (
+            <button key={action} onClick={() => enabled && onExecute(action, symbol, lastPrice, lastSig)}
+              style={{ flex: 1, padding: '9px 0', border: 'none', borderRadius: 5,
+                fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 800,
+                letterSpacing: '0.04em', cursor: enabled ? 'pointer' : 'not-allowed',
+                color: enabled ? (action === 'BUY' ? C.bg : '#fff') : C.text3,
+                background: enabled ? clr : C.border, opacity: enabled ? 1 : 0.35,
+                transition: 'all 0.15s' }}>
+              {action === 'BUY' ? '▲' : '▼'} {action}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Trade Log */}
+      {trades.length > 0 && (
+        <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+          <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.08em', marginBottom: 5 }}>
+            RECENT TRADES · Synced to Cloud
+          </div>
+          {trades.slice(0, 5).map(t => (
+            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between',
+              fontSize: 8, padding: '3px 5px', borderRadius: 3, marginBottom: 2,
+              background: t.action === 'BUY' ? C.greenBg : C.redBg }}>
+              <span style={{ color: t.action === 'BUY' ? C.green : C.red, fontWeight: 700 }}>
+                {t.action} {t.symbol}
+              </span>
+              <span style={{ color: C.text2 }}>₹{(+t.price).toFixed(0)} · {t.signal}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main App ──
+function TEchartApp() {
+  const [selected, setSelected] = useState(WATCHLIST[0]);
+  const [bvIdx, setBvIdx] = useState(2);
+  const [method, setMethod] = useState('close');
+  const [view, setView] = useState('chart');
+  const [trades, setTrades] = useState([]);
+  const [syncSt, setSyncSt] = useState({ status: 'offline', msg: 'Initializing...' });
+
+  const bv = BOX_VALUES[bvIdx];
+
+  // Sync on mount
+  useEffect(() => {
+    const unsub = syncEngine.subscribe((status, msg) => {
+      setSyncSt({ status, msg });
+      // Update DOM sync indicator
+      const dot = document.getElementById('sync-dot');
+      const lbl = document.getElementById('sync-label');
+      if (dot) dot.style.background = status === 'synced' ? C.green : status === 'syncing' ? C.amber : status === 'error' ? C.red : C.text3;
+      if (lbl) lbl.textContent = msg || status.toUpperCase();
+    });
+
+    // Load trades
+    (async () => {
+      try {
+        const merged = await syncEngine.syncAll();
+        setTrades(merged || []);
+      } catch(e) {
+        console.warn('Initial sync failed:', e);
+        setTrades(syncEngine.getLocal());
+      }
+    })();
+
+    // Restore P&F state
+    const saved = syncEngine.getPnFState();
+    if (saved) {
+      if (saved.bvIdx !== undefined) setBvIdx(saved.bvIdx);
+      if (saved.method) setMethod(saved.method);
+      if (saved.symbol) {
+        const stock = WATCHLIST.find(s => s.symbol === saved.symbol);
+        if (stock) setSelected(stock);
+      }
+    }
+
+    return unsub;
+  }, []);
+
+  // Persist P&F state
+  useEffect(() => {
+    syncEngine.savePnFState({ bvIdx, method, symbol: selected.symbol });
+  }, [bvIdx, method, selected]);
+
+  const prices = useMemo(() => genData(selected.symbol), [selected.symbol]);
+  const lastPrice = prices[prices.length - 1]?.close || 0;
+  const { columns, signals } = useMemo(
+    () => buildPnFChart(prices, bv.value, 3, true, method),
+    [prices, bv.value, method]
+  );
+
+  // Matrix scores multi-bv
+  const mScores = useMemo(() => {
+    const sc = {};
+    [0.25, 0.5, 1, 1.5].forEach(v => {
+      const { columns: c, signals: s } = buildPnFChart(prices, v, 3, true, 'close');
+      sc[v + '%'] = matrixScore(c, s);
+    });
+    return sc;
+  }, [prices]);
+
+  // Full watchlist matrix
+  const wlMatrix = useMemo(() => {
+    const result = WATCHLIST.map(stock => {
+      const p = genData(stock.symbol);
+      const scores = {};
+      let total = 0;
+      [0.25, 1, 3].forEach(v => {
+        const { columns: c, signals: s } = buildPnFChart(p, v, 3, true, 'close');
+        const sc = matrixScore(c, s);
+        scores[v] = sc;
+        total += sc;
+      });
+      const lp = p[p.length - 1]?.close || 0;
+      const pp = p[p.length - 2]?.close || lp;
+      return { ...stock, scores, totalScore: total, lastPrice: lp, change: ((lp - pp) / pp * 100) };
+    }).sort((a, b) => b.totalScore - a.totalScore);
+
+    // Push matrix to cloud async
+    syncEngine.pushMatrixToCloud(result.map(s => ({
+      symbol: s.symbol, scores: s.scores, total: s.totalScore
+    })));
+
+    return result;
+  }, []);
+
+  const handleExecute = useCallback((action, symbol, price, signal) => {
+    const trade = {
+      id: Date.now(),
+      timestamp: Date.now(),
+      action,
+      symbol,
+      price: +price.toFixed(2),
+      signal: signal?.label || 'Manual',
+      signalType: signal?.type || 'MANUAL',
+      boxValue: bv.label,
+      method,
+      time: new Date().toLocaleString('en-IN'),
+      source: 'techart',
+    };
+
+    const updated = [trade, ...trades].slice(0, 100);
+    setTrades(updated);
+    syncEngine.saveLocal(updated);
+    syncEngine.pushToCloud(updated);
+  }, [trades, bv, method]);
+
+  const recentSigs = signals.slice(-10).reverse();
+  const bullCount = wlMatrix.filter(s => s.totalScore > 0).length;
+  const dtPct = ((bullCount / wlMatrix.length) * 100).toFixed(0);
+
+  return (
+    <div style={{ display: 'flex', height: 'calc(100vh - 40px)' }}>
+
+      {/* ── Left: Watchlist ── */}
+      <div style={{ width: 210, borderRight: `1px solid ${C.border}`, overflowY: 'auto',
+        background: C.bgCard, flexShrink: 0 }}>
+        <div style={{ padding: '8px 10px', borderBottom: `1px solid ${C.border}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 8, color: C.text3, letterSpacing: '0.08em' }}>
+            WATCHLIST · P&F MATRIX
+          </span>
+          <span style={{ fontSize: 8, color: +dtPct > 60 ? C.amber : +dtPct < 20 ? C.amber : C.green,
+            fontWeight: 700 }}>
+            DT:{dtPct}%
+          </span>
+        </div>
+        {wlMatrix.map(stock => (
+          <div key={stock.symbol} onClick={() => { setSelected(stock); setView('chart'); }}
+            style={{ padding: '8px 10px', cursor: 'pointer',
+              borderBottom: `1px solid ${C.border}`,
+              background: selected.symbol === stock.symbol ? C.bgHover : 'transparent',
+              borderLeft: selected.symbol === stock.symbol ? `2px solid ${C.cyan}` : '2px solid transparent',
+              transition: 'background 0.12s' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700 }}>{stock.symbol}</span>
+              <span style={{ fontSize: 9, fontWeight: 800,
+                color: stock.totalScore > 2 ? C.green : stock.totalScore < -2 ? C.red : C.text2 }}>
+                {stock.totalScore > 0 ? '+' : ''}{stock.totalScore}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 8, color: C.text3 }}>{stock.sector}</span>
+              <div style={{ display: 'flex', gap: 2 }}>
+                {Object.entries(stock.scores).map(([v, sc]) => (
+                  <div key={v} style={{ width: 12, height: 12, borderRadius: 2,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 6, fontWeight: 800,
+                    background: sc > 0 ? C.green + (sc === 2 ? '30' : '15') : sc < 0 ? C.red + (sc === -2 ? '30' : '15') : C.border,
+                    color: sc > 0 ? C.green : sc < 0 ? C.red : C.text3 }}>
+                    {sc > 0 ? '+' + sc : sc}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginTop: 3, height: 2, background: C.border, borderRadius: 1, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${((stock.totalScore + 6) / 12) * 100}%`,
+                background: stock.totalScore > 0 ? C.green : C.red, borderRadius: 1 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Main ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Stock Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 14px', borderBottom: `1px solid ${C.border}`,
+          background: C.bgCard, flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 800 }}>{selected.symbol}</span>
+            <span style={{ fontSize: 9, color: C.text3 }}>{selected.name}</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>₹{lastPrice.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {/* Box Value */}
+            <div style={{ display: 'flex', gap: 1, background: C.bg, borderRadius: 4, padding: 2 }}>
+              {BOX_VALUES.map((b, i) => (
+                <button key={b.label} onClick={() => setBvIdx(i)}
+                  style={{ padding: '3px 7px', border: 'none', borderRadius: 3,
+                    fontSize: 8, fontWeight: 700, fontFamily: 'JetBrains Mono',
+                    cursor: 'pointer',
+                    background: bvIdx === i ? C.bgPanel : 'transparent',
+                    color: bvIdx === i ? C.cyan : C.text3, transition: 'all 0.12s' }}>
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            {/* Method */}
+            <div style={{ display: 'flex', gap: 1, background: C.bg, borderRadius: 4, padding: 2 }}>
+              {['close', 'hl'].map(m => (
+                <button key={m} onClick={() => setMethod(m)}
+                  style={{ padding: '3px 9px', border: 'none', borderRadius: 3,
+                    fontSize: 8, fontWeight: 700, fontFamily: 'JetBrains Mono',
+                    cursor: 'pointer',
+                    background: method === m ? C.bgPanel : 'transparent',
+                    color: method === m ? C.purple : C.text3 }}>
+                  {m === 'close' ? 'CL' : 'HL'}
+                </button>
+              ))}
+            </div>
+            {/* View Tabs */}
+            <div style={{ display: 'flex', gap: 1, background: C.bg, borderRadius: 4, padding: 2 }}>
+              {['chart', 'matrix', 'signals'].map(v => (
+                <button key={v} onClick={() => setView(v)}
+                  style={{ padding: '3px 10px', border: 'none', borderRadius: 3,
+                    fontSize: 8, fontWeight: 700, fontFamily: 'JetBrains Mono',
+                    cursor: 'pointer', textTransform: 'uppercase',
+                    background: view === v ? C.bgPanel : 'transparent',
+                    color: view === v ? C.text1 : C.text3 }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+            <span style={{ padding: '2px 6px', borderRadius: 3, fontSize: 8, fontWeight: 700,
+              background: C.purpleDim + '12', color: C.purple, border: `1px solid ${C.purpleDim}` }}>
+              SLOT {bv.slot}
+            </span>
+          </div>
+        </div>
+
+        {/* ════ CHART VIEW ════ */}
+        {view === 'chart' && (
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <div style={{ flex: 1, padding: 10, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+              <PnFCanvas columns={columns} signals={signals}
+                width={Math.max(420, columns.length * 11 + 72)} height={320}
+                symbol={selected.symbol} />
+
+              {/* Recent Signals */}
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.07em', marginBottom: 5 }}>SIGNALS</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                  {recentSigs.map((s, i) => <SigBadge key={i} signal={s} />)}
+                  {!recentSigs.length && <span style={{ fontSize: 9, color: C.text3 }}>No signals on current params</span>}
+                </div>
+              </div>
+
+              {/* Matrix Bar */}
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.07em', marginBottom: 5 }}>P&F MATRIX SCORE</div>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {Object.entries(mScores).map(([k, v]) => (
+                    <div key={k} style={{ flex: 1, textAlign: 'center', padding: '4px 0',
+                      borderRadius: 4, background: C.bg, border: `1px solid ${C.border}` }}>
+                      <div style={{ fontSize: 7, color: C.text3 }}>{k}</div>
+                      <div style={{ fontSize: 12, fontWeight: 800,
+                        color: v === 2 ? C.green : v === 1 ? C.cyan : v === -1 ? C.amber : v === -2 ? C.red : C.text3 }}>
+                        {v > 0 ? '+' : ''}{v}
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ flex: 1, textAlign: 'center', padding: '4px 0',
+                    borderRadius: 4, background: C.bg, border: `1px solid ${C.borderActive}` }}>
+                    <div style={{ fontSize: 7, color: C.text3 }}>TOTAL</div>
+                    <div style={{ fontSize: 12, fontWeight: 900,
+                      color: Object.values(mScores).reduce((a, b) => a + b, 0) > 0 ? C.green : C.red }}>
+                      {Object.values(mScores).reduce((a, b) => a + b, 0) > 0 ? '+' : ''}
+                      {Object.values(mScores).reduce((a, b) => a + b, 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart Stats */}
+              <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+                {[
+                  ['Columns', columns.length],
+                  ['X', columns.filter(c => c.type === 'X').length],
+                  ['O', columns.filter(c => c.type === 'O').length],
+                  ['Signals', signals.length],
+                  ['Buy Sigs', signals.filter(s => s.bullish === true).length],
+                  ['Sell Sigs', signals.filter(s => s.bullish === false).length],
+                  ['Fresh', signals.filter(s => s.fresh).length],
+                  ['Box', `${bv.label}×3`],
+                ].map(([l, v]) => (
+                  <div key={l} style={{ background: C.bg, borderRadius: 4, padding: '4px 6px',
+                    border: `1px solid ${C.border}` }}>
+                    <div style={{ fontSize: 7, color: C.text3 }}>{l}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.text2 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Trade Panel */}
+            <div style={{ width: 250, borderLeft: `1px solid ${C.border}`, padding: 10,
+              overflowY: 'auto', background: C.bgCard }}>
+              <TradePanel symbol={selected.symbol} signals={signals}
+                lastPrice={lastPrice} onExecute={handleExecute} trades={trades} />
+            </div>
+          </div>
+        )}
+
+        {/* ════ MATRIX VIEW ════ */}
+        {view === 'matrix' && (
+          <div style={{ flex: 1, padding: 14, overflowY: 'auto' }}>
+            <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.07em', marginBottom: 10 }}>
+              P&F PERFORMANCE MATRIX · 0.25% / 1% / 3% × 3 CL · {WATCHLIST.length} STOCKS
+            </div>
+
+            {/* Header */}
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 55px 55px 55px 55px 75px 1fr',
+              gap: 1, background: C.border, borderRadius: 5, overflow: 'hidden', marginBottom: 1 }}>
+              {['SYMBOL', '0.25%', '1%', '3%', 'TOTAL', 'STATUS', 'MATRIX'].map(h => (
+                <div key={h} style={{ background: C.bgPanel, padding: '7px 8px',
+                  fontSize: 7, fontWeight: 700, color: C.text3, letterSpacing: '0.07em' }}>{h}</div>
+              ))}
+            </div>
+
+            {wlMatrix.map(stock => {
+              const st = stock.totalScore >= 4 ? { l: 'STRONG BUY', c: C.green }
+                : stock.totalScore >= 2 ? { l: 'BUY', c: C.cyan }
+                : stock.totalScore <= -4 ? { l: 'STRONG SELL', c: C.red }
+                : stock.totalScore <= -2 ? { l: 'SELL', c: C.amber }
+                : { l: 'NEUTRAL', c: C.text3 };
+              return (
+                <div key={stock.symbol}
+                  onClick={() => { setSelected(stock); setView('chart'); }}
+                  style={{ display: 'grid', gridTemplateColumns: '110px 55px 55px 55px 55px 75px 1fr',
+                    gap: 1, background: C.border, cursor: 'pointer', marginBottom: 1 }}>
+                  <div style={{ background: C.bgCard, padding: '7px 8px', fontSize: 10, fontWeight: 700 }}>
+                    {stock.symbol}
+                    <span style={{ fontSize: 7, color: C.text3, marginLeft: 4 }}>{stock.sector}</span>
+                  </div>
+                  {[0.25, 1, 3].map(v => (
+                    <div key={v} style={{ background: C.bgCard, padding: '7px 8px',
+                      fontSize: 11, fontWeight: 800, textAlign: 'center',
+                      color: stock.scores[v] > 0 ? C.green : stock.scores[v] < 0 ? C.red : C.text3 }}>
+                      {stock.scores[v] > 0 ? '+' : ''}{stock.scores[v]}
+                    </div>
+                  ))}
+                  <div style={{ background: C.bgCard, padding: '7px 8px',
+                    fontSize: 12, fontWeight: 900, textAlign: 'center',
+                    color: stock.totalScore > 2 ? C.green : stock.totalScore < -2 ? C.red : C.text2 }}>
+                    {stock.totalScore > 0 ? '+' : ''}{stock.totalScore}
+                  </div>
+                  <div style={{ background: C.bgCard, padding: '7px 8px',
+                    fontSize: 8, fontWeight: 700, color: st.c, display: 'flex', alignItems: 'center' }}>
+                    {st.l}
+                  </div>
+                  <div style={{ background: C.bgCard, padding: '7px 8px',
+                    display: 'flex', alignItems: 'center' }}>
+                    <div style={{ width: '100%', height: 5, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${((stock.totalScore + 6) / 12) * 100}%`,
+                        background: stock.totalScore > 0 ? C.green : C.red, borderRadius: 2 }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Breadth */}
+            <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+              <div style={{ background: C.bgPanel, border: `1px solid ${C.border}`,
+                borderRadius: 7, padding: 12, flex: 1 }}>
+                <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.07em', marginBottom: 8 }}>BREADTH</div>
+                <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                  {[
+                    ['BULLISH', wlMatrix.filter(s => s.totalScore > 0).length, C.green],
+                    ['NEUTRAL', wlMatrix.filter(s => s.totalScore === 0).length, C.text3],
+                    ['BEARISH', wlMatrix.filter(s => s.totalScore < 0).length, C.red],
+                  ].map(([l, n, c]) => (
+                    <div key={l} style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: c }}>{n}</div>
+                      <div style={{ fontSize: 8, color: C.text3 }}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 8, color: C.text2, lineHeight: 1.5 }}>
+                  DT-Percent: {dtPct}% ·{' '}
+                  {+dtPct > 60 ? '⚠ OVERBOUGHT — Avoid fresh longs'
+                    : +dtPct < 20 ? '⚠ OVERSOLD — Avoid fresh shorts'
+                    : '✓ NEUTRAL ZONE — Trade breakouts'}
+                </div>
+              </div>
+              <div style={{ background: C.bgPanel, border: `1px solid ${C.border}`,
+                borderRadius: 7, padding: 12, flex: 1 }}>
+                <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.07em', marginBottom: 8 }}>SLOT GUIDE</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4,
+                  fontSize: 8, color: C.text2, lineHeight: 1.5 }}>
+                  <div><span style={{ color: C.cyan, fontWeight: 700 }}>S1</span> 0.25-1%: Combos, Follow-throughs, MiniTops</div>
+                  <div><span style={{ color: C.purple, fontWeight: 700 }}>S2</span> 1-3%: Triple Tops, Traps, Poles — trade setups</div>
+                  <div><span style={{ color: C.amber, fontWeight: 700 }}>S3</span> 3-5%: Multi-col breakouts, investment entries</div>
+                  <div><span style={{ color: C.green, fontWeight: 700 }}>S4</span> 5%+: Column reversals, S/R, structure</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════ SIGNALS VIEW ════ */}
+        {view === 'signals' && (
+          <div style={{ flex: 1, padding: 14, overflowY: 'auto' }}>
+            <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.07em', marginBottom: 10 }}>
+              ALL SIGNALS · {selected.symbol} · {bv.label} × 3 {method.toUpperCase()}
+            </div>
+
+            {signals.slice().reverse().map((sig, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', marginBottom: 3, borderRadius: 5,
+                background: C.bgCard,
+                border: `1px solid ${sig.fresh ? (sig.bullish ? C.greenDim : C.redDim) : C.border}` }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: sig.bullish === true ? C.green : sig.bullish === false ? C.red : C.amber,
+                  boxShadow: sig.fresh ? `0 0 6px ${sig.bullish ? C.green : C.red}` : 'none' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700 }}>{sig.label}</div>
+                  <div style={{ fontSize: 8, color: C.text3 }}>
+                    Col {sig.colIdx} · ₹{sig.price?.toFixed(2)} · {sig.fresh ? 'FRESH' : 'CONT'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                  <span style={{ fontSize: 8, color: C.text3 }}>{sig.type}</span>
+                  {sig.fresh && (
+                    <span style={{ fontSize: 7, fontWeight: 700, color: C.cyan,
+                      padding: '1px 5px', background: C.cyanDim + '10', borderRadius: 2 }}>
+                      ACTIONABLE
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {!signals.length && (
+              <div style={{ padding: 30, textAlign: 'center', color: C.text3, fontSize: 11 }}>
+                No signals. Try lower box value.
+              </div>
+            )}
+
+            {/* Trading Rules Quick Ref */}
+            <div style={{ marginTop: 14, background: C.bgPanel, border: `1px solid ${C.border}`,
+              borderRadius: 7, padding: 14 }}>
+              <div style={{ fontSize: 8, color: C.text3, letterSpacing: '0.07em', marginBottom: 8 }}>
+                P&F TRADING RULES
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+                fontSize: 8, color: C.text2, lineHeight: 1.6 }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.green, marginBottom: 3 }}>▲ BULLISH</div>
+                  <div>• DT Buy → X exceeds prior X</div>
+                  <div>• TT Buy → 5-col double-resistance breakout</div>
+                  <div>• Bear Trap → Buy after sell in uptrend</div>
+                  <div>• Low Pole → 50% retrace of sell column</div>
+                  <div>• Triangle Bull → Convergence → X break</div>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.red, marginBottom: 3 }}>▼ BEARISH</div>
+                  <div>• DB Sell → O breaks prior O</div>
+                  <div>• TB Sell → 5-col support breakdown</div>
+                  <div>• Bull Trap → Sell after buy in downtrend</div>
+                  <div>• High Pole → 50% retrace of buy column</div>
+                  <div>• Triangle Bear → Convergence → O break</div>
+                </div>
+                <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
+                  <div style={{ fontWeight: 700, color: C.amber, marginBottom: 3 }}>⚙ EXECUTION</div>
+                  <div>• SAR: Stop & Reverse on every Fresh signal · Exit Long on DB Sell, Short on DT Buy</div>
+                  <div>• Affordability: Trade only if risk ≤ 6 boxes · Pyramid 50% on break + 50% on continuation</div>
+                  <div>• Breadth {'>'}60%: No fresh longs · {'<'}20%: No fresh shorts · Neutral zone = trade breakouts</div>
+                  <div>• Pattern Cluster: Higher box-value trend + lower box-value entry = best setup</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<TEchartApp />);
+</script>
+</body>
+</html>
