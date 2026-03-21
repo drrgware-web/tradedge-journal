@@ -486,14 +486,20 @@ const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove
   const rrClass=rr>=2?'good':rr>=1?'ok':'bad';
   const statusClass=(t.status||'watching').toLowerCase();
 
-  return(<Fragment>
-    <div className={`wl-row ${isExp?'expanded':''}`} onClick={()=>onExpand(isExp?null:s.symbol)}>
+  return(<div style={{borderBottom:'1px solid rgba(255,255,255,0.02)'}}>
+    {/* Row */}
+    <div style={{display:'flex',alignItems:'center',gap:0,padding:'8px 0',cursor:'pointer',transition:'background .12s',background:isExp?'rgba(0,255,136,0.025)':'transparent'}}
+      className="fade-in"
+      onClick={()=>onExpand(isExp?null:s.symbol)}
+      onMouseEnter={e=>{if(!isExp)e.currentTarget.style.background='rgba(0,255,136,0.015)'}}
+      onMouseLeave={e=>{if(!isExp)e.currentTarget.style.background='transparent'}}>
+
       {/* Expand toggle */}
-      <div className="wl-row-cell" style={{justifyContent:'center',color:isExp?'var(--accent)':'var(--text-muted)',fontSize:10,transition:'transform .15s',transform:isExp?'rotate(90deg)':''}}>▶</div>
+      <div style={{width:36,textAlign:'center',color:isExp?'var(--accent)':'var(--text-muted)',fontSize:10,transition:'transform .15s',transform:isExp?'rotate(90deg)':'',flexShrink:0}}>▶</div>
 
       {/* Symbol + Sector + Source */}
-      <div className="wl-row-cell" style={{flexDirection:'column',alignItems:'flex-start',gap:2}}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <div style={{flex:'1 1 auto',padding:'0 8px',minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span className="wl-sym">{s.symbol}</span>
           <span className={`wl-status ${statusClass}`}>{(t.status||'WATCHING').toUpperCase()}</span>
           <span className="wl-source">{s.source||'manual'}</span>
@@ -502,7 +508,7 @@ const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove
       </div>
 
       {/* Trade Plan (E/T/SL + R:R) */}
-      <div className="wl-row-cell" style={{justifyContent:'center'}}>
+      <div style={{flex:'0 0 auto',padding:'0 10px',display:'flex',alignItems:'center'}}>
         {t.entry||t.target||t.sl?(
           <div className="wl-plan">
             {t.entry&&<div className="wl-plan-item"><span className="wl-plan-label">ENTRY</span><span className="wl-plan-val entry">₹{t.entry}</span></div>}
@@ -516,8 +522,8 @@ const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove
         )}
       </div>
 
-      {/* Edit fields (inline when editing) */}
-      <div className="wl-row-cell" style={{gap:4}} onClick={e=>e.stopPropagation()}>
+      {/* Orders / Edit */}
+      <div style={{flex:'0 0 auto',padding:'0 10px',display:'flex',alignItems:'center'}} onClick={e=>e.stopPropagation()}>
         {isEd?(
           <div style={{display:'flex',gap:3,alignItems:'center'}}>
             <input type="number" defaultValue={t.entry||""} id={"e"+s.symbol} placeholder="Entry" style={{width:58,fontSize:9,background:'var(--bg-hover)',border:'1px solid rgba(0,255,136,0.2)',color:'var(--accent)',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
@@ -537,12 +543,9 @@ const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove
           </div>
         )}
       </div>
-
-      {/* Spacer for grid alignment */}
-      <div/>
     </div>
 
-    {/* Expanded chart */}
+    {/* Expanded chart — full width below the row */}
     {isExp&&<div className="wl-chart-wrap">
       {chartData[s.symbol]?(<ChartErrorBoundary symbol={s.symbol}><TEChart symbol={s.symbol} prices={chartData[s.symbol]} onOrder={onOrder} onCollapse={()=>onExpand(null)}/></ChartErrorBoundary>
       ):(<div style={{padding:24,textAlign:'center'}}>
@@ -555,7 +558,7 @@ const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove
         </div>
       </div>)}
     </div>}
-  </Fragment>);
+  </div>);
 };
 
 const WatchlistDashboard=()=>{
@@ -633,12 +636,11 @@ const WatchlistDashboard=()=>{
           </div>
 
           {/* Column headers */}
-          <div className="wl-thead">
-            <div className="wl-th" style={{textAlign:'center'}}></div>
-            <div className="wl-th">Symbol</div>
-            <div className="wl-th" style={{textAlign:'center'}}>Trade Plan</div>
-            <div className="wl-th">Edit / Plan</div>
-            <div className="wl-th" style={{textAlign:'right'}}>Orders</div>
+          <div style={{display:'flex',alignItems:'center',padding:'8px 0',background:'rgba(0,255,136,0.02)',borderBottom:'1px solid var(--border-dim)'}}>
+            <div style={{width:36,textAlign:'center',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}></div>
+            <div style={{flex:'1 1 auto',padding:'0 8px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}>SYMBOL</div>
+            <div style={{flex:'0 0 auto',padding:'0 10px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}>TRADE PLAN</div>
+            <div style={{flex:'0 0 auto',padding:'0 10px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}>ORDERS</div>
           </div>
 
           {/* Stock rows */}
