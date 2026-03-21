@@ -123,7 +123,7 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
   const[showEMA,setShowEMA]=useState({e20:true,e50:true,e200:true});const[hoverBar,setHoverBar]=useState(null);
   const[chartType,setChartType]=useState('hlc');const[collapsed,setCollapsed]=useState(false);
   // Drawings
-const[drawings,setDrawings]=useState(()=>DrawingStore.load(symbol));
+const[drawMode,setDrawMode]=useState(null);const[drawings,setDrawings]=useState(()=>DrawingStore.load(symbol));
   const[drawStart,setDrawStart]=useState(null);const[drawPreview,setDrawPreview]=useState(null);
   const[drawPoints,setDrawPoints]=useState([]);const[selectedId,setSelectedId]=useState(null);const[dragHandle,setDragHandle]=useState(null);const[showDrawings,setShowDrawings]=useState(true);const[magnetMode,setMagnetMode]=useState(true);const[textInput,setTextInput]=useState(null);const[cloudSynced,setCloudSynced]=useState(false);
   // Trade plan + alerts
