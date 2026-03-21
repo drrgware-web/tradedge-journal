@@ -55,12 +55,36 @@ class ChartErrorBoundary extends React.Component{
 // ═══ STORAGE ═══
 const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const CS={
-  drawings:s=>LS.get(`te_chart_draw_${s}`,[]),alerts:s=>LS.get(`te_chart_alerts_${s}`,[]),
-  plan:s=>LS.get(`te_chart_plan_${s}`,null),posConfig:()=>LS.get('te_chart_pos_config',{capital:100000,riskPct:1}),
-  saveDrawings:(s,v)=>LS.set(`te_chart_draw_${s}`,v),saveAlerts:(s,v)=>LS.set(`te_chart_alerts_${s}`,v),
-  savePlan:(s,v)=>v?LS.set(`te_chart_plan_${s}`,v):localStorage.removeItem(`te_chart_plan_${s}`),savePosConfig:v=>LS.set('te_chart_pos_config',v),
+alerts:s=>LS.get(`te_chart_alerts_${s}`,[]),
+plan:s=>LS.get(`te_chart_plan_${s}`,null),posConfig:()=>LS.get('te_chart_pos_config',{capital:100000,riskPct:1}),
+saveAlerts:(s,v)=>LS.set(`te_chart_alerts_${s}`,v),
+savePlan:(s,v)=>v?LS.set(`te_chart_plan_${s}`,v):localStorage.removeItem(`te_chart_plan_${s}`),savePosConfig:v=>LS.set('te_chart_pos_config',v),
+};
+// ═══ SUPABASE CLOUD SYNC ═══
+const SUPABASE_URL='https://urnrdpyhncezljirpnmy.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI0NTk1MzIsImV4cCI6MjA1ODAzNTUzMn0.AU427PEYMdWafYaQjABEEerbdw';
+
+const DrawingCloudSync={
+  async load(symbol){try{const res=await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings?symbol=eq.${symbol}&select=data`,{headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`}});if(!res.ok)return null;const rows=await res.json();return rows.length?rows[0].data:null}catch(e){return null}},
+  async save(symbol,data){try{await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings`,{method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},body:JSON.stringify({symbol,data,updated_at:new Date().toISOString()})})}catch(e){}}
 };
 
+const DrawingStore={
+  key:s=>`te_drawings_v5_${s}`,
+  load:s=>LS.get(DrawingStore.key(s),[]),
+  save(s,d){LS.set(DrawingStore.key(s),d);DrawingCloudSync.save(s,d)},
+  async syncFromCloud(symbol){const cloud=await DrawingCloudSync.load(symbol);if(cloud&&Array.isArray(cloud)){const local=DrawingStore.load(symbol);const map=new Map();local.forEach(d=>map.set(d.id,d));cloud.forEach(d=>{const ex=map.get(d.id);if(!ex||(d.ts&&ex.ts&&d.ts>ex.ts))map.set(d.id,d)});const merged=Array.from(map.values());LS.set(DrawingStore.key(symbol),merged);return merged}return null},
+  undoKey:s=>`te_undo_v5_${s}`,redoKey:s=>`te_redo_v5_${s}`,
+  pushUndo(s,state){const st=LS.get(this.undoKey(s),[]);st.push(JSON.parse(JSON.stringify(state)));if(st.length>50)st.shift();LS.set(this.undoKey(s),st);LS.set(this.redoKey(s),[])},
+  popUndo(s){const st=LS.get(this.undoKey(s),[]);if(!st.length)return null;const r=st.pop();LS.set(this.undoKey(s),st);return r},
+  pushRedo(s,state){const st=LS.get(this.redoKey(s),[]);st.push(JSON.parse(JSON.stringify(state)));LS.set(this.redoKey(s),st)},
+  popRedo(s){const st=LS.get(this.redoKey(s),[]);if(!st.length)return null;const r=st.pop();LS.set(this.redoKey(s),st);return r},
+  hasUndo:s=>LS.get(DrawingStore.undoKey(s),[]).length>0,
+  hasRedo:s=>LS.get(DrawingStore.redoKey(s),[]).length>0
+};
+
+const DRAW_COLORS=['#00ff88','#00c8ff','#8844ff','#ff4455','#ffaa00','#ff66cc','#44ffcc','#88ff44','#ff8844','#44aaff','#aa44ff','#ffffff'];
+const genDrawingId=()=>Date.now().toString(36)+Math.random().toString(36).substr(2,6);
 // ═══ POSITION SIZER ═══
 const PosSizer=({cfg,onCfg,plan})=>{
   const e=plan?.entry,s=plan?.sl,t=plan?.target;
@@ -99,7 +123,7 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
   const[showEMA,setShowEMA]=useState({e20:true,e50:true,e200:true});const[hoverBar,setHoverBar]=useState(null);
   const[chartType,setChartType]=useState('hlc');const[collapsed,setCollapsed]=useState(false);
   // Drawings
-  const[drawMode,setDrawMode]=useState(null);const[drawings,setDrawings]=useState(()=>CS.drawings(symbol));
+const[drawings,setDrawings]=useState(()=>DrawingStore.load(symbol));
   const[drawStart,setDrawStart]=useState(null);const[drawPreview,setDrawPreview]=useState(null);
   // Trade plan + alerts
   const[alerts,setAlerts]=useState(()=>CS.alerts(symbol));const[plan,setPlan]=useState(()=>CS.plan(symbol));
@@ -107,11 +131,11 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
   const[measureResult,setMeasureResult]=useState(null);const[dragLine,setDragLine]=useState(null);const[ctx,setCtx]=useState(null);
 
   // Persist
-  useEffect(()=>{CS.saveDrawings(symbol,drawings)},[drawings,symbol]);
+  (()=>{DrawingStore.save(symbol,drawings)},[drawings,symbol]);
   useEffect(()=>{CS.saveAlerts(symbol,alerts)},[alerts,symbol]);
   useEffect(()=>{CS.savePlan(symbol,plan)},[plan,symbol]);
   useEffect(()=>{CS.savePosConfig(posCfg)},[posCfg]);
-  useEffect(()=>{setDrawings(CS.drawings(symbol));setAlerts(CS.alerts(symbol));setPlan(CS.plan(symbol));setDrawMode(null);setDrawStart(null);setCtx(null);setMeasureResult(null);setDragLine(null)},[symbol]);
+  (()=>{setDrawings(DrawingStore.load(symbol));setAlerts(CS.alerts(symbol));...
 
   const priceData=useMemo(()=>prices?.length?prices:[],[prices]);
   const closes=useMemo(()=>priceData.map(d=>d.c),[priceData]);
