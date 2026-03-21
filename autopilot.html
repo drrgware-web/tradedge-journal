@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge Autopilot — Top-Down Workflow</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{--bg:#06080c;--bg2:#0c1018;--bg3:#121820;--bgc:#0f1520;--bgh:#141d2a;--bd0:rgba(0,255,136,0.06);--bd1:rgba(0,255,136,0.1);--bd2:rgba(0,255,136,0.2);--g:#00ff88;--gd:rgba(0,255,136,0.15);--b:#00c8ff;--p:#8844ff;--r:#ff4455;--a:#ffaa00;--t1:#e8e8e8;--t2:#8899aa;--t3:#556677;--fd:'Outfit',sans-serif;--fm:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t1);font-family:var(--fd);min-height:100vh;-webkit-font-smoothing:antialiased}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.008) 2px,rgba(0,255,136,.008) 4px);pointer-events:none;z-index:9999}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.015) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+#root{position:relative;z-index:1}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.15);border-radius:3px}
+.nav{display:flex;align-items:center;gap:4px;padding:4px 20px;background:var(--bg2);border-bottom:1px solid var(--bd0);position:sticky;top:0;z-index:100}
+.nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--t3);text-decoration:none;border-radius:4px;font-family:var(--fm)}.nav-link:hover{color:var(--t1);background:var(--bgh)}.nav-link.active{color:var(--g);background:var(--gd)}
+.card{background:var(--bgc);border:1px solid var(--bd1);border-radius:8px;overflow:hidden}
+.card:hover{border-color:var(--bd2)}
+@keyframes logoPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.85;transform:scale(1.03)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes glow{0%,100%{box-shadow:0 0 8px rgba(0,255,136,0.15)}50%{box-shadow:0 0 20px rgba(0,255,136,0.3)}}
+
+/* Stage pipeline */
+.stage{border-radius:8px;padding:16px;margin-bottom:12px;animation:fadeUp .4s ease-out both;border:1px solid var(--bd1);background:var(--bgc)}
+.stage-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.stage-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;font-family:var(--fm);flex-shrink:0}
+.stage-title{font-size:15px;font-weight:800;letter-spacing:1px}
+.stage-verdict{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:800;font-family:var(--fm);letter-spacing:1px}
+.pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700;font-family:var(--fm);letter-spacing:0.5px}
+.pill-g{background:rgba(0,255,136,0.12);color:var(--g);border:1px solid rgba(0,255,136,0.3)}
+.pill-r{background:rgba(255,68,85,0.12);color:var(--r);border:1px solid rgba(255,68,85,0.3)}
+.pill-a{background:rgba(255,170,0,0.12);color:var(--a);border:1px solid rgba(255,170,0,0.3)}
+.pill-b{background:rgba(0,200,255,0.12);color:var(--b);border:1px solid rgba(0,200,255,0.3)}
+.pill-p{background:rgba(136,68,255,0.12);color:var(--p);border:1px solid rgba(136,68,255,0.3)}
+
+/* Stock card */
+.scard{background:var(--bg3);border:1px solid var(--bd1);border-radius:6px;padding:10px 12px;cursor:pointer;transition:all .15s}
+.scard:hover{border-color:var(--g);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,255,136,0.08)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="scripts/tradedge-watchlist.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useMemo,Fragment}=React;
+
+// ═══════════════════════════════════════════════════════════
+// DATA LOADER — fetches RRM + Scanner + Sector data
+// ═══════════════════════════════════════════════════════════
+const useData=()=>{
+  const [rrm,setRrm]=useState(null);
+  const [scanner,setScanner]=useState(null);
+  const [sectors,setSectors]=useState(null);
+  const [mps,setMps]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(null);
+
+  useEffect(()=>{
+    Promise.allSettled([
+      fetch('./data/rrm_data.json?t='+Date.now()).then(r=>r.ok?r.json():null),
+      fetch('./data/scanner_results.json?t='+Date.now()).then(r=>r.ok?r.json():null),
+      fetch('./data/sector_constituents.json?t='+Date.now()).then(r=>r.ok?r.json():null),
+      fetch('./data/mps_data.json?t='+Date.now()).then(r=>r.ok?r.json():null),
+    ]).then(([rr,sc,se,mp])=>{
+      if(rr.value)setRrm(rr.value);
+      if(sc.value)setScanner(sc.value);
+      if(se.value)setSectors(se.value);
+      if(mp.value)setMps(mp.value);
+      if(!rr.value&&!sc.value)setError("No data available — run rrm_fetcher.py and scanner");
+      setLoading(false);
+    });
+  },[]);
+  return {rrm,scanner,sectors,mps,loading,error};
+};
+
+// ═══════════════════════════════════════════════════════════
+// MPS ZONE ENGINE — Market Position System (TradEdge)
+// 4 Zones: Easy Money → Smart Money → Hard Money → No Money
+// Each zone defines risk per trade + max portfolio exposure
+// ═══════════════════════════════════════════════════════════
+const MPS_ZONES = {
+  'easy_money':  { label:'EASY MONEY',  color:'#00ff88', icon:'🟢', riskPct:2.0,  maxRisk:2.0,  maxExposure:100, strategy:'Full aggression — max position size, ride trends, add to winners, pyramid into strength', posRule:'1.5-2% risk per trade, 80-100% invested' },
+  'smart_money': { label:'SMART MONEY', color:'#00c8ff', icon:'🔵', riskPct:1.0,  maxRisk:1.25, maxExposure:60,  strategy:'Selective entries — only A+ setups, normal size, focus on leaders in leading sectors', posRule:'0.75-1.25% risk per trade, 40-60% invested' },
+  'hard_money':  { label:'HARD MONEY',  color:'#ffaa00', icon:'🟠', riskPct:0.5,  maxRisk:0.5,  maxExposure:25,  strategy:'Capital preservation — trail existing stops tighter, tiny new positions only on exceptional setups', posRule:'0.25-0.5% risk per trade, 10-25% invested' },
+  'no_money':    { label:'NO MONEY',    color:'#ff4455', icon:'⛔', riskPct:0,    maxRisk:0,    maxExposure:0,   strategy:'100% cash — zero new longs, close all positions, wait for regime change', posRule:'0% risk — DO NOT TRADE' },
+};
+
+const detectMPSZone = (mpsData, scanner, rrm) => {
+  // Priority 1: Read zone directly from MPS data file
+  if (mpsData) {
+    const zone = (mpsData.zone || mpsData.current_zone || mpsData.mps_zone || mpsData.status || '').toLowerCase().replace(/[\s_-]+/g, '_');
+    
+    if (zone.includes('easy'))  return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:'MPS Dashboard', raw:mpsData };
+    if (zone.includes('smart')) return { key:'smart_money', ...MPS_ZONES.smart_money, source:'MPS Dashboard', raw:mpsData };
+    if (zone.includes('hard'))  return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:'MPS Dashboard', raw:mpsData };
+    if (zone.includes('no_money') || zone.includes('nomoney') || zone.includes('no money') || zone === 'bear' || zone === 'danger')
+                                return { key:'no_money',    ...MPS_ZONES.no_money,    source:'MPS Dashboard', raw:mpsData };
+
+    // Check numeric score/value from MPS
+    const score = mpsData.score || mpsData.mps_score || mpsData.value;
+    if (typeof score === 'number') {
+      if (score >= 75) return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:`MPS score: ${score}`, raw:mpsData };
+      if (score >= 50) return { key:'smart_money', ...MPS_ZONES.smart_money, source:`MPS score: ${score}`, raw:mpsData };
+      if (score >= 25) return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:`MPS score: ${score}`, raw:mpsData };
+      return { key:'no_money', ...MPS_ZONES.no_money, source:`MPS score: ${score}`, raw:mpsData };
+    }
+    
+    // Check for zone number
+    const num = parseInt(mpsData.zone_number || mpsData.zone_id || mpsData.level);
+    if (num === 1) return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:'MPS zone 1', raw:mpsData };
+    if (num === 2) return { key:'smart_money', ...MPS_ZONES.smart_money, source:'MPS zone 2', raw:mpsData };
+    if (num === 3) return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:'MPS zone 3', raw:mpsData };
+    if (num === 4) return { key:'no_money',    ...MPS_ZONES.no_money,    source:'MPS zone 4', raw:mpsData };
+  }
+
+  // Priority 2: Derive from scanner breadth if no MPS data
+  if (scanner?.stocks) {
+    const stocks = scanner.stocks;
+    const total = stocks.length || 1;
+    const bullPct = Math.round(stocks.filter(s => s.composite_score >= 3).length / total * 100);
+    const above200Pct = Math.round(stocks.filter(s => s.ema?.cross_50_200 === 'golden_cross' || s.ema?.cross_50_200 === 'bullish').length / total * 100);
+    const breadth = bullPct * 0.6 + above200Pct * 0.4;
+
+    if (breadth >= 45) return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:`Derived breadth: ${breadth.toFixed(0)}%` };
+    if (breadth >= 30) return { key:'smart_money', ...MPS_ZONES.smart_money, source:`Derived breadth: ${breadth.toFixed(0)}%` };
+    if (breadth >= 15) return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:`Derived breadth: ${breadth.toFixed(0)}%` };
+    return { key:'no_money', ...MPS_ZONES.no_money, source:`Derived breadth: ${breadth.toFixed(0)}%` };
+  }
+
+  return { key:'smart_money', ...MPS_ZONES.smart_money, source:'Default (no MPS data)' };
+};
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 1: MARKET REGIME ANALYZER
+// Determines: RISK-ON / CAUTIOUS / RISK-OFF
+// ═══════════════════════════════════════════════════════════
+const analyzeMarketRegime=(rrm,scanner)=>{
+  const regime={score:0,signals:[],verdict:'UNKNOWN',color:'var(--t3)'};
+  if(!rrm&&!scanner)return regime;
+
+  // Check Nifty 50 / broad market from RRM data
+  const niftyKeys=['NIFTY 50','Nifty 50','NIFTY50','^NSEI'];
+  let niftyData=null;
+  if(rrm){
+    // Search through RRM data for Nifty
+    const allItems=Object.values(rrm).flat?.() || [];
+    if(Array.isArray(rrm)){
+      niftyData=rrm.find(d=>niftyKeys.some(k=>d.symbol?.includes(k)||d.name?.includes(k)));
+    }else if(rrm.sectors||rrm.etfs||rrm.indices){
+      const all=[...(rrm.sectors||[]),...(rrm.etfs||[]),...(rrm.indices||[]),...(rrm.assets||[])];
+      niftyData=all.find(d=>niftyKeys.some(k=>(d.symbol||d.name||'').toUpperCase().includes(k.toUpperCase())));
+    }
+  }
+
+  // Analyze scanner breadth
+  if(scanner?.stocks){
+    const stocks=scanner.stocks;
+    const total=stocks.length||1;
+    const bullish=stocks.filter(s=>s.composite_score>=3).length;
+    const bearish=stocks.filter(s=>s.composite_score<=-3).length;
+    const above200=stocks.filter(s=>s.ema?.cross_50_200==='golden_cross'||s.ema?.cross_50_200==='bullish').length;
+    const bullPct=Math.round(bullish/total*100);
+    const bearPct=Math.round(bearish/total*100);
+    const above200Pct=Math.round(above200/total*100);
+
+    // Breadth scoring
+    if(bullPct>40){regime.score+=2;regime.signals.push({text:`Strong breadth: ${bullPct}% stocks bullish`,type:'bull'})}
+    else if(bullPct>25){regime.score+=1;regime.signals.push({text:`Decent breadth: ${bullPct}% bullish`,type:'neutral'})}
+    else{regime.score-=1;regime.signals.push({text:`Weak breadth: ${bullPct}% bullish, ${bearPct}% bearish`,type:'bear'})}
+
+    if(above200Pct>50){regime.score+=1;regime.signals.push({text:`${above200Pct}% above 200 EMA — healthy trend`,type:'bull'})}
+    else if(above200Pct<30){regime.score-=1;regime.signals.push({text:`Only ${above200Pct}% above 200 EMA — damaged`,type:'bear'})}
+
+    // Volume analysis
+    const volSpikes=stocks.filter(s=>['spike','extreme_spike'].includes(s.volume?.signal)).length;
+    const volPct=Math.round(volSpikes/total*100);
+    if(volPct>20){regime.signals.push({text:`${volPct}% showing volume spikes — active market`,type:'neutral'})}
+
+    // Catalyst count
+    const withCatalysts=stocks.filter(s=>s.catalysts?.length>0).length;
+    if(withCatalysts>total*0.15){regime.score+=1;regime.signals.push({text:`${withCatalysts} stocks with catalysts — opportunity rich`,type:'bull'})}
+  }
+
+  // RRM-based signals
+  if(niftyData){
+    const q=niftyData.quadrant||niftyData.zone||'';
+    if(q.toLowerCase().includes('leading')){regime.score+=2;regime.signals.push({text:'Nifty in LEADING quadrant — strong trend',type:'bull'})}
+    else if(q.toLowerCase().includes('weakening')){regime.score+=0;regime.signals.push({text:'Nifty WEAKENING — trend losing steam',type:'neutral'})}
+    else if(q.toLowerCase().includes('lagging')){regime.score-=2;regime.signals.push({text:'Nifty LAGGING — avoid aggressive longs',type:'bear'})}
+    else if(q.toLowerCase().includes('improving')){regime.score+=1;regime.signals.push({text:'Nifty IMPROVING — early recovery',type:'neutral'})}
+  }
+
+  // Verdict
+  if(regime.score>=3){regime.verdict='RISK-ON';regime.color='var(--g)'}
+  else if(regime.score>=1){regime.verdict='CAUTIOUS';regime.color='var(--a)'}
+  else{regime.verdict='RISK-OFF';regime.color='var(--r)'}
+
+  return regime;
+};
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 2: SECTOR ROTATION SCANNER
+// Finds sectors in Leading/Improving quadrant from RRM
+// ═══════════════════════════════════════════════════════════
+const analyzeSectorRotation=(rrm)=>{
+  const result={leading:[],improving:[],weakening:[],lagging:[],raw:[]};
+  if(!rrm)return result;
+
+  // Extract sector data from RRM
+  let sectorList=[];
+  if(Array.isArray(rrm)){sectorList=rrm.filter(d=>d.type==='sector'||d.category==='sector')}
+  else if(rrm.sectors){sectorList=rrm.sectors}
+  else{// Try to find sector-like entries
+    const all=Object.entries(rrm);
+    all.forEach(([key,val])=>{
+      if(Array.isArray(val)){val.forEach(v=>{if(v.quadrant||v.zone)sectorList.push({...v,_source:key})})}
+      else if(val&&typeof val==='object'&&(val.quadrant||val.zone)){sectorList.push({...val,name:key})}
+    });
+  }
+
+  result.raw=sectorList;
+
+  sectorList.forEach(s=>{
+    const q=(s.quadrant||s.zone||'').toLowerCase();
+    const name=s.name||s.symbol||s.sector||'Unknown';
+    const rs=s.rs||s.rs_ratio||s.relative_strength||0;
+    const mom=s.momentum||s.rs_momentum||0;
+    const entry={name,rs,momentum:mom,quadrant:q,raw:s};
+
+    // Multi-timeframe check
+    const dailyQ=(s.daily_quadrant||s.d_quadrant||q).toLowerCase();
+    const weeklyQ=(s.weekly_quadrant||s.w_quadrant||'').toLowerCase();
+    const monthlyQ=(s.monthly_quadrant||s.m_quadrant||'').toLowerCase();
+    entry.mtf={daily:dailyQ,weekly:weeklyQ,monthly:monthlyQ};
+    // MTF alignment score: how many timeframes are leading/improving
+    entry.mtfScore=[dailyQ,weeklyQ,monthlyQ].filter(t=>t.includes('leading')||t.includes('improving')).length;
+
+    if(q.includes('leading'))result.leading.push(entry);
+    else if(q.includes('improving'))result.improving.push(entry);
+    else if(q.includes('weakening'))result.weakening.push(entry);
+    else if(q.includes('lagging'))result.lagging.push(entry);
+  });
+
+  // Sort by RS strength
+  result.leading.sort((a,b)=>(b.rs||0)-(a.rs||0));
+  result.improving.sort((a,b)=>(b.momentum||0)-(a.momentum||0));
+
+  return result;
+};
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 3: STOCK SCREENING
+// Filters stocks in leading sectors with strong technicals
+// ═══════════════════════════════════════════════════════════
+const screenStocks=(scanner,sectorRotation,sectorConstituents)=>{
+  if(!scanner?.stocks)return [];
+
+  // Get names of leading + improving sectors
+  const hotSectors=new Set();
+  [...(sectorRotation.leading||[]),...(sectorRotation.improving||[])].forEach(s=>{
+    hotSectors.add(s.name.toUpperCase());
+    hotSectors.add(s.name.replace(/^Nifty\s*/i,'').toUpperCase());
+    hotSectors.add(s.name.replace(/\s+/g,'').toUpperCase());
+  });
+
+  // Build sector lookup from constituents
+  const stockToSector={};
+  if(sectorConstituents){
+    Object.entries(sectorConstituents).forEach(([sector,stocks])=>{
+      if(Array.isArray(stocks)){stocks.forEach(s=>{const sym=typeof s==='string'?s:(s.symbol||s);stockToSector[sym.toUpperCase()]=sector})}
+    });
+  }
+
+  const scored=scanner.stocks.map(stock=>{
+    let score=0;const reasons=[];const warnings=[];
+
+    // Check if stock's sector is in hot sectors
+    const stockSector=(stock.sector||stockToSector[stock.symbol]||'').toUpperCase();
+    const inHotSector=hotSectors.has(stockSector)||
+      [...hotSectors].some(hs=>stockSector.includes(hs)||hs.includes(stockSector));
+    if(inHotSector){score+=3;reasons.push('Sector in LEADING/IMPROVING quadrant')}
+
+    // Composite score from scanner
+    if(stock.composite_score>=4){score+=3;reasons.push(`Strong composite score: +${stock.composite_score}`)}
+    else if(stock.composite_score>=2){score+=1;reasons.push(`Decent score: +${stock.composite_score}`)}
+    else if(stock.composite_score<0){score-=2;warnings.push(`Weak score: ${stock.composite_score}`)}
+
+    // EMA alignment — golden cross is ideal
+    if(stock.ema?.cross_50_200==='golden_cross'){score+=2;reasons.push('Golden Cross (50>200 EMA)')}
+    else if(stock.ema?.cross_50_200==='death_cross'){score-=2;warnings.push('Death Cross')}
+    if(stock.ema?.cross_9_21==='bullish'||stock.ema?.cross_9_21==='golden_cross'){score+=1;reasons.push('EMA 9>21 bullish')}
+
+    // RSI sweet spot: 50-70 = momentum without overbought
+    if(stock.rsi>=50&&stock.rsi<=70){score+=2;reasons.push(`RSI ${stock.rsi?.toFixed(0)} — momentum zone`)}
+    else if(stock.rsi>70&&stock.rsi<=80){score+=1;reasons.push(`RSI ${stock.rsi?.toFixed(0)} — strong but watch`)}
+    else if(stock.rsi>80){score-=1;warnings.push(`RSI ${stock.rsi?.toFixed(0)} — overbought`)}
+    else if(stock.rsi<40){score-=1;warnings.push(`RSI ${stock.rsi?.toFixed(0)} — weak`)}
+
+    // Breakout proximity
+    if(stock.breakout?.signal==='new_52w_high'){score+=2;reasons.push('New 52W high — breakout')}
+    else if(stock.breakout?.signal==='near_52w_high'){score+=1;reasons.push('Near 52W high — watch for breakout')}
+
+    // Volume confirmation
+    if(stock.volume?.signal==='extreme_spike'){score+=2;reasons.push('Extreme volume spike — institutional interest')}
+    else if(stock.volume?.signal==='spike'){score+=1;reasons.push('Volume spike')}
+    else if(stock.volume?.signal==='dry'){score+=1;reasons.push('Volume drying up — potential VCP setup')}
+
+    // MACD
+    if(stock.macd?.crossover==='bullish_crossover'||stock.macd?.crossover==='bullish'){score+=1;reasons.push('MACD bullish')}
+    else if(stock.macd?.crossover==='bearish_crossover'||stock.macd?.crossover==='bearish'){score-=1;warnings.push('MACD bearish')}
+
+    // Fund holdings — institutional accumulation
+    if(stock.fund_holdings?.no_of_funds>100&&stock.fund_holdings?.fund_shares_change_pct>0){
+      score+=2;reasons.push(`${stock.fund_holdings.no_of_funds} funds accumulating (+${stock.fund_holdings.fund_shares_change_pct.toFixed(1)}%)`)}
+    else if(stock.fund_holdings?.fund_shares_change_pct<-3){
+      warnings.push(`Funds selling: ${stock.fund_holdings.fund_shares_change_pct.toFixed(1)}%`)}
+
+    // Catalysts
+    const bullCatalysts=(stock.catalysts||[]).filter(c=>c.direction==='bullish'&&c.priority>=8);
+    if(bullCatalysts.length>0){score+=2;reasons.push(`${bullCatalysts.length} high-priority catalyst(s): ${bullCatalysts[0].title}`)}
+
+    // Circuit band warning
+    if(stock.circuit?.is_restricted){score-=3;warnings.push(`Circuit restricted: ${stock.circuit.band}`)}
+
+    // Fundamentals
+    const f=stock.fundamentals||{};
+    if(f.mcap_category==='large_cap'||f.mcap_category==='mega_cap'){score+=1;reasons.push(f.mcap_category.replace('_',' '))}
+    if(f.roe>15){score+=1;reasons.push(`ROE ${f.roe}%`)}
+
+    // Returns — STRICT: reject stocks extended >5% from pivot
+    if(stock.returns?.['1w']>5){score-=2;warnings.push(`Up ${stock.returns['1w'].toFixed(1)}% this week — extended beyond 5% pivot zone`)}
+    if(stock.returns?.['1m']>20){score-=1;warnings.push(`Up ${stock.returns['1m'].toFixed(0)}% in 1M — chasing risk`)}
+
+    // Pivot proximity: stock must be within 5% of breakout/pivot level
+    // If near 52W high and weekly return <5%, it's in the buy zone
+    const withinPivot = (stock.breakout?.signal === 'near_52w_high' || stock.breakout?.signal === 'new_52w_high') && (stock.returns?.['1w'] || 0) <= 5;
+    if(withinPivot){score+=2;reasons.push('Within 5% of pivot — optimal entry zone')}
+    else if(stock.returns?.['1w']>5&&stock.breakout?.signal==='new_52w_high'){
+      score-=1;warnings.push('Breakout but >5% extended — wait for pullback')}
+
+    // Risk:Reward estimate — tight SL within 5% max
+    const entry=stock.price;
+    const slPct = stock.rsi > 60 ? 0.04 : 0.05; // 4-5% SL — Minervini style
+    const tgtPct = slPct * 2.5; // Minimum 2.5:1 R:R target
+    const slEstimate=stock.price*(1-slPct);
+    const tgtEstimate=stock.price*(1+tgtPct);
+    const risk=entry-slEstimate;
+    const reward=tgtEstimate-entry;
+    const rr=risk>0?(reward/risk):0;
+
+    return{
+      ...stock,
+      topDownScore:score,
+      reasons,warnings,
+      inHotSector,
+      sectorName:stockSector||stock.sector||'Unknown',
+      estimatedRR:rr,
+      estimatedEntry:entry,
+      estimatedSL:slEstimate,
+      estimatedTarget:tgtEstimate,
+    };
+  });
+
+  // Filter: score >= 5 AND in hot sector preferred
+  return scored
+    .filter(s=>s.topDownScore>=4&&!s.circuit?.is_restricted)
+    .sort((a,b)=>b.topDownScore-a.topDownScore);
+};
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 4: LOW-RISK ENTRY IDENTIFICATION
+// Ranks stocks by entry quality
+// ═══════════════════════════════════════════════════════════
+const rankByEntryQuality=(stocks)=>{
+  return stocks.map(s=>{
+    let entryScore=0;const entryReasons=[];
+
+    // VCP/Tight setup indicators
+    if(s.volume?.signal==='dry'&&s.rsi>=50&&s.rsi<=65){
+      entryScore+=3;entryReasons.push('Volume contraction + RSI momentum — VCP setup')}
+
+    // Inside bar / narrow range
+    if(s.catalysts?.some(c=>c.type==='inside_bar'||c.title?.includes('Inside'))){
+      entryScore+=2;entryReasons.push('Inside bar — low risk entry point')}
+
+    // Near breakout but not extended
+    if(s.breakout?.signal==='near_52w_high'&&s.returns?.['1w']<5){
+      entryScore+=2;entryReasons.push('Coiling near 52W high — breakout imminent')}
+
+    // Price near EMAs (pullback to support)
+    if(s.ema?.cross_9_21==='bullish'&&s.rsi>=45&&s.rsi<=60){
+      entryScore+=2;entryReasons.push('Pullback to EMA support — retest entry')}
+
+    // Fresh MACD crossover
+    if(s.macd?.crossover==='bullish_crossover'){
+      entryScore+=1;entryReasons.push('Fresh MACD bullish crossover')}
+
+    // R:R quality
+    if(s.estimatedRR>=2.5){entryScore+=2;entryReasons.push(`Estimated R:R ${s.estimatedRR.toFixed(1)} — excellent`)}
+    else if(s.estimatedRR>=1.5){entryScore+=1;entryReasons.push(`R:R ${s.estimatedRR.toFixed(1)}`)}
+
+    // Strong volume on breakout
+    if((s.breakout?.signal==='new_52w_high')&&s.volume?.ratio>=2){
+      entryScore+=3;entryReasons.push('Breakout with 2x+ volume — power move')}
+
+    return{...s,entryScore,entryReasons,totalScore:s.topDownScore+entryScore};
+  }).sort((a,b)=>b.totalScore-a.totalScore);
+};
+
+// ═══════════════════════════════════════════════════════════
+// MAIN DASHBOARD
+// ═══════════════════════════════════════════════════════════
+const AutopilotDashboard=()=>{
+  const {rrm,scanner,sectors:sectorConstituents,mps,loading,error}=useData();
+  const [expandedStock,setExpandedStock]=useState(null);
+
+  // Run the full pipeline
+  const mpsZone=useMemo(()=>detectMPSZone(mps,scanner,rrm),[mps,scanner,rrm]);
+  const regime=useMemo(()=>analyzeMarketRegime(rrm,scanner),[rrm,scanner]);
+  const sectorRotation=useMemo(()=>analyzeSectorRotation(rrm),[rrm]);
+  const screenedStocks=useMemo(()=>screenStocks(scanner,sectorRotation,sectorConstituents),[scanner,sectorRotation,sectorConstituents]);
+  const rankedStocks=useMemo(()=>rankByEntryQuality(screenedStocks),[screenedStocks]);
+
+  // Top picks = highest total score, limit 20
+  // In No Money zone, show 0 picks (don't trade!)
+  const topPicks=mpsZone.key==='no_money'?[]:rankedStocks.slice(0,20);
+
+  const saveToWatchlist=()=>{
+    if(!window.teWatchlist||!topPicks.length)return;
+    const name="Autopilot "+new Date().toLocaleDateString("en-IN")+" ["+mpsZone.label+"]";
+    const stocks=topPicks.slice(0,50).map(s=>({
+      symbol:s.symbol,name:s.name,sector:s.sectorName||s.sector,source:"autopilot",
+      trade:{entry:s.estimatedEntry,target:s.estimatedTarget,sl:s.estimatedSL,status:"watching",
+        riskPct:mpsZone.riskPct,mpsZone:mpsZone.label}
+    }));
+    window.teWatchlist.createList(name,stocks);
+    window.teWatchlist.sync();
+    // Also update position sizer config with MPS zone risk
+    try{localStorage.setItem('te_chart_pos_config',JSON.stringify({capital:parseInt(localStorage.getItem('te_chart_pos_config')&&JSON.parse(localStorage.getItem('te_chart_pos_config')).capital)||100000,riskPct:mpsZone.riskPct}))}catch{}
+    alert(`Saved "${name}" with ${stocks.length} stocks\nMPS Zone: ${mpsZone.label} → Risk: ${mpsZone.riskPct}% per trade\nPosition sizer updated to ${mpsZone.riskPct}% risk`);
+  };
+
+  if(loading)return(
+    <div>
+      <nav className="nav"><a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+        <a href="scanner.html" className="nav-link">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a><a href="#" className="nav-link active">Autopilot</a></nav>
+      <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"60vh",flexDirection:"column",gap:12}}>
+        <div style={{width:40,height:40,border:"3px solid var(--bd1)",borderTop:"3px solid var(--g)",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+        <div style={{color:"var(--t3)",fontSize:12,fontFamily:"var(--fm)"}}>Running top-down analysis...</div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>);
+
+  return(
+    <div>
+      <nav className="nav">
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+        <a href="scanner.html" className="nav-link">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a><a href="#" className="nav-link active">Autopilot</a>
+      </nav>
+
+      <div style={{maxWidth:1200,margin:"0 auto",padding:"16px 20px"}}>
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <h1 style={{fontSize:24,fontWeight:900,letterSpacing:2,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ AUTOPILOT</h1>
+            <div style={{fontSize:10,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1}}>TOP-DOWN WORKFLOW • MARKET → SECTOR → STOCK → ENTRY</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={saveToWatchlist} style={{padding:"6px 14px",borderRadius:5,fontSize:11,fontWeight:700,fontFamily:"var(--fm)",cursor:"pointer",border:"1px solid var(--g)",background:"rgba(0,255,136,0.1)",color:"var(--g)"}}>
+              💾 Save Top Picks to Watchlist
+            </button>
+            <button onClick={()=>window.location.reload()} style={{padding:"6px 14px",borderRadius:5,fontSize:11,fontWeight:700,fontFamily:"var(--fm)",cursor:"pointer",border:"1px solid var(--bd2)",background:"var(--bg3)",color:"var(--t1)"}}>
+              ↻ Re-scan
+            </button>
+          </div>
+        </div>
+
+        {error&&<div style={{padding:"8px 14px",marginBottom:12,borderRadius:6,background:"rgba(255,170,0,0.08)",border:"1px solid rgba(255,170,0,0.2)",fontSize:10,color:"var(--a)",fontFamily:"var(--fm)"}}>⚠ {error}</div>}
+
+        {/* ═══ MPS ZONE — THE MASTER SWITCH ═══ */}
+        <div style={{marginBottom:12,padding:"14px 18px",borderRadius:10,
+          background:`linear-gradient(135deg, ${mpsZone.color}08, ${mpsZone.color}03)`,
+          border:`2px solid ${mpsZone.color}33`,animation:"fadeUp .3s ease-out both"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{fontSize:28}}>{mpsZone.icon}</div>
+              <div>
+                <div style={{fontSize:18,fontWeight:900,color:mpsZone.color,fontFamily:"var(--fm)",letterSpacing:2,
+                  animation:mpsZone.key==='easy_money'?'glow 2s infinite':'none'}}>{mpsZone.label}</div>
+                <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)",marginTop:2}}>{mpsZone.source}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:16,alignItems:"center"}}>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1}}>RISK/TRADE</div>
+                <div style={{fontSize:20,fontWeight:900,color:mpsZone.color,fontFamily:"var(--fm)"}}>{mpsZone.riskPct}%</div>
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1}}>MAX EXPOSURE</div>
+                <div style={{fontSize:20,fontWeight:900,color:mpsZone.color,fontFamily:"var(--fm)"}}>{mpsZone.maxExposure}%</div>
+              </div>
+              <div style={{width:1,height:36,background:mpsZone.color+"22"}}/>
+              <div style={{maxWidth:280}}>
+                <div style={{fontSize:9,color:mpsZone.color,fontFamily:"var(--fm)",fontWeight:700,marginBottom:2}}>{mpsZone.posRule}</div>
+                <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>{mpsZone.strategy}</div>
+              </div>
+            </div>
+          </div>
+          {/* Zone bar visualization */}
+          <div style={{display:"flex",gap:3,marginTop:10}}>
+            {Object.entries(MPS_ZONES).map(([k,z])=>(
+              <div key={k} style={{flex:1,height:6,borderRadius:3,background:mpsZone.key===k?z.color:z.color+"18",
+                transition:"all .3s",boxShadow:mpsZone.key===k?`0 0 8px ${z.color}44`:"none"}}>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+            {Object.entries(MPS_ZONES).map(([k,z])=>(
+              <span key={k} style={{fontSize:7,fontFamily:"var(--fm)",fontWeight:mpsZone.key===k?800:400,
+                color:mpsZone.key===k?z.color:"var(--t3)"}}>{z.label}</span>
+            ))}
+          </div>
+          {mpsZone.key==='no_money'&&(
+            <div style={{marginTop:10,padding:"8px 12px",background:"rgba(255,68,85,0.08)",borderRadius:6,border:"1px solid rgba(255,68,85,0.2)",textAlign:"center"}}>
+              <div style={{fontSize:12,fontWeight:800,color:"var(--r)",fontFamily:"var(--fm)"}}>⛔ TRADING HALTED — NO MONEY ZONE</div>
+              <div style={{fontSize:9,color:"var(--t2)",fontFamily:"var(--fm)",marginTop:4}}>The autopilot will not generate any picks in this zone. Protect capital. Wait for zone improvement.</div>
+            </div>
+          )}
+        </div>
+
+        {/* ═══ STAGE 1: MARKET REGIME ═══ */}
+        <div className="stage" style={{animationDelay:"0s",borderColor:regime.color+"33"}}>
+          <div className="stage-hdr">
+            <div className="stage-num" style={{background:regime.color+"18",color:regime.color,border:`2px solid ${regime.color}44`}}>1</div>
+            <div>
+              <div className="stage-title" style={{color:regime.color}}>MARKET REGIME</div>
+              <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)"}}>Is the market safe to trade?</div>
+            </div>
+            <div className="stage-verdict" style={{background:regime.color+"18",color:regime.color,border:`1px solid ${regime.color}44`,marginLeft:"auto",animation:regime.verdict==='RISK-ON'?'glow 2s infinite':'none'}}>
+              {regime.verdict==='RISK-ON'?'🟢':regime.verdict==='CAUTIOUS'?'🟡':'🔴'} {regime.verdict}
+            </div>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {regime.signals.map((s,i)=>(
+              <span key={i} className={`pill ${s.type==='bull'?'pill-g':s.type==='bear'?'pill-r':'pill-a'}`}>{s.text}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* ═══ STAGE 2: SECTOR ROTATION ═══ */}
+        <div className="stage" style={{animationDelay:"0.1s"}}>
+          <div className="stage-hdr">
+            <div className="stage-num" style={{background:"rgba(0,200,255,0.15)",color:"var(--b)",border:"2px solid rgba(0,200,255,0.3)"}}>2</div>
+            <div>
+              <div className="stage-title" style={{color:"var(--b)"}}>SECTOR ROTATION</div>
+              <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)"}}>Where is smart money flowing? (from RRM quadrants)</div>
+            </div>
+            <span style={{marginLeft:"auto",fontSize:10,fontFamily:"var(--fm)",color:"var(--t3)"}}>{sectorRotation.raw.length} sectors analyzed</span>
+          </div>
+
+          {/* Quadrant grid */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {/* Leading */}
+            <div style={{background:"rgba(0,255,136,0.03)",border:"1px solid rgba(0,255,136,0.1)",borderRadius:6,padding:10}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--g)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>▲ LEADING ({sectorRotation.leading.length})</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                {sectorRotation.leading.length?sectorRotation.leading.map((s,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:10,fontFamily:"var(--fm)"}}>
+                    <span style={{color:"#fff",fontWeight:600}}>{s.name}</span>
+                    <div style={{display:"flex",gap:4}}>
+                      {s.rs?<span style={{color:"var(--g)"}}>RS:{typeof s.rs==='number'?s.rs.toFixed(1):s.rs}</span>:null}
+                      {s.mtfScore>=2&&<span className="pill pill-g" style={{fontSize:7}}>MTF✓</span>}
+                    </div>
+                  </div>
+                )):<div style={{fontSize:9,color:"var(--t3)"}}>No sectors in Leading quadrant</div>}
+              </div>
+            </div>
+            {/* Improving */}
+            <div style={{background:"rgba(0,200,255,0.03)",border:"1px solid rgba(0,200,255,0.1)",borderRadius:6,padding:10}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--b)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>↗ IMPROVING ({sectorRotation.improving.length})</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                {sectorRotation.improving.length?sectorRotation.improving.map((s,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:10,fontFamily:"var(--fm)"}}>
+                    <span style={{color:"var(--t2)"}}>{s.name}</span>
+                    {s.momentum?<span style={{color:"var(--b)"}}>Mom:{typeof s.momentum==='number'?s.momentum.toFixed(1):s.momentum}</span>:null}
+                  </div>
+                )):<div style={{fontSize:9,color:"var(--t3)"}}>None</div>}
+              </div>
+            </div>
+            {/* Weakening */}
+            <div style={{background:"rgba(255,170,0,0.03)",border:"1px solid rgba(255,170,0,0.08)",borderRadius:6,padding:10}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--a)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>↘ WEAKENING ({sectorRotation.weakening.length})</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                {sectorRotation.weakening.map((s,i)=><span key={i} className="pill pill-a">{s.name}</span>)}
+                {!sectorRotation.weakening.length&&<span style={{fontSize:9,color:"var(--t3)"}}>None</span>}
+              </div>
+            </div>
+            {/* Lagging */}
+            <div style={{background:"rgba(255,68,85,0.03)",border:"1px solid rgba(255,68,85,0.08)",borderRadius:6,padding:10}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--r)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>▼ LAGGING ({sectorRotation.lagging.length})</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                {sectorRotation.lagging.map((s,i)=><span key={i} className="pill pill-r">{s.name}</span>)}
+                {!sectorRotation.lagging.length&&<span style={{fontSize:9,color:"var(--t3)"}}>None</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ STAGE 3+4: TOP PICKS ═══ */}
+        <div className="stage" style={{animationDelay:"0.2s"}}>
+          <div className="stage-hdr">
+            <div className="stage-num" style={{background:"rgba(136,68,255,0.15)",color:"var(--p)",border:"2px solid rgba(136,68,255,0.3)"}}>3</div>
+            <div>
+              <div className="stage-title" style={{color:"var(--p)"}}>TOP PICKS — LOW RISK ENTRIES</div>
+              <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)"}}>Stocks in leading sectors with strong technicals + catalysts + good R:R</div>
+            </div>
+            <span style={{marginLeft:"auto",fontSize:11,fontFamily:"var(--fm)",color:"var(--g)",fontWeight:800}}>{topPicks.length} stocks</span>
+          </div>
+
+          {topPicks.length===0&&(
+            <div style={{textAlign:"center",padding:30,color:"var(--t3)"}}>
+              <div style={{fontSize:28,marginBottom:8}}>◇</div>
+              <div style={{fontSize:12}}>No stocks pass the top-down filter today.</div>
+              <div style={{fontSize:10,marginTop:4}}>This means either the market regime is RISK-OFF, no sectors are leading, or no stocks meet all criteria.</div>
+            </div>
+          )}
+
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:8}}>
+            {topPicks.map((s,i)=>(
+              <div key={s.symbol} className="scard" onClick={()=>setExpandedStock(expandedStock===s.symbol?null:s.symbol)}
+                style={{animationDelay:`${0.3+i*0.05}s`,animation:"fadeUp .4s ease-out both"}}>
+                {/* Header row */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>{s.symbol}</span>
+                      <span className={`pill ${s.inHotSector?'pill-g':'pill-b'}`}>{s.sectorName}</span>
+                    </div>
+                    <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)",marginTop:2}}>{s.name}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:"var(--fm)"}}>₹{s.price?.toLocaleString()}</div>
+                    <div style={{fontSize:10,fontFamily:"var(--fm)",fontWeight:700,color:s.change_pct>=0?"var(--g)":"var(--r)"}}>
+                      {s.change_pct>=0?"+":""}{s.change_pct?.toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Score bar + MPS risk */}
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                  <div style={{flex:1,height:6,borderRadius:3,background:"rgba(255,255,255,0.04)",overflow:"hidden"}}>
+                    <div style={{height:"100%",borderRadius:3,width:Math.min(s.totalScore/15*100,100)+"%",
+                      background:s.totalScore>=10?"linear-gradient(90deg,#00ff88,#00c8ff)":s.totalScore>=6?"linear-gradient(90deg,#ffaa00,#00ff88)":"#ffaa00"}}/>
+                  </div>
+                  <span style={{fontSize:11,fontWeight:800,fontFamily:"var(--fm)",
+                    color:s.totalScore>=10?"var(--g)":s.totalScore>=6?"var(--a)":"var(--t3)",minWidth:30,textAlign:"right"}}>
+                    {s.totalScore}pts
+                  </span>
+                  <span style={{fontSize:8,fontFamily:"var(--fm)",padding:"1px 5px",borderRadius:3,
+                    background:mpsZone.color+"15",color:mpsZone.color,border:`1px solid ${mpsZone.color}33`}}>
+                    {mpsZone.riskPct}%R
+                  </span>
+                </div>
+
+                {/* Key metrics row */}
+                <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                  <span style={{fontSize:8,fontFamily:"var(--fm)",color:s.rsi>=50&&s.rsi<=70?"var(--g)":s.rsi>70?"var(--a)":"var(--t3)"}}>
+                    RSI:{s.rsi?.toFixed(0)}</span>
+                  <span style={{fontSize:8,fontFamily:"var(--fm)",color:"var(--b)"}}>R:R:{s.estimatedRR?.toFixed(1)}</span>
+                  {s.fund_holdings?.no_of_funds&&<span style={{fontSize:8,fontFamily:"var(--fm)",color:"var(--t2)"}}>
+                    Funds:{s.fund_holdings.no_of_funds}</span>}
+                  {s.volume?.ratio&&<span style={{fontSize:8,fontFamily:"var(--fm)",
+                    color:s.volume.ratio>=2?"var(--p)":"var(--t3)"}}>Vol:{s.volume.ratio}x</span>}
+                </div>
+
+                {/* Reasons */}
+                <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                  {s.reasons.slice(0,3).map((r,ri)=>(
+                    <span key={ri} style={{fontSize:7,padding:"1px 5px",borderRadius:2,background:"rgba(0,255,136,0.06)",
+                      color:"var(--g)",fontFamily:"var(--fm)",border:"1px solid rgba(0,255,136,0.1)"}}>{r}</span>
+                  ))}
+                  {s.entryReasons.slice(0,2).map((r,ri)=>(
+                    <span key={"e"+ri} style={{fontSize:7,padding:"1px 5px",borderRadius:2,background:"rgba(136,68,255,0.06)",
+                      color:"var(--p)",fontFamily:"var(--fm)",border:"1px solid rgba(136,68,255,0.1)"}}>{r}</span>
+                  ))}
+                </div>
+
+                {/* Warnings */}
+                {s.warnings.length>0&&(
+                  <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:4}}>
+                    {s.warnings.slice(0,2).map((w,wi)=>(
+                      <span key={wi} style={{fontSize:7,padding:"1px 5px",borderRadius:2,background:"rgba(255,68,85,0.06)",
+                        color:"var(--r)",fontFamily:"var(--fm)",border:"1px solid rgba(255,68,85,0.1)"}}>⚠ {w}</span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Expanded: Trade plan */}
+                {expandedStock===s.symbol&&(
+                  <div style={{marginTop:8,padding:"8px 10px",background:"rgba(0,0,0,0.3)",borderRadius:6,border:"1px solid var(--bd1)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <span style={{fontSize:9,fontWeight:800,color:"var(--b)",fontFamily:"var(--fm)",letterSpacing:1}}>SUGGESTED TRADE PLAN</span>
+                      <span style={{fontSize:8,fontFamily:"var(--fm)",padding:"2px 6px",borderRadius:3,background:mpsZone.color+"18",color:mpsZone.color,border:`1px solid ${mpsZone.color}33`}}>
+                        {mpsZone.label} → {mpsZone.riskPct}% risk
+                      </span>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:8}}>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>ENTRY</div>
+                        <div style={{fontSize:12,fontWeight:800,color:"var(--g)",fontFamily:"var(--fm)"}}>₹{s.estimatedEntry?.toFixed(1)}</div>
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>TARGET</div>
+                        <div style={{fontSize:12,fontWeight:800,color:"var(--b)",fontFamily:"var(--fm)"}}>₹{s.estimatedTarget?.toFixed(1)}</div>
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>STOPLOSS</div>
+                        <div style={{fontSize:12,fontWeight:800,color:"var(--r)",fontFamily:"var(--fm)"}}>₹{s.estimatedSL?.toFixed(1)}</div>
+                      </div>
+                      <div style={{textAlign:"center",background:"rgba(0,255,136,0.04)",borderRadius:4,padding:"4px 0"}}>
+                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>QTY ({mpsZone.riskPct}%R)</div>
+                        {(()=>{
+                          const cap=parseInt(localStorage.getItem('te_chart_pos_config')&&JSON.parse(localStorage.getItem('te_chart_pos_config')).capital)||100000;
+                          const risk=Math.abs(s.estimatedEntry-s.estimatedSL);
+                          const qty=risk>0?Math.floor((cap*mpsZone.riskPct/100)/risk):0;
+                          return <div style={{fontSize:12,fontWeight:800,color:"#fff",fontFamily:"var(--fm)"}}>{qty}</div>;
+                        })()}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+                      <a href={`stock.html?s=${s.symbol}`} target="_blank" style={{padding:"4px 10px",borderRadius:4,fontSize:9,fontWeight:700,fontFamily:"var(--fm)",
+                        border:"1px solid var(--bd2)",background:"var(--bg3)",color:"var(--t1)",textDecoration:"none"}}>Stock Page ↗</a>
+                      <a href={`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${s.symbol}&interval=D`} target="tradedge_tv" style={{padding:"4px 10px",borderRadius:4,fontSize:9,fontWeight:700,fontFamily:"var(--fm)",
+                        border:"1px solid rgba(0,200,255,0.3)",background:"rgba(0,200,255,0.08)",color:"var(--b)",textDecoration:"none"}}>TV Pro ↗</a>
+                      <a href={`https://zone.definedge.com/chart/NSE/${s.symbol}/pf`} target="_blank" style={{padding:"4px 10px",borderRadius:4,fontSize:9,fontWeight:700,fontFamily:"var(--fm)",
+                        border:"1px solid rgba(136,68,255,0.3)",background:"rgba(136,68,255,0.08)",color:"var(--p)",textDecoration:"none"}}>P&F ↗</a>
+                    </div>
+                    <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",textAlign:"center",marginTop:6}}>
+                      Open in Watchlist → right-click chart to set exact Entry/SL/Target
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Pipeline summary */}
+        <div style={{marginTop:16,padding:"12px 16px",borderRadius:8,background:"var(--bg2)",border:"1px solid var(--bd0)",
+          display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,fontSize:9,fontFamily:"var(--fm)",color:"var(--t3)"}}>
+          <span>PIPELINE: {scanner?.stocks?.length||0} stocks → {sectorRotation.leading.length+sectorRotation.improving.length} hot sectors → {screenedStocks.length} screened → <span style={{color:"var(--g)",fontWeight:800}}>{topPicks.length} top picks</span></span>
+          <span>MPS: <span style={{color:mpsZone.color,fontWeight:700}}>{mpsZone.label} ({mpsZone.riskPct}%R)</span> | Market: <span style={{color:regime.color,fontWeight:700}}>{regime.verdict}</span> | Leading: <span style={{color:"var(--g)"}}>{sectorRotation.leading.length}</span> | {new Date().toLocaleString("en-IN")}</span>
+        </div>
+
+        {/* Footer */}
+        <div style={{marginTop:12,padding:"10px 0",borderTop:"1px solid var(--bd0)",fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1,textAlign:"center"}}>
+          TRADEDGE AUTOPILOT v1.0 • MINERVINI + O'NEIL + DEFINEDGE METHODOLOGY • NOT FINANCIAL ADVICE
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<AutopilotDashboard/>);
+</script>
+</body>
+</html>
