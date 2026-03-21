@@ -93,7 +93,10 @@ jobs:
           # Show what's staged
           echo "=== Staged changes ==="
           git diff --staged --stat
-          
+
+          # Run Fundamental Scanner
+            python scripts/funda_scanner.py || echo "Funda scanner failed, continuing..."
+          git add -f data/funda_scans.json 2>/dev/null || true
           # Commit if there are changes
           if git diff --staged --quiet; then
             echo "No changes to commit"
