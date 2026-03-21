@@ -63,11 +63,30 @@ savePlan:(s,v)=>v?LS.set(`te_chart_plan_${s}`,v):localStorage.removeItem(`te_cha
 // ═══ SUPABASE CLOUD SYNC ═══
 const SUPABASE_URL='https://urnrdpyhncezljirpnmy.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI0NTk1MzIsImV4cCI6MjA1ODAzNTUzMn0.AU427PEYMdWafYaQjABEEerbdw';
-
 const DrawingCloudSync={
-  async load(symbol){try{const res=await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings?symbol=eq.${symbol}&select=data`,{headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`}});if(!res.ok)return null;const rows=await res.json();return rows.length?rows[0].data:null}catch(e){return null}},
-  async save(symbol,data){try{await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings`,{method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},body:JSON.stringify({symbol,data,updated_at:new Date().toISOString()})})}catch(e){}}
+  async load(symbol){
+    try{
+      const res=await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings?symbol=eq.${symbol}&select=data`,{
+        method:'GET',
+        headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json'}
+      });
+      if(!res.ok)return null;
+      const rows=await res.json();
+      return rows.length?rows[0].data:null;
+    }catch(e){console.warn('Cloud load error:',e);return null}
+  },
+  async save(symbol,data){
+    try{
+      const res=await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings`,{
+        method:'POST',
+        headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+        body:JSON.stringify({symbol,data,updated_at:new Date().toISOString()})
+      });
+      if(!res.ok)console.warn('Cloud save failed:',res.status);
+    }catch(e){console.warn('Cloud save error:',e)}
+  }
 };
+
 
 const DrawingStore={
   key:s=>`te_drawings_v5_${s}`,
