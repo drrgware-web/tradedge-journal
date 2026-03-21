@@ -11,980 +11,653 @@
 <style>
 :root{--bg-primary:#06080c;--bg-secondary:#0c1018;--bg-card:#0f1520;--bg-hover:#141d2a;--border-dim:rgba(0,255,136,0.06);--border-low:rgba(0,255,136,0.1);--border-med:rgba(0,255,136,0.2);--accent:#00ff88;--accent-dim:rgba(0,255,136,0.15);--accent2:#00c8ff;--accent3:#8844ff;--red:#ff4455;--amber:#ffaa00;--text-primary:#e8e8e8;--text-secondary:#8899aa;--text-muted:#556677;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-display);min-height:100vh;-webkit-font-smoothing:antialiased}
-body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.008) 2px,rgba(0,255,136,.008) 4px);pointer-events:none;z-index:9999}
+body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-display);min-height:100vh;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.008) 2px,rgba(0,255,136,.008) 4px);pointer-events:none;z-index:9999}
 #root{position:relative;z-index:1}
-::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.15);border-radius:3px}
 .nav{display:flex;align-items:center;gap:4px;padding:4px 20px;background:var(--bg-secondary);border-bottom:1px solid var(--border-dim);position:sticky;top:0;z-index:100}
-.nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-decoration:none;border-radius:4px;font-family:var(--font-mono)}.nav-link:hover{color:var(--text-primary);background:var(--bg-hover)}.nav-link.active{color:var(--accent);background:var(--accent-dim)}
+.nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-decoration:none;border-radius:4px;font-family:var(--font-mono)}
+.nav-link:hover{color:var(--text-primary);background:var(--bg-hover)}
+.nav-link.active{color:var(--accent);background:var(--accent-dim)}
 .card{background:var(--bg-card);border:1px solid var(--border-low);border-radius:8px;overflow:hidden}
-.ob{padding:3px 8px;font-size:8px;font-family:var(--font-mono);font-weight:700;border-radius:3px;cursor:pointer;border:1px solid;transition:all 0.15s}.ob:hover{filter:brightness(1.3)}
+.ob{padding:3px 8px;font-size:8px;font-family:var(--font-mono);font-weight:700;border-radius:3px;cursor:pointer;border:1px solid;transition:all 0.15s}
+.ob:hover{filter:brightness(1.3)}
 .ob-b{background:rgba(0,255,136,0.15);border-color:rgba(0,255,136,0.4);color:var(--accent)}
 .ob-s{background:rgba(255,68,85,0.15);border-color:rgba(255,68,85,0.4);color:var(--red)}
 .ob-sl{background:rgba(255,170,0,0.15);border-color:rgba(255,170,0,0.4);color:var(--amber)}
 .ob-g{background:rgba(136,68,255,0.15);border-color:rgba(136,68,255,0.4);color:var(--accent3)}
 .ob-i{background:rgba(0,200,255,0.1);border-color:rgba(0,200,255,0.3);color:var(--accent2)}
-@keyframes logoPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.85;transform:scale(1.03)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes ctxIn{from{opacity:0;transform:scale(.96) translateY(-3px)}to{opacity:1;transform:none}}
-.ctx-menu{position:fixed;background:#0a0f18f0;border:1px solid rgba(0,255,136,0.2);border-radius:6px;min-width:190px;z-index:600;box-shadow:0 10px 40px rgba(0,0,0,.7);animation:ctxIn .1s ease-out;overflow:hidden;backdrop-filter:blur(12px)}
-.ctx-header{padding:6px 10px;border-bottom:1px solid rgba(0,255,136,0.06);display:flex;justify-content:space-between;align-items:center}
-.ctx-item{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:9px;font-family:var(--font-mono);color:var(--text-primary);cursor:pointer;transition:background .08s;border:none;background:none;width:100%;text-align:left}
-.ctx-item:hover{background:rgba(0,255,136,0.06)}.ctx-item .ck{margin-left:auto;font-size:7px;color:var(--text-muted);padding:1px 3px;background:rgba(255,255,255,0.04);border-radius:2px}
-.ctx-sep{height:1px;background:rgba(0,255,136,0.05);margin:1px 6px}
-.dtb{display:inline-flex;gap:1px;background:rgba(0,0,0,.4);border-radius:4px;border:1px solid var(--border-dim);padding:1px}
-.dtb-btn{padding:2px 6px;font-size:8px;font-family:var(--font-mono);font-weight:600;background:transparent;border:none;color:var(--text-muted);border-radius:3px;cursor:pointer;transition:all .1s;white-space:nowrap}
-.dtb-btn:hover{color:var(--text-primary);background:rgba(255,255,255,.04)}.dtb-btn.active{color:var(--accent);background:rgba(0,255,136,.1)}
-.dtb-btn.danger{color:var(--red)}.dtb-btn.danger:hover{background:rgba(255,68,85,.08)}
+@keyframes logoPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.85;transform:scale(1.03)}}
+@keyframes fadeRow{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ── Watchlist aesthetic overhaul ── */
+.wl-header{display:flex;justify-content:space-between;align-items:flex-end;padding:16px 0 12px;border-bottom:1px solid var(--border-dim);margin-bottom:14px}
+.wl-title{font-size:24px;font-weight:900;letter-spacing:2px;background:linear-gradient(135deg,#00ff88,#00c8ff,#8844ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.wl-subtitle{font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px;letter-spacing:0.5px}
+.wl-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--border-dim)}
+.wl-tab{padding:6px 14px;font-size:11px;font-family:var(--font-mono);font-weight:700;border-radius:6px;cursor:pointer;transition:all .15s;border:1px solid var(--border-low);background:rgba(255,255,255,0.015);color:var(--text-secondary);position:relative}
+.wl-tab:hover{border-color:var(--border-med);color:var(--text-primary);background:var(--bg-hover)}
+.wl-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);box-shadow:0 0 12px rgba(0,255,136,0.06)}
+.wl-tab .wl-tab-count{font-size:8px;color:var(--text-muted);margin-left:4px;opacity:0.7}
+.wl-tab.active .wl-tab-count{color:var(--accent);opacity:0.6}
+
+/* Stock rows */
+.wl-row{display:grid;grid-template-columns:36px 1fr 120px 200px 180px;gap:0;padding:0;border-bottom:1px solid rgba(255,255,255,0.02);transition:all .12s;cursor:pointer;animation:fadeRow .2s ease-out}
+.wl-row:hover{background:rgba(0,255,136,0.015)}
+.wl-row.expanded{background:rgba(0,255,136,0.025);border-bottom-color:var(--accent)}
+.wl-row-cell{padding:10px 10px;display:flex;align-items:center}
+
+/* Stock identity */
+.wl-sym{font-weight:800;color:#fff;font-size:13px;letter-spacing:0.5px}
+.wl-sector{font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-top:1px}
+.wl-source{font-size:7px;padding:1px 5px;border-radius:10px;font-family:var(--font-mono);font-weight:600;background:rgba(0,255,136,0.06);color:rgba(0,255,136,0.5);border:1px solid rgba(0,255,136,0.08)}
+
+/* Status pill */
+.wl-status{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:8px;font-family:var(--font-mono);font-weight:800;letter-spacing:0.8px}
+.wl-status.watching{background:rgba(136,153,170,0.06);color:var(--text-muted);border:1px solid rgba(136,153,170,0.1)}
+.wl-status.active{background:rgba(0,255,136,0.08);color:var(--accent);border:1px solid rgba(0,255,136,0.15)}
+.wl-status.triggered{background:rgba(255,170,0,0.08);color:var(--amber);border:1px solid rgba(255,170,0,0.15)}
+.wl-status.exited{background:rgba(136,68,255,0.08);color:var(--accent3);border:1px solid rgba(136,68,255,0.15)}
+
+/* Trade plan mini display */
+.wl-plan{display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:10px}
+.wl-plan-item{display:flex;flex-direction:column;align-items:center;gap:1px}
+.wl-plan-label{font-size:7px;font-weight:700;letter-spacing:0.5px;opacity:0.5}
+.wl-plan-val{font-weight:700;font-size:10px}
+.wl-plan-val.entry{color:var(--accent)}.wl-plan-val.target{color:var(--accent2)}.wl-plan-val.sl{color:var(--red)}
+.wl-rr{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800;font-family:var(--font-mono)}
+.wl-rr.good{background:rgba(0,255,136,0.08);color:var(--accent);border:1px solid rgba(0,255,136,0.12)}
+.wl-rr.ok{background:rgba(255,170,0,0.08);color:var(--amber);border:1px solid rgba(255,170,0,0.12)}
+.wl-rr.bad{background:rgba(255,68,85,0.08);color:var(--red);border:1px solid rgba(255,68,85,0.12)}
+
+/* Order buttons */
+.wl-orders{display:flex;gap:3px;align-items:center}
+.wl-btn{padding:4px 10px;border-radius:4px;font-size:8px;font-family:var(--font-mono);font-weight:700;cursor:pointer;border:1px solid;transition:all .12s;white-space:nowrap}
+.wl-btn:hover{filter:brightness(1.2);transform:translateY(-1px)}
+.wl-btn.buy{background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.3);color:var(--accent)}
+.wl-btn.sell{background:rgba(255,68,85,0.1);border-color:rgba(255,68,85,0.3);color:var(--red)}
+.wl-btn.sl{background:rgba(255,170,0,0.1);border-color:rgba(255,170,0,0.3);color:var(--amber)}
+.wl-btn.gtt{background:rgba(136,68,255,0.1);border-color:rgba(136,68,255,0.3);color:var(--accent3)}
+.wl-btn.edit{background:transparent;border-color:var(--border-low);color:var(--text-muted)}
+.wl-btn.del{background:transparent;border-color:rgba(255,68,85,0.15);color:rgba(255,68,85,0.4);font-size:10px;padding:2px 6px}
+.wl-btn.del:hover{color:var(--red);border-color:rgba(255,68,85,0.4)}
+
+/* Chart expanded area */
+.wl-chart-wrap{padding:8px 12px;background:linear-gradient(180deg,rgba(0,0,0,0.4),rgba(6,8,12,0.9));border-bottom:2px solid var(--accent)}
+
+/* Empty state */
+.wl-empty{padding:60px 20px;text-align:center}
+.wl-empty-icon{font-size:48px;margin-bottom:12px;opacity:0.3}
+.wl-empty-text{font-size:14px;font-weight:700;color:var(--text-muted);margin-bottom:4px}
+.wl-empty-sub{font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6}
+
+/* List card header */
+.wl-list-header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-dim);background:linear-gradient(90deg,rgba(0,255,136,0.015),transparent)}
+.wl-list-name{font-size:15px;font-weight:800;color:#fff;letter-spacing:0.5px}
+.wl-list-meta{font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-left:8px}
+
+/* Column header */
+.wl-thead{display:grid;grid-template-columns:36px 1fr 120px 200px 180px;padding:0;background:rgba(0,255,136,0.02);border-bottom:1px solid var(--border-dim)}
+.wl-th{padding:8px 10px;font-size:8px;font-weight:700;font-family:var(--font-mono);color:var(--text-muted);letter-spacing:1px;text-transform:uppercase}
+
+/* Responsive */
+@media(max-width:900px){.wl-row,.wl-thead{grid-template-columns:30px 1fr 100px 160px 140px}.wl-btn{padding:3px 6px;font-size:7px}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script src="scripts/tradedge-watchlist.js"></script>
 <script type="text/babel">
-const {useState,useEffect,useMemo,useRef,useCallback,Fragment}=React;
+const {useState, useEffect, useMemo, useRef, useCallback, Fragment} = React;
 
-// ═══ UTILITIES ═══
-if(typeof calcEMA==='undefined'){window.calcEMA=function(c,p){if(!c||c.length<p)return[];const k=2/(p+1);const e=new Array(c.length).fill(0);let s=0;for(let i=0;i<p;i++)s+=c[i];e[p-1]=s/p;for(let i=p;i<c.length;i++)e[i]=c[i]*k+e[i-1]*(1-k);for(let i=0;i<p-1;i++)e[i]=e[p-1];return e}}
-if(typeof fmtVol==='undefined'){window.fmtVol=function(v){if(!v)return"0";if(v>=1e9)return(v/1e9).toFixed(1)+"B";if(v>=1e7)return(v/1e7).toFixed(1)+"Cr";if(v>=1e5)return(v/1e5).toFixed(1)+"L";if(v>=1e3)return(v/1e3).toFixed(1)+"K";return v+""}}
-const beep=(freq=880,dur=150)=>{try{const a=new(window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator();const g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=freq;g.gain.value=0.12;o.start();o.stop(a.currentTime+dur/1000);setTimeout(()=>a.close(),dur+100)}catch{}};
-const logToJournal=(symbol,action,price,qty,meta={})=>{const trades=JSON.parse(localStorage.getItem('te_trades')||'[]');trades.push({id:Date.now(),symbol,action,price,qty,ts:new Date().toISOString(),status:'executed',...meta});localStorage.setItem('te_trades',JSON.stringify(trades))};
+const TEChart = ({symbol, prices}) => {
+  const canvasRef = useRef(null);
+  const [viewStart, setViewStart] = useState(null);
+  const [viewCount, setViewCount] = useState(120);
+  const [crosshair, setCrosshair] = useState(null);
+  const [isDrag, setIsDrag] = useState(false);
+  const [dragX, setDragX] = useState(null);
+  const [showEMA, setShowEMA] = useState({e20:true,e50:true,e200:true});
+  const [hoverBar, setHoverBar] = useState(null);
 
-class ChartErrorBoundary extends React.Component{
-  constructor(p){super(p);this.state={error:null}}
-  static getDerivedStateFromError(e){return{error:e.message}}
-  render(){if(this.state.error)return React.createElement('div',{style:{padding:20,textAlign:'center',color:'#ff4455',fontSize:10,fontFamily:'var(--font-mono)'}},
-    '⚠ '+this.state.error, React.createElement('button',{className:'ob ob-i',style:{marginLeft:8},onClick:()=>this.setState({error:null})},'Retry'));
-  return this.props.children}
-}
+  const priceData = useMemo(() => {
+    if (!prices || !prices.length) return [];
+    return prices;
+  }, [prices]);
 
-// ═══ STORAGE ═══
-const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}},del:k=>{try{localStorage.removeItem(k)}catch{}}};
-const CS={
-  drawings:s=>LS.get(`te_chart_draw_${s}`,[]),alerts:s=>LS.get(`te_chart_alerts_${s}`,[]),
-  plan:s=>LS.get(`te_chart_plan_${s}`,null),posConfig:()=>LS.get('te_chart_pos_config',{capital:100000,riskPct:1}),
-  saveDrawings:(s,v)=>LS.set(`te_chart_draw_${s}`,v),saveAlerts:(s,v)=>LS.set(`te_chart_alerts_${s}`,v),
-  savePlan:(s,v)=>v?LS.set(`te_chart_plan_${s}`,v):LS.del(`te_chart_plan_${s}`),savePosConfig:v=>LS.set('te_chart_pos_config',v),
+  const start = viewStart ?? Math.max(0, priceData.length - viewCount);
+  const visible = priceData.slice(start, start + viewCount);
+
+  const closes = useMemo(() => priceData.map(d => d.c), [priceData]);
+  const ema20 = useMemo(() => closes.length >= 20 ? calcEMA(closes, 20) : [], [closes]);
+  const ema50 = useMemo(() => closes.length >= 50 ? calcEMA(closes, 50) : [], [closes]);
+  const ema200 = useMemo(() => closes.length >= 200 ? calcEMA(closes, 200) : [], [closes]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !visible.length) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const W = rect.width, H = 480;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.scale(dpr, dpr);
+
+    const padL = 62, padR = 10, padT = 10, padB = 22;
+    const volH = 72, chartH = H - padT - padB - volH - 8;
+    const chartW = W - padL - padR, barW = chartW / viewCount;
+
+    // Price range with EMAs
+    let allH = visible.map(d => d.h), allL = visible.map(d => d.l);
+    for (let i = 0; i < visible.length; i++) {
+      const gi = start + i;
+      if (showEMA.e20 && gi < ema20.length) { allH.push(ema20[gi]); allL.push(ema20[gi]); }
+      if (showEMA.e50 && gi < ema50.length) { allH.push(ema50[gi]); allL.push(ema50[gi]); }
+      if (showEMA.e200 && gi < ema200.length) { allH.push(ema200[gi]); allL.push(ema200[gi]); }
+    }
+    const pMax = Math.max(...allH) * 1.005, pMin = Math.min(...allL) * 0.995, pRng = pMax - pMin || 1;
+    const toY = (p) => padT + (1 - (p - pMin) / pRng) * chartH;
+    const toX = (i) => padL + i * barW + barW / 2;
+    const maxVol = Math.max(...visible.map(d => d.v)) || 1;
+    const volTop = padT + chartH + 8;
+    const toVolY = (v) => volTop + volH - (v / maxVol) * volH;
+
+    // Clear
+    ctx.fillStyle = "#06080c"; ctx.fillRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = "rgba(0,255,136,0.04)"; ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 6; i++) {
+      const p = pMin + pRng * i / 6, y = toY(p);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+      ctx.fillStyle = "#334"; ctx.font = "10px 'JetBrains Mono',monospace"; ctx.textAlign = "right";
+      ctx.fillText(p.toFixed(1), padL - 6, y + 3);
+    }
+
+    // Date labels
+    ctx.fillStyle = "#334"; ctx.font = "9px 'JetBrains Mono',monospace"; ctx.textAlign = "center";
+    const dStep = Math.max(1, Math.floor(viewCount / 8));
+    for (let i = 0; i < visible.length; i += dStep) {
+      const x = toX(i), dt = visible[i].date || "";
+      if (dt) { const p = dt.split("-"); ctx.fillText(p[2]+"/"+p[1], x, H - 4); }
+      ctx.strokeStyle = "rgba(0,255,136,0.02)";
+      ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
+    }
+
+    // Volume
+    for (let i = 0; i < visible.length; i++) {
+      const b = visible[i], x = toX(i), bull = b.c >= b.o;
+      ctx.fillStyle = bull ? "rgba(0,204,102,0.25)" : "rgba(238,51,68,0.25)";
+      ctx.fillRect(x - barW * 0.35, toVolY(b.v), barW * 0.7, volTop + volH - toVolY(b.v));
+    }
+    ctx.fillStyle = "#223"; ctx.font = "8px monospace"; ctx.textAlign = "right";
+    ctx.fillText(fmtVol(maxVol), padL - 6, volTop + 8);
+
+    // EMAs
+    const drawEMA = (ed, col) => {
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath(); let s = false;
+      for (let i = 0; i < visible.length; i++) {
+        const gi = start + i; if (gi >= ed.length) break;
+        const x = toX(i), y = toY(ed[gi]);
+        if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
+      } ctx.stroke();
+    };
+    if (showEMA.e200 && ema200.length) drawEMA(ema200, "#ff6644");
+    if (showEMA.e50 && ema50.length) drawEMA(ema50, "#ffaa00");
+    if (showEMA.e20 && ema20.length) drawEMA(ema20, "#00bbff");
+
+    // HLC Bars
+    for (let i = 0; i < visible.length; i++) {
+      const b = visible[i], x = toX(i), bull = b.c >= b.o;
+      const col = bull ? "#00cc66" : "#ee3344";
+      // H-L line
+      ctx.strokeStyle = col; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, toY(b.h)); ctx.lineTo(x, toY(b.l)); ctx.stroke();
+      // Close tick right
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, toY(b.c)); ctx.lineTo(x + barW * 0.35, toY(b.c)); ctx.stroke();
+    }
+
+    // Crosshair
+    if (crosshair) {
+      const {x: mx, y: my} = crosshair;
+      if (mx >= padL && mx <= W - padR) {
+        ctx.strokeStyle = "rgba(0,255,136,0.2)"; ctx.lineWidth = 0.5; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(mx, padT); ctx.lineTo(mx, H - padB); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(padL, my); ctx.lineTo(W - padR, my); ctx.stroke();
+        ctx.setLineDash([]);
+        // Price label
+        if (my >= padT && my <= padT + chartH) {
+          const pr = pMax - ((my - padT) / chartH) * pRng;
+          ctx.fillStyle = "#0a1520"; ctx.fillRect(0, my - 9, padL - 2, 18);
+          ctx.strokeStyle = "#00ff88"; ctx.lineWidth = 0.5; ctx.strokeRect(0, my - 9, padL - 2, 18);
+          ctx.fillStyle = "#00ff88"; ctx.font = "bold 9px 'JetBrains Mono',monospace"; ctx.textAlign = "right";
+          ctx.fillText(pr.toFixed(2), padL - 6, my + 3);
+        }
+        // Date label
+        const bi = Math.round((mx - padL) / barW - 0.5);
+        if (bi >= 0 && bi < visible.length) {
+          const dx = toX(bi), ds = visible[bi].date || "";
+          ctx.fillStyle = "#0a1520"; ctx.fillRect(dx - 32, H - padB, 64, padB);
+          ctx.strokeStyle = "#00ff88"; ctx.strokeRect(dx - 32, H - padB, 64, padB);
+          ctx.fillStyle = "#00ff88"; ctx.font = "bold 8px 'JetBrains Mono',monospace"; ctx.textAlign = "center";
+          ctx.fillText(ds, dx, H - 8);
+        }
+      }
+    }
+
+    // Legend
+    ctx.fillStyle = "#ddd"; ctx.font = "bold 13px 'Outfit',sans-serif"; ctx.textAlign = "left";
+    ctx.fillText("NSE:" + symbol, padL + 4, padT + 16);
+
+    const hb = hoverBar || visible[visible.length - 1];
+    if (hb) {
+      const iy = padT + 32; const bc = hb.c >= hb.o ? "#00cc66" : "#ee3344";
+      ctx.font = "11px 'JetBrains Mono',monospace";
+      ctx.fillStyle = "#667"; ctx.fillText("O ", padL + 4, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.o?.toFixed(2), padL + 20, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("H ", padL + 88, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.h?.toFixed(2), padL + 104, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("L ", padL + 172, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.l?.toFixed(2), padL + 186, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("C ", padL + 254, iy);
+      ctx.fillStyle = bc; ctx.fillText(hb.c?.toFixed(2), padL + 268, iy);
+      ctx.fillStyle = "#667"; ctx.fillText("V ", padL + 340, iy);
+      ctx.fillStyle = "#aaa"; ctx.fillText(fmtVol(hb.v || 0), padL + 354, iy);
+    }
+
+    const ey = padT + 48;
+    if (showEMA.e20 && ema20.length) { ctx.fillStyle = "#00bbff"; ctx.font = "10px 'JetBrains Mono',monospace"; ctx.fillText("EMA20: " + (ema20[start + visible.length - 1]?.toFixed(2)||"—"), padL + 4, ey); }
+    if (showEMA.e50 && ema50.length) { ctx.fillStyle = "#ffaa00"; ctx.fillText("EMA50: " + (ema50[start + visible.length - 1]?.toFixed(2)||"—"), padL + 140, ey); }
+    if (showEMA.e200 && ema200.length) { ctx.fillStyle = "#ff6644"; ctx.fillText("EMA200: " + (ema200[start + visible.length - 1]?.toFixed(2)||"—"), padL + 280, ey); }
+
+    // Separator
+    ctx.strokeStyle = "rgba(0,255,136,0.06)"; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(padL, volTop - 4); ctx.lineTo(W - padR, volTop - 4); ctx.stroke();
+  }, [visible, viewCount, start, crosshair, showEMA, hoverBar, symbol, ema20, ema50, ema200, priceData]);
+
+  useEffect(() => { draw(); }, [draw]);
+  useEffect(() => { const h = () => draw(); window.addEventListener("resize", h); return () => window.removeEventListener("resize", h); }, [draw]);
+
+  const handleMouseMove = (e) => {
+    const rect = canvasRef.current?.getBoundingClientRect(); if (!rect) return;
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    setCrosshair({x: mx, y: my});
+    const padL = 62, chartW = rect.width - padL - 10, bw = chartW / viewCount;
+    const idx = Math.round((mx - padL) / bw - 0.5);
+    setHoverBar(idx >= 0 && idx < visible.length ? visible[idx] : null);
+    if (isDrag && dragX != null) {
+      const delta = e.clientX - dragX, bDelta = Math.round(delta / bw);
+      if (Math.abs(bDelta) >= 1) {
+        setViewStart(pv => { const s = (pv ?? Math.max(0, priceData.length - viewCount)) - bDelta; return Math.max(0, Math.min(priceData.length - viewCount, s)); });
+        setDragX(e.clientX);
+      }
+    }
+  };
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    setViewCount(pv => { const n = pv + (e.deltaY > 0 ? 1 : -1) * Math.max(3, Math.floor(pv * 0.1)); return Math.max(20, Math.min(priceData.length, n)); });
+  };
+
+  if (!priceData.length) {
+    return (
+      <div style={{background:"var(--bg-card)",border:"1px solid var(--border-low)",borderRadius:8,padding:40,textAlign:"center"}}>
+        <div style={{color:"var(--text-muted)",fontSize:12,marginBottom:8}}>No price data available for chart</div>
+        <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+          <button onClick={() => window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${symbol}&interval=D`, 'tradedge_tv')}
+            style={{padding:"6px 14px",borderRadius:4,fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(0,200,255,0.3)",background:"rgba(0,200,255,0.08)",color:"#00c8ff"}}>
+            ⭐ Open in TradingView Pro
+          </button>
+          <button onClick={() => window.open(`https://zone.definedge.com/chart/NSE/${symbol}/pf`, '_blank')}
+            style={{padding:"6px 14px",borderRadius:4,fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.3)",background:"rgba(136,68,255,0.08)",color:"#8844ff"}}>
+            🔷 Definedge P&F
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{background:"var(--bg-card)",borderRadius:10,border:"1px solid var(--border-low)",overflow:"hidden"}}>
+      {/* Toolbar */}
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:"var(--bg-secondary)",borderBottom:"1px solid var(--border-dim)",flexWrap:"wrap"}}>
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+        <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>HLC + Volume</span>
+
+        {/* EMA toggles */}
+        {[{k:"e20",l:"EMA 20",c:"#00bbff"},{k:"e50",l:"EMA 50",c:"#ffaa00"},{k:"e200",l:"EMA 200",c:"#ff6644"}].map(em => (
+          <button key={em.k} onClick={() => setShowEMA(p => ({...p,[em.k]:!p[em.k]}))}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",
+              border:`1px solid ${showEMA[em.k]?em.c+"55":"var(--border-dim)"}`,
+              background:showEMA[em.k]?em.c+"15":"transparent",color:showEMA[em.k]?em.c:"var(--text-muted)"}}>
+            {em.l}
+          </button>
+        ))}
+
+        {/* External links */}
+        <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+          <button onClick={() => window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${symbol}&interval=D`, 'tradedge_tv')}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(0,200,255,0.2)",background:"transparent",color:"#00c8ff"}}>
+            ⭐ TV Pro
+          </button>
+          <button onClick={() => window.open(`https://zone.definedge.com/chart/NSE/${symbol}/pf`, '_blank')}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.2)",background:"transparent",color:"#8844ff"}}>
+            🔷 P&F
+          </button>
+          <button onClick={() => window.open(`https://zone.definedge.com/chart/NSE/${symbol}/renko`, '_blank')}
+            style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.2)",background:"transparent",color:"#8844ff"}}>
+            🔷 Renko
+          </button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div style={{cursor:isDrag?"grabbing":"crosshair"}}>
+        <canvas ref={canvasRef}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => { setCrosshair(null); setHoverBar(null); setIsDrag(false); }}
+          onMouseDown={(e) => { setIsDrag(true); setDragX(e.clientX); }}
+          onMouseUp={() => { setIsDrag(false); setDragX(null); }}
+          onWheel={handleWheel}
+          style={{display:"block",width:"100%"}}/>
+      </div>
+
+      {/* Bottom bar */}
+      <div style={{display:"flex",justifyContent:"space-between",padding:"3px 12px",background:"var(--bg-secondary)",
+        borderTop:"1px solid var(--border-dim)",fontSize:8,fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>
+        <span>Bars: {viewCount} | Visible: {visible.length} | Total: {priceData.length} | Scroll: Zoom | Drag: Pan</span>
+        <span style={{color:"var(--accent)"}}>◈ TradEdge — Zero External Dependencies</span>
+      </div>
+    </div>
+  );
 };
 
-// ═══════════════════════════════════════════════════════════
-// P&F ENGINE — Definedge Method
-// High/Low method: X columns use highs, O columns use lows
-// Percentage box sizes, 3-box reversal standard
-// ═══════════════════════════════════════════════════════════
-function buildPnF(ohlc, boxPct=1, reversal=3, method='hl') {
-  if (!ohlc || ohlc.length < 2) return { columns: [], boxSize: 0 };
-  // Log-scale percentage box: each box = boxPct% of price
-  // Definedge uses absolute box at reference price for simplicity
-  const refPrice = ohlc[Math.floor(ohlc.length/2)].c; // midpoint reference
-  const boxSize = refPrice * boxPct / 100;
-  if (boxSize <= 0) return { columns: [], boxSize };
 
-  const toBox = p => Math.floor(p / boxSize);
-  const columns = []; // {type:'X'|'O', low:boxNum, high:boxNum, vol:number, startDate, endDate, bars:count}
+// ═══════════════════════════════════════════════════════════
+// ORDER DIALOG
+// ═══════════════════════════════════════════════════════════
+
+const OrderDialog = ({symbol, type, onClose, lastPrice}) => {
+  const [qty, setQty] = useState(1);
+  const [price, setPrice] = useState(lastPrice || 0);
+  const [triggerPrice, setTriggerPrice] = useState(0);
+  const [orderType, setOrderType] = useState(type === "GTT" ? "LIMIT" : "MARKET");
+  const [product, setProduct] = useState("CNC");
+  const [gttTarget, setGttTarget] = useState(0);
+  const [gttSL, setGttSL] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+  const txnType = (type === "SELL" || type === "SL") ? "SELL" : "BUY";
+  const colors = {BUY:"var(--accent)",SELL:"var(--red)",SL:"var(--amber)",GTT:"var(--accent3)"};
   
-  // Start with first bar direction
-  let curType = null, curLow = 0, curHigh = 0, curVol = 0, curStart = '', curBars = 0;
-  
-  const pushCol = (end) => {
-    if (curType) columns.push({ type: curType, low: curLow, high: curHigh, vol: curVol, startDate: curStart, endDate: end, bars: curBars });
+  const submit = async () => {
+    const w = localStorage.getItem("zd_worker_url");
+    if (!w) { alert("Set zd_worker_url"); return; }
+    setSubmitting(true);
+    const h = {"Content-Type":"application/json", "Authorization": localStorage.getItem("kite_auth") || ""};
+    let res;
+    try {
+      if (type === "GTT") {
+        h["X-Kite-Action"] = "gtt-place";
+        const r = await fetch(w, {method:"POST", headers:h, body:JSON.stringify({
+          type:"two-leg", condition:{exchange:"NSE",tradingsymbol:symbol,trigger_values:[gttTarget,gttSL],last_price:lastPrice},
+          orders:[{exchange:"NSE",tradingsymbol:symbol,transaction_type:"SELL",quantity:qty,price:gttTarget,order_type:"LIMIT",product},
+                  {exchange:"NSE",tradingsymbol:symbol,transaction_type:"SELL",quantity:qty,price:gttSL,order_type:"LIMIT",product}]
+        })});
+        res = await r.json();
+      } else {
+        h["X-Kite-Action"] = "place-order";
+        const r = await fetch(w, {method:"POST", headers:h, body:JSON.stringify({
+          tradingsymbol:symbol,exchange:"NSE",transaction_type:txnType,order_type:orderType,quantity:qty,product,
+          price:orderType==="LIMIT"?price:0,trigger_price:(orderType==="SL"||orderType==="SL-M")?triggerPrice:0
+        })});
+        res = await r.json();
+      }
+    } catch(e) { res = {error: e.message}; }
+    setResult(res); setSubmitting(false);
   };
-  
-  for (let i = 0; i < ohlc.length; i++) {
-    const bar = ohlc[i];
-    const price = method === 'close' ? bar.c : (curType === 'X' ? bar.h : curType === 'O' ? bar.l : bar.c);
-    const priceAlt = method === 'close' ? bar.c : (curType === 'X' ? bar.l : curType === 'O' ? bar.h : bar.c);
-    const bMain = toBox(price), bAlt = toBox(priceAlt);
-    const bh = toBox(bar.h), bl = toBox(bar.l);
-    
-    if (!curType) {
-      // Initialize: determine first direction
-      curType = 'X'; curLow = bl; curHigh = bh; curVol = bar.v || 0; curStart = bar.date; curBars = 1;
-      continue;
-    }
-    
-    if (curType === 'X') {
-      const newHigh = method === 'close' ? toBox(bar.c) : bh;
-      const checkRev = method === 'close' ? toBox(bar.c) : bl;
-      if (newHigh > curHigh) {
-        curHigh = newHigh; curVol += (bar.v || 0); curBars++;
-      } else if (curHigh - checkRev >= reversal) {
-        // Reversal to O column
-        pushCol(ohlc[i-1]?.date || bar.date);
-        curType = 'O'; curHigh = curHigh - 1; curLow = checkRev; curVol = bar.v || 0; curStart = bar.date; curBars = 1;
-      }
-    } else { // O column
-      const newLow = method === 'close' ? toBox(bar.c) : bl;
-      const checkRev = method === 'close' ? toBox(bar.c) : bh;
-      if (newLow < curLow) {
-        curLow = newLow; curVol += (bar.v || 0); curBars++;
-      } else if (checkRev - curLow >= reversal) {
-        // Reversal to X column
-        pushCol(ohlc[i-1]?.date || bar.date);
-        curType = 'X'; curLow = curLow + 1; curHigh = checkRev; curVol = bar.v || 0; curStart = bar.date; curBars = 1;
-      }
-    }
-  }
-  // Push final column
-  pushCol(ohlc[ohlc.length - 1].date);
-  
-  return { columns, boxSize };
-}
 
-// P&F SMA — Simple Moving Average of column close prices (10-column SMA)
-function pnfSMA(columns, boxSize, period = 10) {
-  if (columns.length < period) return [];
-  const sma = [];
-  for (let i = 0; i < columns.length; i++) {
-    if (i < period - 1) { sma.push(null); continue; }
-    let sum = 0;
-    for (let j = i - period + 1; j <= i; j++) {
-      const col = columns[j];
-      // Close = high for X, low for O (Definedge convention)
-      sum += (col.type === 'X' ? col.high : col.low) * boxSize;
-    }
-    sma.push(sum / period);
-  }
-  return sma;
-}
-
-// P&F Pattern Detection — Definedge breakout signals
-function pnfSignals(columns) {
-  const signals = [];
-  for (let i = 2; i < columns.length; i++) {
-    const c = columns[i], p1 = columns[i-1], p2 = columns[i-2];
-    const p3 = columns[i-3], p4 = columns[i-4];
-    // Double Top Breakout: X column exceeds previous X column's high
-    if (c.type === 'X' && p2 && p2.type === 'X' && c.high > p2.high) {
-      signals.push({ col: i, type: 'dbl_top', dir: 'bull', price: c.high });
-    }
-    // Double Bottom Breakdown: O column goes below previous O column's low
-    if (c.type === 'O' && p2 && p2.type === 'O' && c.low < p2.low) {
-      signals.push({ col: i, type: 'dbl_bot', dir: 'bear', price: c.low });
-    }
-    // Triple Top Breakout
-    if (c.type === 'X' && p2 && p4 && p2.type === 'X' && p4.type === 'X' && c.high > p2.high && c.high > p4.high) {
-      signals.push({ col: i, type: 'triple_top', dir: 'bull', price: c.high });
-    }
-    // Triple Bottom Breakdown
-    if (c.type === 'O' && p2 && p4 && p2.type === 'O' && p4.type === 'O' && c.low < p2.low && c.low < p4.low) {
-      signals.push({ col: i, type: 'triple_bot', dir: 'bear', price: c.low });
-    }
-    // Bullish Catapult: Triple top followed by immediate continuation
-    if (i >= 5 && c.type === 'X') {
-      const prev = signals.find(s => s.col === i - 2 && s.type === 'triple_top');
-      if (prev && c.high > columns[i-2].high) {
-        signals.push({ col: i, type: 'bull_catapult', dir: 'bull', price: c.high });
-      }
-    }
-    // Bearish Catapult
-    if (i >= 5 && c.type === 'O') {
-      const prev = signals.find(s => s.col === i - 2 && s.type === 'triple_bot');
-      if (prev && c.low < columns[i-2].low) {
-        signals.push({ col: i, type: 'bear_catapult', dir: 'bear', price: c.low });
-      }
-    }
-  }
-  return signals;
-}
-
-// P&F Vertical Count — Definedge method
-// Count boxes in a column × reversal × box_size + base
-function pnfVerticalCount(columns, colIdx, boxSize, reversal = 3) {
-  if (colIdx < 0 || colIdx >= columns.length) return null;
-  const col = columns[colIdx];
-  const boxCount = col.high - col.low + 1;
-  if (col.type === 'X') {
-    return { target: (col.low * boxSize) + (boxCount * reversal * boxSize), dir: 'up', boxes: boxCount, base: col.low * boxSize };
-  } else {
-    return { target: (col.high * boxSize) - (boxCount * reversal * boxSize), dir: 'down', boxes: boxCount, base: col.high * boxSize };
-  }
-}
-
-// P&F Horizontal Count — Definedge method
-// Count columns in congestion zone × box_size × reversal + base
-function pnfHorizontalCount(columns, startCol, endCol, boxSize, reversal = 3) {
-  if (startCol < 0 || endCol >= columns.length || startCol > endCol) return null;
-  const width = endCol - startCol + 1;
-  // Find the base (lowest point in congestion for bullish, highest for bearish)
-  let minBox = Infinity, maxBox = -Infinity;
-  for (let i = startCol; i <= endCol; i++) {
-    minBox = Math.min(minBox, columns[i].low);
-    maxBox = Math.max(maxBox, columns[i].high);
-  }
-  const lastCol = columns[endCol];
-  if (lastCol.type === 'X') {
-    return { target: (minBox * boxSize) + (width * reversal * boxSize), dir: 'up', width, base: minBox * boxSize };
-  } else {
-    return { target: (maxBox * boxSize) - (width * reversal * boxSize), dir: 'down', width, base: maxBox * boxSize };
-  }
-}
-
-// P&F 45° trend lines — bullish support from low, bearish resistance from high
-function pnf45Lines(columns) {
-  const lines = [];
-  // Bullish Support: start from significant lows, go up 1 box per column
-  // Bearish Resistance: start from significant highs, go down 1 box per column
-  for (let i = 0; i < columns.length; i++) {
-    const c = columns[i];
-    // Detect reversal points as anchor for 45° lines
-    if (c.type === 'X' && i > 0 && columns[i-1].type === 'O') {
-      lines.push({ start: i-1, baseBox: columns[i-1].low, dir: 'bull', type: '45_support' });
-    }
-    if (c.type === 'O' && i > 0 && columns[i-1].type === 'X') {
-      lines.push({ start: i-1, baseBox: columns[i-1].high, dir: 'bear', type: '45_resist' });
-    }
-  }
-  // Keep only last 3 of each type
-  const bull = lines.filter(l => l.dir === 'bull').slice(-3);
-  const bear = lines.filter(l => l.dir === 'bear').slice(-3);
-  return [...bull, ...bear];
-}
-
-// ═══════════════════════════════════════════════════════════
-// RENKO ENGINE — Definedge Method
-// Close-based brick construction (Definedge standard)
-// Percentage brick sizes
-// ═══════════════════════════════════════════════════════════
-function buildRenko(ohlc, brickPct = 1) {
-  if (!ohlc || ohlc.length < 2) return { bricks: [], brickSize: 0 };
-  const refPrice = ohlc[Math.floor(ohlc.length / 2)].c;
-  const brickSize = refPrice * brickPct / 100;
-  if (brickSize <= 0) return { bricks: [], brickSize };
-
-  const toBrick = p => Math.floor(p / brickSize);
-  const bricks = []; // {type:'up'|'down', low:price, high:price, open:price, close:price, vol, date}
-  let lastBrickTop = toBrick(ohlc[0].c) * brickSize;
-  let lastBrickBot = lastBrickTop - brickSize;
-  let lastDir = null;
-
-  for (let i = 1; i < ohlc.length; i++) {
-    const close = ohlc[i].c;
-    const vol = ohlc[i].v || 0;
-    const date = ohlc[i].date;
-
-    if (close >= lastBrickTop + brickSize) {
-      // Build up bricks
-      while (close >= lastBrickTop + brickSize) {
-        const newBot = lastBrickTop;
-        const newTop = lastBrickTop + brickSize;
-        bricks.push({ type: 'up', low: newBot, high: newTop, open: newBot, close: newTop, vol, date, srcIdx: i });
-        lastBrickBot = newBot;
-        lastBrickTop = newTop;
-        lastDir = 'up';
-      }
-    } else if (close <= lastBrickBot - brickSize) {
-      // Build down bricks
-      while (close <= lastBrickBot - brickSize) {
-        const newTop = lastBrickBot;
-        const newBot = lastBrickBot - brickSize;
-        bricks.push({ type: 'down', low: newBot, high: newTop, open: newTop, close: newBot, vol, date, srcIdx: i });
-        lastBrickTop = newTop;
-        lastBrickBot = newBot;
-        lastDir = 'down';
-      }
-    }
-  }
-  return { bricks, brickSize };
-}
-
-// Renko SMA — Moving average of brick close prices
-function renkoSMA(bricks, period) {
-  if (bricks.length < period) return [];
-  const sma = [];
-  for (let i = 0; i < bricks.length; i++) {
-    if (i < period - 1) { sma.push(null); continue; }
-    let sum = 0;
-    for (let j = i - period + 1; j <= i; j++) sum += bricks[j].close;
-    sma.push(sum / period);
-  }
-  return sma;
-}
-
-// Renko Vertical Count — Definedge method
-// Count consecutive bricks in current swing direction
-// Target = base + (count × brick_size) for up, base - (count × brick_size) for down
-function renkoVerticalCount(bricks, swingStartIdx, brickSize) {
-  if (swingStartIdx < 0 || swingStartIdx >= bricks.length) return null;
-  const dir = bricks[swingStartIdx].type;
-  let count = 0;
-  for (let i = swingStartIdx; i < bricks.length; i++) {
-    if (bricks[i].type !== dir) break;
-    count++;
-  }
-  if (dir === 'up') {
-    const base = bricks[swingStartIdx].low;
-    return { target: base + count * brickSize, dir: 'up', count, base };
-  } else {
-    const base = bricks[swingStartIdx].high;
-    return { target: base - count * brickSize, dir: 'down', count, base };
-  }
-}
-
-// Renko Horizontal Count — count bricks in congestion zone
-function renkoHorizontalCount(bricks, startIdx, endIdx, brickSize) {
-  if (startIdx < 0 || endIdx >= bricks.length) return null;
-  const width = endIdx - startIdx + 1;
-  let minP = Infinity, maxP = -Infinity;
-  for (let i = startIdx; i <= endIdx; i++) {
-    minP = Math.min(minP, bricks[i].low);
-    maxP = Math.max(maxP, bricks[i].high);
-  }
-  const lastBrick = bricks[endIdx];
-  if (lastBrick.type === 'up') return { target: minP + width * brickSize, dir: 'up', width, base: minP };
-  return { target: maxP - width * brickSize, dir: 'down', width, base: maxP };
-}
-
-// Renko support/resistance from reversal points
-function renkoSRZones(bricks) {
-  const zones = [];
-  for (let i = 1; i < bricks.length; i++) {
-    if (bricks[i].type !== bricks[i-1].type) {
-      // Reversal point
-      const price = bricks[i-1].type === 'up' ? bricks[i-1].high : bricks[i-1].low;
-      zones.push({ price, type: bricks[i-1].type === 'up' ? 'resistance' : 'support', idx: i-1 });
-    }
-  }
-  return zones.slice(-10); // Last 10 S/R zones
-}
-
-// ═══ POSITION SIZER ═══
-const PosSizer=({cfg,onCfg,plan})=>{
-  const e=plan?.entry,s=plan?.sl,t=plan?.target;
-  const risk=e&&s?Math.abs(e-s):0,reward=e&&t?Math.abs(t-e):0;
-  const rr=risk>0&&reward>0?(reward/risk).toFixed(2):"—";
-  const ml=cfg.capital*cfg.riskPct/100,qty=risk>0?Math.floor(ml/risk):0;
-  const pv=qty*(e||0),cp=cfg.capital>0?((pv/cfg.capital)*100).toFixed(1):0;
-  return(
-    <div style={{background:"#080c14ee",border:"1px solid var(--border-low)",borderRadius:6,padding:"8px 10px",fontSize:9,fontFamily:"var(--font-mono)",minWidth:190,backdropFilter:"blur(8px)"}}>
-      <div style={{fontSize:9,fontWeight:800,color:"var(--accent)",marginBottom:6,letterSpacing:1}}>POSITION SIZER</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:6}}>
-        <div><label style={{color:"var(--text-muted)",fontSize:8}}>Capital ₹</label>
-          <input type="number" value={cfg.capital} onChange={ev=>onCfg({...cfg,capital:+ev.target.value||0})}
-            style={{width:"100%",background:"var(--bg-hover)",border:"1px solid var(--border-dim)",color:"#fff",borderRadius:3,padding:"3px 5px",fontSize:9,fontFamily:"var(--font-mono)"}}/></div>
-        <div><label style={{color:"var(--text-muted)",fontSize:8}}>Risk %</label>
-          <input type="number" value={cfg.riskPct} step={0.25} min={0.1} max={10} onChange={ev=>onCfg({...cfg,riskPct:+ev.target.value||1})}
-            style={{width:"100%",background:"var(--bg-hover)",border:"1px solid var(--border-dim)",color:"#fff",borderRadius:3,padding:"3px 5px",fontSize:9,fontFamily:"var(--font-mono)"}}/></div>
-      </div>
-      {e&&s?(
-        <div style={{borderTop:"1px solid var(--border-dim)",paddingTop:6}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:4}}>
-            <span style={{color:"var(--text-muted)"}}>Risk/sh: <span style={{color:"var(--amber)"}}>{risk.toFixed(2)}</span></span>
-            <span style={{color:"var(--text-muted)"}}>R:R: <span style={{color:"#00c8ff",fontWeight:800}}>{rr}</span></span>
-          </div>
-          <div style={{padding:"4px 6px",background:"rgba(0,255,136,0.04)",borderRadius:3,border:"1px solid rgba(0,255,136,0.08)"}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text-muted)"}}>Qty:</span><span style={{color:"#fff",fontWeight:800,fontSize:11}}>{qty}</span></div>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text-muted)"}}>Value:</span><span style={{color:"var(--accent2)"}}>₹{pv.toLocaleString()} ({cp}%)</span></div>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text-muted)"}}>Max Loss:</span><span style={{color:"var(--red)"}}>₹{ml.toLocaleString()}</span></div>
-          </div>
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.8)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-med)",borderRadius:10,padding:20,width:380}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}>
+          <div><span style={{fontSize:16,fontWeight:800,color:"#fff"}}>{symbol}</span>
+            <span style={{fontSize:11,color:colors[type],fontWeight:700,marginLeft:8,padding:"2px 8px",background:colors[type]+"22",borderRadius:4}}>{type}</span></div>
+          <button style={{background:"none",border:"none",color:"var(--text-muted)",fontSize:18,cursor:"pointer"}} onClick={onClose}>x</button>
         </div>
-      ):(<div style={{color:"var(--text-muted)",textAlign:"center",padding:6,fontSize:8}}>Right-click chart → Mark Entry + SL</div>)}
+        {result ? (
+          <div style={{textAlign:"center",padding:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:result.data||result.status==="success"?"var(--accent)":"var(--red)",marginBottom:8}}>{result.data||result.status==="success"?"Order Placed!":"Failed"}</div>
+            <pre style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)",background:"var(--bg-card)",padding:8,borderRadius:4,textAlign:"left",maxHeight:80,overflow:"auto"}}>{JSON.stringify(result,null,2)}</pre>
+            <button className="ob ob-i" style={{marginTop:10,padding:"5px 16px",fontSize:10}} onClick={onClose}>Close</button>
+          </div>
+        ) : (
+          <div>
+            {type !== "GTT" ? (
+              <Fragment>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <label style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Type
+                    <select value={orderType} onChange={e=>setOrderType(e.target.value)} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--border-low)",color:"#fff",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}>
+                      <option value="MARKET">MARKET</option><option value="LIMIT">LIMIT</option><option value="SL">SL</option><option value="SL-M">SL-M</option>
+                    </select></label>
+                  <label style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Product
+                    <select value={product} onChange={e=>setProduct(e.target.value)} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--border-low)",color:"#fff",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}>
+                      <option value="CNC">CNC</option><option value="MIS">MIS</option>
+                    </select></label>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <label style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Qty
+                    <input type="number" value={qty} onChange={e=>setQty(parseInt(e.target.value)||1)} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--border-low)",color:"#fff",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}/></label>
+                  {orderType!=="MARKET" && <label style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Price
+                    <input type="number" value={price} onChange={e=>setPrice(parseFloat(e.target.value)||0)} step={0.05} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--border-low)",color:"#fff",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}/></label>}
+                </div>
+                {(orderType==="SL"||orderType==="SL-M") && <label style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",display:"block",marginBottom:8}}>Trigger Price
+                  <input type="number" value={triggerPrice} onChange={e=>setTriggerPrice(parseFloat(e.target.value)||0)} step={0.05} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--border-low)",color:"#fff",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}/></label>}
+              </Fragment>
+            ) : (
+              <div style={{marginBottom:8}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  <label style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Qty<input type="number" value={qty} onChange={e=>setQty(parseInt(e.target.value)||1)} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--border-low)",color:"#fff",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}/></label>
+                  <label style={{fontSize:9,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>Target<input type="number" value={gttTarget} onChange={e=>setGttTarget(parseFloat(e.target.value)||0)} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}/></label>
+                  <label style={{fontSize:9,color:"var(--red)",fontFamily:"var(--font-mono)"}}>SL<input type="number" value={gttSL} onChange={e=>setGttSL(parseFloat(e.target.value)||0)} style={{display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--red)",color:"var(--red)",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"}}/></label>
+                </div>
+                <div style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginTop:4}}>GTT OCO: Sells at Target OR SL</div>
+              </div>
+            )}
+            <button style={{width:"100%",padding:"7px",fontSize:11,fontWeight:800,fontFamily:"var(--font-mono)",background:colors[type],color:"#000",border:"none",borderRadius:5,cursor:"pointer"}}
+              onClick={submit} disabled={submitting}>{submitting?"Placing...":type==="GTT"?"Place GTT":txnType+" "+symbol}</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
 // ═══════════════════════════════════════════════════════════
-// TECHART v4.0 — FULL TRADING COCKPIT
-// HLC / OHLC / Line / P&F / Renko with all overlays
+// WATCHLIST DASHBOARD — AESTHETIC OVERHAUL
 // ═══════════════════════════════════════════════════════════
-const TEChart=({symbol,prices,onOrder,onCollapse})=>{
-  const canvasRef=useRef(null);
-  const [viewStart,setViewStart]=useState(null);
-  const [viewCount,setViewCount]=useState(120);
-  const [crosshair,setCrosshair]=useState(null);
-  const [isDrag,setIsDrag]=useState(false);
-  const [dragX,setDragX]=useState(null);
-  const [showEMA,setShowEMA]=useState({e20:true,e50:true,e200:true});
-  const [hoverBar,setHoverBar]=useState(null);
-  const [chartType,setChartType]=useState('hlc');
-  const [boxPct,setBoxPct]=useState(1); // P&F/Renko box %
-  const [pnfMethod,setPnfMethod]=useState('close'); // Definedge default: close-based
-  const [pnfReversal,setPnfReversal]=useState(3); // 3-box or 1-box
-  const [show45,setShow45]=useState(true); // P&F 45° trend lines
-  const [showSignals,setShowSignals]=useState(true); // P&F breakout signals
-  const [showSR,setShowSR]=useState(true); // Renko S/R zones
-  const [collapsed,setCollapsed]=useState(false);
 
-  // Drawings
-  const [drawMode,setDrawMode]=useState(null);
-  const [drawings,setDrawings]=useState(()=>CS.drawings(symbol));
-  const [drawStart,setDrawStart]=useState(null);
-  const [drawPreview,setDrawPreview]=useState(null);
+const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove,chartData,chartFailed,setRefresh})=>{
+  const t=s.trade||{};
+  const risk=t.entry&&t.sl?Math.abs(t.entry-t.sl):0;
+  const reward=t.entry&&t.target?Math.abs(t.target-t.entry):0;
+  const rr=risk>0&&reward>0?(reward/risk):0;
+  const rrClass=rr>=2?'good':rr>=1?'ok':'bad';
+  const statusClass=(t.status||'watching').toLowerCase();
 
-  // Trade plan + alerts
-  const [alerts,setAlerts]=useState(()=>CS.alerts(symbol));
-  const [plan,setPlan]=useState(()=>CS.plan(symbol));
-  const [posCfg,setPosCfg]=useState(()=>CS.posConfig());
-  const [showPos,setShowPos]=useState(false);
-  const [measureResult,setMeasureResult]=useState(null);
-  const [dragLine,setDragLine]=useState(null);
-  const [ctx,setCtx]=useState(null);
-  // P&F/Renko count targets displayed
-  const [countTargets,setCountTargets]=useState([]);
+  return(<Fragment>
+    <div className={`wl-row ${isExp?'expanded':''}`} onClick={()=>onExpand(isExp?null:s.symbol)}>
+      {/* Expand toggle */}
+      <div className="wl-row-cell" style={{justifyContent:'center',color:isExp?'var(--accent)':'var(--text-muted)',fontSize:10,transition:'transform .15s',transform:isExp?'rotate(90deg)':''}}>▶</div>
 
-  // Persist
-  useEffect(()=>{CS.saveDrawings(symbol,drawings)},[drawings,symbol]);
-  useEffect(()=>{CS.saveAlerts(symbol,alerts)},[alerts,symbol]);
-  useEffect(()=>{CS.savePlan(symbol,plan)},[plan,symbol]);
-  useEffect(()=>{CS.savePosConfig(posCfg)},[posCfg]);
+      {/* Symbol + Sector + Source */}
+      <div className="wl-row-cell" style={{flexDirection:'column',alignItems:'flex-start',gap:2}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span className="wl-sym">{s.symbol}</span>
+          <span className={`wl-status ${statusClass}`}>{(t.status||'WATCHING').toUpperCase()}</span>
+          <span className="wl-source">{s.source||'manual'}</span>
+        </div>
+        <span className="wl-sector">{s.sector||'—'}</span>
+      </div>
 
-  useEffect(()=>{
-    setDrawings(CS.drawings(symbol));setAlerts(CS.alerts(symbol));setPlan(CS.plan(symbol));
-    setDrawMode(null);setDrawStart(null);setCtx(null);setMeasureResult(null);setDragLine(null);setCountTargets([]);
-  },[symbol]);
+      {/* Trade Plan (E/T/SL + R:R) */}
+      <div className="wl-row-cell" style={{justifyContent:'center'}}>
+        {t.entry||t.target||t.sl?(
+          <div className="wl-plan">
+            {t.entry&&<div className="wl-plan-item"><span className="wl-plan-label">ENTRY</span><span className="wl-plan-val entry">₹{t.entry}</span></div>}
+            {t.target&&<div className="wl-plan-item"><span className="wl-plan-label">TGT</span><span className="wl-plan-val target">₹{t.target}</span></div>}
+            {t.sl&&<div className="wl-plan-item"><span className="wl-plan-label">SL</span><span className="wl-plan-val sl">₹{t.sl}</span></div>}
+            {rr>0&&<span className={`wl-rr ${rrClass}`}>{rr.toFixed(1)}R</span>}
+            {t.qty&&<div className="wl-plan-item"><span className="wl-plan-label">QTY</span><span className="wl-plan-val" style={{color:'var(--text-secondary)'}}>{t.qty}</span></div>}
+          </div>
+        ):(
+          <span style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',opacity:0.4}}>No plan</span>
+        )}
+      </div>
 
-  const priceData=useMemo(()=>prices?.length?prices:[],[prices]);
-  const closes=useMemo(()=>priceData.map(d=>d.c),[priceData]);
-  const ema20=useMemo(()=>closes.length>=20?calcEMA(closes,20):[],[closes]);
-  const ema50=useMemo(()=>closes.length>=50?calcEMA(closes,50):[],[closes]);
-  const ema200=useMemo(()=>closes.length>=200?calcEMA(closes,200):[],[closes]);
+      {/* Edit fields (inline when editing) */}
+      <div className="wl-row-cell" style={{gap:4}} onClick={e=>e.stopPropagation()}>
+        {isEd?(
+          <div style={{display:'flex',gap:3,alignItems:'center'}}>
+            <input type="number" defaultValue={t.entry||""} id={"e"+s.symbol} placeholder="Entry" style={{width:58,fontSize:9,background:'var(--bg-hover)',border:'1px solid rgba(0,255,136,0.2)',color:'var(--accent)',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
+            <input type="number" defaultValue={t.target||""} id={"t"+s.symbol} placeholder="Tgt" style={{width:58,fontSize:9,background:'var(--bg-hover)',border:'1px solid rgba(0,200,255,0.2)',color:'var(--accent2)',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
+            <input type="number" defaultValue={t.sl||""} id={"s"+s.symbol} placeholder="SL" style={{width:58,fontSize:9,background:'var(--bg-hover)',border:'1px solid rgba(255,68,85,0.2)',color:'var(--red)',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
+            <input type="number" defaultValue={t.qty||""} id={"q"+s.symbol} placeholder="Qty" style={{width:40,fontSize:9,background:'var(--bg-hover)',border:'1px solid var(--border-low)',color:'#fff',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
+            <button className="wl-btn buy" onClick={()=>onSaveEdit(s.symbol)}>Save</button>
+          </div>
+        ):(
+          <div className="wl-orders">
+            <button className="wl-btn edit" onClick={()=>onEdit(s.symbol)}>Edit</button>
+            <button className="wl-btn buy" onClick={()=>onOrder({symbol:s.symbol,type:'BUY',price:t.entry||0})}>BUY</button>
+            <button className="wl-btn sell" onClick={()=>onOrder({symbol:s.symbol,type:'SELL',price:t.entry||0})}>SELL</button>
+            <button className="wl-btn sl" onClick={()=>onOrder({symbol:s.symbol,type:'SL',price:t.sl||0})}>SL</button>
+            <button className="wl-btn gtt" onClick={()=>onOrder({symbol:s.symbol,type:'GTT',price:t.entry||0})}>GTT</button>
+            <button className="wl-btn del" onClick={()=>onRemove(s.symbol)}>×</button>
+          </div>
+        )}
+      </div>
 
-  // P&F and Renko data
-  const pnfData=useMemo(()=>(chartType==='pnf'?buildPnF(priceData,boxPct,pnfReversal,pnfMethod):{columns:[],boxSize:0}),[priceData,boxPct,pnfReversal,pnfMethod,chartType]);
-  const pnfSma10=useMemo(()=>pnfSMA(pnfData.columns,pnfData.boxSize,10),[pnfData]);
-  const pnfSigs=useMemo(()=>pnfSignals(pnfData.columns),[pnfData]);
-  const pnf45=useMemo(()=>pnf45Lines(pnfData.columns),[pnfData]);
-  const renkoData=useMemo(()=>(chartType==='renko'?buildRenko(priceData,boxPct):{bricks:[],brickSize:0}),[priceData,boxPct,chartType]);
-  const renkoSma20=useMemo(()=>renkoSMA(renkoData.bricks,20),[renkoData]);
-  const renkoSma40=useMemo(()=>renkoSMA(renkoData.bricks,40),[renkoData]);
-  const renkoSR=useMemo(()=>renkoSRZones(renkoData.bricks),[renkoData]);
+      {/* Spacer for grid alignment */}
+      <div/>
+    </div>
 
-  const isPnfRenko=chartType==='pnf'||chartType==='renko';
-  const si=viewStart??Math.max(0,(isPnfRenko?(chartType==='pnf'?pnfData.columns.length:renkoData.bricks.length):priceData.length)-viewCount);
-  const vis=isPnfRenko?[]/*unused for pnf/renko*/:priceData.slice(si,si+viewCount);
+    {/* Expanded chart */}
+    {isExp&&<div className="wl-chart-wrap">
+      {chartData[s.symbol]?(<ChartErrorBoundary symbol={s.symbol}><TEChart symbol={s.symbol} prices={chartData[s.symbol]} onOrder={onOrder} onCollapse={()=>onExpand(null)}/></ChartErrorBoundary>
+      ):(<div style={{padding:24,textAlign:'center'}}>
+        {!chartFailed[s.symbol]&&<div><div style={{width:20,height:20,border:'2px solid var(--border-low)',borderTop:'2px solid var(--accent)',borderRadius:'50%',animation:'spin .8s linear infinite',margin:'0 auto 8px'}}/><div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>Loading {s.symbol}...</div></div>}
+        {chartFailed[s.symbol]&&<div style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:8}}>No data for <b style={{color:'#fff'}}>{s.symbol}</b></div>}
+        <div style={{display:'flex',gap:5,justifyContent:'center',marginTop:8}}>
+          <button onClick={()=>window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${s.symbol}&interval=D`,'tradedge_tv')} className="ob ob-i" style={{padding:'4px 10px',fontSize:9}}>TV Pro</button>
+          <button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${s.symbol}/pf`,'_blank')} className="ob ob-g" style={{padding:'4px 10px',fontSize:9}}>P&F</button>
+          <button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${s.symbol}/renko`,'_blank')} className="ob ob-g" style={{padding:'4px 10px',fontSize:9}}>Renko</button>
+        </div>
+      </div>)}
+    </div>}
+  </Fragment>);
+};
 
-  const PAD={L:62,R:10,T:10,B:22};const VH=isPnfRenko?0:72;const CH_BASE=480;
+const WatchlistDashboard=()=>{
+  const[lists,setLists]=useState([]);const[activeList,setActiveList]=useState(null);const[refresh,setRefresh]=useState(0);
+  const[editingTrade,setEditingTrade]=useState(null);const[expandedStock,setExpandedStock]=useState(null);
+  const[chartData,setChartData]=useState({});const[chartFailed,setChartFailed]=useState({});const[orderDialog,setOrderDialog]=useState(null);
 
-  // ═══ LAYOUT CALCULATOR ═══
-  const getL=useCallback(()=>{
-    if(!canvasRef.current)return null;
-    const r=canvasRef.current.parentElement?.getBoundingClientRect();
-    const W=r?r.width:800;
-    const CH=CH_BASE;const cH=CH-PAD.T-PAD.B-VH-(isPnfRenko?0:8);
+  useEffect(()=>{if(window.teWatchlist)setLists(window.teWatchlist.getLists())},[refresh]);
+  useEffect(()=>{if(!expandedStock||chartData[expandedStock]||chartFailed[expandedStock])return;
+    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),5000);
+    fetch("./data/stock_details/"+expandedStock+".json?t="+Date.now(),{signal:ac.signal})
+      .then(r=>r.ok?r.json():null).then(d=>{clearTimeout(to);if(d?.price_history?.length)setChartData(p=>({...p,[expandedStock]:d.price_history}));else setChartFailed(p=>({...p,[expandedStock]:true}))})
+      .catch(()=>{clearTimeout(to);setChartFailed(p=>({...p,[expandedStock]:true}))});
+    return()=>{clearTimeout(to);ac.abort()}},[expandedStock]);
 
-    let pM,pm;
-    if(chartType==='pnf'){
-      const cols=pnfData.columns;if(!cols.length)return null;
-      const vs=Math.min(viewCount,cols.length);const startI=Math.max(0,cols.length-vs);
-      const visCols=cols.slice(startI,startI+vs);
-      pm=Math.min(...visCols.map(c=>c.low))*pnfData.boxSize*0.99;
-      pM=Math.max(...visCols.map(c=>c.high))*pnfData.boxSize*1.01;
-    }else if(chartType==='renko'){
-      const br=renkoData.bricks;if(!br.length)return null;
-      const vs=Math.min(viewCount,br.length);const startI=Math.max(0,br.length-vs);
-      const visBr=br.slice(startI,startI+vs);
-      pm=Math.min(...visBr.map(b=>b.low))*0.99;pM=Math.max(...visBr.map(b=>b.high))*1.01;
-    }else{
-      if(!vis.length)return null;
-      let aH=vis.map(d=>d.h),aL=vis.map(d=>d.l);
-      for(let i=0;i<vis.length;i++){const g=si+i;
-        if(showEMA.e20&&g<ema20.length){aH.push(ema20[g]);aL.push(ema20[g])}
-        if(showEMA.e50&&g<ema50.length){aH.push(ema50[g]);aL.push(ema50[g])}
-        if(showEMA.e200&&g<ema200.length){aH.push(ema200[g]);aL.push(ema200[g])}}
-      pM=Math.max(...aH)*1.005;pm=Math.min(...aL)*0.995;
-    }
-    // Include overlays in range
-    alerts.forEach(a=>{if(a.price>pm&&a.price<pM*2){pM=Math.max(pM,a.price*1.005);pm=Math.min(pm,a.price*0.995)}});
-    if(plan){[plan.entry,plan.target,plan.sl].filter(Boolean).forEach(p=>{pM=Math.max(pM,p*1.005);pm=Math.min(pm,p*0.995)})}
-    drawings.filter(d=>d.type==='hline').forEach(d=>{pM=Math.max(pM,d.price*1.005);pm=Math.min(pm,d.price*0.995)});
-    countTargets.forEach(ct=>{pM=Math.max(pM,ct.target*1.01);pm=Math.min(pm,ct.target*0.99)});
+  const active=activeList?lists.find(l=>l.id===activeList):lists[0];
 
-    const pR=pM-pm||1;const bW=(W-PAD.L-PAD.R)/viewCount;
-    return{W,CH,cH,bW,pM,pm,pR,
-      toY:p=>PAD.T+(1-(p-pm)/pR)*cH,toP:y=>pM-((y-PAD.T)/cH)*pR,
-      toX:i=>PAD.L+i*bW+bW/2,toBi:x=>Math.round((x-PAD.L)/bW-0.5)};
-  },[vis,viewCount,si,showEMA,ema20,ema50,ema200,alerts,plan,drawings,chartType,pnfData,renkoData,isPnfRenko,countTargets]);
-
-  const hitTest=useCallback((my,L)=>{
-    if(!L)return null;const t=5;
-    if(plan?.entry&&Math.abs(my-L.toY(plan.entry))<t)return{type:'entry',price:plan.entry};
-    if(plan?.target&&Math.abs(my-L.toY(plan.target))<t)return{type:'target',price:plan.target};
-    if(plan?.sl&&Math.abs(my-L.toY(plan.sl))<t)return{type:'sl',price:plan.sl};
-    for(let i=0;i<alerts.length;i++){if(Math.abs(my-L.toY(alerts[i].price))<t)return{type:'alert',idx:i,price:alerts[i].price}}
-    for(let i=0;i<drawings.length;i++){if(drawings[i].type==='hline'&&Math.abs(my-L.toY(drawings[i].price))<t)return{type:'drawing',idx:i,price:drawings[i].price}}
-    for(let i=0;i<countTargets.length;i++){if(Math.abs(my-L.toY(countTargets[i].target))<t)return{type:'count',idx:i,price:countTargets[i].target}}
-    return null;
-  },[plan,alerts,drawings,countTargets]);
-
-  // ═══ DRAW ═══
-  const draw=useCallback(()=>{
-    const cv=canvasRef.current;const L=getL();if(!cv||!L)return;
-    const c=cv.getContext("2d"),dp=devicePixelRatio||1;
-    const{W,CH,cH,bW,pM,pm,pR,toY,toP,toX}=L;
-    cv.width=W*dp;cv.height=CH*dp;cv.style.width=W+"px";cv.style.height=CH+"px";c.scale(dp,dp);
-    c.fillStyle="#06080c";c.fillRect(0,0,W,CH);
-
-    // Grid
-    c.strokeStyle="rgba(0,255,136,0.04)";c.lineWidth=0.5;
-    const gridSteps=isPnfRenko?10:6;
-    for(let i=0;i<=gridSteps;i++){const p=pm+pR*i/gridSteps,y=toY(p);
-      c.beginPath();c.moveTo(PAD.L,y);c.lineTo(W-PAD.R,y);c.stroke();
-      c.fillStyle="#334";c.font="10px 'JetBrains Mono',monospace";c.textAlign="right";c.fillText(p.toFixed(1),PAD.L-6,y+3)}
-
-    // ══ CHART-SPECIFIC RENDERING ══
-    if(chartType==='pnf'){
-      // P&F Chart
-      const cols=pnfData.columns;const bs=pnfData.boxSize;if(!cols.length||!bs){c.restore?.();return}
-      const vc=Math.min(viewCount,cols.length);const startI=Math.max(0,cols.length-vc);
-      const visCols=cols.slice(startI,startI+vc);
-
-      // Draw X/O columns
-      for(let ci=0;ci<visCols.length;ci++){
-        const col=visCols[ci];const x=toX(ci);
-        const isX=col.type==='X';
-        // Volume-based opacity
-        const maxV=Math.max(...visCols.map(c=>c.vol||1));const volAlpha=Math.max(0.4,Math.min(1,(col.vol||0)/maxV));
-        
-        for(let b=col.low;b<=col.high;b++){
-          const py=toY((b+1)*bs);const pyBot=toY(b*bs);const bh=pyBot-py;const bww=bW*0.7;
-          if(isX){
-            c.strokeStyle=`rgba(0,204,102,${volAlpha})`;c.lineWidth=1.5;
-            c.beginPath();c.moveTo(x-bww/2,py);c.lineTo(x+bww/2,pyBot);c.stroke();
-            c.beginPath();c.moveTo(x+bww/2,py);c.lineTo(x-bww/2,pyBot);c.stroke();
-          }else{
-            c.strokeStyle=`rgba(238,51,68,${volAlpha})`;c.lineWidth=1.5;
-            const cx=x,cy=(py+pyBot)/2,rx=bww/2,ry=bh/2;
-            c.beginPath();c.ellipse(cx,cy,rx,Math.max(ry,1),0,0,Math.PI*2);c.stroke();
-          }
-        }
-      }
-
-      // 10-col SMA
-      const sma=pnfSma10;c.strokeStyle="#ff00ff88";c.lineWidth=1.5;c.beginPath();let started=false;
-      for(let ci=0;ci<visCols.length;ci++){
-        const gi=startI+ci;if(gi>=sma.length||sma[gi]==null)continue;
-        const x=toX(ci),y=toY(sma[gi]);
-        if(!started){c.moveTo(x,y);started=true}else c.lineTo(x,y);}
-      c.stroke();
-
-      // 45° trend lines
-      if(show45){pnf45.forEach(line=>{
-        const colStart=line.start-startI;if(colStart<0)return;
-        c.strokeStyle=line.dir==='bull'?"rgba(0,255,136,0.25)":"rgba(255,68,85,0.25)";c.lineWidth=1;c.setLineDash([4,3]);c.beginPath();
-        for(let ci=colStart;ci<visCols.length;ci++){
-          const boxOffset=ci-colStart;const bx=line.dir==='bull'?line.baseBox+boxOffset:line.baseBox-boxOffset;
-          const x=toX(ci),y=toY(bx*bs);
-          if(ci===colStart)c.moveTo(x,y);else c.lineTo(x,y);}
-        c.stroke();c.setLineDash([]);})}
-
-      // Breakout signals
-      if(showSignals){pnfSigs.forEach(sig=>{
-        const ci=sig.col-startI;if(ci<0||ci>=visCols.length)return;
-        const x=toX(ci),y=toY(sig.price*bs);
-        const isBull=sig.dir==='bull';
-        c.fillStyle=isBull?"rgba(0,255,136,0.15)":"rgba(255,68,85,0.15)";
-        c.beginPath();if(isBull){c.moveTo(x,y-12);c.lineTo(x-6,y-4);c.lineTo(x+6,y-4)}
-        else{c.moveTo(x,y+12);c.lineTo(x-6,y+4);c.lineTo(x+6,y+4)}c.fill();
-        c.fillStyle=isBull?"#00ff8888":"#ff445588";c.font="bold 7px 'JetBrains Mono',monospace";c.textAlign="center";
-        const labels={dbl_top:"DBL⬆",dbl_bot:"DBL⬇",triple_top:"TRP⬆",triple_bot:"TRP⬇",bull_catapult:"CAT⬆",bear_catapult:"CAT⬇"};
-        c.fillText(labels[sig.type]||sig.type,x,isBull?y-14:y+18);})}
-
-      // Date labels for P&F
-      c.fillStyle="#334";c.font="8px 'JetBrains Mono',monospace";c.textAlign="center";
-      const dstep=Math.max(1,Math.floor(visCols.length/8));
-      for(let ci=0;ci<visCols.length;ci+=dstep){
-        const dt=visCols[ci].startDate;if(!dt)continue;
-        const p=dt.split("-");c.fillText(p[1]+"/"+p[0]?.slice(2),toX(ci),CH-4)}
-
-      // Legend
-      c.fillStyle="#ddd";c.font="bold 12px 'Outfit',sans-serif";c.textAlign="left";
-      c.fillText(`P&F ${symbol} | ${boxPct}% box | ${pnfReversal}-box rev | ${pnfMethod.toUpperCase()} | ${cols.length} cols`,PAD.L+4,PAD.T+14);
-      c.fillStyle="#ff00ff88";c.font="10px 'JetBrains Mono',monospace";c.fillText("SMA(10): "+(sma[sma.length-1]?.toFixed(1)||"—"),PAD.L+4,PAD.T+28);
-
-    }else if(chartType==='renko'){
-      // Renko Chart
-      const br=renkoData.bricks;const bs=renkoData.brickSize;if(!br.length||!bs)return;
-      const vc=Math.min(viewCount,br.length);const startI=Math.max(0,br.length-vc);
-      const visBr=br.slice(startI,startI+vc);
-
-      // Draw bricks
-      for(let bi=0;bi<visBr.length;bi++){
-        const b=visBr[bi];const x=toX(bi);const isUp=b.type==='up';
-        const yt=toY(b.high),yb=toY(b.low),bh=yb-yt;const bww=bW*0.8;
-        c.fillStyle=isUp?"rgba(0,204,102,0.8)":"rgba(238,51,68,0.8)";
-        c.fillRect(x-bww/2,yt,bww,Math.max(bh,1));
-        c.strokeStyle=isUp?"#00cc66":"#ee3344";c.lineWidth=0.5;
-        c.strokeRect(x-bww/2,yt,bww,Math.max(bh,1));
-      }
-
-      // 20-brick SMA
-      c.strokeStyle="#00bbff88";c.lineWidth=1.5;c.beginPath();let s20=false;
-      for(let bi=0;bi<visBr.length;bi++){const gi=startI+bi;if(gi>=renkoSma20.length||renkoSma20[gi]==null)continue;
-        const x=toX(bi),y=toY(renkoSma20[gi]);if(!s20){c.moveTo(x,y);s20=true}else c.lineTo(x,y)}c.stroke();
-
-      // 40-brick SMA
-      c.strokeStyle="#ffaa0088";c.lineWidth=1.5;c.beginPath();let s40=false;
-      for(let bi=0;bi<visBr.length;bi++){const gi=startI+bi;if(gi>=renkoSma40.length||renkoSma40[gi]==null)continue;
-        const x=toX(bi),y=toY(renkoSma40[gi]);if(!s40){c.moveTo(x,y);s40=true}else c.lineTo(x,y)}c.stroke();
-
-      // S/R zones
-      if(showSR){renkoSR.forEach(z=>{const y=toY(z.price);
-        c.strokeStyle=z.type==='support'?"rgba(0,255,136,0.15)":"rgba(255,68,85,0.15)";c.lineWidth=1;c.setLineDash([4,6]);
-        c.beginPath();c.moveTo(PAD.L,y);c.lineTo(W-PAD.R,y);c.stroke();c.setLineDash([]);
-        c.fillStyle=z.type==='support'?"#00ff8833":"#ff445533";c.font="7px 'JetBrains Mono',monospace";c.textAlign="right";
-        c.fillText((z.type==='support'?"S":"R")+" "+z.price.toFixed(1),W-PAD.R-2,y-2)})}
-
-      // Date labels
-      c.fillStyle="#334";c.font="8px 'JetBrains Mono',monospace";c.textAlign="center";
-      const dstep=Math.max(1,Math.floor(visBr.length/8));
-      for(let bi=0;bi<visBr.length;bi+=dstep){const dt=visBr[bi].date;if(!dt)continue;
-        const p=dt.split("-");c.fillText(p[2]+"/"+p[1],toX(bi),CH-4)}
-
-      // Legend
-      c.fillStyle="#ddd";c.font="bold 12px 'Outfit',sans-serif";c.textAlign="left";
-      c.fillText(`Renko ${symbol} | ${boxPct}% brick | ${br.length} bricks`,PAD.L+4,PAD.T+14);
-      c.fillStyle="#00bbff88";c.font="10px 'JetBrains Mono',monospace";
-      c.fillText("SMA(20): "+(renkoSma20[renkoSma20.length-1]?.toFixed(1)||"—"),PAD.L+4,PAD.T+28);
-      c.fillStyle="#ffaa0088";c.fillText("SMA(40): "+(renkoSma40[renkoSma40.length-1]?.toFixed(1)||"—"),PAD.L+150,PAD.T+28);
-
-    }else{
-      // HLC / Candle / Line chart (existing)
-      if(!vis.length)return;
-      const toVY=v=>PAD.T+cH+8+VH-(v/(Math.max(...vis.map(d=>d.v))||1))*VH;
-      // Dates
-      c.fillStyle="#334";c.font="9px 'JetBrains Mono',monospace";c.textAlign="center";
-      const ds=Math.max(1,Math.floor(viewCount/8));
-      for(let i=0;i<vis.length;i+=ds){const x=toX(i),dt=vis[i].date||"";if(dt){const p=dt.split("-");c.fillText(p[2]+"/"+p[1],x,CH-4)}}
-      // Volume
-      for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i);c.fillStyle=b.c>=b.o?"rgba(0,204,102,0.25)":"rgba(238,51,68,0.25)";
-        c.fillRect(x-bW*0.35,toVY(b.v),bW*0.7,PAD.T+cH+8+VH-toVY(b.v))}
-      // EMAs
-      const dE=(ed,col)=>{c.strokeStyle=col;c.lineWidth=1.2;c.beginPath();let s=false;for(let i=0;i<vis.length;i++){const g=si+i;if(g>=ed.length)break;const x=toX(i),y=toY(ed[g]);if(!s){c.moveTo(x,y);s=true}else c.lineTo(x,y)}c.stroke()};
-      if(showEMA.e200&&ema200.length)dE(ema200,"#ff6644");if(showEMA.e50&&ema50.length)dE(ema50,"#ffaa00");if(showEMA.e20&&ema20.length)dE(ema20,"#00bbff");
-      // Bars
-      for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i),bu=b.c>=b.o,col=bu?"#00cc66":"#ee3344";
-        if(chartType==='candle'){c.strokeStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x,toY(b.h));c.lineTo(x,toY(b.l));c.stroke();
-          const bT=toY(Math.max(b.o,b.c)),bB=toY(Math.min(b.o,b.c)),bw=Math.max(bW*0.6,2);c.fillStyle=bu?col+"55":col;c.fillRect(x-bw/2,bT,bw,Math.max(bB-bT,1));c.strokeRect(x-bw/2,bT,bw,Math.max(bB-bT,1))}
-        else if(chartType==='line'){if(i===0){c.beginPath();c.moveTo(x,toY(b.c))}else c.lineTo(x,toY(b.c));if(i===vis.length-1){c.strokeStyle="#00bbff";c.lineWidth=1.5;c.stroke()}}
-        else{c.strokeStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x,toY(b.h));c.lineTo(x,toY(b.l));c.stroke();c.lineWidth=1.5;c.beginPath();c.moveTo(x,toY(b.c));c.lineTo(x+bW*0.35,toY(b.c));c.stroke()}}
-      // Legend
-      c.fillStyle="#ddd";c.font="bold 13px 'Outfit',sans-serif";c.textAlign="left";c.fillText("NSE:"+symbol,PAD.L+4,PAD.T+16);
-      const hb=hoverBar||vis[vis.length-1];
-      if(hb){const iy=PAD.T+32,bc=hb.c>=hb.o?"#00cc66":"#ee3344";c.font="11px 'JetBrains Mono',monospace";
-        c.fillStyle="#667";c.fillText("O",PAD.L+4,iy);c.fillStyle=bc;c.fillText(hb.o?.toFixed(2),PAD.L+18,iy);
-        c.fillStyle="#667";c.fillText("H",PAD.L+80,iy);c.fillStyle=bc;c.fillText(hb.h?.toFixed(2),PAD.L+94,iy);
-        c.fillStyle="#667";c.fillText("L",PAD.L+156,iy);c.fillStyle=bc;c.fillText(hb.l?.toFixed(2),PAD.L+168,iy);
-        c.fillStyle="#667";c.fillText("C",PAD.L+230,iy);c.fillStyle=bc;c.fillText(hb.c?.toFixed(2),PAD.L+244,iy);
-        c.fillStyle="#667";c.fillText("V",PAD.L+316,iy);c.fillStyle="#aaa";c.fillText(fmtVol(hb.v||0),PAD.L+330,iy)}
-      if(showEMA.e20&&ema20.length){c.fillStyle="#00bbff";c.font="10px 'JetBrains Mono',monospace";c.fillText("E20:"+ema20[si+vis.length-1]?.toFixed(1),PAD.L+4,PAD.T+48)}
-      if(showEMA.e50&&ema50.length){c.fillStyle="#ffaa00";c.fillText("E50:"+ema50[si+vis.length-1]?.toFixed(1),PAD.L+120,PAD.T+48)}
-      if(showEMA.e200&&ema200.length){c.fillStyle="#ff6644";c.fillText("E200:"+ema200[si+vis.length-1]?.toFixed(1),PAD.L+240,PAD.T+48)}
-      // Volume separator
-      c.strokeStyle="rgba(0,255,136,0.05)";c.lineWidth=0.5;c.beginPath();c.moveTo(PAD.L,PAD.T+cH+4);c.lineTo(W-PAD.R,PAD.T+cH+4);c.stroke();
-    }
-
-    // ══ SHARED OVERLAYS (all chart types) ══
-    // Drawings (h-lines work on all)
-    drawings.forEach(d=>{if(d.type==='hline'){const y=toY(d.price);if(y<PAD.T-20||y>PAD.T+cH+20)return;
-      c.strokeStyle=(d.color||"#ffaa00")+"88";c.lineWidth=1;c.setLineDash(d.dash||[6,4]);
-      c.beginPath();c.moveTo(PAD.L,y);c.lineTo(W-PAD.R,y);c.stroke();c.setLineDash([]);
-      c.fillStyle=(d.color||"#ffaa00")+"88";c.font="bold 8px 'JetBrains Mono',monospace";c.textAlign="left";
-      c.fillText((d.label||"LINE")+" ₹"+d.price.toFixed(1),PAD.L+4,y-3)}
-    if(!isPnfRenko){// Trendline/fib/rect only on OHLC
-      if(d.type==='trendline'){const x1=toX(d.bi1-si),y1=toY(d.p1),x2=toX(d.bi2-si),y2=toY(d.p2);c.strokeStyle=(d.color||"#00c8ff")+"bb";c.lineWidth=1.5;c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.stroke()}
-      else if(d.type==='fib'){const lvs=[0,0.236,0.382,0.5,0.618,0.786,1],rng=d.p1-d.p2;const cols=["#44455566","#ffaa0066","#00c8ff66","#00ff8866","#00c8ff66","#ffaa0066","#44455566"];
-        lvs.forEach((lv,li)=>{const p=d.p2+rng*lv,y=toY(p);c.strokeStyle=cols[li];c.lineWidth=0.7;c.setLineDash([4,3]);c.beginPath();c.moveTo(PAD.L,y);c.lineTo(W-PAD.R,y);c.stroke();c.setLineDash([]);c.fillStyle=cols[li].replace("66","aa");c.font="8px 'JetBrains Mono',monospace";c.textAlign="left";c.fillText(`${(lv*100).toFixed(1)}% ₹${p.toFixed(1)}`,PAD.L+4,y-2)})}
-      else if(d.type==='rect'){const x1=toX(d.bi1-si),y1=toY(d.p1),x2=toX(d.bi2-si),y2=toY(d.p2);c.strokeStyle=(d.color||"#8844ff")+"88";c.lineWidth=1;c.strokeRect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1))}}});
-
-    // Alerts
-    alerts.forEach(a=>{const y=toY(a.price);if(y<PAD.T-10||y>PAD.T+cH+10)return;c.strokeStyle="#ff00ff55";c.lineWidth=1;c.setLineDash([8,4,2,4]);c.beginPath();c.moveTo(PAD.L,y);c.lineTo(W-PAD.R,y);c.stroke();c.setLineDash([]);c.fillStyle="#ff00ff88";c.font="bold 8px 'JetBrains Mono',monospace";c.textAlign="right";c.fillText("🔔 "+a.price.toFixed(1),W-PAD.R-4,y-3)});
-
-    // Count targets
-    countTargets.forEach(ct=>{const y=toY(ct.target);c.strokeStyle=ct.dir==='up'?"#00ff8844":"#ff445544";c.lineWidth=1;c.setLineDash([10,4]);
-      c.beginPath();c.moveTo(PAD.L,y);c.lineTo(W-PAD.R,y);c.stroke();c.setLineDash([]);
-      c.fillStyle=ct.dir==='up'?"#00ff8866":"#ff445566";c.font="bold 8px 'JetBrains Mono',monospace";c.textAlign="right";
-      c.fillText("🎯 "+ct.label+" ₹"+ct.target.toFixed(1),W-PAD.R-4,y-3)});
-
-    // Trade Plan
-    if(plan){const drawPL=(price,tag,color)=>{if(!price)return;const y=toY(price);c.save();c.strokeStyle=color+"44";c.lineWidth=1;c.setLineDash([6,5]);c.beginPath();c.moveTo(PAD.L,y);c.lineTo(W-PAD.R,y);c.stroke();c.setLineDash([]);
-      c.fillStyle=color+"18";const tw=c.measureText(tag+" "+price.toFixed(1)).width+10;c.fillRect(W-PAD.R-tw-2,y-8,tw,16);c.fillStyle=color+"99";c.font="bold 8px 'JetBrains Mono',monospace";c.textAlign="right";c.fillText(tag+" ₹"+price.toFixed(1),W-PAD.R-4,y+3);
-      c.fillStyle=color+"22";c.fillRect(PAD.L,y-7,18,14);c.fillStyle=color+"88";c.textAlign="center";c.fillText(tag,PAD.L+9,y+3);c.restore()};
-      drawPL(plan.entry,"E","#00ff88");drawPL(plan.target,"T","#00aaff");drawPL(plan.sl,"SL","#ff4455");
-      if(plan.entry&&plan.sl){const risk=Math.abs(plan.entry-plan.sl),reward=plan.target?Math.abs(plan.target-plan.entry):0;
-        const rr=risk>0&&reward>0?(reward/risk).toFixed(1):"—";const yE=toY(plan.entry),yS=toY(plan.sl);
-        c.fillStyle="rgba(255,68,85,0.02)";c.fillRect(PAD.L,Math.min(yE,yS),W-PAD.L-PAD.R,Math.abs(yS-yE));
-        if(plan.target){const yT=toY(plan.target);c.fillStyle="rgba(0,255,136,0.02)";c.fillRect(PAD.L,Math.min(yE,yT),W-PAD.L-PAD.R,Math.abs(yT-yE))}
-        c.fillStyle="rgba(255,255,255,0.07)";c.font="bold 20px 'Outfit',sans-serif";c.textAlign="center";c.fillText("R:R "+rr,(yE+yS)/2<CH/2?W/2:W/2,(yE+yS)/2+7);
-        const qty=risk>0?Math.floor((posCfg.capital*posCfg.riskPct/100)/risk):0;
-        c.fillStyle="rgba(255,255,255,0.05)";c.font="11px 'JetBrains Mono',monospace";c.fillText("QTY "+qty+" | "+posCfg.riskPct+"% R",W/2,(yE+yS)/2+22)}}
-
-    // Crosshair
-    if(crosshair&&!ctx){const{x:mx,y:my}=crosshair;if(mx>=PAD.L&&mx<=W-PAD.R){
-      c.strokeStyle=drawMode?"rgba(255,255,255,.1)":"rgba(0,255,136,.12)";c.lineWidth=0.5;c.setLineDash([3,3]);
-      c.beginPath();c.moveTo(mx,PAD.T);c.lineTo(mx,CH-PAD.B);c.stroke();c.beginPath();c.moveTo(PAD.L,my);c.lineTo(W-PAD.R,my);c.stroke();c.setLineDash([]);
-      if(my>=PAD.T&&my<=PAD.T+cH){const pr=toP(my);c.fillStyle="#0a1520";c.fillRect(0,my-9,PAD.L-2,18);c.strokeStyle="#00ff88";c.lineWidth=0.5;c.strokeRect(0,my-9,PAD.L-2,18);
-        c.fillStyle="#00ff88";c.font="bold 9px 'JetBrains Mono',monospace";c.textAlign="right";c.fillText(pr.toFixed(2),PAD.L-6,my+3)}}}
-
-    if(drawMode){c.fillStyle="#0c1220bb";c.fillRect(W/2-55,PAD.T+2,110,16);c.fillStyle="#00ff88";c.font="bold 8px 'JetBrains Mono',monospace";c.textAlign="center";c.fillText("✏ "+drawMode.toUpperCase(),W/2,PAD.T+12)}
-  },[vis,viewCount,si,crosshair,showEMA,hoverBar,symbol,ema20,ema50,ema200,priceData,drawings,drawMode,drawStart,drawPreview,alerts,plan,posCfg,ctx,chartType,getL,pnfData,renkoData,pnfSma10,renkoSma20,renkoSma40,pnfSigs,pnf45,renkoSR,show45,showSignals,showSR,countTargets,isPnfRenko,boxPct,pnfReversal,pnfMethod]);
-
-  useEffect(()=>{draw()},[draw]);
-  useEffect(()=>{const h=()=>draw();window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h)},[draw]);
-
-  // ══ MOUSE ══
-  const onMM=e=>{if(ctx)return;const r=canvasRef.current?.getBoundingClientRect();if(!r)return;const mx=e.clientX-r.left,my=e.clientY-r.top;setCrosshair({x:mx,y:my});const L=getL();if(!L)return;
-    if(!isPnfRenko){const idx=L.toBi(mx);setHoverBar(idx>=0&&idx<vis.length?vis[idx]:null)}
-    if(dragLine){const np=L.toP(my);if(dragLine.type==='entry')setPlan(p=>({...p,entry:np}));else if(dragLine.type==='target')setPlan(p=>({...p,target:np}));else if(dragLine.type==='sl')setPlan(p=>({...p,sl:np}));else if(dragLine.type==='alert')setAlerts(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],price:np};return n});else if(dragLine.type==='drawing')setDrawings(p=>{const n=[...p];if(n[dragLine.idx]?.type==='hline')n[dragLine.idx]={...n[dragLine.idx],price:np};return n});return}
-    if(drawMode&&drawStart){setDrawPreview({x:mx,y:my,price:L.toP(my),bi:(L.toBi(mx)||0)+si})}
-    if(!drawMode&&isDrag&&dragX!=null){const bd=Math.round((e.clientX-dragX)/L.bW);if(Math.abs(bd)>=1){setViewStart(pv=>{const len=isPnfRenko?(chartType==='pnf'?pnfData.columns.length:renkoData.bricks.length):priceData.length;const s=(pv??Math.max(0,len-viewCount))-bd;return Math.max(0,Math.min(len-viewCount,s))});setDragX(e.clientX)}}
-    const hit=hitTest(my,L);if(canvasRef.current)canvasRef.current.style.cursor=dragLine?'ns-resize':hit?'ns-resize':drawMode?'crosshair':isDrag?'grabbing':'crosshair'};
-  const onMD=e=>{if(e.button===2||ctx)return;const L=getL();if(!L)return;const r=canvasRef.current.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,price=L.toP(my),bi=(L.toBi(mx)||0)+si;
-    const hit=hitTest(my,L);if(hit&&!drawMode){setDragLine(hit);return}
-    if(drawMode==='hline'){setDrawings(p=>[...p,{type:'hline',price,color:"#ffaa00",dash:[6,4],label:"LINE",ts:Date.now()}]);setDrawMode(null)}
-    else if((drawMode==='trendline'||drawMode==='fib'||drawMode==='rect'||drawMode==='measure')&&!drawStart){setDrawStart({sx:mx,sy:my,price,bi})}
-    else if(drawStart&&drawMode!=='measure'){
-      if(drawMode==='trendline')setDrawings(p=>[...p,{type:'trendline',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,color:"#00c8ff",ts:Date.now()}]);
-      else if(drawMode==='fib')setDrawings(p=>[...p,{type:'fib',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,ts:Date.now()}]);
-      else if(drawMode==='rect')setDrawings(p=>[...p,{type:'rect',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,color:"#8844ff",ts:Date.now()}]);
-      setDrawStart(null);setDrawPreview(null);setDrawMode(null)}
-    else if(drawMode==='measure'&&drawStart){setMeasureResult({from:drawStart.price,to:price,diff:price-drawStart.price,pct:((price-drawStart.price)/drawStart.price*100)});setDrawStart(null);setDrawPreview(null);setDrawMode(null)}
-    else if(!drawMode){setIsDrag(true);setDragX(e.clientX)}};
-  const onMU=()=>{if(dragLine){setDragLine(null);return}setIsDrag(false);setDragX(null)};
-  const onML=()=>{setCrosshair(null);setHoverBar(null);setIsDrag(false);if(!drawStart)setDrawPreview(null);if(dragLine)setDragLine(null)};
-  const onWH=e=>{e.preventDefault();setViewCount(pv=>{const n=pv+(e.deltaY>0?1:-1)*Math.max(3,Math.floor(pv*0.1));return Math.max(20,Math.min(500,n))})};
-  const onCM=e=>{e.preventDefault();const L=getL();if(!L)return;const r=canvasRef.current.getBoundingClientRect(),my=e.clientY-r.top;const price=L.toP(my);const hit=hitTest(my,L);
-    // P&F/Renko: also check for count target option
-    setCtx({x:e.clientX,y:e.clientY,price,hit,isPnf:chartType==='pnf',isRenko:chartType==='renko'})};
-
-  const ctxAction=(action)=>{const price=ctx?.price;const hit=ctx?.hit;setCtx(null);
-    if(action==='alert')setAlerts(p=>[...p,{price,ts:Date.now()}]);
-    else if(action==='buy'&&onOrder)onOrder({symbol,type:'BUY',price});
-    else if(action==='sell'&&onOrder)onOrder({symbol,type:'SELL',price});
-    else if(action==='gtt'&&onOrder)onOrder({symbol,type:'GTT',price});
-    else if(action==='entry')setPlan(p=>({...p,entry:price}));
-    else if(action==='target')setPlan(p=>({...p,target:price}));
-    else if(action==='sl')setPlan(p=>({...p,sl:price}));
-    else if(action==='clearplan'){setPlan(null);CS.savePlan(symbol,null)}
-    else if(action==='hline')setDrawings(p=>[...p,{type:'hline',price,color:"#ffaa00",dash:[6,4],label:"LINE",ts:Date.now()}]);
-    else if(action==='del_hit'&&hit){
-      if(hit.type==='entry')setPlan(p=>{const n={...p};delete n.entry;return n.sl||n.target?n:null});
-      else if(hit.type==='target')setPlan(p=>{const n={...p};delete n.target;return n.entry||n.sl?n:null});
-      else if(hit.type==='sl')setPlan(p=>{const n={...p};delete n.sl;return n.entry||n.target?n:null});
-      else if(hit.type==='alert')setAlerts(p=>p.filter((_,i)=>i!==hit.idx));
-      else if(hit.type==='drawing')setDrawings(p=>p.filter((_,i)=>i!==hit.idx));
-      else if(hit.type==='count')setCountTargets(p=>p.filter((_,i)=>i!==hit.idx))}
-    else if(action==='vcount'){
-      if(chartType==='pnf'&&pnfData.columns.length>0){
-        const r=pnfVerticalCount(pnfData.columns,pnfData.columns.length-1,pnfData.boxSize,pnfReversal);
-        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`V.Count P&F (${r.boxes}box×${pnfReversal}rev)`}])}
-      else if(chartType==='renko'&&renkoData.bricks.length>0){
-        let swStart=renkoData.bricks.length-1;const d=renkoData.bricks[swStart].type;
-        while(swStart>0&&renkoData.bricks[swStart-1].type===d)swStart--;
-        const r=renkoVerticalCount(renkoData.bricks,swStart,renkoData.brickSize);
-        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`V.Count Renko (${r.count}bricks)`}])}}
-    else if(action==='hcount'){
-      if(chartType==='pnf'&&pnfData.columns.length>=5){const end=pnfData.columns.length-1,start=Math.max(0,end-9);
-        const r=pnfHorizontalCount(pnfData.columns,start,end,pnfData.boxSize,pnfReversal);
-        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`H.Count P&F (${r.width}cols)`}])}
-      else if(chartType==='renko'&&renkoData.bricks.length>=5){const end=renkoData.bricks.length-1,start=Math.max(0,end-9);
-        const r=renkoHorizontalCount(renkoData.bricks,start,end,renkoData.brickSize);
-        if(r)setCountTargets(p=>[...p,{target:r.target,dir:r.dir,label:`H.Count Renko (${r.width}bricks)`}])}}
+  const handleSaveEdit=(sym)=>{
+    const en=+(document.getElementById("e"+sym)?.value)||null;
+    const tg=+(document.getElementById("t"+sym)?.value)||null;
+    const sl=+(document.getElementById("s"+sym)?.value)||null;
+    const qt=parseInt(document.getElementById("q"+sym)?.value)||0;
+    window.teWatchlist.updateTrade(active.id,sym,{entry:en,target:tg,sl:sl,qty:qt,status:en?"active":"watching"});
+    setEditingTrade(null);setRefresh(r=>r+1);
   };
 
-  useEffect(()=>{const h=e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;const k=e.key.toLowerCase();
-    if(k==='escape'){setDrawMode(null);setDrawStart(null);setDrawPreview(null);setCtx(null);setDragLine(null)}
-    else if(k==='h')setDrawMode(m=>m==='hline'?null:'hline');
-    else if(k==='t')setDrawMode(m=>m==='trendline'?null:'trendline');
-    else if(k==='f')setDrawMode(m=>m==='fib'?null:'fib');
-    else if(k==='r'&&!isPnfRenko)setDrawMode(m=>m==='rect'?null:'rect');
-    else if(k==='m')setDrawMode(m=>m==='measure'?null:'measure');
-    else if(k==='p')setShowPos(v=>!v);
-  };window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[isPnfRenko]);
+  // Stats for active list
+  const stats=useMemo(()=>{
+    if(!active)return{total:0,active:0,watching:0,withPlan:0};
+    const stks=active.stocks;
+    return{total:stks.length,active:stks.filter(s=>s.trade?.status==='active').length,
+      watching:stks.filter(s=>!s.trade?.status||s.trade.status==='watching').length,
+      withPlan:stks.filter(s=>s.trade?.entry).length};
+  },[active]);
 
-  if(!priceData.length)return(<div style={{background:"var(--bg-card)",border:"1px solid var(--border-low)",borderRadius:8,padding:30,textAlign:"center"}}><div style={{color:"var(--text-muted)",fontSize:11,marginBottom:8}}>No chart data</div></div>);
-
-  return(
-    <div style={{background:"var(--bg-card)",borderRadius:8,border:"1px solid var(--border-low)",overflow:"hidden",position:"relative"}}>
-      {/* TOOLBAR */}
-      <div style={{display:"flex",alignItems:"center",gap:3,padding:"4px 8px",background:"var(--bg-secondary)",borderBottom:"1px solid var(--border-dim)",flexWrap:"wrap"}}>
-        <button className="dtb-btn" onClick={()=>{setCollapsed(!collapsed);if(onCollapse&&collapsed)onCollapse()}} style={{fontSize:10,color:"var(--text-muted)"}}>{collapsed?"▼":"▲"}</button>
-        <span style={{fontSize:10,fontWeight:800,color:"var(--accent)",fontFamily:"var(--font-mono)",letterSpacing:1}}>◈ {symbol}</span>
-        {!collapsed&&<Fragment>
-          {/* Chart type selector */}
-          <div className="dtb">
-            {[{k:'hlc',l:'HLC'},{k:'candle',l:'OHLC'},{k:'line',l:'Line'},{k:'pnf',l:'P&F'},{k:'renko',l:'Renko'}].map(ct=>
-              <button key={ct.k} className={`dtb-btn ${chartType===ct.k?'active':''}`} onClick={()=>{setChartType(ct.k);setViewStart(null);setViewCount(ct.k==='pnf'||ct.k==='renko'?200:120)}}>{ct.l}</button>)}
-          </div>
-
-          {/* P&F/Renko specific controls */}
-          {isPnfRenko&&<Fragment>
-            <div className="dtb">
-              {[0.25,0.5,1,3].map(bp=>
-                <button key={bp} className={`dtb-btn ${boxPct===bp?'active':''}`} onClick={()=>setBoxPct(bp)}>{bp}%</button>)}
-            </div>
-            {chartType==='pnf'&&<Fragment>
-              <div className="dtb">
-                <button className={`dtb-btn ${pnfReversal===3?'active':''}`} onClick={()=>setPnfReversal(3)}>3-box</button>
-                <button className={`dtb-btn ${pnfReversal===1?'active':''}`} onClick={()=>setPnfReversal(1)}>1-box</button>
-              </div>
-              <div className="dtb">
-                <button className={`dtb-btn ${pnfMethod==='close'?'active':''}`} onClick={()=>setPnfMethod('close')}>Close</button>
-                <button className={`dtb-btn ${pnfMethod==='hl'?'active':''}`} onClick={()=>setPnfMethod('hl')}>H/L</button>
-              </div>
-              <button className={`dtb-btn ${show45?'active':''}`} onClick={()=>setShow45(!show45)}>45°</button>
-              <button className={`dtb-btn ${showSignals?'active':''}`} onClick={()=>setShowSignals(!showSignals)}>Sig</button>
-            </Fragment>}
-            {chartType==='renko'&&<button className={`dtb-btn ${showSR?'active':''}`} onClick={()=>setShowSR(!showSR)}>S/R</button>}
-            <span style={{fontSize:7,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>
-              {chartType==='pnf'?`${pnfData.columns.length} cols`:`${renkoData.bricks.length} bricks`}
-            </span>
-          </Fragment>}
-
-          {/* EMA toggles (OHLC only) */}
-          {!isPnfRenko&&<Fragment>
-            {[{k:"e20",l:"20",c:"#00bbff"},{k:"e50",l:"50",c:"#ffaa00"},{k:"e200",l:"200",c:"#ff6644"}].map(em=>
-              <button key={em.k} onClick={()=>setShowEMA(p=>({...p,[em.k]:!p[em.k]}))} style={{padding:"1px 5px",borderRadius:3,fontSize:7,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:`1px solid ${showEMA[em.k]?em.c+"55":"var(--border-dim)"}`,background:showEMA[em.k]?em.c+"10":"transparent",color:showEMA[em.k]?em.c:"var(--text-muted)"}}>E{em.l}</button>)}
-          </Fragment>}
-
-          <div style={{width:1,height:14,background:"var(--border-dim)"}}/>
-          {/* Drawing tools */}
-          <div className="dtb">
-            {[{k:'hline',l:'─'},{k:'trendline',l:'╲'},{k:'fib',l:'⊞'},{k:'rect',l:'▭'},{k:'measure',l:'📏'}].filter(dt=>!isPnfRenko||dt.k==='hline'||dt.k==='measure').map(dt=>
-              <button key={dt.k} className={`dtb-btn ${drawMode===dt.k?'active':''}`} onClick={()=>{setDrawMode(drawMode===dt.k?null:dt.k);setDrawStart(null);setDrawPreview(null)}}>{dt.l}</button>)}
-          </div>
-          <button className={`dtb-btn ${showPos?'active':''}`} onClick={()=>setShowPos(!showPos)}>💰</button>
-          {countTargets.length>0&&<span style={{fontSize:7,color:"var(--accent2)",fontFamily:"var(--font-mono)"}}>🎯{countTargets.length}</span>}
-          {measureResult&&<span style={{fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,color:measureResult.diff>=0?"#00ff88":"#ff4455"}}>
-            📏{measureResult.diff>=0?"+":""}{measureResult.diff.toFixed(1)} ({measureResult.pct>=0?"+":""}{measureResult.pct.toFixed(1)}%)
-            <button style={{marginLeft:2,fontSize:7,background:"none",border:"none",color:"var(--text-muted)",cursor:"pointer"}} onClick={()=>setMeasureResult(null)}>×</button></span>}
-          <div style={{marginLeft:"auto",display:"flex",gap:3}}>
-            <button onClick={()=>window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${symbol}&interval=D`,'tradedge_tv')} style={{padding:"1px 6px",borderRadius:3,fontSize:7,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(0,200,255,0.2)",background:"transparent",color:"#00c8ff"}}>TV</button>
-            <button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${symbol}/pf`,'_blank')} style={{padding:"1px 6px",borderRadius:3,fontSize:7,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.2)",background:"transparent",color:"#8844ff"}}>P&F</button>
-            <button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${symbol}/renko`,'_blank')} style={{padding:"1px 6px",borderRadius:3,fontSize:7,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.2)",background:"transparent",color:"#8844ff"}}>Rnk</button>
-          </div>
-        </Fragment>}
-      </div>
-      {!collapsed&&<div style={{position:"relative"}}>
-        <canvas ref={canvasRef} onMouseMove={onMM} onMouseLeave={onML} onMouseDown={onMD} onMouseUp={onMU} onWheel={onWH} onContextMenu={onCM} style={{display:"block",width:"100%"}}/>
-        {showPos&&<div style={{position:"absolute",top:8,right:8,zIndex:50}}><PosSizer cfg={posCfg} onCfg={setPosCfg} plan={plan}/></div>}
-      </div>}
-      {ctx&&<CtxMenu x={ctx.x} y={ctx.y} price={ctx.price} hit={ctx.hit} isPnf={ctx.isPnf} isRenko={ctx.isRenko} onClose={()=>setCtx(null)} onAction={ctxAction}/>}
-      {!collapsed&&<div style={{display:"flex",justifyContent:"space-between",padding:"2px 8px",background:"var(--bg-secondary)",borderTop:"1px solid var(--border-dim)",fontSize:7,fontFamily:"var(--font-mono)",color:"var(--text-muted)",flexWrap:"wrap",gap:3}}>
-        <span>Scroll:Zoom | Drag:Pan | Right-Click:Actions{isPnfRenko?" | V.Count & H.Count via right-click":""}</span>
-        <span style={{color:"var(--accent)"}}>◈ TradEdge v4.0</span>
-      </div>}
-    </div>);
-};
-
-// ═══ CONTEXT MENU ═══
-const CtxMenu=({x,y,price,hit,isPnf,isRenko,onClose,onAction})=>{
-  const ref=useRef(null);
-  useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))onClose()};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h)},[onClose]);
-  const[pos,setPos]=useState({left:x,top:y});
-  useEffect(()=>{if(!ref.current)return;const r=ref.current.getBoundingClientRect();let l=x,t=y;if(l+r.width>innerWidth-8)l=innerWidth-r.width-8;if(t+r.height>innerHeight-8)t=innerHeight-r.height-8;setPos({left:Math.max(4,l),top:Math.max(4,t)})},[x,y]);
-  const hitLabel=hit?({entry:"Entry",target:"Target",sl:"Stoploss",alert:"Alert",drawing:"H-Line",count:"Count Target"}[hit.type]):"";
-  return(
-    <div ref={ref} className="ctx-menu" style={pos}>
-      <div className="ctx-header"><span style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:800,color:"var(--accent)"}}>₹{price.toFixed(2)}</span>
-        {hit&&<span style={{fontSize:7,color:"var(--amber)",fontFamily:"var(--font-mono)"}}>{hitLabel}</span>}</div>
-      {hit&&<Fragment>
-        <button className="ctx-item" style={{color:"var(--red)"}} onClick={()=>onAction('del_hit')}><span style={{width:14,textAlign:"center"}}>🗑</span>Delete {hitLabel}</button>
-        <button className="ctx-item" onClick={()=>onAction('alert_hit')}><span style={{width:14,textAlign:"center"}}>🔔</span>Alert at ₹{hit.price.toFixed(1)}</button>
-        <div className="ctx-sep"/></Fragment>}
-      <button className="ctx-item" onClick={()=>onAction('alert')}><span style={{width:14,textAlign:"center"}}>🔔</span>Alert ₹{price.toFixed(1)}</button>
-      <div className="ctx-sep"/>
-      <button className="ctx-item" style={{color:"var(--accent)"}} onClick={()=>onAction('buy')}><span style={{width:14,textAlign:"center"}}>🟢</span>BUY ₹{price.toFixed(1)}</button>
-      <button className="ctx-item" style={{color:"var(--red)"}} onClick={()=>onAction('sell')}><span style={{width:14,textAlign:"center"}}>🔴</span>SELL ₹{price.toFixed(1)}</button>
-      <button className="ctx-item" style={{color:"var(--accent3)"}} onClick={()=>onAction('gtt')}><span style={{width:14,textAlign:"center"}}>⚡</span>GTT ₹{price.toFixed(1)}</button>
-      <div className="ctx-sep"/>
-      <button className="ctx-item" onClick={()=>onAction('entry')}><span style={{width:14,textAlign:"center",color:"#00ff88"}}>E</span>Mark Entry</button>
-      <button className="ctx-item" onClick={()=>onAction('target')}><span style={{width:14,textAlign:"center",color:"#00aaff"}}>T</span>Mark Target</button>
-      <button className="ctx-item" onClick={()=>onAction('sl')}><span style={{width:14,textAlign:"center",color:"#ff4455"}}>SL</span>Mark Stoploss</button>
-      <div className="ctx-sep"/>
-      <button className="ctx-item" onClick={()=>onAction('hline')}><span style={{width:14,textAlign:"center"}}>─</span>H-Line</button>
-      {(isPnf||isRenko)&&<Fragment>
-        <div className="ctx-sep"/>
-        <button className="ctx-item" style={{color:"var(--accent2)"}} onClick={()=>onAction('vcount')}><span style={{width:14,textAlign:"center"}}>🎯</span>Vertical Count Target</button>
-        <button className="ctx-item" style={{color:"var(--accent2)"}} onClick={()=>onAction('hcount')}><span style={{width:14,textAlign:"center"}}>🎯</span>Horizontal Count Target</button>
-      </Fragment>}
-    </div>);
-};
-
-// ═══ ORDER DIALOG ═══
-const OrderDialog=({symbol,type,onClose,lastPrice})=>{
-  const[qty,setQty]=useState(1);const[price,setPrice]=useState(lastPrice||0);const[triggerPrice,setTriggerPrice]=useState(0);
-  const[orderType,setOrderType]=useState(type==="GTT"?"LIMIT":"MARKET");const[product,setProduct]=useState("CNC");
-  const[gttTarget,setGttTarget]=useState(0);const[gttSL,setGttSL]=useState(0);const[submitting,setSubmitting]=useState(false);const[result,setResult]=useState(null);
-  const txnType=(type==="SELL"||type==="SL")?"SELL":"BUY";const colors={BUY:"var(--accent)",SELL:"var(--red)",SL:"var(--amber)",GTT:"var(--accent3)"};
-  const inp={display:"block",width:"100%",padding:"4px 6px",marginTop:3,background:"var(--bg-card)",border:"1px solid var(--border-low)",color:"#fff",borderRadius:4,fontSize:10,fontFamily:"var(--font-mono)"};
-  const submit=async()=>{const w=localStorage.getItem("zd_worker_url");if(!w){alert("Set zd_worker_url");return}setSubmitting(true);
-    const h={"Content-Type":"application/json","Authorization":localStorage.getItem("kite_auth")||""};let res;
-    try{if(type==="GTT"){h["X-Kite-Action"]="gtt-place";const r=await fetch(w,{method:"POST",headers:h,body:JSON.stringify({type:"two-leg",condition:{exchange:"NSE",tradingsymbol:symbol,trigger_values:[gttTarget,gttSL],last_price:lastPrice},orders:[{exchange:"NSE",tradingsymbol:symbol,transaction_type:"SELL",quantity:qty,price:gttTarget,order_type:"LIMIT",product},{exchange:"NSE",tradingsymbol:symbol,transaction_type:"SELL",quantity:qty,price:gttSL,order_type:"LIMIT",product}]})});res=await r.json()}
-    else{h["X-Kite-Action"]="place-order";const r=await fetch(w,{method:"POST",headers:h,body:JSON.stringify({tradingsymbol:symbol,exchange:"NSE",transaction_type:txnType,order_type:orderType,quantity:qty,product,price:orderType==="LIMIT"?price:0,trigger_price:(orderType==="SL"||orderType==="SL-M")?triggerPrice:0})});res=await r.json()}}catch(e){res={error:e.message}}
-    setResult(res);setSubmitting(false);if(res&&(res.data||res.status==="success")){beep(880,200);logToJournal(symbol,txnType,price,qty,{orderType,product,type})}};
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
-      <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-med)",borderRadius:10,padding:20,width:360}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><div><span style={{fontSize:16,fontWeight:800,color:"#fff"}}>{symbol}</span><span style={{fontSize:11,color:colors[type],fontWeight:700,marginLeft:8,padding:"2px 8px",background:colors[type]+"22",borderRadius:4}}>{type}</span></div><button style={{background:"none",border:"none",color:"var(--text-muted)",fontSize:16,cursor:"pointer"}} onClick={onClose}>×</button></div>
-        {result?(<div style={{textAlign:"center",padding:10}}><div style={{fontSize:13,fontWeight:700,color:result.data||result.status==="success"?"var(--accent)":"var(--red)",marginBottom:6}}>{result.data||result.status==="success"?"✓ Placed":"✗ Failed"}</div><pre style={{fontSize:7,color:"var(--text-muted)",fontFamily:"var(--font-mono)",background:"var(--bg-card)",padding:6,borderRadius:4,textAlign:"left",maxHeight:60,overflow:"auto"}}>{JSON.stringify(result,null,2)}</pre><button className="ob ob-i" style={{marginTop:8,padding:"5px 14px",fontSize:10}} onClick={onClose}>Close</button></div>):(<div>
-          {type!=="GTT"?(<Fragment><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}><label style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Type<select value={orderType} onChange={e=>setOrderType(e.target.value)} style={inp}><option value="MARKET">MARKET</option><option value="LIMIT">LIMIT</option><option value="SL">SL</option><option value="SL-M">SL-M</option></select></label><label style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Product<select value={product} onChange={e=>setProduct(e.target.value)} style={inp}><option value="CNC">CNC</option><option value="MIS">MIS</option></select></label></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}><label style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Qty<input type="number" value={qty} onChange={e=>setQty(+e.target.value||1)} style={inp}/></label>{orderType!=="MARKET"&&<label style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Price<input type="number" value={price} onChange={e=>setPrice(+e.target.value||0)} step={0.05} style={inp}/></label>}</div></Fragment>):(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:6}}><label style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Qty<input type="number" value={qty} onChange={e=>setQty(+e.target.value||1)} style={inp}/></label><label style={{fontSize:8,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>Target<input type="number" value={gttTarget} onChange={e=>setGttTarget(+e.target.value||0)} style={{...inp,borderColor:"var(--accent)",color:"var(--accent)"}}/></label><label style={{fontSize:8,color:"var(--red)",fontFamily:"var(--font-mono)"}}>SL<input type="number" value={gttSL} onChange={e=>setGttSL(+e.target.value||0)} style={{...inp,borderColor:"var(--red)",color:"var(--red)"}}/></label></div>)}
-          <button style={{width:"100%",padding:"7px",fontSize:11,fontWeight:800,fontFamily:"var(--font-mono)",background:colors[type],color:"#000",border:"none",borderRadius:5,cursor:"pointer"}} onClick={submit} disabled={submitting}>{submitting?"...":type==="GTT"?"Place GTT":txnType+" "+symbol}</button></div>)}
-      </div></div>);
-};
-
-// ═══ WATCHLIST DASHBOARD ═══
-const WatchlistDashboard=()=>{
-  const[lists,setLists]=useState([]);const[activeList,setActiveList]=useState(null);const[refresh,setRefresh]=useState(0);const[editingTrade,setEditingTrade]=useState(null);
-  const[expandedStock,setExpandedStock]=useState(null);const[chartData,setChartData]=useState({});const[chartFailed,setChartFailed]=useState({});const[orderDialog,setOrderDialog]=useState(null);
-  useEffect(()=>{if(window.teWatchlist)setLists(window.teWatchlist.getLists())},[refresh]);
-  useEffect(()=>{if(!expandedStock||chartData[expandedStock]||chartFailed[expandedStock])return;const ac=new AbortController();const to=setTimeout(()=>ac.abort(),5000);
-    fetch("./data/stock_details/"+expandedStock+".json?t="+Date.now(),{signal:ac.signal}).then(r=>r.ok?r.json():null).then(d=>{clearTimeout(to);if(d?.price_history?.length)setChartData(p=>({...p,[expandedStock]:d.price_history}));else setChartFailed(p=>({...p,[expandedStock]:true}))}).catch(()=>{clearTimeout(to);setChartFailed(p=>({...p,[expandedStock]:true}))});return()=>{clearTimeout(to);ac.abort()}},[expandedStock]);
-  const active=activeList?lists.find(l=>l.id===activeList):lists[0];
   return(<div>
-    <nav className="nav"><a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TE" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
-      <a href="scanner.html" className="nav-link">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="#" className="nav-link active">Watchlist</a></nav>
-    <div style={{maxWidth:1440,margin:"0 auto",padding:"16px 20px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div><h1 style={{fontSize:22,fontWeight:900,letterSpacing:2,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>WATCHLISTS</h1>
-          <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{lists.length} lists | HLC·OHLC·Line·P&F·Renko | Right-click → Trade</div></div>
-        <div style={{display:"flex",gap:6}}><button className="ob ob-b" style={{padding:"5px 12px",fontSize:10}} onClick={()=>{const n=prompt("Name:");if(n){window.teWatchlist.createList(n);setRefresh(r=>r+1)}}}>+ New</button>
-          <button className="ob ob-i" style={{padding:"5px 12px",fontSize:10}} onClick={async()=>{await window.teWatchlist.sync();await window.teWatchlist.pullFromCloud();setLists(window.teWatchlist.getLists());setRefresh(r=>r+1)}}>Sync</button></div>
+    <nav className="nav">
+      <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TE" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+      <a href="scanner.html" className="nav-link">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="#" className="nav-link active">Watchlist</a>
+    </nav>
+
+    <div style={{maxWidth:1440,margin:"0 auto",padding:"0 20px"}}>
+      {/* Header */}
+      <div className="wl-header">
+        <div>
+          <div className="wl-title">WATCHLISTS</div>
+          <div className="wl-subtitle">{lists.length} lists | HLC · OHLC · Line · P&F · Renko | Right-click chart → Trade</div>
+        </div>
+        <div style={{display:'flex',gap:6}}>
+          <button className="wl-btn buy" style={{padding:'6px 14px',fontSize:10}} onClick={()=>{const n=prompt("Name:");if(n){window.teWatchlist.createList(n);setRefresh(r=>r+1)}}}>+ New</button>
+          <button className="wl-btn" style={{padding:'6px 14px',fontSize:10,background:'rgba(0,200,255,0.08)',borderColor:'rgba(0,200,255,0.2)',color:'var(--accent2)'}} onClick={async()=>{await window.teWatchlist.sync();await window.teWatchlist.pullFromCloud();setLists(window.teWatchlist.getLists());setRefresh(r=>r+1)}}>☁ Sync</button>
+        </div>
       </div>
-      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>{lists.map(l=><button key={l.id} onClick={()=>{setActiveList(l.id);setExpandedStock(null)}} style={{padding:"5px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,background:active?.id===l.id?"var(--accent-dim)":"rgba(255,255,255,0.03)",border:"1px solid "+(active?.id===l.id?"var(--accent)":"var(--border-low)"),color:active?.id===l.id?"var(--accent)":"var(--text-secondary)",borderRadius:4,cursor:"pointer"}}>{l.name} ({l.stocks.length})</button>)}</div>
-      {active?(<div className="card">
-        <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>{active.name} <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",fontWeight:400}}>{active.stocks.length} stocks</span></span>
-          <div style={{display:"flex",gap:4}}><button className="ob ob-b" onClick={()=>{const s=prompt("Symbol:");if(s){window.teWatchlist.addStock(active.id,{symbol:s.toUpperCase(),source:"manual"});setRefresh(r=>r+1)}}}>+Add</button>
-            <button className="ob ob-i" onClick={()=>{const n=prompt("Rename:",active.name);if(n){window.teWatchlist.renameList(active.id,n);setRefresh(r=>r+1)}}}>Rename</button>
-            <button className="ob ob-s" onClick={()=>{if(confirm("Delete?")){window.teWatchlist.deleteList(active.id);setActiveList(null);setRefresh(r=>r+1)}}}>Delete</button></div></div>
-        <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
-          <thead><tr style={{background:"rgba(0,255,136,0.03)"}}>{["","SYMBOL","SECTOR","SRC","STATUS","ENTRY","TGT","SL","QTY","ORDERS"].map(h=><th key={h} style={{padding:"7px 8px",textAlign:"left",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-          <tbody>{active.stocks.map((s,i)=>{const t=s.trade||{};const isExp=expandedStock===s.symbol;const isEd=editingTrade===s.symbol;
-            return(<Fragment key={i}>
-              <tr style={{borderBottom:"1px solid rgba(255,255,255,0.02)",cursor:"pointer",background:isExp?"rgba(0,255,136,0.03)":"transparent"}} onClick={()=>setExpandedStock(isExp?null:s.symbol)}>
-                <td style={{padding:"5px 8px",fontSize:11}}>{isExp?"▼":"▶"}</td>
-                <td style={{padding:"5px 8px"}}><span style={{fontWeight:700,color:"#fff"}}>{s.symbol}</span></td>
-                <td style={{padding:"5px 8px",color:"var(--text-muted)",fontSize:9}}>{s.sector||""}</td>
-                <td style={{padding:"5px 8px"}}><span style={{fontSize:7,padding:"1px 4px",borderRadius:2,fontFamily:"var(--font-mono)",background:"rgba(0,255,136,0.08)",color:"var(--accent)"}}>{s.source||"manual"}</span></td>
-                <td style={{padding:"5px 8px"}}><span style={{fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,color:t.status==="active"?"var(--accent)":"var(--text-muted)"}}>{(t.status||"WATCH").toUpperCase()}</span></td>
-                {isEd?(<Fragment>
-                  <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.entry||""} id={"e"+s.symbol} style={{width:60,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--border-med)",color:"#fff",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
-                  <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.target||""} id={"t"+s.symbol} style={{width:60,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
-                  <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.sl||""} id={"s"+s.symbol} style={{width:60,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--red)",color:"var(--red)",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
-                  <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.qty||""} id={"q"+s.symbol} style={{width:40,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--border-med)",color:"#fff",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
-                </Fragment>):(<Fragment>
-                  <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10}}>{t.entry||"—"}</td>
-                  <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10,color:t.target?"var(--accent)":"var(--text-muted)"}}>{t.target||"—"}</td>
-                  <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10,color:t.sl?"var(--red)":"var(--text-muted)"}}>{t.sl||"—"}</td>
-                  <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10}}>{t.qty||"—"}</td></Fragment>)}
-                <td style={{padding:"3px 6px"}} onClick={e=>e.stopPropagation()}><div style={{display:"flex",gap:2,flexWrap:"nowrap"}}>
-                  {isEd?<button className="ob ob-b" onClick={()=>{const en=+document.getElementById("e"+s.symbol)?.value||null;const tg=+document.getElementById("t"+s.symbol)?.value||null;const sl=+document.getElementById("s"+s.symbol)?.value||null;const qt=parseInt(document.getElementById("q"+s.symbol)?.value)||0;window.teWatchlist.updateTrade(active.id,s.symbol,{entry:en,target:tg,sl:sl,qty:qt,status:en?"active":"watching"});setEditingTrade(null);setRefresh(r=>r+1)}}>Save</button>:<button className="ob" style={{borderColor:"var(--border-low)",color:"var(--text-muted)"}} onClick={()=>setEditingTrade(s.symbol)}>Edit</button>}
-                  <button className="ob ob-b" onClick={()=>setOrderDialog({symbol:s.symbol,type:"BUY",price:t.entry||0})}>BUY</button>
-                  <button className="ob ob-s" onClick={()=>setOrderDialog({symbol:s.symbol,type:"SELL",price:t.entry||0})}>SELL</button>
-                  <button className="ob ob-sl" onClick={()=>setOrderDialog({symbol:s.symbol,type:"SL",price:t.sl||0})}>SL</button>
-                  <button className="ob ob-g" onClick={()=>setOrderDialog({symbol:s.symbol,type:"GTT",price:t.entry||0})}>GTT</button>
-                  <button className="ob ob-s" style={{padding:"2px 4px"}} onClick={()=>{window.teWatchlist.removeStock(active.id,s.symbol);setRefresh(r=>r+1)}}>x</button></div></td>
-              </tr>
-              {isExp&&<tr><td colSpan={10} style={{padding:0,background:"rgba(0,0,0,0.3)",borderBottom:"2px solid var(--accent)"}}>
-                <div style={{padding:"6px 10px"}}>{chartData[s.symbol]?(<ChartErrorBoundary symbol={s.symbol}><TEChart symbol={s.symbol} prices={chartData[s.symbol]} onOrder={o=>setOrderDialog(o)} onCollapse={()=>setExpandedStock(null)}/></ChartErrorBoundary>):(<div style={{padding:20,textAlign:"center"}}>
-                  {!chartFailed[s.symbol]&&<div><div style={{width:20,height:20,border:"2px solid var(--border-low)",borderTop:"2px solid var(--accent)",borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 6px"}}/><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Loading...</div></div>}
-                  {chartFailed[s.symbol]&&<div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:8}}>No data for <b style={{color:"#fff"}}>{s.symbol}</b></div>}
-                  <div style={{display:"flex",gap:5,justifyContent:"center",marginTop:6}}><button onClick={()=>window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${s.symbol}&interval=D`,'tradedge_tv')} className="ob ob-i" style={{padding:"4px 10px",fontSize:9}}>TV Pro</button><button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${s.symbol}/pf`,'_blank')} className="ob ob-g" style={{padding:"4px 10px",fontSize:9}}>P&F</button><button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${s.symbol}/renko`,'_blank')} className="ob ob-g" style={{padding:"4px 10px",fontSize:9}}>Renko</button></div></div>)}</div>
-              </td></tr>}
-            </Fragment>)})}</tbody>
-        </table>
-        {active.stocks.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text-muted)",fontSize:11,fontFamily:"var(--font-mono)"}}>Empty watchlist</div>}
-      </div>):(<div style={{padding:60,textAlign:"center",color:"var(--text-muted)"}}><div style={{fontSize:40,marginBottom:12}}>📋</div><div style={{fontSize:14,fontWeight:700}}>No Watchlists</div></div>)}
+
+      {/* Tabs */}
+      <div className="wl-tabs">
+        {lists.map(l=><button key={l.id} className={`wl-tab ${active?.id===l.id?'active':''}`} onClick={()=>{setActiveList(l.id);setExpandedStock(null);setEditingTrade(null)}}>
+          {l.name}<span className="wl-tab-count">({l.stocks.length})</span>
+        </button>)}
+      </div>
+
+      {active?(
+        <div className="card" style={{borderRadius:10}}>
+          {/* List header */}
+          <div className="wl-list-header">
+            <div style={{display:'flex',alignItems:'center'}}>
+              <span className="wl-list-name">{active.name}</span>
+              <span className="wl-list-meta">{stats.total} stocks · {stats.active} active · {stats.withPlan} with plan</span>
+            </div>
+            <div style={{display:'flex',gap:4}}>
+              <button className="wl-btn buy" onClick={()=>{const s=prompt("Symbol:");if(s){window.teWatchlist.addStock(active.id,{symbol:s.toUpperCase(),source:"manual"});setRefresh(r=>r+1)}}}>+ Add</button>
+              <button className="wl-btn edit" onClick={()=>{const n=prompt("Rename:",active.name);if(n){window.teWatchlist.renameList(active.id,n);setRefresh(r=>r+1)}}}>Rename</button>
+              <button className="wl-btn del" style={{fontSize:8}} onClick={()=>{if(confirm("Delete '"+active.name+"'?")){window.teWatchlist.deleteList(active.id);setActiveList(null);setRefresh(r=>r+1)}}}>Delete</button>
+            </div>
+          </div>
+
+          {/* Column headers */}
+          <div className="wl-thead">
+            <div className="wl-th" style={{textAlign:'center'}}></div>
+            <div className="wl-th">Symbol</div>
+            <div className="wl-th" style={{textAlign:'center'}}>Trade Plan</div>
+            <div className="wl-th">Edit / Plan</div>
+            <div className="wl-th" style={{textAlign:'right'}}>Orders</div>
+          </div>
+
+          {/* Stock rows */}
+          {active.stocks.map((s,i)=>(
+            <StockRow key={s.symbol+i} s={s} active={active} isExp={expandedStock===s.symbol} isEd={editingTrade===s.symbol}
+              onExpand={setExpandedStock} onEdit={setEditingTrade} onSaveEdit={handleSaveEdit}
+              onOrder={setOrderDialog} onRemove={sym=>{window.teWatchlist.removeStock(active.id,sym);setRefresh(r=>r+1)}}
+              chartData={chartData} chartFailed={chartFailed} setRefresh={setRefresh}/>
+          ))}
+
+          {active.stocks.length===0&&<div className="wl-empty"><div className="wl-empty-icon">📋</div><div className="wl-empty-text">Empty watchlist</div><div className="wl-empty-sub">Add stocks manually or save a scan from the Scanner page</div></div>}
+        </div>
+      ):(<div className="wl-empty"><div className="wl-empty-icon">📋</div><div className="wl-empty-text">No Watchlists</div><div className="wl-empty-sub">Create a new watchlist to get started</div></div>)}
+
+      {/* Footer */}
+      <div style={{padding:'14px 0',marginTop:12,borderTop:'1px solid var(--border-dim)',display:'flex',justifyContent:'space-between',fontSize:8,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:0.5}}>
+        <span>TRADEDGE WATCHLIST v4.0 · HLC·OHLC·Line·P&F·Renko · Keyboard: H T F R M P</span>
+        <span style={{color:'var(--accent)'}}>◈ CYBERPUNK EDITION</span>
+      </div>
     </div>
     {orderDialog&&<OrderDialog symbol={orderDialog.symbol} type={orderDialog.type} lastPrice={orderDialog.price} onClose={()=>setOrderDialog(null)}/>}
   </div>);
