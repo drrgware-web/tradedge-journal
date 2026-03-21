@@ -212,15 +212,43 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
     return{W,CH:480,cH,bW,pM,pm,pR,toY:p=>PAD.T+(1-(p-pm)/pR)*cH,toP:y=>pM-((y-PAD.T)/cH)*pR,toX:i=>PAD.L+i*bW+bW/2,toBi:x=>Math.round((x-PAD.L)/bW-0.5)};
   },[vis,viewCount,si,showEMA,ema20,ema50,ema200,alerts,plan,drawings]);
 
-  const hitTest=useCallback((my,L)=>{
-    if(!L)return null;const t=6;
+  const hitTest=useCallback((mx,my,L)=>{
+    if(!L)return null;const t=8;
+    // Check trade plan lines
     if(plan?.entry&&Math.abs(my-L.toY(plan.entry))<t)return{type:'entry',price:plan.entry};
     if(plan?.target&&Math.abs(my-L.toY(plan.target))<t)return{type:'target',price:plan.target};
     if(plan?.sl&&Math.abs(my-L.toY(plan.sl))<t)return{type:'sl',price:plan.sl};
+    // Check alerts
     for(let i=0;i<alerts.length;i++){if(Math.abs(my-L.toY(alerts[i].price))<t)return{type:'alert',idx:i,price:alerts[i].price}}
-    for(let i=0;i<drawings.length;i++){if(drawings[i].type==='hline'&&Math.abs(my-L.toY(drawings[i].price))<t)return{type:'drawing',idx:i,price:drawings[i].price}}
+    // Check all drawings
+    if(showDrawings){for(let i=drawings.length-1;i>=0;i--){const d=drawings[i];
+      if(d.type==='hline'){if(Math.abs(my-L.toY(d.price))<t)return{type:'drawing',idx:i,drawType:'hline',id:d.id,price:d.price}}
+      else if(d.type==='trendline'||d.type==='ray'){
+        const x1=L.toX(d.bi1-si),y1=L.toY(d.p1),x2=L.toX(d.bi2-si),y2=L.toY(d.p2);
+        // Check endpoints
+        if(Math.hypot(mx-x1,my-y1)<t)return{type:'drawing',idx:i,drawType:d.type,id:d.id,handle:'p1',price:d.p1};
+        if(Math.hypot(mx-x2,my-y2)<t)return{type:'drawing',idx:i,drawType:d.type,id:d.id,handle:'p2',price:d.p2};
+        // Check line body (point-to-line distance)
+        const A=my-y1,B=x1-x2,C=mx-x1,D=y1-y2;
+        const dot=A*D-C*B,lenSq=(x2-x1)*(x2-x1)+(y2-y1)*(y2-y1);
+        if(lenSq>0){const dist=Math.abs(dot)/Math.sqrt(lenSq);
+          const proj=((mx-x1)*(x2-x1)+(my-y1)*(y2-y1))/lenSq;
+          if(dist<t&&proj>=0&&proj<=1)return{type:'drawing',idx:i,drawType:d.type,id:d.id,handle:'body',price:(d.p1+d.p2)/2}}}
+      else if(d.type==='channel'){
+        const x1=L.toX(d.bi1-si),y1=L.toY(d.p1),x2=L.toX(d.bi2-si),y2=L.toY(d.p2);
+        if(Math.hypot(mx-x1,my-y1)<t)return{type:'drawing',idx:i,drawType:'channel',id:d.id,handle:'p1',price:d.p1};
+        if(Math.hypot(mx-x2,my-y2)<t)return{type:'drawing',idx:i,drawType:'channel',id:d.id,handle:'p2',price:d.p2}}
+      else if(d.type==='fib'){
+        if(Math.abs(my-L.toY(d.p1))<t)return{type:'drawing',idx:i,drawType:'fib',id:d.id,handle:'p1',price:d.p1};
+        if(Math.abs(my-L.toY(d.p2))<t)return{type:'drawing',idx:i,drawType:'fib',id:d.id,handle:'p2',price:d.p2}}
+      else if(d.type==='rect'){
+        const x1=L.toX(d.bi1-si),y1=L.toY(d.p1),x2=L.toX(d.bi2-si),y2=L.toY(d.p2);
+        if(Math.hypot(mx-x1,my-y1)<t)return{type:'drawing',idx:i,drawType:'rect',id:d.id,handle:'p1',price:d.p1};
+        if(Math.hypot(mx-x2,my-y2)<t)return{type:'drawing',idx:i,drawType:'rect',id:d.id,handle:'p2',price:d.p2}}
+      else if(d.type==='text'){const x=L.toX(d.bi-si),y=L.toY(d.price);if(Math.abs(mx-x)<50&&Math.abs(my-y)<12)return{type:'drawing',idx:i,drawType:'text',id:d.id,price:d.price}}
+    }}
     return null;
-  },[plan,alerts,drawings]);
+  },[plan,alerts,drawings,si,showDrawings]);
 
   const draw=useCallback(()=>{
     const cv=canvasRef.current;const L=getL();if(!cv||!L)return;
@@ -303,13 +331,36 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
 
   const onMM=e=>{if(ctx)return;const r=canvasRef.current?.getBoundingClientRect();if(!r)return;const mx=e.clientX-r.left,my=e.clientY-r.top;setCrosshair({x:mx,y:my});const L=getL();if(!L)return;
     const idx=L.toBi(mx);setHoverBar(idx>=0&&idx<vis.length?vis[idx]:null);
-    if(dragLine){const np=L.toP(my);if(dragLine.type==='entry')setPlan(p=>({...p,entry:np}));else if(dragLine.type==='target')setPlan(p=>({...p,target:np}));else if(dragLine.type==='sl')setPlan(p=>({...p,sl:np}));else if(dragLine.type==='alert')setAlerts(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],price:np};return n});else if(dragLine.type==='drawing')setDrawings(p=>{const n=[...p];if(n[dragLine.idx]?.type==='hline')n[dragLine.idx]={...n[dragLine.idx],price:np};return n});return}
+    // Handle dragging
+    if(dragLine){const np=L.toP(my),nb=(L.toBi(mx)||0)+si;
+      if(dragLine.type==='entry')setPlan(p=>({...p,entry:np}));
+      else if(dragLine.type==='target')setPlan(p=>({...p,target:np}));
+      else if(dragLine.type==='sl')setPlan(p=>({...p,sl:np}));
+      else if(dragLine.type==='alert')setAlerts(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],price:np};return n});
+      else if(dragLine.type==='drawing'){
+        const d=drawings[dragLine.idx];if(!d)return;
+        if(d.type==='hline')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],price:np,ts:Date.now()};return n});
+        else if((d.type==='trendline'||d.type==='ray')&&dragLine.handle==='p1')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],bi1:nb,p1:np,ts:Date.now()};return n});
+        else if((d.type==='trendline'||d.type==='ray')&&dragLine.handle==='p2')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],bi2:nb,p2:np,ts:Date.now()};return n});
+        else if((d.type==='trendline'||d.type==='ray')&&dragLine.handle==='body'){
+          const dy=np-dragLine.lastPrice;const dbi=nb-dragLine.lastBi;
+          setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],p1:d.p1+dy,p2:d.p2+dy,bi1:d.bi1+dbi,bi2:d.bi2+dbi,ts:Date.now()};return n});
+          setDragLine({...dragLine,lastPrice:np,lastBi:nb})}
+        else if(d.type==='fib'&&dragLine.handle==='p1')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],p1:np,ts:Date.now()};return n});
+        else if(d.type==='fib'&&dragLine.handle==='p2')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],p2:np,ts:Date.now()};return n});
+        else if(d.type==='rect'&&dragLine.handle==='p1')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],bi1:nb,p1:np,ts:Date.now()};return n});
+        else if(d.type==='rect'&&dragLine.handle==='p2')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],bi2:nb,p2:np,ts:Date.now()};return n});
+        else if(d.type==='text')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],bi:nb,price:np,ts:Date.now()};return n});
+        else if(d.type==='channel'){
+          if(dragLine.handle==='p1')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],bi1:nb,p1:np,ts:Date.now()};return n});
+          else if(dragLine.handle==='p2')setDrawings(p=>{const n=[...p];n[dragLine.idx]={...n[dragLine.idx],bi2:nb,p2:np,ts:Date.now()};return n})}}
+      return}
     if(drawMode&&drawStart){setDrawPreview({x:mx,y:my,price:L.toP(my),bi:(L.toBi(mx)||0)+si})}
     if(!drawMode&&isDrag&&dragX!=null){const bd=Math.round((e.clientX-dragX)/L.bW);if(Math.abs(bd)>=1){setViewStart(pv=>{const s=(pv??Math.max(0,priceData.length-viewCount))-bd;return Math.max(0,Math.min(priceData.length-viewCount,s))});setDragX(e.clientX)}}
-    const hit=hitTest(my,L);if(canvasRef.current)canvasRef.current.style.cursor=dragLine?'ns-resize':hit?'ns-resize':drawMode?'crosshair':isDrag?'grabbing':'crosshair'};
+    const hit=hitTest(mx,my,L);if(canvasRef.current)canvasRef.current.style.cursor=dragLine?'move':hit?(hit.handle==='body'?'move':'pointer'):drawMode?'crosshair':isDrag?'grabbing':'crosshair'};
 
   const onMD=e=>{if(e.button===2||ctx)return;const L=getL();if(!L)return;const r=canvasRef.current.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,price=L.toP(my),bi=(L.toBi(mx)||0)+si;
-    const hit=hitTest(my,L);if(hit&&!drawMode){setDragLine(hit);return}
+    const hit=hitTest(mx,my,L);if(hit&&!drawMode){if(hit.type==='drawing')saveUndo();setDragLine({...hit,lastPrice:price,lastBi:bi});return}
     if(drawMode==='hline'){addDrawing({type:'hline',price,color:"#ffaa00",dash:[6,4]});setDrawMode(null)}
     else if(drawMode==='text'){setTextInput({bi,price});setDrawMode(null)}
     else if((drawMode==='trendline'||drawMode==='ray'||drawMode==='fib'||drawMode==='rect'||drawMode==='measure')&&!drawStart){setDrawStart({sx:mx,sy:my,price,bi})}
@@ -327,7 +378,7 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
   const onMU=()=>{if(dragLine){setDragLine(null);return}setIsDrag(false);setDragX(null)};
   const onML=()=>{setCrosshair(null);setHoverBar(null);setIsDrag(false);if(!drawStart)setDrawPreview(null);if(dragLine)setDragLine(null)};
   const onWH=e=>{e.preventDefault();setViewCount(pv=>{const n=pv+(e.deltaY>0?1:-1)*Math.max(3,Math.floor(pv*0.1));return Math.max(20,Math.min(500,n))})};
-  const onCM=e=>{e.preventDefault();const L=getL();if(!L)return;const r=canvasRef.current.getBoundingClientRect(),my=e.clientY-r.top;const price=L.toP(my);const hit=hitTest(my,L);setCtx({x:e.clientX,y:e.clientY,price,hit})};
+  const onCM=e=>{e.preventDefault();const L=getL();if(!L)return;const r=canvasRef.current.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const price=L.toP(my);const hit=hitTest(mx,my,L);setCtx({x:e.clientX,y:e.clientY,price,hit})};
 
   const ctxAction=(action)=>{const price=ctx?.price;const hit=ctx?.hit;setCtx(null);
     if(action==='alert')setAlerts(p=>[...p,{price,ts:Date.now()}]);
@@ -406,7 +457,7 @@ const CtxMenu=({x,y,price,hit,onClose,onAction})=>{
   useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))onClose()};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h)},[onClose]);
   const[pos,setPos]=useState({left:x,top:y});
   useEffect(()=>{if(!ref.current)return;const r=ref.current.getBoundingClientRect();let l=x,t=y;if(l+r.width>innerWidth-8)l=innerWidth-r.width-8;if(t+r.height>innerHeight-8)t=innerHeight-r.height-8;setPos({left:Math.max(4,l),top:Math.max(4,t)})},[x,y]);
-  const hitLabel=hit?({entry:"Entry",target:"Target",sl:"Stoploss",alert:"Alert",drawing:"H-Line"}[hit.type]):"";
+  const hitLabel=hit?(hit.type==='drawing'?({hline:'H-Line',trendline:'Trendline',ray:'Ray',channel:'Channel',fib:'Fib',rect:'Rectangle',text:'Text'}[hit.drawType]||'Drawing'):{entry:"Entry",target:"Target",sl:"Stoploss",alert:"Alert"}[hit.type]):"";
   return(
     <div ref={ref} className="ctx-menu" style={pos}>
       <div className="ctx-header"><span style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:800,color:"var(--accent)"}}>₹{price.toFixed(2)}</span>{hit&&<span style={{fontSize:7,color:"var(--amber)",fontFamily:"var(--font-mono)"}}>{hitLabel}</span>}</div>
