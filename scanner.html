@@ -10,825 +10,412 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-:root {
-  --bg-primary: #06080c;
-  --bg-secondary: #0c1018;
-  --bg-tertiary: #121820;
-  --bg-card: #0f1520;
-  --bg-hover: #141d2a;
-  --border-dim: rgba(0,255,136,0.06);
-  --border-low: rgba(0,255,136,0.1);
-  --border-med: rgba(0,255,136,0.2);
-  --border-hi: rgba(0,255,136,0.4);
-  --accent: #00ff88;
-  --accent-dim: rgba(0,255,136,0.15);
-  --accent2: #00c8ff;
-  --accent3: #8844ff;
-  --red: #ff4455;
-  --red-dim: rgba(255,68,85,0.12);
-  --amber: #ffaa00;
-  --amber-dim: rgba(255,170,0,0.12);
-  --text-primary: #e8e8e8;
-  --text-secondary: #8899aa;
-  --text-muted: #556677;
-  --font-display: 'Outfit', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: var(--font-display);
-  min-height: 100vh;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-}
-body::after {
-  content: '';
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,136,0.008) 2px, rgba(0,255,136,0.008) 4px);
-  pointer-events: none; z-index: 9999;
-}
-body::before {
-  content: '';
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background-image: linear-gradient(rgba(0,255,136,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,255,136,0.02) 1px, transparent 1px);
-  background-size: 48px 48px;
-  pointer-events: none; z-index: 0;
-}
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-primary); }
-::-webkit-scrollbar-thumb { background: rgba(0,255,136,0.2); border-radius: 3px; }
-#root { position: relative; z-index: 1; }
-
-.card { background: var(--bg-card); border: 1px solid var(--border-low); border-radius: 8px; overflow: hidden; }
-.card:hover { border-color: var(--border-med); }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; font-family: var(--font-mono); letter-spacing: 0.5px; white-space: nowrap; }
-.badge-bullish { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
-.badge-bearish { background: rgba(255,68,85,0.12); color: #ff4455; border: 1px solid rgba(255,68,85,0.3); }
-.badge-neutral { background: rgba(136,153,170,0.1); color: #889; border: 1px solid rgba(136,153,170,0.15); }
-.badge-warning { background: rgba(255,170,0,0.12); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
-.badge-info { background: rgba(0,200,255,0.12); color: #00c8ff; border: 1px solid rgba(0,200,255,0.3); }
-.badge-purple { background: rgba(136,68,255,0.12); color: #8844ff; border: 1px solid rgba(136,68,255,0.3); }
-
-.btn { padding: 6px 14px; border-radius: 5px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1px solid var(--border-med); background: var(--bg-tertiary); color: var(--text-primary); }
-.btn:hover { border-color: var(--accent); color: var(--accent); }
-.btn-accent { background: rgba(0,255,136,0.1); border-color: var(--accent); color: var(--accent); }
-.btn-accent:hover { background: rgba(0,255,136,0.2); }
-
-input[type="text"], input[type="number"], select, textarea {
-  background: var(--bg-tertiary); border: 1px solid var(--border-low); border-radius: 4px; padding: 6px 10px;
-  color: var(--accent); font-family: var(--font-mono); font-size: 11px; outline: none; transition: border-color 0.15s;
-}
-input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-select option { background: var(--bg-secondary); color: var(--text-primary); }
-input::placeholder, textarea::placeholder { color: var(--text-muted); }
-
-.nav { display: flex; align-items: center; gap: 4px; padding: 8px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-dim); position: sticky; top: 0; z-index: 100; }
-.nav-link { padding: 5px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-decoration: none; border-radius: 4px; transition: all 0.15s; font-family: var(--font-mono); }
-.nav-link:hover { color: var(--text-primary); background: var(--bg-hover); }
-.nav-link.active { color: var(--accent); background: var(--accent-dim); }
-
-.tabs { display: flex; gap: 2px; background: var(--bg-secondary); padding: 3px; border-radius: 6px; border: 1px solid var(--border-dim); }
-.tab { padding: 6px 16px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); color: var(--text-muted); border-radius: 4px; cursor: pointer; transition: all 0.15s; border: none; background: transparent; }
-.tab:hover { color: var(--text-primary); }
-.tab.active { color: var(--accent); background: var(--accent-dim); }
-
-/* Funda scan cards */
-.funda-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
-.funda-card {
-  background: var(--bg-tertiary); border: 1px solid var(--border-low); border-radius: 6px;
-  padding: 12px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden;
-}
-.funda-card:hover { border-color: var(--border-med); transform: translateY(-1px); }
-.funda-card.selected { border-color: var(--accent); background: rgba(0,255,136,0.04); }
-.funda-card-count {
-  position: absolute; top: 8px; right: 10px; font-family: var(--font-mono);
-  font-size: 20px; font-weight: 900; opacity: 0.15;
-}
-.funda-card-name { font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; padding-right: 40px; }
-.funda-card-desc { font-size: 9px; color: var(--text-muted); line-height: 1.4; margin-bottom: 6px; }
-.funda-card-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.funda-cat { font-size: 8px; font-weight: 700; font-family: var(--font-mono); padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-/* TechnoFunda highlight */
-.tf-row { background: linear-gradient(90deg, rgba(136,68,255,0.04), transparent) !important; }
-.tf-badge { background: rgba(136,68,255,0.15); color: #8844ff; border: 1px solid rgba(136,68,255,0.3); font-size: 8px; padding: 1px 6px; border-radius: 3px; font-family: var(--font-mono); font-weight: 700; }
-
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes logoPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.03); } }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-.fade-in { animation: fadeIn 0.3s ease-out; }
-.pulse { animation: pulse 2s infinite; }
+:root{--bg-primary:#06080c;--bg-secondary:#0c1018;--bg-tertiary:#121820;--bg-card:#0f1520;--bg-hover:#141d2a;--border-dim:rgba(0,255,136,0.06);--border-low:rgba(0,255,136,0.1);--border-med:rgba(0,255,136,0.2);--border-hi:rgba(0,255,136,0.4);--accent:#00ff88;--accent-dim:rgba(0,255,136,0.15);--accent2:#00c8ff;--accent3:#8844ff;--red:#ff4455;--amber:#ffaa00;--text-primary:#e8e8e8;--text-secondary:#8899aa;--text-muted:#556677;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-display);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.008) 2px,rgba(0,255,136,0.008) 4px);pointer-events:none;z-index:9999}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(0,255,136,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.2);border-radius:3px}
+#root{position:relative;z-index:1}
+.card{background:var(--bg-card);border:1px solid var(--border-low);border-radius:8px;overflow:hidden}.card:hover{border-color:var(--border-med)}
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:0.5px;white-space:nowrap}
+.badge-bullish{background:rgba(0,255,136,0.12);color:#00ff88;border:1px solid rgba(0,255,136,0.3)}.badge-bearish{background:rgba(255,68,85,0.12);color:#ff4455;border:1px solid rgba(255,68,85,0.3)}.badge-neutral{background:rgba(136,153,170,0.1);color:#889;border:1px solid rgba(136,153,170,0.15)}.badge-warning{background:rgba(255,170,0,0.12);color:#ffaa00;border:1px solid rgba(255,170,0,0.3)}.badge-info{background:rgba(0,200,255,0.12);color:#00c8ff;border:1px solid rgba(0,200,255,0.3)}.badge-purple{background:rgba(136,68,255,0.12);color:#8844ff;border:1px solid rgba(136,68,255,0.3)}
+.btn{padding:6px 14px;border-radius:5px;font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;border:1px solid var(--border-med);background:var(--bg-tertiary);color:var(--text-primary)}.btn:hover{border-color:var(--accent);color:var(--accent)}.btn-accent{background:rgba(0,255,136,0.1);border-color:var(--accent);color:var(--accent)}.btn-accent:hover{background:rgba(0,255,136,0.2)}
+input[type="text"],input[type="number"],select,textarea{background:var(--bg-tertiary);border:1px solid var(--border-low);border-radius:4px;padding:6px 10px;color:var(--accent);font-family:var(--font-mono);font-size:11px;outline:none;transition:border-color 0.15s}input:focus,select:focus,textarea:focus{border-color:var(--accent)}select option{background:var(--bg-secondary);color:var(--text-primary)}input::placeholder,textarea::placeholder{color:var(--text-muted)}
+.nav{display:flex;align-items:center;gap:4px;padding:8px 20px;background:var(--bg-secondary);border-bottom:1px solid var(--border-dim);position:sticky;top:0;z-index:100}
+.nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-decoration:none;border-radius:4px;transition:all 0.15s;font-family:var(--font-mono)}.nav-link:hover{color:var(--text-primary);background:var(--bg-hover)}.nav-link.active{color:var(--accent);background:var(--accent-dim)}
+.tabs{display:flex;gap:2px;background:var(--bg-secondary);padding:3px;border-radius:6px;border:1px solid var(--border-dim)}.tab{padding:6px 16px;font-size:11px;font-weight:600;font-family:var(--font-mono);color:var(--text-muted);border-radius:4px;cursor:pointer;transition:all 0.15s;border:none;background:transparent}.tab:hover{color:var(--text-primary)}.tab.active{color:var(--accent);background:var(--accent-dim)}
+.funda-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.funda-card{background:var(--bg-tertiary);border:1px solid var(--border-low);border-radius:6px;padding:12px;cursor:pointer;transition:all 0.15s;position:relative;overflow:hidden}.funda-card:hover{border-color:var(--border-med);transform:translateY(-1px)}.funda-card.selected{border-color:var(--accent);background:rgba(0,255,136,0.04)}
+.funda-card-count{position:absolute;top:8px;right:10px;font-family:var(--font-mono);font-size:20px;font-weight:900;opacity:0.15}
+.funda-card-name{font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:4px;padding-right:40px}
+.funda-card-desc{font-size:9px;color:var(--text-muted);line-height:1.4;margin-bottom:6px}
+.funda-card-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.funda-cat{font-size:8px;font-weight:700;font-family:var(--font-mono);padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:0.5px}
+.tf-badge{background:rgba(136,68,255,0.15);color:#8844ff;border:1px solid rgba(136,68,255,0.3);font-size:8px;padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-weight:700}
+.ft-badge{background:rgba(0,200,255,0.15);color:#00c8ff;border:1px solid rgba(0,200,255,0.3);font-size:8px;padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-weight:700}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes logoPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.85;transform:scale(1.03)}}
+.fade-in{animation:fadeIn 0.3s ease-out}
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script src="scripts/tradedge-watchlist.js"></script>
 <script type="text/babel">
-const { useState, useEffect, useMemo, useCallback, useRef, Fragment } = React;
+const{useState,useEffect,useMemo,useCallback,useRef,Fragment}=React;
 
-const DATA_URL = "./data/scanner_results.json?t=" + Date.now();
-const FUNDA_URL = "./data/funda_scans.json?t=" + Date.now();
+const DATA_URL="./data/scanner_results.json?t="+Date.now();
+const FUNDA_URL="./data/funda_scans.json?t="+Date.now();
 
-// ═══════════════════════════════════════════════════════════════
-// DATA HOOKS
-// ═══════════════════════════════════════════════════════════════
+// ── ChartInk results storage ──
+const CI_KEY='te_chartink_results';
+function saveCI(name,stocks){try{const ex=JSON.parse(localStorage.getItem(CI_KEY)||'{}');ex[name]={stocks:stocks.map(s=>s.symbol||s),count:stocks.length,at:new Date().toISOString()};const ks=Object.keys(ex);if(ks.length>20)delete ex[ks.sort((a,b)=>new Date(ex[a].at)-new Date(ex[b].at))[0]];localStorage.setItem(CI_KEY,JSON.stringify(ex));return ex}catch{return{}}}
+function getCI(){try{return JSON.parse(localStorage.getItem(CI_KEY)||'{}')}catch{return{}}}
+function getCIMap(){const s=getCI(),m={};Object.entries(s).forEach(([n,d])=>{(d.stocks||[]).forEach(sym=>{const k=(typeof sym==='string'?sym:sym.symbol||'').toUpperCase();if(!m[k])m[k]=[];m[k].push(n)})});return m}
 
-function useStockData() {
-  const [stocks, setStocks] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
-  const [meta, setMeta] = React.useState({});
+// ── Data Hooks ──
+function useStockData(){const[stocks,setStocks]=useState([]);const[loading,setLoading]=useState(true);const[error,setError]=useState(null);const[meta,setMeta]=useState({});
+  useEffect(()=>{let c=false;(async()=>{try{const r=await fetch(DATA_URL);if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();if(!c){setStocks(j.stocks||[]);setMeta(j.meta||{});setLoading(false)}}catch(e){if(!c){setStocks(FALLBACK);setMeta({generated_at:new Date().toISOString(),total_scanned:FALLBACK.length,version:"mock"});setLoading(false);setError("Using offline data")}}})();return()=>{c=true}},[]);
+  return{stocks,loading,error,meta}}
 
-  React.useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch(DATA_URL);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        if (!cancelled) { setStocks(json.stocks || []); setMeta(json.meta || {}); setLoading(false); }
-      } catch (e) {
-        if (!cancelled) { setStocks(FALLBACK_MOCK); setMeta({generated_at: new Date().toISOString(), total_scanned: FALLBACK_MOCK.length, version: "mock"}); setLoading(false); setError("Using offline data"); }
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
-  return { stocks, loading, error, meta };
-}
+function useFundaData(){const[d,setD]=useState(null);const[l,setL]=useState(true);
+  useEffect(()=>{fetch(FUNDA_URL).then(r=>r.ok?r.json():null).then(d=>{setD(d);setL(false)}).catch(()=>setL(false))},[]);
+  return{fundaData:d,fundaLoading:l}}
 
-// ═══ FUNDA SCAN DATA HOOK ═══
-function useFundaData() {
-  const [fundaData, setFundaData] = useState(null);
-  const [fundaLoading, setFundaLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(FUNDA_URL)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { setFundaData(d); setFundaLoading(false); })
-      .catch(() => setFundaLoading(false));
-  }, []);
-
-  return { fundaData, fundaLoading };
-}
-
-const FALLBACK_MOCK = [
-  { symbol:"NTPC", name:"NTPC Ltd", sector:"Power", price:382.4, change_pct:2.15, rsi:68.5, composite_score:5, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[{type:"52w_high_volume",priority:9,title:"52W High with Volume",direction:"bullish"}], fundamentals:{pe_ratio:15.02,market_cap_cr:370800,mcap_category:"large_cap",eps:22.08,roe:12.31,debt_to_equity:145}, fund_holdings:{no_of_funds:245,fund_shares_change_pct:-0.83}, macd:{crossover:"bullish"}, ema:{cross_9_21:"bullish",cross_50_200:"golden_cross"}, breakout:{signal:"new_52w_high"}, volume:{ratio:1.8,signal:"above_avg"}, bollinger:{signal:"upper_breakout"}, returns:{"1d":2.15,"1w":3.2,"1m":5.34,"3m":17.64} },
-  { symbol:"HAL", name:"Hindustan Aeronautics", sector:"Defence", price:4850, change_pct:3.1, rsi:72.3, composite_score:5, circuit:{band:"No Band",is_restricted:false}, earnings_alert:"📅 Reports Q4 in 5 days", catalysts:[{type:"earnings_blockbuster",priority:10,title:"Blockbuster EPS +62%",direction:"bullish"}], fundamentals:{pe_ratio:38.5,market_cap_cr:324000,mcap_category:"large_cap",eps:126,roe:28.5,debt_to_equity:0}, fund_holdings:{no_of_funds:189,fund_shares_change_pct:2.4}, macd:{crossover:"bullish"}, ema:{cross_9_21:"golden_cross",cross_50_200:"golden_cross"}, breakout:{signal:"new_52w_high"}, volume:{ratio:3.2,signal:"extreme_spike"}, bollinger:{signal:"upper_breakout"}, returns:{"1d":3.1,"1w":5.8,"1m":12.4,"3m":28.7} },
-  { symbol:"COALINDIA", name:"Coal India", sector:"Mining", price:485, change_pct:1.2, rsi:65.8, composite_score:4, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[{type:"institutional_accumulation",priority:8,title:"Fund Holding +3.2%",direction:"bullish"}], fundamentals:{pe_ratio:8.2,market_cap_cr:298500,mcap_category:"large_cap",eps:59,roe:52,debt_to_equity:8}, fund_holdings:{no_of_funds:312,fund_shares_change_pct:3.2}, macd:{crossover:"bullish"}, ema:{cross_9_21:"bullish",cross_50_200:"golden_cross"}, breakout:{signal:"near_52w_high"}, volume:{ratio:2.1,signal:"spike"}, bollinger:{signal:"upper_breakout"}, returns:{"1d":1.2,"1w":2.8,"1m":6.1,"3m":15.3} },
-  { symbol:"SBIN", name:"State Bank of India", sector:"Banking", price:1066.7, change_pct:1.88, rsi:48.2, composite_score:3, circuit:{band:"No Band",is_restricted:false}, earnings_alert:null, catalysts:[], fundamentals:{pe_ratio:11.17,market_cap_cr:984630,mcap_category:"mega_cap",eps:81.94,roe:15.83,debt_to_equity:null}, fund_holdings:{no_of_funds:410,fund_shares_change_pct:0.5}, macd:{crossover:"bullish_crossover"}, ema:{cross_9_21:"golden_cross",cross_50_200:"bullish"}, breakout:{signal:"none"}, volume:{ratio:2.4,signal:"spike"}, bollinger:{signal:"neutral"}, returns:{"1d":1.88,"1w":3.5,"1m":-11.0,"3m":10.75} },
-  { symbol:"TCS", name:"TCS", sector:"IT", price:2409.2, change_pct:-0.05, rsi:18.5, composite_score:-5, circuit:{band:"No Band",is_restricted:false}, earnings_alert:"⚠️ Reports Q4 TODAY", catalysts:[{type:"earnings_decline",priority:8,title:"EPS Decline -15%",direction:"bearish"}], fundamentals:{pe_ratio:18.18,market_cap_cr:871670,mcap_category:"mega_cap",eps:131.54,roe:50.48,debt_to_equity:8}, fund_holdings:{no_of_funds:520,fund_shares_change_pct:-2.1}, macd:{crossover:"bearish_crossover"}, ema:{cross_9_21:"death_cross",cross_50_200:"death_cross"}, breakout:{signal:"near_52w_low"}, volume:{ratio:0.8,signal:"normal"}, bollinger:{signal:"lower_breakout"}, returns:{"1d":-0.05,"1w":-3.2,"1m":-10.51,"3m":-25.19} },
+const FALLBACK=[
+  {symbol:"NTPC",name:"NTPC Ltd",sector:"Power",price:382.4,change_pct:2.15,rsi:68.5,composite_score:5,circuit:{band:"No Band",is_restricted:false},earnings_alert:null,catalysts:[{type:"52w_high",priority:9,title:"52W High",direction:"bullish"}],fundamentals:{pe_ratio:15,market_cap_cr:370800,mcap_category:"large_cap",eps:22,roe:12,debt_to_equity:145},fund_holdings:{no_of_funds:245,fund_shares_change_pct:-0.83},macd:{crossover:"bullish"},ema:{cross_9_21:"bullish",cross_50_200:"golden_cross"},breakout:{signal:"new_52w_high"},volume:{ratio:1.8,signal:"above_avg"},bollinger:{signal:"upper_breakout"},returns:{"1d":2.15,"1w":3.2,"1m":5.34,"3m":17.64}},
+  {symbol:"HAL",name:"HAL",sector:"Defence",price:4850,change_pct:3.1,rsi:72.3,composite_score:5,circuit:{band:"No Band",is_restricted:false},earnings_alert:null,catalysts:[{type:"earnings_blockbuster",priority:10,title:"Blockbuster EPS +62%",direction:"bullish"}],fundamentals:{pe_ratio:38.5,market_cap_cr:324000,mcap_category:"large_cap",eps:126,roe:28.5,debt_to_equity:0},fund_holdings:{no_of_funds:189,fund_shares_change_pct:2.4},macd:{crossover:"bullish"},ema:{cross_9_21:"golden_cross",cross_50_200:"golden_cross"},breakout:{signal:"new_52w_high"},volume:{ratio:3.2,signal:"extreme_spike"},bollinger:{signal:"upper_breakout"},returns:{"1d":3.1,"1w":5.8,"1m":12.4,"3m":28.7}},
+  {symbol:"TCS",name:"TCS",sector:"IT",price:2409,change_pct:-0.05,rsi:18.5,composite_score:-5,circuit:{band:"No Band",is_restricted:false},earnings_alert:"⚠️ Reports Q4",catalysts:[{type:"earnings_decline",priority:8,title:"EPS -15%",direction:"bearish"}],fundamentals:{pe_ratio:18,market_cap_cr:871670,mcap_category:"mega_cap",eps:131,roe:50,debt_to_equity:8},fund_holdings:{no_of_funds:520,fund_shares_change_pct:-2.1},macd:{crossover:"bearish_crossover"},ema:{cross_9_21:"death_cross",cross_50_200:"death_cross"},breakout:{signal:"near_52w_low"},volume:{ratio:0.8,signal:"normal"},bollinger:{signal:"lower_breakout"},returns:{"1d":-0.05,"1w":-3.2,"1m":-10.5,"3m":-25.19}},
 ];
 
-const SCAN_CATEGORIES = [
-  { id:"all", label:"ALL", icon:"◉" },
-  { id:"catalyst", label:"CATALYSTS", icon:"⚡" },
-  { id:"bullish", label:"BULLISH", icon:"▲" },
-  { id:"bearish", label:"BEARISH", icon:"▼" },
-  { id:"earnings", label:"EARNINGS", icon:"📊" },
-  { id:"volume", label:"VOLUME", icon:"📈" },
-  { id:"breakout", label:"BREAKOUT", icon:"💥" },
-  { id:"momentum", label:"MOMENTUM", icon:"🚀" },
-];
+const SCAN_CATS=[{id:"all",label:"ALL",icon:"◉"},{id:"catalyst",label:"CATALYSTS",icon:"⚡"},{id:"bullish",label:"BULLISH",icon:"▲"},{id:"bearish",label:"BEARISH",icon:"▼"},{id:"earnings",label:"EARNINGS",icon:"📊"},{id:"volume",label:"VOLUME",icon:"📈"},{id:"breakout",label:"BREAKOUT",icon:"💥"},{id:"momentum",label:"MOMENTUM",icon:"🚀"}];
+const CAT_COLORS={growth:{bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"},ownership:{bg:"rgba(0,200,255,0.08)",border:"rgba(0,200,255,0.25)",color:"#00c8ff"},capex:{bg:"rgba(255,170,0,0.08)",border:"rgba(255,170,0,0.25)",color:"#ffaa00"},momentum:{bg:"rgba(136,68,255,0.08)",border:"rgba(136,68,255,0.25)",color:"#8844ff"},earnings:{bg:"rgba(255,100,0,0.08)",border:"rgba(255,100,0,0.25)",color:"#ff6400"},quality:{bg:"rgba(0,230,200,0.08)",border:"rgba(0,230,200,0.25)",color:"#00e6c8"}};
 
-// Category colors for funda scans
-const CAT_COLORS = {
-  growth: { bg: "rgba(0,255,136,0.08)", border: "rgba(0,255,136,0.25)", color: "#00ff88" },
-  ownership: { bg: "rgba(0,200,255,0.08)", border: "rgba(0,200,255,0.25)", color: "#00c8ff" },
-  capex: { bg: "rgba(255,170,0,0.08)", border: "rgba(255,170,0,0.25)", color: "#ffaa00" },
-  momentum: { bg: "rgba(136,68,255,0.08)", border: "rgba(136,68,255,0.25)", color: "#8844ff" },
-  earnings: { bg: "rgba(255,100,0,0.08)", border: "rgba(255,100,0,0.25)", color: "#ff6400" },
-  quality: { bg: "rgba(0,230,200,0.08)", border: "rgba(0,230,200,0.25)", color: "#00e6c8" },
-};
+// ── Helpers ──
+const SignalBadge=({signal})=>{const m={bullish_crossover:"badge-bullish",bullish:"badge-bullish",golden_cross:"badge-warning",new_52w_high:"badge-bullish",near_52w_high:"badge-bullish",spike:"badge-info",extreme_spike:"badge-purple",upper_breakout:"badge-bullish",bearish_crossover:"badge-bearish",bearish:"badge-bearish",death_cross:"badge-bearish",new_52w_low:"badge-bearish",near_52w_low:"badge-bearish",lower_breakout:"badge-bearish",above_avg:"badge-info",normal:"badge-neutral",none:"badge-neutral",neutral:"badge-neutral"};return<span className={`badge ${m[signal]||"badge-neutral"}`}>{(signal||"—").replace(/_/g," ").toUpperCase()}</span>};
+const ScoreBar=({score})=>{const p=Math.min(Math.abs(score)/7*100,100);const pos=score>=0;return<div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:56,height:7,borderRadius:4,background:"rgba(255,255,255,0.04)",overflow:"hidden",position:"relative"}}><div style={{position:"absolute",[pos?"left":"right"]:0,top:0,height:"100%",width:`${p}%`,borderRadius:4,background:pos?"linear-gradient(90deg,#00ff8855,#00ff88)":"linear-gradient(90deg,#ff4455,#ff445555)"}}/></div><span style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,color:score>0?"#00ff88":score<0?"#ff4455":"#556",minWidth:22,textAlign:"right"}}>{score>0?"+"+score:score}</span></div>};
+const FundBadge=({funds,changePct})=>{if(!funds)return<span style={{color:"var(--text-muted)",fontSize:10}}>—</span>;const c=changePct>0?"#00ff88":changePct<0?"#ff4455":"#889";return<div style={{fontFamily:"var(--font-mono)",fontSize:10,lineHeight:1.4}}><div style={{color:"#ddd",fontWeight:600}}>{funds}</div><div style={{color}}>{changePct>0?"+":""}{changePct?.toFixed(1)}%</div></div>};
+const PctCell=({val})=>{if(val==null)return<span style={{color:"var(--text-muted)"}}>—</span>;const c=val>0?"#00ff88":val<0?"#ff4455":"#889";return<span style={{color:c,fontWeight:600,fontFamily:"var(--font-mono)",fontSize:11}}>{val>0?"+":""}{val.toFixed(2)}%</span>};
+const CatalystPill=({catalyst})=>{const cs={bullish:{bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"},bearish:{bg:"rgba(255,68,85,0.08)",border:"rgba(255,68,85,0.25)",color:"#ff4455"},neutral:{bg:"rgba(136,153,170,0.08)",border:"rgba(136,153,170,0.15)",color:"#889"}};const c=cs[catalyst.direction]||cs.neutral;return<div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:4,background:c.bg,border:`1px solid ${c.border}`,fontSize:9,fontFamily:"var(--font-mono)",fontWeight:600,color:c.color,whiteSpace:"nowrap"}}><span style={{fontSize:7}}>P{catalyst.priority}</span> {catalyst.title}</div>};
 
-// ═══════════════════════════════════════════════════════════════
-// HELPER COMPONENTS (same as your existing ones)
-// ═══════════════════════════════════════════════════════════════
+const TVMiniChart=({symbol})=>{const ref=useRef(null);const[prices,setPrices]=useState(null);
+  useEffect(()=>{fetch(`./data/stock_details/${symbol}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).then(d=>{if(d?.price_history?.length)setPrices(d.price_history.slice(-60))}).catch(()=>{})},[symbol]);
+  useEffect(()=>{if(!ref.current||!prices?.length)return;const cv=ref.current;const dp=window.devicePixelRatio||1;const W=cv.parentElement.offsetWidth;const H=80;cv.width=W*dp;cv.height=H*dp;cv.style.width=W+"px";cv.style.height=H+"px";const ctx=cv.getContext("2d");ctx.scale(dp,dp);const cl=prices.map(p=>p.c||p.close||0).filter(v=>v>0);if(cl.length<2)return;const mn=Math.min(...cl),mx=Math.max(...cl),rg=mx-mn||1;const pad=4,cW=W-pad*2,cH=H-20,st=cW/(cl.length-1);ctx.clearRect(0,0,W,H);const f=cl[0],l=cl[cl.length-1];const lc=l>=f?"#00ff88":"#ff4455";ctx.beginPath();cl.forEach((c,i)=>{const x=pad+i*st;const y=pad+(1-(c-mn)/rg)*cH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.strokeStyle=lc;ctx.lineWidth=1.5;ctx.stroke();ctx.lineTo(pad+(cl.length-1)*st,H);ctx.lineTo(pad,H);ctx.closePath();const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,l>=f?"rgba(0,255,136,0.12)":"rgba(255,68,85,0.12)");g.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=g;ctx.fill();ctx.fillStyle="#889";ctx.font="9px 'JetBrains Mono'";ctx.textAlign="right";ctx.fillText(`₹${l.toFixed(1)}`,W-4,12);ctx.fillStyle=lc;ctx.fillText(`${l>=f?"+":""}${((l-f)/f*100).toFixed(1)}%`,W-4,24)},[prices]);
+  if(!prices)return<div style={{height:80,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-muted)",fontSize:9}}>Loading...</div>;
+  return<canvas ref={ref} style={{width:"100%",borderRadius:4,cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${symbol}`,'_blank')}/>};
 
-const SignalBadge = ({signal}) => {
-  const map = { bullish_crossover:"badge-bullish", bullish:"badge-bullish", golden_cross:"badge-warning", new_52w_high:"badge-bullish", near_52w_high:"badge-bullish", spike:"badge-info", extreme_spike:"badge-purple", upper_breakout:"badge-bullish", bearish_crossover:"badge-bearish", bearish:"badge-bearish", death_cross:"badge-bearish", new_52w_low:"badge-bearish", near_52w_low:"badge-bearish", lower_breakout:"badge-bearish", above_avg:"badge-info", normal:"badge-neutral", none:"badge-neutral", neutral:"badge-neutral" };
-  return <span className={`badge ${map[signal]||"badge-neutral"}`}>{(signal||"—").replace(/_/g," ").toUpperCase()}</span>;
-};
-
-const ScoreBar = ({score}) => {
-  const pct = Math.min(Math.abs(score)/7*100, 100);
-  const isPos = score >= 0;
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:6}}>
-      <div style={{width:56,height:7,borderRadius:4,background:"rgba(255,255,255,0.04)",overflow:"hidden",position:"relative"}}>
-        <div style={{position:"absolute",[isPos?"left":"right"]:0,top:0,height:"100%",width:`${pct}%`,borderRadius:4,
-          background:isPos?"linear-gradient(90deg,#00ff8855,#00ff88)":"linear-gradient(90deg,#ff4455,#ff445555)"}}/>
-      </div>
-      <span style={{fontFamily:"var(--font-mono)",fontSize:11,fontWeight:700,color:score>0?"#00ff88":score<0?"#ff4455":"#556",minWidth:22,textAlign:"right"}}>{score>0?`+${score}`:score}</span>
+const StockDrilldown=({stock,onClose})=>{if(!stock)return null;const f=stock.fundamentals||{};const fh=stock.fund_holdings||{};
+  return<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",justifyContent:"center",alignItems:"flex-start",overflowY:"auto",padding:"40px 20px"}} onClick={onClose}>
+    <div style={{maxWidth:1100,width:"100%",background:"var(--bg-secondary)",border:"1px solid var(--border-med)",borderRadius:10}} onClick={e=>e.stopPropagation()} className="fade-in">
+      <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><span style={{fontSize:22,fontWeight:800,color:"#fff"}}>{stock.symbol}</span><span style={{fontSize:13,color:"var(--text-secondary)",marginLeft:10}}>{stock.name}</span><span className="badge badge-info" style={{marginLeft:8}}>{stock.sector}</span></div><div style={{display:"flex",alignItems:"center",gap:12}}><div style={{textAlign:"right"}}><div style={{fontSize:22,fontWeight:700,color:"#fff",fontFamily:"var(--font-mono)"}}>₹{stock.price?.toLocaleString()}</div><PctCell val={stock.change_pct}/></div><button onClick={onClose} style={{background:"none",border:"1px solid var(--border-low)",borderRadius:4,width:32,height:32,color:"var(--text-muted)",cursor:"pointer",fontSize:16}}>✕</button></div></div>
+      <div style={{padding:"12px 20px"}}><TVMiniChart symbol={stock.symbol}/></div>
+      <div style={{padding:"0 20px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>{[["MCap",f.market_cap_cr?`₹${(f.market_cap_cr/100).toFixed(0)}K Cr`:"—"],["P/E",f.pe_ratio||"—"],["EPS",f.eps?`₹${f.eps}`:"—"],["ROE",f.roe?`${f.roe}%`:"—"],["D/E",f.debt_to_equity!=null?f.debt_to_equity+"%":"N/A"],["RSI",stock.rsi?.toFixed(1)],["Funds",fh.no_of_funds||"—"],["Fund Chg",fh.fund_shares_change_pct!=null?`${fh.fund_shares_change_pct>0?"+":""}${fh.fund_shares_change_pct}%`:"—"]].map(([l,v],i)=><div key={i} style={{background:"var(--bg-tertiary)",borderRadius:6,padding:"10px 12px",border:"1px solid var(--border-dim)"}}><div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{l}</div><div style={{fontSize:15,fontWeight:600,color:"#ddd",fontFamily:"var(--font-mono)"}}>{v}</div></div>)}</div>
+      {stock.catalysts?.length>0&&<div style={{padding:"0 20px 16px"}}><div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>⚡ CATALYSTS</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{stock.catalysts.map((c,i)=><CatalystPill key={i} catalyst={c}/>)}</div></div>}
+      <div style={{padding:"0 20px 20px"}}><div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>SIGNALS</div><div style={{display:"flex",flexWrap:"wrap",gap:8}}>{[["MACD",stock.macd?.crossover],["EMA",stock.ema?.cross_9_21],["52W",stock.breakout?.signal],["VOL",stock.volume?.signal]].map(([l,s],i)=><div key={i}><span style={{fontSize:9,color:"var(--text-muted)"}}>{l}</span> <SignalBadge signal={s}/></div>)}</div></div>
     </div>
-  );
-};
-
-const FundBadge = ({funds, changePct}) => {
-  if (!funds) return <span style={{color:"var(--text-muted)",fontSize:10}}>—</span>;
-  const color = changePct > 0 ? "#00ff88" : changePct < 0 ? "#ff4455" : "#889";
-  return (<div style={{fontFamily:"var(--font-mono)",fontSize:10,lineHeight:1.4}}><div style={{color:"#ddd",fontWeight:600}}>{funds}</div><div style={{color}}>{changePct > 0 ? "+" : ""}{changePct?.toFixed(1)}%</div></div>);
-};
-
-const PctCell = ({val}) => {
-  if (val == null) return <span style={{color:"var(--text-muted)"}}>—</span>;
-  const c = val > 0 ? "#00ff88" : val < 0 ? "#ff4455" : "#889";
-  return <span style={{color:c,fontWeight:600,fontFamily:"var(--font-mono)",fontSize:11}}>{val>0?"+":""}{val.toFixed(2)}%</span>;
-};
-
-const CatalystPill = ({catalyst}) => {
-  const colors = { bullish:{bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"}, bearish:{bg:"rgba(255,68,85,0.08)",border:"rgba(255,68,85,0.25)",color:"#ff4455"}, neutral:{bg:"rgba(136,153,170,0.08)",border:"rgba(136,153,170,0.15)",color:"#889"} };
-  const c = colors[catalyst.direction] || colors.neutral;
-  return (<div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:4,background:c.bg,border:`1px solid ${c.border}`,fontSize:9,fontFamily:"var(--font-mono)",fontWeight:600,color:c.color,whiteSpace:"nowrap"}}><span style={{fontSize:7}}>P{catalyst.priority}</span> {catalyst.title}</div>);
-};
-
-// Mini chart
-const TVMiniChart = ({symbol}) => {
-  const canvasRef = useRef(null);
-  const [prices, setPrices] = useState(null);
-  useEffect(() => { fetch(`./data/stock_details/${symbol}.json?t=${Date.now()}`).then(r=>r.ok?r.json():null).then(d=>{if(d?.price_history?.length)setPrices(d.price_history.slice(-60))}).catch(()=>{}); }, [symbol]);
-  useEffect(() => {
-    if (!canvasRef.current || !prices?.length) return;
-    const canvas = canvasRef.current; const dpr = window.devicePixelRatio || 1;
-    const W = canvas.parentElement.offsetWidth; const H = 80;
-    canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = W + "px"; canvas.style.height = H + "px";
-    const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
-    const closes = prices.map(p => p.c || p.close || 0).filter(v => v > 0);
-    const vols = prices.map(p => p.v || p.volume || 0);
-    if (closes.length < 2) return;
-    const mn = Math.min(...closes), mx = Math.max(...closes), range = mx - mn || 1;
-    const pad = 4, chartW = W - pad * 2, chartH = H - 20, step = chartW / (closes.length - 1);
-    ctx.clearRect(0, 0, W, H);
-    const maxVol = Math.max(...vols) || 1;
-    vols.forEach((v, i) => { const x = pad + i * step; const bh = (v / maxVol) * 16; ctx.fillStyle = i > 0 && closes[i] >= closes[i-1] ? "rgba(0,255,136,0.15)" : "rgba(255,68,85,0.15)"; ctx.fillRect(x - step/3, H - bh, step * 0.6, bh); });
-    const first = closes[0], last = closes[closes.length - 1]; const lineColor = last >= first ? "#00ff88" : "#ff4455";
-    ctx.beginPath(); closes.forEach((c, i) => { const x = pad + i * step; const y = pad + (1 - (c - mn) / range) * chartH; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
-    ctx.strokeStyle = lineColor; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.lineTo(pad + (closes.length - 1) * step, H); ctx.lineTo(pad, H); ctx.closePath();
-    const grad = ctx.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, last >= first ? "rgba(0,255,136,0.12)" : "rgba(255,68,85,0.12)"); grad.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = grad; ctx.fill();
-    ctx.fillStyle = "#889"; ctx.font = "9px 'JetBrains Mono'"; ctx.textAlign = "right"; ctx.fillText(`₹${last.toFixed(1)}`, W - 4, 12);
-    ctx.fillStyle = last >= first ? "#00ff88" : "#ff4455"; ctx.fillText(`${last >= first ? "+" : ""}${((last - first) / first * 100).toFixed(1)}%`, W - 4, 24);
-  }, [prices]);
-  if (!prices) return <div style={{height:80,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-muted)",fontSize:9}}>Loading chart...</div>;
-  return <canvas ref={canvasRef} style={{width:"100%",borderRadius:4,cursor:"pointer"}} onClick={() => window.open(`stock.html?s=${symbol}`, '_blank')}/>;
-};
-
-// Drilldown modal
-const StockDrilldown = ({stock, onClose}) => {
-  if (!stock) return null;
-  const f = stock.fundamentals || {}; const fh = stock.fund_holdings || {};
-  return (
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",justifyContent:"center",alignItems:"flex-start",overflowY:"auto",padding:"40px 20px"}} onClick={onClose}>
-      <div style={{maxWidth:1100,width:"100%",background:"var(--bg-secondary)",border:"1px solid var(--border-med)",borderRadius:10}} onClick={e=>e.stopPropagation()} className="fade-in">
-        <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <span style={{fontSize:22,fontWeight:800,color:"#fff"}}>{stock.symbol}</span>
-            <span style={{fontSize:13,color:"var(--text-secondary)",marginLeft:10}}>{stock.name}</span>
-            <span className="badge badge-info" style={{marginLeft:8}}>{stock.sector}</span>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{textAlign:"right"}}><div style={{fontSize:22,fontWeight:700,color:"#fff",fontFamily:"var(--font-mono)"}}>₹{stock.price?.toLocaleString()}</div><PctCell val={stock.change_pct}/></div>
-            <button onClick={onClose} style={{background:"none",border:"1px solid var(--border-low)",borderRadius:4,width:32,height:32,color:"var(--text-muted)",cursor:"pointer",fontSize:16}}>✕</button>
-          </div>
-        </div>
-        <div style={{padding:"12px 20px"}}><TVMiniChart symbol={stock.symbol}/></div>
-        <div style={{padding:"0 20px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
-          {[["Market Cap",f.market_cap_cr?`₹${(f.market_cap_cr/100).toFixed(0)}K Cr`:"—"],["P/E",f.pe_ratio||"—"],["EPS",f.eps?`₹${f.eps}`:"—"],["ROE",f.roe?`${f.roe}%`:"—"],["D/E",f.debt_to_equity!=null?f.debt_to_equity+"%":"N/A"],["RSI(14)",stock.rsi?.toFixed(1)],["Funds",fh.no_of_funds||"—"],["Fund Chg",fh.fund_shares_change_pct!=null?`${fh.fund_shares_change_pct>0?"+":""}${fh.fund_shares_change_pct}%`:"—"]].map(([l,v],i)=>(
-            <div key={i} style={{background:"var(--bg-tertiary)",borderRadius:6,padding:"10px 12px",border:"1px solid var(--border-dim)"}}>
-              <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{l}</div>
-              <div style={{fontSize:15,fontWeight:600,color:"#ddd",fontFamily:"var(--font-mono)"}}>{v}</div>
-            </div>
-          ))}
-        </div>
-        {stock.catalysts?.length > 0 && <div style={{padding:"0 20px 16px"}}><div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>⚡ CATALYSTS</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{stock.catalysts.map((c,i)=><CatalystPill key={i} catalyst={c}/>)}</div></div>}
-        <div style={{padding:"0 20px 16px"}}><div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>SIGNALS</div><div style={{display:"flex",flexWrap:"wrap",gap:8}}>{[["MACD",stock.macd?.crossover],["EMA 9/21",stock.ema?.cross_9_21],["EMA 50/200",stock.ema?.cross_50_200],["52W",stock.breakout?.signal],["VOL",stock.volume?.signal],["BB",stock.bollinger?.signal]].map(([l,s],i)=><div key={i}><span style={{fontSize:9,color:"var(--text-muted)"}}>{l}</span> <SignalBadge signal={s}/></div>)}</div></div>
-        <div style={{padding:"0 20px 20px"}}><div style={{fontSize:11,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>RETURNS</div><div style={{display:"flex",gap:16}}>{[["1D",stock.returns?.["1d"]],["1W",stock.returns?.["1w"]],["1M",stock.returns?.["1m"]],["3M",stock.returns?.["3m"]]].map(([p,v],i)=><div key={i} style={{textAlign:"center"}}><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{p}</div><PctCell val={v}/></div>)}</div></div>
-      </div>
-    </div>
-  );
-};
+  </div>};
 
 // ═══════════════════════════════════════════════════════════════
-// FUNDA SCANS PANEL — NEW COMPONENT
+// FUNDA SCANS PANEL — 3 modes: Fundamental / TechnoFunda / FundaTech
 // ═══════════════════════════════════════════════════════════════
 
-const FundaScansPanel = ({ fundaData, activeFundaScan, setActiveFundaScan, onFilterByFunda }) => {
-  if (!fundaData?.scans) return null;
+const FundaScansPanel=({fundaData,activeFundaScan,setActiveFundaScan,onFilterByFunda,allStocks})=>{
+  if(!fundaData?.scans)return null;
+  const scans=Object.values(fundaData.scans);
+  const tfBack=fundaData.technofunda?Object.values(fundaData.technofunda):[];
+  const[mode,setMode]=useState('funda');
+  const[savedCI,setSavedCI]=useState(()=>getCI());
+  const ciMap=useMemo(()=>getCIMap(),[savedCI]);
 
-  const scans = Object.values(fundaData.scans);
-  const tfScans = fundaData.technofunda ? Object.values(fundaData.technofunda) : [];
-  const [showTF, setShowTF] = useState(false);
-
-  const displayScans = showTF ? tfScans : scans;
-  const totalMatches = scans.reduce((a, s) => a + s.count, 0);
-
-  return (
-    <div className="fade-in">
-      {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <div>
-          <span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>
-            {showTF ? "⚡ TECHNOFUNDA SCANS" : "📊 FUNDAMENTAL SCANS"} • {displayScans.length} SCANS • {showTF ? tfScans.reduce((a,s)=>a+s.count,0) : totalMatches} MATCHES
-          </span>
-          {fundaData.generated && <span style={{fontSize:9,color:"var(--text-muted)",marginLeft:8}}>Updated: {new Date(fundaData.generated).toLocaleString("en-IN")}</span>}
-        </div>
-        <div style={{display:"flex",gap:4}}>
-          <button className={`btn ${!showTF?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setShowTF(false)}>Fundamental</button>
-          {tfScans.length > 0 && <button className={`btn ${showTF?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setShowTF(true)}>
-            TechnoFunda ({tfScans.length})
-          </button>}
-          {activeFundaScan && <button className="btn" style={{fontSize:9,padding:"4px 10px",borderColor:"var(--red)",color:"var(--red)"}} onClick={()=>{setActiveFundaScan(null);onFilterByFunda(null)}}>✕ Clear</button>}
-        </div>
-      </div>
-
-      {/* Scan Cards Grid */}
-      <div className="funda-grid">
-        {displayScans.map(scan => {
-          const catColor = CAT_COLORS[scan.category] || CAT_COLORS.growth;
-          const isSelected = activeFundaScan === (showTF ? scan.funda_scan : scan.id);
-
-          return (
-            <div key={scan.id || scan.name} className={`funda-card ${isSelected ? "selected" : ""}`}
-              onClick={() => {
-                const scanId = showTF ? scan.funda_scan : scan.id;
-                if (isSelected) { setActiveFundaScan(null); onFilterByFunda(null); }
-                else {
-                  setActiveFundaScan(scanId);
-                  const syms = scan.stocks.map(s => s.symbol);
-                  onFilterByFunda(syms);
-                }
-              }}>
-              <div className="funda-card-count" style={{color: catColor.color}}>{scan.count}</div>
-              <div className="funda-card-name">{scan.name}</div>
-              <div className="funda-card-desc">{scan.description}</div>
-              <div className="funda-card-meta">
-                <span className="funda-cat" style={{background:catColor.bg, border:`1px solid ${catColor.border}`, color:catColor.color}}>
-                  {scan.category || "scan"}
-                </span>
-                <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{scan.count} stocks</span>
-                {showTF && <span className="tf-badge">TECHNOFUNDA</span>}
-              </div>
-              {/* Top 5 stocks preview */}
-              {scan.stocks?.length > 0 && (
-                <div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>
-                  {scan.stocks.slice(0, 5).map(s => (
-                    <span key={s.symbol} style={{fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,
-                      padding:"1px 5px",borderRadius:2,background:"rgba(255,255,255,0.04)",color:"var(--text-secondary)"}}>
-                      {s.symbol}
-                    </span>
-                  ))}
-                  {scan.stocks.length > 5 && <span style={{fontSize:8,color:"var(--text-muted)"}}>+{scan.stocks.length - 5}</span>}
-                </div>
-              )}
-              {/* TechnoFunda: show matching technical scans */}
-              {showTF && scan.stocks?.[0]?.technical_scans?.length > 0 && (
-                <div style={{marginTop:4,fontSize:8,color:"var(--accent3)",fontFamily:"var(--font-mono)"}}>
-                  Tech: {scan.stocks[0].technical_scans.slice(0,2).join(", ")}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Selected scan detail table */}
-      {activeFundaScan && (
-        <div style={{marginTop:12,border:"1px solid var(--border-low)",borderRadius:6,overflow:"hidden"}} className="fade-in">
-          <div style={{padding:"8px 12px",background:"rgba(0,255,136,0.03)",borderBottom:"1px solid var(--border-dim)",
-            fontSize:10,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>
-            {(displayScans.find(s => (s.id || s.funda_scan) === activeFundaScan) || {}).name} — {(displayScans.find(s => (s.id || s.funda_scan) === activeFundaScan) || {}).count} stocks
-          </div>
-          <div style={{maxHeight:300,overflowY:"auto"}}>
-            <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
-              <thead>
-                <tr style={{background:"rgba(0,255,136,0.02)"}}>
-                  {["#","SYMBOL","PRICE","MCAP(Cr)","ROCE","D/E","P/E","NPM","52WH%",showTF?"TECH SCANS":null].filter(Boolean).map(h=>(
-                    <th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:8,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(displayScans.find(s => (s.id || s.funda_scan) === activeFundaScan)?.stocks || []).map((s, i) => (
-                  <tr key={s.symbol} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}}
-                    onClick={() => window.open(`stock.html?s=${s.symbol}`, '_blank')}>
-                    <td style={{padding:"5px 8px",color:"var(--text-muted)"}}>{i+1}</td>
-                    <td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{s.symbol}</td>
-                    <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>₹{s.price?.toFixed(0)}</td>
-                    <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-secondary)"}}>{s.market_cap?.toFixed(0)}</td>
-                    <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.roce>15?"#00ff88":s.roce>8?"#ffaa00":"#889"}}>{s.roce?.toFixed(1)}</td>
-                    <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.de<0.5?"#00ff88":s.de<1?"#ffaa00":"#ff4455"}}>{s.de?.toFixed(2)}</td>
-                    <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>{s.pe?.toFixed(1)}</td>
-                    <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.npm>10?"#00ff88":"var(--text-secondary)"}}>{s.npm?.toFixed(1)}</td>
-                    <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s["52wh_dist"]<10?"#00ff88":s["52wh_dist"]<25?"#ffaa00":"var(--text-muted)"}}>{s["52wh_dist"]}%</td>
-                    {showTF && <td style={{padding:"5px 8px",fontSize:8,color:"var(--accent3)"}}>{s.technical_scans?.slice(0,2).join(", ")}</td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════
-// SCAN BUILDER (Updated with Funda Scans tab)
-// ═══════════════════════════════════════════════════════════════
-
-const ScanBuilder = ({onApplyFilter, onScanResults, fundaData, activeFundaScan, setActiveFundaScan, onFilterByFunda}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("funda_scans");
-  const [clauseText, setClauseText] = useState("");
-  const [scanRunning, setScanRunning] = useState(false);
-  const [scanResults, setScanResults] = useState(null);
-  const [savedPresets, setSavedPresets] = useState(() => { try { return JSON.parse(localStorage.getItem('te_chartink_presets') || '[]'); } catch { return []; } });
-  const savePresetsToLS = (p) => { setSavedPresets(p); try { localStorage.setItem('te_chartink_presets', JSON.stringify(p)); } catch {} };
-  const [fundaFilters, setFundaFilters] = useState({pe_on:false,pe_min:0,pe_max:50,roe_on:false,roe_min:10,de_on:false,de_max:1});
-  const [chartinkSymbols, setChartinkSymbols] = useState(null);
-  
-  const applyAllFilters = () => {
-    const n = { funda: null, chartink: null };
-    if (fundaFilters.pe_on || fundaFilters.roe_on || fundaFilters.de_on) n.funda = {...fundaFilters};
-    if (scanResults?.stocks?.length > 0) { const syms = scanResults.stocks.map(s => s.symbol.toUpperCase()); setChartinkSymbols(syms); n.chartink = syms; }
-    if (onApplyFilter) onApplyFilter(n);
-  };
-  const resetAllFilters = () => {
-    setClauseText(""); setScanResults(null); setChartinkSymbols(null);
-    setFundaFilters({pe_on:false,pe_min:0,pe_max:50,roe_on:false,roe_min:10,de_on:false,de_max:1});
-    if (onApplyFilter) onApplyFilter({funda:null,chartink:null});
-    if (onScanResults) onScanResults(null);
-    setActiveFundaScan(null); onFilterByFunda(null);
-  };
-
-  const tabs = [
-    {id:"funda_scans", label:"Funda Scans", icon:"📊"},
-    {id:"scans", label:"Tech Scans", icon:"📋"},
-    {id:"technicals", label:"Technicals", icon:"📈"},
-    {id:"fundamentals", label:"Filters", icon:"⚙"},
-    {id:"clause", label:"ChartInk", icon:"⌨"},
-  ];
-
-  return (
-    <div className="card" style={{marginBottom:12}}>
-      <div style={{padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:isOpen?"1px solid var(--border-dim)":"none"}} onClick={()=>setIsOpen(!isOpen)}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{color:"var(--accent)",fontSize:14}}>◈</span>
-          <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600}}>SCAN BUILDER</span>
-          {fundaData?.scans && <span style={{fontSize:9,fontFamily:"var(--font-mono)",color:"var(--accent3)",padding:"1px 6px",borderRadius:3,background:"rgba(136,68,255,0.1)"}}>
-            {Object.values(fundaData.scans).reduce((a,s)=>a+s.count,0)} funda matches
-          </span>}
-          {activeFundaScan && <span style={{fontSize:9,fontFamily:"var(--font-mono)",color:"var(--accent)",padding:"1px 6px",borderRadius:3,background:"var(--accent-dim)"}}>FUNDA FILTER ACTIVE</span>}
-        </div>
-        <span style={{color:"var(--text-muted)",fontSize:14,transform:isOpen?"rotate(180deg)":"",transition:"transform 0.2s"}}>▾</span>
-      </div>
-
-      {isOpen && (
-        <div className="fade-in" style={{padding:16}}>
-          <div className="tabs" style={{marginBottom:12,flexWrap:"wrap"}}>
-            {tabs.map(t=>(<button key={t.id} className={`tab ${activeTab===t.id?"active":""}`} onClick={()=>setActiveTab(t.id)}>{t.icon} {t.label}</button>))}
-          </div>
-
-          {/* ═══ FUNDA SCANS TAB (NEW) ═══ */}
-          {activeTab === "funda_scans" && (
-            <FundaScansPanel fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={onFilterByFunda}/>
-          )}
-
-          {/* Tech Scans */}
-          {activeTab === "scans" && (
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {["Inside Bar (D)","NR7","VCP","Tight Setup","Volume Breakout","Gap Up > 3%","Earnings Gap Up","Positive Earnings Reaction","Momentum Scanner","200MA Turnaround","SuperTrend Buy","Pocket Pivot"].map((s,i) => (
-                <label key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--text-primary)",cursor:"pointer"}}><input type="checkbox" defaultChecked={i<2||i===4||i===6||i===7} style={{accentColor:"var(--accent)"}}/>{s}</label>
-              ))}
-            </div>
-          )}
-
-          {/* Technicals */}
-          {activeTab === "technicals" && (
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              {[["Price(₹)","25","10000"],["MCap(Cr)","300","5000000"],["MA50 Vol >","100000",""]].map(([l,d1,d2],i)=>(
-                <label key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
-                  <input type="checkbox" defaultChecked style={{accentColor:"var(--accent)"}}/> {l}
-                  <input type="number" placeholder={d1} defaultValue={d1} style={{width:60}}/>{d2&&<>-<input type="number" placeholder={d2} defaultValue={d2} style={{width:70}}/></>}
-                </label>
-              ))}
-            </div>
-          )}
-
-          {/* Filters (Fundamentals) */}
-          {activeTab === "fundamentals" && (
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
-                <input type="checkbox" checked={fundaFilters.pe_on} onChange={e=>setFundaFilters(p=>({...p,pe_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> P/E Range
-                <input type="number" value={fundaFilters.pe_min} onChange={e=>setFundaFilters(p=>({...p,pe_min:+e.target.value||0}))} style={{width:50}}/> - <input type="number" value={fundaFilters.pe_max} onChange={e=>setFundaFilters(p=>({...p,pe_max:+e.target.value||0}))} style={{width:50}}/>
-              </label>
-              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
-                <input type="checkbox" checked={fundaFilters.roe_on} onChange={e=>setFundaFilters(p=>({...p,roe_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> ROE {">"} (%)
-                <input type="number" value={fundaFilters.roe_min} onChange={e=>setFundaFilters(p=>({...p,roe_min:+e.target.value||0}))} style={{width:50}}/>
-              </label>
-              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}>
-                <input type="checkbox" checked={fundaFilters.de_on} onChange={e=>setFundaFilters(p=>({...p,de_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> Debt/Equity {"<"}
-                <input type="number" value={fundaFilters.de_max} onChange={e=>setFundaFilters(p=>({...p,de_max:+e.target.value||0}))} style={{width:50}}/>
-              </label>
-            </div>
-          )}
-
-          {/* ChartInk Clause */}
-          {activeTab === "clause" && (
-            <div>
-              <div style={{fontSize:10,color:"var(--text-muted)",marginBottom:6,fontFamily:"var(--font-mono)"}}>Paste your ChartInk scan clause:</div>
-              <textarea rows={4} style={{width:"100%",resize:"vertical",fontSize:11}}
-                placeholder='( cash ( latest close > latest sma( latest close, 200 ) and latest rsi( 14 ) > 50 ) )'
-                value={clauseText} onChange={e=>setClauseText(e.target.value)}/>
-              <div style={{marginTop:8,display:"flex",gap:8,alignItems:"center"}}>
-                <button className="btn btn-accent" onClick={async () => {
-                  if (!clauseText.trim()) return;
-                  const workerUrl = localStorage.getItem('zd_worker_url');
-                  if (!workerUrl) { alert('Set zd_worker_url in localStorage first'); return; }
-                  setScanRunning(true); setScanResults(null);
-                  try { const r = await fetch(workerUrl, {method:'POST',headers:{'X-Kite-Action':'chartink-scan','Content-Type':'application/json'},body:JSON.stringify({scan_clause:clauseText.trim()})}); const data = await r.json(); setScanResults(data); if(onScanResults)onScanResults(data); } catch(e) { setScanResults({error:e.message}); }
-                  setScanRunning(false);
-                }}>{scanRunning?"⏳ Scanning...":"▶ Run Scan"}</button>
-                <button className="btn" onClick={()=>{if(!clauseText.trim())return;const name=prompt("Name:");if(!name)return;savePresetsToLS([...savedPresets,{name,clause:clauseText.trim(),date:new Date().toLocaleDateString("en-IN")}])}}>💾 Save</button>
-                {scanResults?.count!=null&&<span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>{scanResults.count} found</span>}
-              </div>
-              {scanResults?.stocks?.length>0&&(
-                <div style={{marginTop:12,maxHeight:300,overflowY:"auto",border:"1px solid var(--border-low)",borderRadius:6}}>
-                  <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
-                    <thead><tr style={{background:"rgba(0,255,136,0.05)"}}>{["#","SYMBOL","NAME","CLOSE","CHG%","VOL"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)"}}>{h}</th>)}</tr></thead>
-                    <tbody>{scanResults.stocks.map((s,i)=>(<tr key={i} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${s.symbol}`,'_blank')}><td style={{padding:"5px 8px",color:"var(--text-muted)"}}>{i+1}</td><td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{s.symbol}</td><td style={{padding:"5px 8px",color:"var(--text-secondary)"}}>{s.name}</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>₹{s.close}</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontWeight:600,color:s.change_pct>=0?"#00ff88":"#ff4455"}}>{s.change_pct>=0?"+":""}{s.change_pct?.toFixed(2)}%</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>{(s.volume/1000).toFixed(0)}K</td></tr>))}</tbody>
-                  </table>
-                </div>
-              )}
-              {savedPresets.length>0&&<div style={{marginTop:12}}><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>SAVED PRESETS ({savedPresets.length})</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{savedPresets.map((p,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"var(--bg-hover)",border:"1px solid var(--border-low)",borderRadius:4,cursor:"pointer",fontSize:10,fontFamily:"var(--font-mono)"}} onClick={()=>{setClauseText(p.clause);setScanResults(null)}}><span style={{color:"var(--accent)",fontWeight:700}}>{p.name}</span><span style={{color:"var(--text-muted)",fontSize:8}}>{p.date}</span><span style={{color:"var(--red)",cursor:"pointer",marginLeft:4,fontSize:12}} onClick={e=>{e.stopPropagation();if(confirm(`Delete "${p.name}"?`))savePresetsToLS(savedPresets.filter((_,j)=>j!==i))}}>×</span></div>))}</div></div>}
-            </div>
-          )}
-
-          <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center"}}>
-            {chartinkSymbols?.length>0&&<span style={{fontSize:9,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>CHARTINK: {chartinkSymbols.length}</span>}
-            {activeFundaScan&&<span style={{fontSize:9,color:"var(--accent3)",fontFamily:"var(--font-mono)"}}>FUNDA: {activeFundaScan}</span>}
-            <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={resetAllFilters}>Reset All</button>
-            <button className="btn btn-accent" onClick={applyAllFilters}>Apply Filters</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN SCANNER DASHBOARD
-// ═══════════════════════════════════════════════════════════════
-
-const ScannerDashboard = () => {
-  const { stocks, loading, error, meta } = useStockData();
-  const { fundaData, fundaLoading } = useFundaData();
-  const [activePreset, setActivePreset] = useState("all");
-  const [sortBy, setSortBy] = useState("score_desc");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStock, setSelectedStock] = useState(null);
-  const [excludeCircuit, setExcludeCircuit] = useState(true);
-  const [appliedFilters, setAppliedFilters] = useState({ funda: null, chartink: null });
-  const [chartinkResults, setChartinkResults] = useState(null);
-  const [wlSidebar, setWlSidebar] = useState(false);
-  const [wlRefresh, setWlRefresh] = useState(0);
-  
-  // ═══ NEW: Funda scan filter state ═══
-  const [activeFundaScan, setActiveFundaScan] = useState(null);
-  const [fundaFilterSyms, setFundaFilterSyms] = useState(null);
-
-  const filteredStocks = useMemo(() => {
-    let list = [...stocks];
-    if (excludeCircuit) list = list.filter(s => !s.circuit?.is_restricted);
-    
-    // ChartInk filter
-    if (appliedFilters.chartink?.length > 0) { const syms = new Set(appliedFilters.chartink); list = list.filter(s => syms.has(s.symbol.toUpperCase())); }
-    
-    // Fundamental scan filter (from funda_scans.json)
-    if (fundaFilterSyms?.length > 0) {
-      const fSyms = new Set(fundaFilterSyms.map(s => s.toUpperCase()));
-      list = list.filter(s => fSyms.has(s.symbol.toUpperCase()));
-    }
-    
-    // Basic funda filters
-    if (appliedFilters.funda) {
-      const ff = appliedFilters.funda;
-      list = list.filter(s => { const f = s.fundamentals || {};
-        if (ff.pe_on && f.pe_ratio != null && (f.pe_ratio < ff.pe_min || f.pe_ratio > ff.pe_max)) return false;
-        if (ff.roe_on && (f.roe == null || f.roe < ff.roe_min)) return false;
-        if (ff.de_on && f.debt_to_equity != null && f.debt_to_equity > ff.de_max) return false;
-        return true;
+  // FundaTech: funda picks with bullish technicals
+  const ftScans=useMemo(()=>{
+    if(!allStocks?.length)return[];
+    const sm={};allStocks.forEach(s=>{sm[s.symbol.toUpperCase()]=s});
+    return scans.filter(s=>s.count>0).map(scan=>{
+      const matches=[];
+      scan.stocks.forEach(fs=>{
+        const t=sm[fs.symbol.toUpperCase()];if(!t)return;
+        const sigs=[];
+        if(['bullish','bullish_crossover'].includes(t.macd?.crossover))sigs.push('MACD Bull');
+        if(['golden_cross','bullish'].includes(t.ema?.cross_9_21))sigs.push('EMA 9/21▲');
+        if(['golden_cross'].includes(t.ema?.cross_50_200))sigs.push('GoldenCross');
+        if(['new_52w_high','near_52w_high'].includes(t.breakout?.signal))sigs.push('52WHigh');
+        if(['spike','extreme_spike'].includes(t.volume?.signal))sigs.push('VolSpike');
+        if(['upper_breakout'].includes(t.bollinger?.signal))sigs.push('BBBreak');
+        if(t.rsi>=55&&t.rsi<=75)sigs.push(`RSI${t.rsi?.toFixed(0)}`);
+        if(t.composite_score>=3)sigs.push(`Score+${t.composite_score}`);
+        const ci=ciMap[fs.symbol.toUpperCase()]||[];ci.forEach(n=>sigs.push(`CI:${n}`));
+        if(sigs.length>0)matches.push({...fs,technical_signals:sigs,composite_score:t.composite_score||0,rsi:t.rsi||0,change_pct:t.change_pct||0});
       });
-    }
-    
-    // Preset filter
-    if (activePreset === "catalyst") list = list.filter(s => s.catalysts?.length > 0);
-    else if (activePreset === "bullish") list = list.filter(s => s.composite_score >= 3);
-    else if (activePreset === "bearish") list = list.filter(s => s.composite_score <= -3);
-    else if (activePreset === "earnings") list = list.filter(s => s.earnings_alert);
-    else if (activePreset === "volume") list = list.filter(s => ["spike","extreme_spike"].includes(s.volume?.signal));
-    else if (activePreset === "breakout") list = list.filter(s => ["new_52w_high","near_52w_high"].includes(s.breakout?.signal));
-    else if (activePreset === "momentum") list = list.filter(s => s.rsi > 55 && s.rsi < 80 && s.composite_score > 0);
-    
-    if (searchQuery) { const q = searchQuery.toUpperCase(); list = list.filter(s => s.symbol.includes(q) || s.name.toUpperCase().includes(q) || s.sector.toUpperCase().includes(q)); }
-    
-    const sorters = { score_desc:(a,b)=>b.composite_score-a.composite_score, score_asc:(a,b)=>a.composite_score-b.composite_score, change_desc:(a,b)=>b.change_pct-a.change_pct, rsi_desc:(a,b)=>(b.rsi||0)-(a.rsi||0), funds_desc:(a,b)=>(b.fund_holdings?.no_of_funds||0)-(a.fund_holdings?.no_of_funds||0), mcap_desc:(a,b)=>(b.fundamentals?.market_cap_cr||0)-(a.fundamentals?.market_cap_cr||0) };
-    list.sort(sorters[sortBy] || sorters.score_desc);
-    return list;
-  }, [stocks, activePreset, sortBy, searchQuery, excludeCircuit, appliedFilters, fundaFilterSyms]);
+      matches.sort((a,b)=>(b.composite_score||0)-(a.composite_score||0));
+      return{id:`ft_${scan.id}`,name:`FT: ${scan.name}`,funda_scan:scan.id,category:scan.category,description:`${scan.name} + bullish technicals`,count:matches.length,stocks:matches};
+    }).filter(s=>s.count>0);
+  },[scans,allStocks,ciMap]);
 
-  const summary = useMemo(() => ({
-    bullish: stocks.filter(s=>s.composite_score>=3).length,
-    bearish: stocks.filter(s=>s.composite_score<=-3).length,
-    catalysts: stocks.filter(s=>s.catalysts?.length>0).length,
-    volume: stocks.filter(s=>["spike","extreme_spike"].includes(s.volume?.signal)).length,
-    earnings: stocks.filter(s=>s.earnings_alert).length,
-    restricted: stocks.filter(s=>s.circuit?.is_restricted).length,
-    fundaScans: fundaData?.scans ? Object.values(fundaData.scans).reduce((a,s)=>a+s.count,0) : 0,
-  }), [stocks, fundaData]);
+  // TechnoFunda: ChartInk → funda
+  const tfScans=useMemo(()=>{
+    if(Object.keys(ciMap).length===0)return tfBack;
+    const ciS=new Set(Object.keys(ciMap));
+    return scans.filter(s=>s.count>0).map(scan=>{
+      const ol=scan.stocks.filter(fs=>ciS.has(fs.symbol.toUpperCase()));
+      const en=ol.map(fs=>({...fs,technical_scans:ciMap[fs.symbol.toUpperCase()]||[]}));
+      en.sort((a,b)=>(b.technical_scans?.length||0)-(a.technical_scans?.length||0));
+      return{id:`tf_${scan.id}`,name:`TF: ${scan.name}`,funda_scan:scan.id,category:scan.category,description:`'${scan.name}' + ChartInk scans`,count:en.length,stocks:en};
+    }).filter(s=>s.count>0);
+  },[scans,ciMap,tfBack]);
 
-  if (loading) return (
-    <div>
-      <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
-        <a href="scanner.html" className="nav-link active">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a>
-      </nav>
-      <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"60vh",flexDirection:"column",gap:12}}>
-        <div style={{width:40,height:40,border:"3px solid var(--border-low)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-        <div style={{color:"var(--text-muted)",fontSize:12,fontFamily:"var(--font-mono)"}}>Loading scanner data...</div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  const disp=mode==='funda'?scans:mode==='technofunda'?tfScans:ftScans;
+  const total=disp.reduce((a,s)=>a+s.count,0);
+
+  return(
+  <div className="fade-in">
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+      <span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>
+        {mode==='funda'?'📊 FUNDAMENTAL':mode==='technofunda'?'⚡ TECHNOFUNDA':'🔀 FUNDATECH'} • {disp.length} SCANS • {total} MATCHES
+      </span>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+        <button className={`btn ${mode==='funda'?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setMode('funda')}>📊 Fundamental</button>
+        <button className={`btn ${mode==='technofunda'?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setMode('technofunda')}>⚡ TechnoFunda ({tfScans.length})</button>
+        <button className={`btn ${mode==='fundatech'?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setMode('fundatech')}>🔀 FundaTech ({ftScans.length})</button>
+        {activeFundaScan&&<button className="btn" style={{fontSize:9,padding:"4px 10px",borderColor:"var(--red)",color:"var(--red)"}} onClick={()=>{setActiveFundaScan(null);onFilterByFunda(null)}}>✕ Clear</button>}
       </div>
     </div>
-  );
 
-  return (
-    <div>
-      <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
-        <a href="scanner.html" className="nav-link active">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a>
-      </nav>
+    <div style={{padding:"6px 10px",borderRadius:4,marginBottom:10,fontSize:10,fontFamily:"var(--font-mono)",background:mode==='funda'?"rgba(0,255,136,0.04)":mode==='technofunda'?"rgba(136,68,255,0.04)":"rgba(0,200,255,0.04)",border:`1px solid ${mode==='funda'?"rgba(0,255,136,0.1)":mode==='technofunda'?"rgba(136,68,255,0.1)":"rgba(0,200,255,0.1)"}`,color:"var(--text-secondary)"}}>
+      {mode==='funda'&&"📊 Definedge-style fundamental scans. Click card → filter main table."}
+      {mode==='technofunda'&&`⚡ Tech→Funda: Your ${Object.keys(savedCI).length} saved ChartInk scans filtered by fundamentals. Run scans via ChartInk tab first.`}
+      {mode==='fundatech'&&"🔀 Funda→Tech: Fundamentally strong stocks with bullish MACD, EMA, Volume, RSI, Breakouts, ChartInk matches."}
+    </div>
 
-      <div style={{maxWidth:1440,margin:"0 auto",padding:"12px 16px"}}>
-        {error && <div style={{padding:"6px 12px",marginBottom:8,borderRadius:4,background:"rgba(255,170,0,0.08)",border:"1px solid rgba(255,170,0,0.2)",fontSize:10,color:"#ffaa00",fontFamily:"var(--font-mono)"}}>⚠ {error}</div>}
-        
-        {/* Header */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-          <div>
-            <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ SCANNER</h1>
-            <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>
-              {meta.total_scanned || stocks.length} STOCKS • {meta.generated_at ? new Date(meta.generated_at).toLocaleString("en-IN") : "OFFLINE"}
-              {fundaData && <span style={{color:"var(--accent3)"}}> • {summary.fundaScans} FUNDA MATCHES</span>}
-            </div>
+    {mode==='technofunda'&&Object.keys(savedCI).length>0&&<div style={{marginBottom:10,display:"flex",flexWrap:"wrap",gap:4,alignItems:"center"}}>
+      <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>SAVED SCANS:</span>
+      {Object.entries(savedCI).map(([n,d])=><span key={n} style={{fontSize:9,fontFamily:"var(--font-mono)",padding:"2px 6px",borderRadius:3,background:"rgba(136,68,255,0.08)",border:"1px solid rgba(136,68,255,0.2)",color:"#8844ff"}}>{n} ({d.count})</span>)}
+      <button style={{fontSize:8,padding:"2px 6px",background:"transparent",border:"1px solid rgba(255,68,85,0.2)",color:"var(--red)",borderRadius:3,cursor:"pointer"}} onClick={()=>{localStorage.removeItem(CI_KEY);setSavedCI({})}}>Clear</button>
+    </div>}
+    {mode==='technofunda'&&Object.keys(savedCI).length===0&&<div style={{padding:16,textAlign:"center",color:"var(--text-muted)",fontSize:11,fontFamily:"var(--font-mono)",border:"1px dashed var(--border-low)",borderRadius:6,marginBottom:10}}>No saved ChartInk scans. Go to <b>ChartInk tab</b> → run scans → they auto-save for TechnoFunda.</div>}
+
+    <div className="funda-grid">
+      {disp.map(scan=>{const cc=CAT_COLORS[scan.category]||CAT_COLORS.growth;const isSel=activeFundaScan===(scan.funda_scan||scan.id);
+        return<div key={scan.id||scan.name} className={`funda-card ${isSel?"selected":""}`}
+          onClick={()=>{const id=scan.funda_scan||scan.id;if(isSel){setActiveFundaScan(null);onFilterByFunda(null)}else{setActiveFundaScan(id);onFilterByFunda(scan.stocks.map(s=>s.symbol))}}}>
+          <div className="funda-card-count" style={{color:cc.color}}>{scan.count}</div>
+          <div className="funda-card-name">{scan.name}</div>
+          <div className="funda-card-desc">{scan.description}</div>
+          <div className="funda-card-meta">
+            <span className="funda-cat" style={{background:cc.bg,border:`1px solid ${cc.border}`,color:cc.color}}>{scan.category||"scan"}</span>
+            <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{scan.count} stocks</span>
+            {mode==='technofunda'&&<span className="tf-badge">TECHNOFUNDA</span>}
+            {mode==='fundatech'&&<span className="ft-badge">FUNDATECH</span>}
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <input type="text" placeholder="⌕ Search..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} style={{width:200}}/>
-            <label style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)",fontFamily:"var(--font-mono)",cursor:"pointer"}}>
-              <input type="checkbox" checked={excludeCircuit} onChange={e=>setExcludeCircuit(e.target.checked)} style={{accentColor:"var(--accent)"}}/> Exclude 2%/5%
-            </label>
-            <button style={{padding:"3px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,background:"rgba(0,255,136,0.1)",border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:4,cursor:"pointer"}} onClick={()=>{
-              const src=chartinkResults?.stocks?.length>0?chartinkResults.stocks:filteredStocks;
-              const name=prompt("Save "+src.length+" stocks:");if(!name)return;
-              window.teWatchlist?.createList(name,src.slice(0,200).map(s=>({symbol:s.symbol,name:s.name||"",sector:s.sector||"",source:"scanner"})));
-              window.teWatchlist?.sync();setWlRefresh(r=>r+1);
-            }}>💾 Save</button>
-            <button style={{padding:"3px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,background:wlSidebar?"rgba(136,68,255,0.2)":"transparent",border:"1px solid "+(wlSidebar?"#8844ff":"rgba(255,255,255,0.1)"),color:wlSidebar?"#8844ff":"var(--text-muted)",borderRadius:4,cursor:"pointer"}} onClick={()=>setWlSidebar(!wlSidebar)}>📋 WL</button>
-          </div>
+          {scan.stocks?.length>0&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>
+            {scan.stocks.slice(0,5).map(s=><span key={s.symbol} style={{fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,padding:"1px 5px",borderRadius:2,background:"rgba(255,255,255,0.04)",color:"var(--text-secondary)"}}>{s.symbol}</span>)}
+            {scan.stocks.length>5&&<span style={{fontSize:8,color:"var(--text-muted)"}}>+{scan.stocks.length-5}</span>}
+          </div>}
+          {mode==='technofunda'&&scan.stocks?.[0]?.technical_scans?.length>0&&<div style={{marginTop:4,fontSize:8,color:"#8844ff",fontFamily:"var(--font-mono)"}}>CI: {scan.stocks[0].technical_scans.slice(0,3).join(", ")}</div>}
+          {mode==='fundatech'&&scan.stocks?.[0]?.technical_signals?.length>0&&<div style={{marginTop:4,fontSize:8,color:"#00c8ff",fontFamily:"var(--font-mono)"}}>{scan.stocks[0].technical_signals.slice(0,3).join(" • ")}</div>}
+        </div>})}
+    </div>
+
+    {activeFundaScan&&(()=>{const sel=disp.find(s=>(s.funda_scan||s.id)===activeFundaScan);if(!sel)return null;
+      return<div style={{marginTop:12,border:"1px solid var(--border-low)",borderRadius:6,overflow:"hidden"}} className="fade-in">
+        <div style={{padding:"8px 12px",background:"rgba(0,255,136,0.03)",borderBottom:"1px solid var(--border-dim)",fontSize:10,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>{sel.name} — {sel.count} stocks</div>
+        <div style={{maxHeight:350,overflowY:"auto"}}>
+          <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}><thead><tr style={{background:"rgba(0,255,136,0.02)"}}>
+            {["#","SYMBOL","SECTOR","PRICE","MCAP","ROCE","D/E","P/E","NPM","52WH%",mode==='fundatech'?"TECH SIGNALS":mode==='technofunda'?"CI SCANS":null].filter(Boolean).map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:8,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)"}}>{h}</th>)}
+          </tr></thead><tbody>
+            {sel.stocks.map((s,i)=><tr key={s.symbol} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${s.symbol}`,'_blank')}>
+              <td style={{padding:"5px 8px",color:"var(--text-muted)"}}>{i+1}</td>
+              <td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{s.symbol}</td>
+              <td style={{padding:"5px 8px",color:"var(--text-muted)",fontSize:9}}>{s.sector||""}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>₹{s.price?.toFixed(0)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-secondary)"}}>{s.market_cap?.toFixed(0)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.roce>15?"#00ff88":s.roce>8?"#ffaa00":"#889"}}>{s.roce?.toFixed(1)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.de<0.5?"#00ff88":s.de<1?"#ffaa00":"#ff4455"}}>{s.de?.toFixed(2)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>{s.pe?.toFixed(1)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.npm>10?"#00ff88":"var(--text-secondary)"}}>{s.npm?.toFixed(1)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s["52wh_dist"]<10?"#00ff88":s["52wh_dist"]<25?"#ffaa00":"var(--text-muted)"}}>{s["52wh_dist"]}%</td>
+              {mode==='fundatech'&&<td style={{padding:"5px 8px",maxWidth:220}}><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{(s.technical_signals||[]).slice(0,4).map((sig,j)=><span key={j} style={{padding:"1px 5px",borderRadius:2,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:600,background:sig.includes('CI:')?"rgba(136,68,255,0.1)":"rgba(0,255,136,0.1)",color:sig.includes('CI:')?"#8844ff":"#00ff88"}}>{sig}</span>)}</div></td>}
+              {mode==='technofunda'&&<td style={{padding:"5px 8px"}}><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{(s.technical_scans||[]).slice(0,3).map((n,j)=><span key={j} style={{padding:"1px 5px",borderRadius:2,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:600,background:"rgba(136,68,255,0.1)",color:"#8844ff"}}>{n}</span>)}</div></td>}
+            </tr>)}
+          </tbody></table>
         </div>
+      </div>})()}
+  </div>);
+};
 
-        {/* Summary cards */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
-          {[
-            {label:"BULLISH",count:summary.bullish,color:"#00ff88",icon:"▲"},
-            {label:"BEARISH",count:summary.bearish,color:"#ff4455",icon:"▼"},
-            {label:"CATALYSTS",count:summary.catalysts,color:"#ffaa00",icon:"⚡"},
-            {label:"VOL SPIKE",count:summary.volume,color:"#ff00ff",icon:"📊"},
-            {label:"EARNINGS",count:summary.earnings,color:"#00c8ff",icon:"📅"},
-            {label:"FUNDA",count:summary.fundaScans,color:"#8844ff",icon:"📊"},
-          ].map((c,i)=>(
-            <div key={i} style={{background:`linear-gradient(135deg,${c.color}06,${c.color}03)`,border:`1px solid ${c.color}18`,borderRadius:6,padding:"8px 10px",cursor:"pointer"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=c.color+"44"}} onMouseLeave={e=>{e.currentTarget.style.borderColor=c.color+"18"}}>
-              <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>{c.icon} {c.label}</div>
-              <div style={{fontSize:20,fontWeight:800,color:c.color}}>{c.count}</div>
-            </div>
-          ))}
+// ═══════════════════════════════════════════════════════════════
+// SCAN BUILDER
+// ═══════════════════════════════════════════════════════════════
+
+const ScanBuilder=({onApplyFilter,onScanResults,fundaData,activeFundaScan,setActiveFundaScan,onFilterByFunda,allStocks})=>{
+  const[isOpen,setIsOpen]=useState(false);
+  const[activeTab,setActiveTab]=useState("funda_scans");
+  const[clauseText,setClauseText]=useState("");
+  const[scanRunning,setScanRunning]=useState(false);
+  const[scanResults,setScanResults]=useState(null);
+  const[savedPresets,setSavedPresets]=useState(()=>{try{return JSON.parse(localStorage.getItem('te_chartink_presets')||'[]')}catch{return[]}});
+  const saveP=p=>{setSavedPresets(p);try{localStorage.setItem('te_chartink_presets',JSON.stringify(p))}catch{}};
+  const[fundaFilters,setFF]=useState({pe_on:false,pe_min:0,pe_max:50,roe_on:false,roe_min:10,de_on:false,de_max:1});
+  const[ciSyms,setCISyms]=useState(null);
+
+  const applyAll=()=>{const n={funda:null,chartink:null};if(fundaFilters.pe_on||fundaFilters.roe_on||fundaFilters.de_on)n.funda={...fundaFilters};if(scanResults?.stocks?.length>0){const s=scanResults.stocks.map(s=>s.symbol.toUpperCase());setCISyms(s);n.chartink=s}if(onApplyFilter)onApplyFilter(n)};
+  const resetAll=()=>{setClauseText("");setScanResults(null);setCISyms(null);setFF({pe_on:false,pe_min:0,pe_max:50,roe_on:false,roe_min:10,de_on:false,de_max:1});if(onApplyFilter)onApplyFilter({funda:null,chartink:null});if(onScanResults)onScanResults(null);setActiveFundaScan(null);onFilterByFunda(null)};
+
+  const tabs=[{id:"funda_scans",label:"Funda Scans",icon:"📊"},{id:"scans",label:"Tech Scans",icon:"📋"},{id:"technicals",label:"Technicals",icon:"📈"},{id:"fundamentals",label:"Filters",icon:"⚙"},{id:"clause",label:"ChartInk",icon:"⌨"}];
+
+  return(
+  <div className="card" style={{marginBottom:12}}>
+    <div style={{padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:isOpen?"1px solid var(--border-dim)":"none"}} onClick={()=>setIsOpen(!isOpen)}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <span style={{color:"var(--accent)",fontSize:14}}>◈</span>
+        <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600}}>SCAN BUILDER</span>
+        {fundaData?.scans&&<span style={{fontSize:9,fontFamily:"var(--font-mono)",color:"var(--accent3)",padding:"1px 6px",borderRadius:3,background:"rgba(136,68,255,0.1)"}}>{Object.values(fundaData.scans).reduce((a,s)=>a+s.count,0)} funda</span>}
+        {activeFundaScan&&<span style={{fontSize:9,fontFamily:"var(--font-mono)",color:"var(--accent)",padding:"1px 6px",borderRadius:3,background:"var(--accent-dim)"}}>FILTER ACTIVE</span>}
+      </div>
+      <span style={{color:"var(--text-muted)",fontSize:14,transform:isOpen?"rotate(180deg)":"",transition:"transform 0.2s"}}>▾</span>
+    </div>
+    {isOpen&&<div className="fade-in" style={{padding:16}}>
+      <div className="tabs" style={{marginBottom:12,flexWrap:"wrap"}}>{tabs.map(t=><button key={t.id} className={`tab ${activeTab===t.id?"active":""}`} onClick={()=>setActiveTab(t.id)}>{t.icon} {t.label}</button>)}</div>
+
+      {activeTab==="funda_scans"&&<FundaScansPanel fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={onFilterByFunda} allStocks={allStocks}/>}
+
+      {activeTab==="scans"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{["Inside Bar (D)","NR7","VCP","Tight Setup","Volume Breakout","Gap Up > 3%","Earnings Gap Up","Positive Earnings Reaction","Momentum Scanner","200MA Turnaround","SuperTrend Buy","Pocket Pivot"].map((s,i)=><label key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--text-primary)",cursor:"pointer"}}><input type="checkbox" defaultChecked={i<2||i===4||i===6||i===7} style={{accentColor:"var(--accent)"}}/>{s}</label>)}</div>}
+
+      {activeTab==="technicals"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{[["Price(₹)","25","10000"],["MCap(Cr)","300","5000000"],["MA50 Vol >","100000",""]].map(([l,d1,d2],i)=><label key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" defaultChecked style={{accentColor:"var(--accent)"}}/> {l} <input type="number" placeholder={d1} defaultValue={d1} style={{width:60}}/>{d2&&<>-<input type="number" placeholder={d2} defaultValue={d2} style={{width:70}}/></>}</label>)}</div>}
+
+      {activeTab==="fundamentals"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" checked={fundaFilters.pe_on} onChange={e=>setFF(p=>({...p,pe_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> P/E <input type="number" value={fundaFilters.pe_min} onChange={e=>setFF(p=>({...p,pe_min:+e.target.value||0}))} style={{width:50}}/> - <input type="number" value={fundaFilters.pe_max} onChange={e=>setFF(p=>({...p,pe_max:+e.target.value||0}))} style={{width:50}}/></label>
+        <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" checked={fundaFilters.roe_on} onChange={e=>setFF(p=>({...p,roe_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> ROE {">"} <input type="number" value={fundaFilters.roe_min} onChange={e=>setFF(p=>({...p,roe_min:+e.target.value||0}))} style={{width:50}}/></label>
+        <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" checked={fundaFilters.de_on} onChange={e=>setFF(p=>({...p,de_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> D/E {"<"} <input type="number" value={fundaFilters.de_max} onChange={e=>setFF(p=>({...p,de_max:+e.target.value||0}))} style={{width:50}}/></label>
+      </div>}
+
+      {activeTab==="clause"&&<div>
+        <div style={{fontSize:10,color:"var(--text-muted)",marginBottom:6,fontFamily:"var(--font-mono)"}}>Paste ChartInk scan clause:</div>
+        <textarea rows={4} style={{width:"100%",resize:"vertical",fontSize:11}} placeholder='( cash ( latest close > latest sma( latest close, 200 ) and latest rsi( 14 ) > 50 ) )' value={clauseText} onChange={e=>setClauseText(e.target.value)}/>
+        <div style={{marginTop:8,display:"flex",gap:8,alignItems:"center"}}>
+          <button className="btn btn-accent" onClick={async()=>{
+            if(!clauseText.trim())return;const wUrl=localStorage.getItem('zd_worker_url');if(!wUrl){alert('Set zd_worker_url in localStorage first');return}
+            setScanRunning(true);setScanResults(null);
+            try{const r=await fetch(wUrl,{method:'POST',headers:{'X-Kite-Action':'chartink-scan','Content-Type':'application/json'},body:JSON.stringify({scan_clause:clauseText.trim()})});const data=await r.json();
+              if(data.error){setScanResults({error:data.error})}
+              else{setScanResults(data);if(onScanResults)onScanResults(data);
+                // Auto-save for TechnoFunda
+                const sName=savedPresets.find(p=>p.clause===clauseText.trim())?.name||"Scan "+new Date().toLocaleTimeString("en-IN");
+                saveCI(sName,data.stocks||[]);
+              }
+            }catch(e){setScanResults({error:e.message})}setScanRunning(false);
+          }}>{scanRunning?"⏳ Scanning...":"▶ Run Scan"}</button>
+          <button className="btn" onClick={()=>{if(!clauseText.trim())return;const name=prompt("Name:");if(!name)return;saveP([...savedPresets,{name,clause:clauseText.trim(),date:new Date().toLocaleDateString("en-IN")}])}}>💾 Save</button>
+          {scanResults?.count!=null&&<span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>{scanResults.count} found — saved for TechnoFunda ✓</span>}
+          {scanResults?.error&&<span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--red)"}}>{scanResults.error}</span>}
         </div>
+        {scanResults?.stocks?.length>0&&<div style={{marginTop:12,maxHeight:300,overflowY:"auto",border:"1px solid var(--border-low)",borderRadius:6}}>
+          <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}><thead><tr style={{background:"rgba(0,255,136,0.05)"}}>{["#","SYMBOL","NAME","CLOSE","CHG%","VOL"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)"}}>{h}</th>)}</tr></thead>
+          <tbody>{scanResults.stocks.map((s,i)=><tr key={i} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${s.symbol}`,'_blank')}><td style={{padding:"5px 8px",color:"var(--text-muted)"}}>{i+1}</td><td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{s.symbol}</td><td style={{padding:"5px 8px",color:"var(--text-secondary)"}}>{s.name}</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>₹{s.close}</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontWeight:600,color:s.change_pct>=0?"#00ff88":"#ff4455"}}>{s.change_pct>=0?"+":""}{s.change_pct?.toFixed(2)}%</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>{(s.volume/1000).toFixed(0)}K</td></tr>)}</tbody></table>
+        </div>}
+        {savedPresets.length>0&&<div style={{marginTop:12}}><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>SAVED PRESETS ({savedPresets.length})</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{savedPresets.map((p,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"var(--bg-hover)",border:"1px solid var(--border-low)",borderRadius:4,cursor:"pointer",fontSize:10,fontFamily:"var(--font-mono)"}} onClick={()=>{setClauseText(p.clause);setScanResults(null)}}><span style={{color:"var(--accent)",fontWeight:700}}>{p.name}</span><span style={{color:"var(--text-muted)",fontSize:8}}>{p.date}</span><span style={{color:"var(--red)",cursor:"pointer",marginLeft:4,fontSize:12}} onClick={e=>{e.stopPropagation();if(confirm(`Delete "${p.name}"?`))saveP(savedPresets.filter((_,j)=>j!==i))}}>×</span></div>)}</div></div>}
+      </div>}
 
-        {/* Scan Builder (with Funda Scans) */}
-        <ScanBuilder onApplyFilter={setAppliedFilters} onScanResults={setChartinkResults}
-          fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan}
-          onFilterByFunda={setFundaFilterSyms}/>
+      <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center"}}>
+        {ciSyms?.length>0&&<span style={{fontSize:9,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>CHARTINK: {ciSyms.length}</span>}
+        {activeFundaScan&&<span style={{fontSize:9,color:"var(--accent3)",fontFamily:"var(--font-mono)"}}>FUNDA: {activeFundaScan}</span>}
+        <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={resetAll}>Reset All</button>
+        <button className="btn btn-accent" onClick={applyAll}>Apply Filters</button>
+      </div>
+    </div>}
+  </div>);
+};
 
-        {/* Preset Tabs */}
-        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10,padding:"8px 0",borderTop:"1px solid var(--border-dim)",borderBottom:"1px solid var(--border-dim)"}}>
-          {SCAN_CATEGORIES.map(p=>(
-            <button key={p.id} onClick={()=>setActivePreset(activePreset===p.id?"all":p.id)}
-              style={{background:activePreset===p.id?"var(--accent-dim)":"rgba(255,255,255,0.02)",border:`1px solid ${activePreset===p.id?"var(--accent)":"rgba(255,255,255,0.06)"}`,borderRadius:4,padding:"4px 10px",color:activePreset===p.id?"var(--accent)":"var(--text-muted)",fontSize:10,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer"}}>{p.icon} {p.label}</button>
-          ))}
-          <div style={{marginLeft:"auto",display:"flex",gap:4,alignItems:"center"}}>
-            <span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>SORT:</span>
-            <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{fontSize:10,padding:"3px 6px"}}>
-              <option value="score_desc">Score ↓</option><option value="score_asc">Score ↑</option>
-              <option value="change_desc">Change% ↓</option><option value="rsi_desc">RSI ↓</option>
-              <option value="funds_desc">Funds ↓</option><option value="mcap_desc">MCap ↓</option>
-            </select>
-          </div>
+// ═══════════════════════════════════════════════════════════════
+// MAIN DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+
+const ScannerDashboard=()=>{
+  const{stocks,loading,error,meta}=useStockData();
+  const{fundaData}=useFundaData();
+  const[activePreset,setActivePreset]=useState("all");
+  const[sortBy,setSortBy]=useState("score_desc");
+  const[searchQuery,setSearchQuery]=useState("");
+  const[selectedStock,setSelectedStock]=useState(null);
+  const[excludeCircuit,setExcludeCircuit]=useState(true);
+  const[appliedFilters,setAppliedFilters]=useState({funda:null,chartink:null});
+  const[chartinkResults,setChartinkResults]=useState(null);
+  const[wlSidebar,setWlSidebar]=useState(false);
+  const[wlRefresh,setWlRefresh]=useState(0);
+  const[activeFundaScan,setActiveFundaScan]=useState(null);
+  const[fundaFilterSyms,setFundaFilterSyms]=useState(null);
+
+  const filteredStocks=useMemo(()=>{
+    let list=[...stocks];
+    if(excludeCircuit)list=list.filter(s=>!s.circuit?.is_restricted);
+    if(appliedFilters.chartink?.length>0){const sy=new Set(appliedFilters.chartink);list=list.filter(s=>sy.has(s.symbol.toUpperCase()))}
+    if(fundaFilterSyms?.length>0){const fs=new Set(fundaFilterSyms.map(s=>s.toUpperCase()));list=list.filter(s=>fs.has(s.symbol.toUpperCase()))}
+    if(appliedFilters.funda){const ff=appliedFilters.funda;list=list.filter(s=>{const f=s.fundamentals||{};if(ff.pe_on&&f.pe_ratio!=null&&(f.pe_ratio<ff.pe_min||f.pe_ratio>ff.pe_max))return false;if(ff.roe_on&&(f.roe==null||f.roe<ff.roe_min))return false;if(ff.de_on&&f.debt_to_equity!=null&&f.debt_to_equity>ff.de_max)return false;return true})}
+    if(activePreset==="catalyst")list=list.filter(s=>s.catalysts?.length>0);
+    else if(activePreset==="bullish")list=list.filter(s=>s.composite_score>=3);
+    else if(activePreset==="bearish")list=list.filter(s=>s.composite_score<=-3);
+    else if(activePreset==="earnings")list=list.filter(s=>s.earnings_alert);
+    else if(activePreset==="volume")list=list.filter(s=>["spike","extreme_spike"].includes(s.volume?.signal));
+    else if(activePreset==="breakout")list=list.filter(s=>["new_52w_high","near_52w_high"].includes(s.breakout?.signal));
+    else if(activePreset==="momentum")list=list.filter(s=>s.rsi>55&&s.rsi<80&&s.composite_score>0);
+    if(searchQuery){const q=searchQuery.toUpperCase();list=list.filter(s=>s.symbol.includes(q)||s.name.toUpperCase().includes(q)||s.sector.toUpperCase().includes(q))}
+    const srt={score_desc:(a,b)=>b.composite_score-a.composite_score,score_asc:(a,b)=>a.composite_score-b.composite_score,change_desc:(a,b)=>b.change_pct-a.change_pct,rsi_desc:(a,b)=>(b.rsi||0)-(a.rsi||0),funds_desc:(a,b)=>(b.fund_holdings?.no_of_funds||0)-(a.fund_holdings?.no_of_funds||0),mcap_desc:(a,b)=>(b.fundamentals?.market_cap_cr||0)-(a.fundamentals?.market_cap_cr||0)};
+    list.sort(srt[sortBy]||srt.score_desc);return list;
+  },[stocks,activePreset,sortBy,searchQuery,excludeCircuit,appliedFilters,fundaFilterSyms]);
+
+  const summary=useMemo(()=>({bullish:stocks.filter(s=>s.composite_score>=3).length,bearish:stocks.filter(s=>s.composite_score<=-3).length,catalysts:stocks.filter(s=>s.catalysts?.length>0).length,volume:stocks.filter(s=>["spike","extreme_spike"].includes(s.volume?.signal)).length,earnings:stocks.filter(s=>s.earnings_alert).length,funda:fundaData?.scans?Object.values(fundaData.scans).reduce((a,s)=>a+s.count,0):0}),[stocks,fundaData]);
+
+  if(loading)return<div><nav className="nav"><a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TE" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a><a href="scanner.html" className="nav-link active">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a></nav><div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"60vh",flexDirection:"column",gap:12}}><div style={{width:40,height:40,border:"3px solid var(--border-low)",borderTop:"3px solid var(--accent)",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div></div>;
+
+  return(
+  <div>
+    <nav className="nav"><a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TE" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a><a href="scanner.html" className="nav-link active">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a></nav>
+
+    <div style={{maxWidth:1440,margin:"0 auto",padding:"12px 16px"}}>
+      {error&&<div style={{padding:"6px 12px",marginBottom:8,borderRadius:4,background:"rgba(255,170,0,0.08)",border:"1px solid rgba(255,170,0,0.2)",fontSize:10,color:"#ffaa00",fontFamily:"var(--font-mono)"}}>⚠ {error}</div>}
+
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ SCANNER</h1>
+          <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{meta.total_scanned||stocks.length} STOCKS • {meta.generated_at?new Date(meta.generated_at).toLocaleString("en-IN"):"OFFLINE"}{fundaData&&<span style={{color:"var(--accent3)"}}> • {summary.funda} FUNDA</span>}</div>
         </div>
-
-        <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:8,fontFamily:"var(--font-mono)"}}>
-          Showing <span style={{color:"var(--accent)",fontWeight:700}}>{filteredStocks.length}</span> stocks
-          {activeFundaScan && <span style={{color:"var(--accent3)",marginLeft:8}}>• Funda filter: {activeFundaScan}</span>}
-        </div>
-
-        {/* Results Table */}
-        <div className="card">
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-              <thead>
-                <tr style={{background:"rgba(0,255,136,0.03)"}}>
-                  {["STOCK","PRICE","CHG%","SCORE","RSI","FUNDS","MACD","EMA 9/21","52W","VOL","CATALYSTS","1M","3M"].map(h=>(
-                    <th key={h} style={{padding:"8px 8px",textAlign:"left",color:"var(--text-muted)",fontSize:9,fontWeight:700,letterSpacing:1,borderBottom:"1px solid var(--border-dim)",fontFamily:"var(--font-mono)",whiteSpace:"nowrap"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStocks.map((stock,i) => {
-                  // Check if stock is in any funda scan for TechnoFunda highlight
-                  const inFunda = fundaFilterSyms?.includes(stock.symbol);
-                  return (
-                    <tr key={stock.symbol} className={inFunda ? "tf-row" : ""}
-                      style={{background:i%2===0?"transparent":"rgba(255,255,255,0.008)",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.02)"}}
-                      onClick={(e) => { if (e.shiftKey||e.ctrlKey) setSelectedStock(stock); else window.open(`stock.html?s=${stock.symbol}`,'_blank'); }}
-                      onMouseEnter={e=>e.currentTarget.style.background="rgba(0,255,136,0.03)"}
-                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"rgba(255,255,255,0.008)"}>
-                      <td style={{padding:"8px",whiteSpace:"nowrap"}}>
-                        <div style={{fontWeight:700,color:"#fff",fontSize:12}}>{stock.symbol}</div>
-                        <div style={{fontSize:9,color:"var(--text-muted)"}}>{stock.sector}</div>
-                        {stock.circuit?.is_restricted&&<span className="badge badge-bearish" style={{fontSize:8}}>⊘ {stock.circuit.band}</span>}
-                        {stock.earnings_alert&&<div style={{fontSize:8,color:"var(--amber)",marginTop:1}}>{stock.earnings_alert}</div>}
-                        {inFunda&&<span className="tf-badge" style={{marginTop:2,display:"inline-block"}}>FUNDA ✓</span>}
-                      </td>
-                      <td style={{padding:"8px",fontWeight:600,color:"#ddd",fontFamily:"var(--font-mono)"}}>₹{stock.price?.toLocaleString()}</td>
-                      <td style={{padding:"8px"}}><PctCell val={stock.change_pct}/></td>
-                      <td style={{padding:"8px"}}><ScoreBar score={stock.composite_score}/></td>
-                      <td style={{padding:"8px"}}><span style={{color:stock.rsi>=70?"#ff4455":stock.rsi<=30?"#00ff88":"#889",fontWeight:600,fontFamily:"var(--font-mono)"}}>{stock.rsi?.toFixed(1)}</span></td>
-                      <td style={{padding:"8px"}}><FundBadge funds={stock.fund_holdings?.no_of_funds} changePct={stock.fund_holdings?.fund_shares_change_pct}/></td>
-                      <td style={{padding:"8px"}}><SignalBadge signal={stock.macd?.crossover}/></td>
-                      <td style={{padding:"8px"}}><SignalBadge signal={stock.ema?.cross_9_21}/></td>
-                      <td style={{padding:"8px"}}><SignalBadge signal={stock.breakout?.signal}/></td>
-                      <td style={{padding:"8px"}}><span style={{color:stock.volume?.ratio>=2?"#ff00ff":"#667",fontWeight:600,fontFamily:"var(--font-mono)",fontSize:11}}>{stock.volume?.ratio}x</span></td>
-                      <td style={{padding:"8px",maxWidth:200}}><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{stock.catalysts?.slice(0,2).map((c,j)=><CatalystPill key={j} catalyst={c}/>)}{stock.catalysts?.length>2&&<span style={{fontSize:9,color:"var(--text-muted)"}}>+{stock.catalysts.length-2}</span>}</div></td>
-                      <td style={{padding:"8px"}}><PctCell val={stock.returns?.["1m"]}/></td>
-                      <td style={{padding:"8px"}}><PctCell val={stock.returns?.["3m"]}/></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {filteredStocks.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text-muted)"}}><div style={{fontSize:28,marginBottom:8}}>◇</div><div style={{fontSize:12}}>No stocks match filters</div></div>}
-        </div>
-
-        {/* Watchlist Sidebar */}
-        {wlSidebar && (
-          <div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",background:"#0a0e14",borderLeft:"1px solid var(--border-med)",zIndex:200,display:"flex",flexDirection:"column",boxShadow:"-10px 0 40px rgba(0,0,0,0.5)"}}>
-            <div style={{padding:"12px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:13,fontWeight:800,fontFamily:"var(--font-mono)",color:"#fff"}}>📋 WATCHLISTS</span>
-              <div style={{display:"flex",gap:6}}>
-                <button style={{padding:"2px 8px",fontSize:9,fontFamily:"var(--font-mono)",background:"rgba(0,255,136,0.1)",border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:3,cursor:"pointer"}} onClick={()=>{const name=prompt("New watchlist:");if(name){window.teWatchlist?.createList(name);window.teWatchlist?.sync();setWlRefresh(r=>r+1)}}}>+ New</button>
-                <button style={{padding:"2px 8px",fontSize:12,background:"transparent",border:"1px solid rgba(255,255,255,0.1)",color:"var(--text-muted)",borderRadius:3,cursor:"pointer"}} onClick={()=>setWlSidebar(false)}>✕</button>
-              </div>
-            </div>
-            <div style={{flex:1,overflowY:"auto",padding:8}}>
-              {(window.teWatchlist?.getLists()||[]).map((list,li)=>(
-                <div key={list.id} style={{marginBottom:8,border:"1px solid var(--border-low)",borderRadius:6,overflow:"hidden"}}>
-                  <div style={{padding:"8px 10px",background:"rgba(0,255,136,0.03)",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid var(--border-dim)"}}>
-                    <div><div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{list.name}</div><div style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{list.stocks.length} stocks</div></div>
-                    <div style={{display:"flex",gap:4}}>
-                      <button style={{fontSize:8,padding:"2px 6px",border:"1px solid var(--border-low)",background:"transparent",color:"var(--accent)",borderRadius:3,cursor:"pointer"}} onClick={()=>{setAppliedFilters(p=>({...p,chartink:list.stocks.map(s=>s.symbol.toUpperCase())}));setWlSidebar(false)}}>Filter ▶</button>
-                      <button style={{fontSize:8,padding:"2px 6px",border:"1px solid rgba(255,68,85,0.3)",background:"transparent",color:"var(--red)",borderRadius:3,cursor:"pointer"}} onClick={()=>{if(confirm(`Delete "${list.name}"?`)){window.teWatchlist?.deleteList(list.id);window.teWatchlist?.sync();setWlRefresh(r=>r+1)}}}>🗑</button>
-                    </div>
-                  </div>
-                  <div style={{maxHeight:200,overflowY:"auto"}}>{list.stocks.map((s,si)=>(<div key={si} style={{display:"flex",justifyContent:"space-between",padding:"4px 10px",borderBottom:"1px solid rgba(255,255,255,0.02)",fontSize:10,cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${s.symbol}`,'_blank')}><span style={{fontWeight:700,color:"#fff"}}>{s.symbol}</span><span style={{color:"var(--text-muted)",fontSize:9}}>{s.sector}</span></div>))}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{padding:"8px 12px",borderTop:"1px solid var(--border-dim)",fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)",textAlign:"center"}}><a href="watchlist.html" style={{color:"var(--accent)",textDecoration:"none"}}>Open Full Watchlist →</a></div>
-          </div>
-        )}
-
-        <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>
-          <span>TRADEDGE SCANNER v2.0 • TECHNOFUNDA EDITION</span>
-          <span>⚡ CYBERPUNK EDITION</span>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <input type="text" placeholder="⌕ Search..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} style={{width:200}}/>
+          <label style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)",fontFamily:"var(--font-mono)",cursor:"pointer"}}><input type="checkbox" checked={excludeCircuit} onChange={e=>setExcludeCircuit(e.target.checked)} style={{accentColor:"var(--accent)"}}/> Exclude 2%/5%</label>
+          <button style={{padding:"3px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,background:"rgba(0,255,136,0.1)",border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:4,cursor:"pointer"}} onClick={()=>{const src=chartinkResults?.stocks?.length>0?chartinkResults.stocks:filteredStocks;const name=prompt("Save "+src.length+" stocks:");if(!name)return;window.teWatchlist?.createList(name,src.slice(0,200).map(s=>({symbol:s.symbol,name:s.name||"",sector:s.sector||"",source:"scanner"})));window.teWatchlist?.sync();setWlRefresh(r=>r+1)}}>💾 Save</button>
+          <button style={{padding:"3px 10px",fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,background:wlSidebar?"rgba(136,68,255,0.2)":"transparent",border:"1px solid "+(wlSidebar?"#8844ff":"rgba(255,255,255,0.1)"),color:wlSidebar?"#8844ff":"var(--text-muted)",borderRadius:4,cursor:"pointer"}} onClick={()=>setWlSidebar(!wlSidebar)}>📋 WL</button>
         </div>
       </div>
 
-      <StockDrilldown stock={selectedStock} onClose={()=>setSelectedStock(null)}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
+        {[{label:"BULLISH",count:summary.bullish,color:"#00ff88",icon:"▲"},{label:"BEARISH",count:summary.bearish,color:"#ff4455",icon:"▼"},{label:"CATALYSTS",count:summary.catalysts,color:"#ffaa00",icon:"⚡"},{label:"VOL SPIKE",count:summary.volume,color:"#ff00ff",icon:"📊"},{label:"EARNINGS",count:summary.earnings,color:"#00c8ff",icon:"📅"},{label:"FUNDA",count:summary.funda,color:"#8844ff",icon:"📊"}].map((c,i)=><div key={i} style={{background:`linear-gradient(135deg,${c.color}06,${c.color}03)`,border:`1px solid ${c.color}18`,borderRadius:6,padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>{c.icon} {c.label}</div><div style={{fontSize:20,fontWeight:800,color:c.color}}>{c.count}</div></div>)}
+      </div>
+
+      <ScanBuilder onApplyFilter={setAppliedFilters} onScanResults={setChartinkResults} fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={setFundaFilterSyms} allStocks={stocks}/>
+
+      <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10,padding:"8px 0",borderTop:"1px solid var(--border-dim)",borderBottom:"1px solid var(--border-dim)"}}>
+        {SCAN_CATS.map(p=><button key={p.id} onClick={()=>setActivePreset(activePreset===p.id?"all":p.id)} style={{background:activePreset===p.id?"var(--accent-dim)":"rgba(255,255,255,0.02)",border:`1px solid ${activePreset===p.id?"var(--accent)":"rgba(255,255,255,0.06)"}`,borderRadius:4,padding:"4px 10px",color:activePreset===p.id?"var(--accent)":"var(--text-muted)",fontSize:10,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer"}}>{p.icon} {p.label}</button>)}
+        <div style={{marginLeft:"auto",display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>SORT:</span><select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{fontSize:10,padding:"3px 6px"}}><option value="score_desc">Score ↓</option><option value="score_asc">Score ↑</option><option value="change_desc">Change% ↓</option><option value="rsi_desc">RSI ↓</option><option value="funds_desc">Funds ↓</option><option value="mcap_desc">MCap ↓</option></select></div>
+      </div>
+
+      <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:8,fontFamily:"var(--font-mono)"}}>Showing <span style={{color:"var(--accent)",fontWeight:700}}>{filteredStocks.length}</span> stocks{activeFundaScan&&<span style={{color:"var(--accent3)",marginLeft:8}}>• Funda: {activeFundaScan}</span>}</div>
+
+      <div className="card"><div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+          <thead><tr style={{background:"rgba(0,255,136,0.03)"}}>{["STOCK","PRICE","CHG%","SCORE","RSI","FUNDS","MACD","EMA 9/21","52W","VOL","CATALYSTS","1M","3M"].map(h=><th key={h} style={{padding:"8px",textAlign:"left",color:"var(--text-muted)",fontSize:9,fontWeight:700,letterSpacing:1,borderBottom:"1px solid var(--border-dim)",fontFamily:"var(--font-mono)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+          <tbody>{filteredStocks.map((stock,i)=>{const inF=fundaFilterSyms?.map(s=>s.toUpperCase()).includes(stock.symbol.toUpperCase());
+            return<tr key={stock.symbol} style={{background:inF?"linear-gradient(90deg,rgba(136,68,255,0.04),transparent)":i%2===0?"transparent":"rgba(255,255,255,0.008)",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.02)"}}
+              onClick={e=>{if(e.shiftKey||e.ctrlKey)setSelectedStock(stock);else window.open(`stock.html?s=${stock.symbol}`,'_blank')}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(0,255,136,0.03)"} onMouseLeave={e=>e.currentTarget.style.background=inF?"linear-gradient(90deg,rgba(136,68,255,0.04),transparent)":i%2===0?"transparent":"rgba(255,255,255,0.008)"}>
+              <td style={{padding:"8px",whiteSpace:"nowrap"}}><div style={{fontWeight:700,color:"#fff",fontSize:12}}>{stock.symbol}</div><div style={{fontSize:9,color:"var(--text-muted)"}}>{stock.sector}</div>{stock.circuit?.is_restricted&&<span className="badge badge-bearish" style={{fontSize:8}}>⊘{stock.circuit.band}</span>}{stock.earnings_alert&&<div style={{fontSize:8,color:"var(--amber)",marginTop:1}}>{stock.earnings_alert}</div>}{inF&&<span className="tf-badge" style={{marginTop:2,display:"inline-block"}}>FUNDA✓</span>}</td>
+              <td style={{padding:"8px",fontWeight:600,color:"#ddd",fontFamily:"var(--font-mono)"}}>₹{stock.price?.toLocaleString()}</td>
+              <td style={{padding:"8px"}}><PctCell val={stock.change_pct}/></td>
+              <td style={{padding:"8px"}}><ScoreBar score={stock.composite_score}/></td>
+              <td style={{padding:"8px"}}><span style={{color:stock.rsi>=70?"#ff4455":stock.rsi<=30?"#00ff88":"#889",fontWeight:600,fontFamily:"var(--font-mono)"}}>{stock.rsi?.toFixed(1)}</span></td>
+              <td style={{padding:"8px"}}><FundBadge funds={stock.fund_holdings?.no_of_funds} changePct={stock.fund_holdings?.fund_shares_change_pct}/></td>
+              <td style={{padding:"8px"}}><SignalBadge signal={stock.macd?.crossover}/></td>
+              <td style={{padding:"8px"}}><SignalBadge signal={stock.ema?.cross_9_21}/></td>
+              <td style={{padding:"8px"}}><SignalBadge signal={stock.breakout?.signal}/></td>
+              <td style={{padding:"8px"}}><span style={{color:stock.volume?.ratio>=2?"#ff00ff":"#667",fontWeight:600,fontFamily:"var(--font-mono)",fontSize:11}}>{stock.volume?.ratio}x</span></td>
+              <td style={{padding:"8px",maxWidth:200}}><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{stock.catalysts?.slice(0,2).map((c,j)=><CatalystPill key={j} catalyst={c}/>)}{stock.catalysts?.length>2&&<span style={{fontSize:9,color:"var(--text-muted)"}}>+{stock.catalysts.length-2}</span>}</div></td>
+              <td style={{padding:"8px"}}><PctCell val={stock.returns?.["1m"]}/></td>
+              <td style={{padding:"8px"}}><PctCell val={stock.returns?.["3m"]}/></td>
+            </tr>})}</tbody>
+        </table>
+      </div>{filteredStocks.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text-muted)"}}><div style={{fontSize:28,marginBottom:8}}>◇</div><div style={{fontSize:12}}>No stocks match</div></div>}</div>
+
+      {/* Watchlist Sidebar */}
+      {wlSidebar&&<div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",background:"#0a0e14",borderLeft:"1px solid var(--border-med)",zIndex:200,display:"flex",flexDirection:"column",boxShadow:"-10px 0 40px rgba(0,0,0,0.5)"}}>
+        <div style={{padding:"12px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:800,fontFamily:"var(--font-mono)",color:"#fff"}}>📋 WATCHLISTS</span><div style={{display:"flex",gap:6}}><button style={{padding:"2px 8px",fontSize:9,fontFamily:"var(--font-mono)",background:"rgba(0,255,136,0.1)",border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:3,cursor:"pointer"}} onClick={()=>{const name=prompt("New:");if(name){window.teWatchlist?.createList(name);window.teWatchlist?.sync();setWlRefresh(r=>r+1)}}}>+ New</button><button style={{padding:"2px 8px",fontSize:12,background:"transparent",border:"1px solid rgba(255,255,255,0.1)",color:"var(--text-muted)",borderRadius:3,cursor:"pointer"}} onClick={()=>setWlSidebar(false)}>✕</button></div></div>
+        <div style={{flex:1,overflowY:"auto",padding:8}}>{(window.teWatchlist?.getLists()||[]).map((list,li)=><div key={list.id} style={{marginBottom:8,border:"1px solid var(--border-low)",borderRadius:6,overflow:"hidden"}}><div style={{padding:"8px 10px",background:"rgba(0,255,136,0.03)",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid var(--border-dim)"}}><div><div style={{fontSize:11,fontWeight:700,color:"#fff"}}>{list.name}</div><div style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{list.stocks.length} stocks</div></div><div style={{display:"flex",gap:4}}><button style={{fontSize:8,padding:"2px 6px",border:"1px solid var(--border-low)",background:"transparent",color:"var(--accent)",borderRadius:3,cursor:"pointer"}} onClick={()=>{setAppliedFilters(p=>({...p,chartink:list.stocks.map(s=>s.symbol.toUpperCase())}));setWlSidebar(false)}}>Filter▶</button><button style={{fontSize:8,padding:"2px 6px",border:"1px solid rgba(255,68,85,0.3)",background:"transparent",color:"var(--red)",borderRadius:3,cursor:"pointer"}} onClick={()=>{if(confirm(`Delete "${list.name}"?`)){window.teWatchlist?.deleteList(list.id);window.teWatchlist?.sync();setWlRefresh(r=>r+1)}}}>🗑</button></div></div><div style={{maxHeight:200,overflowY:"auto"}}>{list.stocks.map((s,si)=><div key={si} style={{display:"flex",justifyContent:"space-between",padding:"4px 10px",borderBottom:"1px solid rgba(255,255,255,0.02)",fontSize:10,cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${s.symbol}`,'_blank')}><span style={{fontWeight:700,color:"#fff"}}>{s.symbol}</span><span style={{color:"var(--text-muted)",fontSize:9}}>{s.sector}</span></div>)}</div></div>)}</div>
+        <div style={{padding:"8px 12px",borderTop:"1px solid var(--border-dim)",fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)",textAlign:"center"}}><a href="watchlist.html" style={{color:"var(--accent)",textDecoration:"none"}}>Open Full Watchlist →</a></div>
+      </div>}
+
+      <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}><span>TRADEDGE SCANNER v3.0 • TECHNOFUNDA EDITION</span><span>⚡ CYBERPUNK</span></div>
     </div>
-  );
+    <StockDrilldown stock={selectedStock} onClose={()=>setSelectedStock(null)}/>
+  </div>);
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<ScannerDashboard/>);
