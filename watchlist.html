@@ -27,80 +27,33 @@ body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:r
 .ob-g{background:rgba(136,68,255,0.15);border-color:rgba(136,68,255,0.4);color:var(--accent3)}
 .ob-i{background:rgba(0,200,255,0.1);border-color:rgba(0,200,255,0.3);color:var(--accent2)}
 @keyframes logoPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.85;transform:scale(1.03)}}
-@keyframes fadeRow{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* ── Watchlist aesthetic overhaul ── */
-.wl-header{display:flex;justify-content:space-between;align-items:flex-end;padding:16px 0 12px;border-bottom:1px solid var(--border-dim);margin-bottom:14px}
-.wl-title{font-size:24px;font-weight:900;letter-spacing:2px;background:linear-gradient(135deg,#00ff88,#00c8ff,#8844ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
-.wl-subtitle{font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px;letter-spacing:0.5px}
-.wl-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--border-dim)}
-.wl-tab{padding:6px 14px;font-size:11px;font-family:var(--font-mono);font-weight:700;border-radius:6px;cursor:pointer;transition:all .15s;border:1px solid var(--border-low);background:rgba(255,255,255,0.015);color:var(--text-secondary);position:relative}
-.wl-tab:hover{border-color:var(--border-med);color:var(--text-primary);background:var(--bg-hover)}
-.wl-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);box-shadow:0 0 12px rgba(0,255,136,0.06)}
-.wl-tab .wl-tab-count{font-size:8px;color:var(--text-muted);margin-left:4px;opacity:0.7}
-.wl-tab.active .wl-tab-count{color:var(--accent);opacity:0.6}
+/* ── Aesthetic enhancements (CSS only, no JSX changes) ── */
+table{border-spacing:0}
+table thead tr{background:linear-gradient(90deg,rgba(0,255,136,0.03),rgba(0,200,255,0.01),transparent) !important}
+table thead th{padding:9px 10px !important;font-size:8px !important;letter-spacing:1.2px !important;text-transform:uppercase;border-bottom:1px solid rgba(0,255,136,0.08) !important}
+table tbody tr{transition:all .15s !important}
+table tbody tr:hover{background:rgba(0,255,136,0.02) !important}
+table tbody td{padding:8px 10px !important;vertical-align:middle}
 
-/* Stock rows */
-.wl-row{display:grid;grid-template-columns:36px 1fr 120px 200px 180px;gap:0;padding:0;border-bottom:1px solid rgba(255,255,255,0.02);transition:all .12s;cursor:pointer;animation:fadeRow .2s ease-out}
-.wl-row:hover{background:rgba(0,255,136,0.015)}
-.wl-row.expanded{background:rgba(0,255,136,0.025);border-bottom-color:var(--accent)}
-.wl-row-cell{padding:10px 10px;display:flex;align-items:center}
+/* Nicer card borders */
+.card{border-radius:10px !important;border-color:rgba(0,255,136,0.08) !important;box-shadow:0 2px 20px rgba(0,0,0,0.3)}
+.card:hover{border-color:rgba(0,255,136,0.12) !important}
 
-/* Stock identity */
-.wl-sym{font-weight:800;color:#fff;font-size:13px;letter-spacing:0.5px}
-.wl-sector{font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-top:1px}
-.wl-source{font-size:7px;padding:1px 5px;border-radius:10px;font-family:var(--font-mono);font-weight:600;background:rgba(0,255,136,0.06);color:rgba(0,255,136,0.5);border:1px solid rgba(0,255,136,0.08)}
+/* Better buttons */
+.ob{border-radius:4px !important;transition:all .15s !important;font-size:9px !important}
+.ob:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.ob-b{box-shadow:0 0 8px rgba(0,255,136,0.05)}
+.ob-s{box-shadow:0 0 8px rgba(255,68,85,0.05)}
 
-/* Status pill */
-.wl-status{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:8px;font-family:var(--font-mono);font-weight:800;letter-spacing:0.8px}
-.wl-status.watching{background:rgba(136,153,170,0.06);color:var(--text-muted);border:1px solid rgba(136,153,170,0.1)}
-.wl-status.active{background:rgba(0,255,136,0.08);color:var(--accent);border:1px solid rgba(0,255,136,0.15)}
-.wl-status.triggered{background:rgba(255,170,0,0.08);color:var(--amber);border:1px solid rgba(255,170,0,0.15)}
-.wl-status.exited{background:rgba(136,68,255,0.08);color:var(--accent3);border:1px solid rgba(136,68,255,0.15)}
+/* Nav polish */
+.nav{padding:6px 20px !important;backdrop-filter:blur(12px);background:rgba(12,16,24,0.95) !important}
+.nav-link{font-size:10px !important;padding:6px 14px !important;border-radius:5px !important;transition:all .15s}
+.nav-link.active{box-shadow:0 0 10px rgba(0,255,136,0.08)}
 
-/* Trade plan mini display */
-.wl-plan{display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:10px}
-.wl-plan-item{display:flex;flex-direction:column;align-items:center;gap:1px}
-.wl-plan-label{font-size:7px;font-weight:700;letter-spacing:0.5px;opacity:0.5}
-.wl-plan-val{font-weight:700;font-size:10px}
-.wl-plan-val.entry{color:var(--accent)}.wl-plan-val.target{color:var(--accent2)}.wl-plan-val.sl{color:var(--red)}
-.wl-rr{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800;font-family:var(--font-mono)}
-.wl-rr.good{background:rgba(0,255,136,0.08);color:var(--accent);border:1px solid rgba(0,255,136,0.12)}
-.wl-rr.ok{background:rgba(255,170,0,0.08);color:var(--amber);border:1px solid rgba(255,170,0,0.12)}
-.wl-rr.bad{background:rgba(255,68,85,0.08);color:var(--red);border:1px solid rgba(255,68,85,0.12)}
-
-/* Order buttons */
-.wl-orders{display:flex;gap:3px;align-items:center}
-.wl-btn{padding:4px 10px;border-radius:4px;font-size:8px;font-family:var(--font-mono);font-weight:700;cursor:pointer;border:1px solid;transition:all .12s;white-space:nowrap}
-.wl-btn:hover{filter:brightness(1.2);transform:translateY(-1px)}
-.wl-btn.buy{background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.3);color:var(--accent)}
-.wl-btn.sell{background:rgba(255,68,85,0.1);border-color:rgba(255,68,85,0.3);color:var(--red)}
-.wl-btn.sl{background:rgba(255,170,0,0.1);border-color:rgba(255,170,0,0.3);color:var(--amber)}
-.wl-btn.gtt{background:rgba(136,68,255,0.1);border-color:rgba(136,68,255,0.3);color:var(--accent3)}
-.wl-btn.edit{background:transparent;border-color:var(--border-low);color:var(--text-muted)}
-.wl-btn.del{background:transparent;border-color:rgba(255,68,85,0.15);color:rgba(255,68,85,0.4);font-size:10px;padding:2px 6px}
-.wl-btn.del:hover{color:var(--red);border-color:rgba(255,68,85,0.4)}
-
-/* Chart expanded area */
-.wl-chart-wrap{padding:8px 12px;background:linear-gradient(180deg,rgba(0,0,0,0.4),rgba(6,8,12,0.9));border-bottom:2px solid var(--accent)}
-
-/* Empty state */
-.wl-empty{padding:60px 20px;text-align:center}
-.wl-empty-icon{font-size:48px;margin-bottom:12px;opacity:0.3}
-.wl-empty-text{font-size:14px;font-weight:700;color:var(--text-muted);margin-bottom:4px}
-.wl-empty-sub{font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6}
-
-/* List card header */
-.wl-list-header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-dim);background:linear-gradient(90deg,rgba(0,255,136,0.015),transparent)}
-.wl-list-name{font-size:15px;font-weight:800;color:#fff;letter-spacing:0.5px}
-.wl-list-meta{font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-left:8px}
-
-/* Column header */
-.wl-thead{display:grid;grid-template-columns:36px 1fr 120px 200px 180px;padding:0;background:rgba(0,255,136,0.02);border-bottom:1px solid var(--border-dim)}
-.wl-th{padding:8px 10px;font-size:8px;font-weight:700;font-family:var(--font-mono);color:var(--text-muted);letter-spacing:1px;text-transform:uppercase}
-
-/* Responsive */
-@media(max-width:900px){.wl-row,.wl-thead{grid-template-columns:30px 1fr 100px 160px 140px}.wl-btn{padding:3px 6px;font-size:7px}}
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.15);border-radius:3px}
 </style>
 </head>
 <body>
@@ -475,194 +428,148 @@ const OrderDialog = ({symbol, type, onClose, lastPrice}) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// WATCHLIST DASHBOARD — AESTHETIC OVERHAUL
+// WATCHLIST DASHBOARD
 // ═══════════════════════════════════════════════════════════
 
-const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove,chartData,chartFailed,setRefresh})=>{
-  const t=s.trade||{};
-  const risk=t.entry&&t.sl?Math.abs(t.entry-t.sl):0;
-  const reward=t.entry&&t.target?Math.abs(t.target-t.entry):0;
-  const rr=risk>0&&reward>0?(reward/risk):0;
-  const rrClass=rr>=2?'good':rr>=1?'ok':'bad';
-  const statusClass=(t.status||'watching').toLowerCase();
+const WatchlistDashboard = () => {
+  const [lists, setLists] = useState([]);
+  const [activeList, setActiveList] = useState(null);
+  const [refresh, setRefresh] = useState(0);
+  const [editingTrade, setEditingTrade] = useState(null);
+  const [expandedStock, setExpandedStock] = useState(null);
+  const [chartData, setChartData] = useState({});
+  const [orderDialog, setOrderDialog] = useState(null);
 
-  return(<div style={{borderBottom:'1px solid rgba(255,255,255,0.02)'}}>
-    {/* Row */}
-    <div style={{display:'flex',alignItems:'center',gap:0,padding:'8px 0',cursor:'pointer',transition:'background .12s',background:isExp?'rgba(0,255,136,0.025)':'transparent'}}
-      className="fade-in"
-      onClick={()=>onExpand(isExp?null:s.symbol)}
-      onMouseEnter={e=>{if(!isExp)e.currentTarget.style.background='rgba(0,255,136,0.015)'}}
-      onMouseLeave={e=>{if(!isExp)e.currentTarget.style.background='transparent'}}>
+  useEffect(() => { if (window.teWatchlist) setLists(window.teWatchlist.getLists()); }, [refresh]);
 
-      {/* Expand toggle */}
-      <div style={{width:36,textAlign:'center',color:isExp?'var(--accent)':'var(--text-muted)',fontSize:10,transition:'transform .15s',transform:isExp?'rotate(90deg)':'',flexShrink:0}}>▶</div>
+  useEffect(() => {
+    if (!expandedStock || chartData[expandedStock]) return;
+    fetch("./data/stock_details/" + expandedStock + ".json?t=" + Date.now())
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.price_history && d.price_history.length) setChartData(prev => ({...prev, [expandedStock]: d.price_history})); })
+      .catch(() => {});
+  }, [expandedStock]);
 
-      {/* Symbol + Sector + Source */}
-      <div style={{flex:'1 1 auto',padding:'0 8px',minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          <span className="wl-sym">{s.symbol}</span>
-          <span className={`wl-status ${statusClass}`}>{(t.status||'WATCHING').toUpperCase()}</span>
-          <span className="wl-source">{s.source||'manual'}</span>
-        </div>
-        <span className="wl-sector">{s.sector||'—'}</span>
-      </div>
+  const active = activeList ? lists.find(l => l.id === activeList) : lists[0];
 
-      {/* Trade Plan (E/T/SL + R:R) */}
-      <div style={{flex:'0 0 auto',padding:'0 10px',display:'flex',alignItems:'center'}}>
-        {t.entry||t.target||t.sl?(
-          <div className="wl-plan">
-            {t.entry&&<div className="wl-plan-item"><span className="wl-plan-label">ENTRY</span><span className="wl-plan-val entry">₹{t.entry}</span></div>}
-            {t.target&&<div className="wl-plan-item"><span className="wl-plan-label">TGT</span><span className="wl-plan-val target">₹{t.target}</span></div>}
-            {t.sl&&<div className="wl-plan-item"><span className="wl-plan-label">SL</span><span className="wl-plan-val sl">₹{t.sl}</span></div>}
-            {rr>0&&<span className={`wl-rr ${rrClass}`}>{rr.toFixed(1)}R</span>}
-            {t.qty&&<div className="wl-plan-item"><span className="wl-plan-label">QTY</span><span className="wl-plan-val" style={{color:'var(--text-secondary)'}}>{t.qty}</span></div>}
+  return (
+    <div>
+      <nav className="nav">
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:40,marginRight:12,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+        <a href="scanner.html" className="nav-link">Scanner</a>
+        <a href="sectors.html" className="nav-link">Sectors</a>
+        <a href="rrg.html" className="nav-link">RRG</a>
+        <a href="matrix.html" className="nav-link">Matrix</a>
+        <a href="mps.html" className="nav-link">MPS</a>
+        <a href="index.html" className="nav-link">Journal</a>
+        <a href="#" className="nav-link active">Watchlist</a>
+      </nav>
+      <div style={{maxWidth:1440,margin:"0 auto",padding:"16px 20px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <h1 style={{fontSize:24,fontWeight:900,letterSpacing:3,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>WATCHLISTS</h1>
+            <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginTop:4,letterSpacing:0.5}}>{lists.length} lists | HLC·OHLC·Line·P&F·Renko | Right-click → Trade</div>
           </div>
-        ):(
-          <span style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',opacity:0.4}}>No plan</span>
-        )}
-      </div>
-
-      {/* Orders / Edit */}
-      <div style={{flex:'0 0 auto',padding:'0 10px',display:'flex',alignItems:'center'}} onClick={e=>e.stopPropagation()}>
-        {isEd?(
-          <div style={{display:'flex',gap:3,alignItems:'center'}}>
-            <input type="number" defaultValue={t.entry||""} id={"e"+s.symbol} placeholder="Entry" style={{width:58,fontSize:9,background:'var(--bg-hover)',border:'1px solid rgba(0,255,136,0.2)',color:'var(--accent)',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
-            <input type="number" defaultValue={t.target||""} id={"t"+s.symbol} placeholder="Tgt" style={{width:58,fontSize:9,background:'var(--bg-hover)',border:'1px solid rgba(0,200,255,0.2)',color:'var(--accent2)',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
-            <input type="number" defaultValue={t.sl||""} id={"s"+s.symbol} placeholder="SL" style={{width:58,fontSize:9,background:'var(--bg-hover)',border:'1px solid rgba(255,68,85,0.2)',color:'var(--red)',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
-            <input type="number" defaultValue={t.qty||""} id={"q"+s.symbol} placeholder="Qty" style={{width:40,fontSize:9,background:'var(--bg-hover)',border:'1px solid var(--border-low)',color:'#fff',borderRadius:4,padding:'4px 5px',fontFamily:'var(--font-mono)'}}/>
-            <button className="wl-btn buy" onClick={()=>onSaveEdit(s.symbol)}>Save</button>
+          <div style={{display:"flex",gap:6}}>
+            <button className="ob ob-b" style={{padding:"5px 12px",fontSize:10}} onClick={() => { const n=prompt("Name:"); if(n){window.teWatchlist.createList(n);setRefresh(r=>r+1);} }}>+ New</button>
+            <button className="ob ob-i" style={{padding:"5px 12px",fontSize:10}} onClick={async()=>{await window.teWatchlist.sync();await window.teWatchlist.pullFromCloud();setLists(window.teWatchlist.getLists());setRefresh(r=>r+1);}}>Sync</button>
           </div>
-        ):(
-          <div className="wl-orders">
-            <button className="wl-btn edit" onClick={()=>onEdit(s.symbol)}>Edit</button>
-            <button className="wl-btn buy" onClick={()=>onOrder({symbol:s.symbol,type:'BUY',price:t.entry||0})}>BUY</button>
-            <button className="wl-btn sell" onClick={()=>onOrder({symbol:s.symbol,type:'SELL',price:t.entry||0})}>SELL</button>
-            <button className="wl-btn sl" onClick={()=>onOrder({symbol:s.symbol,type:'SL',price:t.sl||0})}>SL</button>
-            <button className="wl-btn gtt" onClick={()=>onOrder({symbol:s.symbol,type:'GTT',price:t.entry||0})}>GTT</button>
-            <button className="wl-btn del" onClick={()=>onRemove(s.symbol)}>×</button>
-          </div>
-        )}
-      </div>
-    </div>
-
-    {/* Expanded chart — full width below the row */}
-    {isExp&&<div className="wl-chart-wrap">
-      {chartData[s.symbol]?(<TEChart symbol={s.symbol} prices={chartData[s.symbol]}/>
-      ):(<div style={{padding:24,textAlign:'center'}}>
-        {!chartFailed[s.symbol]&&<div><div style={{width:20,height:20,border:'2px solid var(--border-low)',borderTop:'2px solid var(--accent)',borderRadius:'50%',animation:'spin .8s linear infinite',margin:'0 auto 8px'}}/><div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>Loading {s.symbol}...</div></div>}
-        {chartFailed[s.symbol]&&<div style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:8}}>No data for <b style={{color:'#fff'}}>{s.symbol}</b></div>}
-        <div style={{display:'flex',gap:5,justifyContent:'center',marginTop:8}}>
-          <button onClick={()=>window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${s.symbol}&interval=D`,'tradedge_tv')} className="ob ob-i" style={{padding:'4px 10px',fontSize:9}}>TV Pro</button>
-          <button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${s.symbol}/pf`,'_blank')} className="ob ob-g" style={{padding:'4px 10px',fontSize:9}}>P&F</button>
-          <button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${s.symbol}/renko`,'_blank')} className="ob ob-g" style={{padding:'4px 10px',fontSize:9}}>Renko</button>
         </div>
-      </div>)}
-    </div>}
-  </div>);
-};
-
-const WatchlistDashboard=()=>{
-  const[lists,setLists]=useState([]);const[activeList,setActiveList]=useState(null);const[refresh,setRefresh]=useState(0);
-  const[editingTrade,setEditingTrade]=useState(null);const[expandedStock,setExpandedStock]=useState(null);
-  const[chartData,setChartData]=useState({});const[chartFailed,setChartFailed]=useState({});const[orderDialog,setOrderDialog]=useState(null);
-
-  useEffect(()=>{if(window.teWatchlist)setLists(window.teWatchlist.getLists())},[refresh]);
-  useEffect(()=>{if(!expandedStock||chartData[expandedStock]||chartFailed[expandedStock])return;
-    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),5000);
-    fetch("./data/stock_details/"+expandedStock+".json?t="+Date.now(),{signal:ac.signal})
-      .then(r=>r.ok?r.json():null).then(d=>{clearTimeout(to);if(d?.price_history?.length)setChartData(p=>({...p,[expandedStock]:d.price_history}));else setChartFailed(p=>({...p,[expandedStock]:true}))})
-      .catch(()=>{clearTimeout(to);setChartFailed(p=>({...p,[expandedStock]:true}))});
-    return()=>{clearTimeout(to);ac.abort()}},[expandedStock]);
-
-  const active=activeList?lists.find(l=>l.id===activeList):lists[0];
-
-  const handleSaveEdit=(sym)=>{
-    const en=+(document.getElementById("e"+sym)?.value)||null;
-    const tg=+(document.getElementById("t"+sym)?.value)||null;
-    const sl=+(document.getElementById("s"+sym)?.value)||null;
-    const qt=parseInt(document.getElementById("q"+sym)?.value)||0;
-    window.teWatchlist.updateTrade(active.id,sym,{entry:en,target:tg,sl:sl,qty:qt,status:en?"active":"watching"});
-    setEditingTrade(null);setRefresh(r=>r+1);
-  };
-
-  // Stats for active list
-  const stats=useMemo(()=>{
-    if(!active)return{total:0,active:0,watching:0,withPlan:0};
-    const stks=active.stocks;
-    return{total:stks.length,active:stks.filter(s=>s.trade?.status==='active').length,
-      watching:stks.filter(s=>!s.trade?.status||s.trade.status==='watching').length,
-      withPlan:stks.filter(s=>s.trade?.entry).length};
-  },[active]);
-
-  return(<div>
-    <nav className="nav">
-      <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TE" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
-      <a href="scanner.html" className="nav-link">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="#" className="nav-link active">Watchlist</a>
-    </nav>
-
-    <div style={{maxWidth:1440,margin:"0 auto",padding:"0 20px"}}>
-      {/* Header */}
-      <div className="wl-header">
-        <div>
-          <div className="wl-title">WATCHLISTS</div>
-          <div className="wl-subtitle">{lists.length} lists | HLC · OHLC · Line · P&F · Renko | Right-click chart → Trade</div>
+        <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+          {lists.map(l=><button key={l.id} onClick={()=>{setActiveList(l.id);setExpandedStock(null);}}
+            style={{padding:"6px 14px",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,
+              background:(active&&active.id===l.id)?"var(--accent-dim)":"rgba(255,255,255,0.02)",
+              border:"1px solid "+((active&&active.id===l.id)?"var(--accent)":"rgba(255,255,255,0.06)"),
+              color:(active&&active.id===l.id)?"var(--accent)":"var(--text-secondary)",borderRadius:6,cursor:"pointer",
+              boxShadow:(active&&active.id===l.id)?"0 0 12px rgba(0,255,136,0.06)":"none",transition:"all .15s"}}>{l.name} ({l.stocks.length})</button>)}
         </div>
-        <div style={{display:'flex',gap:6}}>
-          <button className="wl-btn buy" style={{padding:'6px 14px',fontSize:10}} onClick={()=>{const n=prompt("Name:");if(n){window.teWatchlist.createList(n);setRefresh(r=>r+1)}}}>+ New</button>
-          <button className="wl-btn" style={{padding:'6px 14px',fontSize:10,background:'rgba(0,200,255,0.08)',borderColor:'rgba(0,200,255,0.2)',color:'var(--accent2)'}} onClick={async()=>{await window.teWatchlist.sync();await window.teWatchlist.pullFromCloud();setLists(window.teWatchlist.getLists());setRefresh(r=>r+1)}}>☁ Sync</button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="wl-tabs">
-        {lists.map(l=><button key={l.id} className={`wl-tab ${active?.id===l.id?'active':''}`} onClick={()=>{setActiveList(l.id);setExpandedStock(null);setEditingTrade(null)}}>
-          {l.name}<span className="wl-tab-count">({l.stocks.length})</span>
-        </button>)}
-      </div>
-
-      {active?(
-        <div className="card" style={{borderRadius:10}}>
-          {/* List header */}
-          <div className="wl-list-header">
-            <div style={{display:'flex',alignItems:'center'}}>
-              <span className="wl-list-name">{active.name}</span>
-              <span className="wl-list-meta">{stats.total} stocks · {stats.active} active · {stats.withPlan} with plan</span>
+        {active ? (
+          <div className="card">
+            <div style={{padding:"12px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center",background:"linear-gradient(90deg,rgba(0,255,136,0.015),transparent)"}}>
+              <span style={{fontSize:15,fontWeight:800,color:"#fff",letterSpacing:0.5}}>{active.name} <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",fontWeight:400,marginLeft:6}}>{active.stocks.length} stocks</span></span>
+              <div style={{display:"flex",gap:4}}>
+                <button className="ob ob-b" onClick={()=>{const s=prompt("Symbol:");if(s){window.teWatchlist.addStock(active.id,{symbol:s.toUpperCase(),source:"manual"});setRefresh(r=>r+1);}}}>+ Add</button>
+                <button className="ob ob-i" onClick={()=>{const n=prompt("Rename:",active.name);if(n){window.teWatchlist.renameList(active.id,n);setRefresh(r=>r+1);}}}>Rename</button>
+                <button className="ob ob-s" onClick={()=>{if(confirm("Delete?")){window.teWatchlist.deleteList(active.id);setActiveList(null);setRefresh(r=>r+1);}}}>Delete</button>
+              </div>
             </div>
-            <div style={{display:'flex',gap:4}}>
-              <button className="wl-btn buy" onClick={()=>{const s=prompt("Symbol:");if(s){window.teWatchlist.addStock(active.id,{symbol:s.toUpperCase(),source:"manual"});setRefresh(r=>r+1)}}}>+ Add</button>
-              <button className="wl-btn edit" onClick={()=>{const n=prompt("Rename:",active.name);if(n){window.teWatchlist.renameList(active.id,n);setRefresh(r=>r+1)}}}>Rename</button>
-              <button className="wl-btn del" style={{fontSize:8}} onClick={()=>{if(confirm("Delete '"+active.name+"'?")){window.teWatchlist.deleteList(active.id);setActiveList(null);setRefresh(r=>r+1)}}}>Delete</button>
-            </div>
+            <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
+              <thead><tr style={{background:"rgba(0,255,136,0.03)"}}>
+                {["","SYMBOL","SECTOR","SRC","STATUS","ENTRY","TGT","SL","QTY","ORDERS"].map(h=><th key={h} style={{padding:"7px 8px",textAlign:"left",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)",whiteSpace:"nowrap"}}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {active.stocks.map((s,i) => {
+                  const t = s.trade || {};
+                  const isExp = expandedStock === s.symbol;
+                  const isEd = editingTrade === s.symbol;
+                  return (
+                    <Fragment key={i}>
+                      <tr style={{borderBottom:"1px solid rgba(255,255,255,0.02)",cursor:"pointer",background:isExp?"rgba(0,255,136,0.03)":"transparent"}} onClick={()=>setExpandedStock(isExp?null:s.symbol)}>
+                        <td style={{padding:"5px 8px",fontSize:11}}>{isExp?"▼":"▶"}</td>
+                        <td style={{padding:"5px 8px"}}><span style={{fontWeight:700,color:"#fff"}}>{s.symbol}</span></td>
+                        <td style={{padding:"5px 8px",color:"var(--text-muted)",fontSize:9}}>{s.sector||""}</td>
+                        <td style={{padding:"5px 8px"}}><span style={{fontSize:7,padding:"1px 4px",borderRadius:2,fontFamily:"var(--font-mono)",background:"rgba(0,255,136,0.08)",color:"var(--accent)"}}>{s.source||"manual"}</span></td>
+                        <td style={{padding:"5px 8px"}}><span style={{fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,color:t.status==="active"?"var(--accent)":"var(--text-muted)"}}>{(t.status||"WATCH").toUpperCase()}</span></td>
+                        {isEd ? (
+                          <Fragment>
+                            <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.entry||""} id={"e"+s.symbol} style={{width:60,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--border-med)",color:"#fff",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
+                            <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.target||""} id={"t"+s.symbol} style={{width:60,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--accent)",color:"var(--accent)",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
+                            <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.sl||""} id={"s"+s.symbol} style={{width:60,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--red)",color:"var(--red)",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
+                            <td style={{padding:"2px"}} onClick={e=>e.stopPropagation()}><input type="number" defaultValue={t.qty||""} id={"q"+s.symbol} style={{width:40,fontSize:9,background:"var(--bg-hover)",border:"1px solid var(--border-med)",color:"#fff",borderRadius:3,padding:"2px 4px",fontFamily:"var(--font-mono)"}}/></td>
+                          </Fragment>
+                        ) : (
+                          <Fragment>
+                            <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10}}>{t.entry||"\u2014"}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10,color:t.target?"var(--accent)":"var(--text-muted)"}}>{t.target||"\u2014"}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10,color:t.sl?"var(--red)":"var(--text-muted)"}}>{t.sl||"\u2014"}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontSize:10}}>{t.qty||"\u2014"}</td>
+                          </Fragment>
+                        )}
+                        <td style={{padding:"3px 6px"}} onClick={e=>e.stopPropagation()}>
+                          <div style={{display:"flex",gap:2,flexWrap:"nowrap"}}>
+                            {isEd ? <button className="ob ob-b" onClick={()=>{
+                              const en=parseFloat(document.getElementById("e"+s.symbol)?.value)||null;
+                              const tg=parseFloat(document.getElementById("t"+s.symbol)?.value)||null;
+                              const sl=parseFloat(document.getElementById("s"+s.symbol)?.value)||null;
+                              const qt=parseInt(document.getElementById("q"+s.symbol)?.value)||0;
+                              window.teWatchlist.updateTrade(active.id,s.symbol,{entry:en,target:tg,sl:sl,qty:qt,status:en?"active":"watching"});
+                              setEditingTrade(null);setRefresh(r=>r+1);
+                            }}>Save</button> : <button className="ob" style={{borderColor:"var(--border-low)",color:"var(--text-muted)"}} onClick={()=>setEditingTrade(s.symbol)}>Edit</button>}
+                            <button className="ob ob-b" onClick={()=>setOrderDialog({symbol:s.symbol,type:"BUY",price:t.entry||0})}>BUY</button>
+                            <button className="ob ob-s" onClick={()=>setOrderDialog({symbol:s.symbol,type:"SELL",price:t.entry||0})}>SELL</button>
+                            <button className="ob ob-sl" onClick={()=>setOrderDialog({symbol:s.symbol,type:"SL",price:t.sl||0})}>SL</button>
+                            <button className="ob ob-g" onClick={()=>setOrderDialog({symbol:s.symbol,type:"GTT",price:t.entry||0})}>GTT</button>
+                            <button className="ob ob-s" style={{padding:"2px 4px"}} onClick={()=>{window.teWatchlist.removeStock(active.id,s.symbol);setRefresh(r=>r+1);}}>x</button>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExp && <tr><td colSpan={10} style={{padding:"8px 12px",background:"rgba(0,0,0,0.3)",borderBottom:"2px solid var(--accent)"}}>
+                        {chartData[s.symbol] ? <TEChart symbol={s.symbol} prices={chartData[s.symbol]}/> : (
+                          <div style={{padding:24,textAlign:"center",color:"var(--text-muted)",fontSize:10,fontFamily:"var(--font-mono)"}}>
+                            Loading {s.symbol} chart...
+                            <div style={{marginTop:8,display:"flex",gap:6,justifyContent:"center"}}>
+                              <button className="ob ob-i" onClick={()=>window.open("stock.html?s="+s.symbol,"_blank")}>Stock Page</button>
+                              <button className="ob ob-b" onClick={()=>window.open("https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A"+s.symbol+"&interval=D","tradedge_tv")}>TV Pro</button>
+                            </div>
+                          </div>
+                        )}
+                      </td></tr>}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+            {active.stocks.length===0 && <div style={{padding:40,textAlign:"center",color:"var(--text-muted)",fontSize:11,fontFamily:"var(--font-mono)"}}>Empty. Add stocks or save a scan.</div>}
           </div>
-
-          {/* Column headers */}
-          <div style={{display:'flex',alignItems:'center',padding:'8px 0',background:'rgba(0,255,136,0.02)',borderBottom:'1px solid var(--border-dim)'}}>
-            <div style={{width:36,textAlign:'center',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}></div>
-            <div style={{flex:'1 1 auto',padding:'0 8px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}>SYMBOL</div>
-            <div style={{flex:'0 0 auto',padding:'0 10px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}>TRADE PLAN</div>
-            <div style={{flex:'0 0 auto',padding:'0 10px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:1}}>ORDERS</div>
-          </div>
-
-          {/* Stock rows */}
-          {active.stocks.map((s,i)=>(
-            <StockRow key={s.symbol+i} s={s} active={active} isExp={expandedStock===s.symbol} isEd={editingTrade===s.symbol}
-              onExpand={setExpandedStock} onEdit={setEditingTrade} onSaveEdit={handleSaveEdit}
-              onOrder={setOrderDialog} onRemove={sym=>{window.teWatchlist.removeStock(active.id,sym);setRefresh(r=>r+1)}}
-              chartData={chartData} chartFailed={chartFailed} setRefresh={setRefresh}/>
-          ))}
-
-          {active.stocks.length===0&&<div className="wl-empty"><div className="wl-empty-icon">📋</div><div className="wl-empty-text">Empty watchlist</div><div className="wl-empty-sub">Add stocks manually or save a scan from the Scanner page</div></div>}
+        ) : <div style={{padding:60,textAlign:"center",color:"var(--text-muted)"}}><div style={{fontSize:48,marginBottom:12,opacity:0.3}}>📋</div><div style={{fontSize:14,fontWeight:700}}>No Watchlists</div><div style={{fontSize:10,fontFamily:"var(--font-mono)",marginTop:4,opacity:0.5}}>Create one to get started</div></div>}
+        <div style={{padding:"14px 0",marginTop:12,borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:8,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:0.5}}>
+          <span>TRADEDGE WATCHLIST v4.0 · Keys: H T F R M P · Scroll:Zoom · Drag:Pan</span>
+          <span style={{color:"var(--accent)"}}>◈ CYBERPUNK EDITION</span>
         </div>
-      ):(<div className="wl-empty"><div className="wl-empty-icon">📋</div><div className="wl-empty-text">No Watchlists</div><div className="wl-empty-sub">Create a new watchlist to get started</div></div>)}
-
-      {/* Footer */}
-      <div style={{padding:'14px 0',marginTop:12,borderTop:'1px solid var(--border-dim)',display:'flex',justifyContent:'space-between',fontSize:8,fontFamily:'var(--font-mono)',color:'var(--text-muted)',letterSpacing:0.5}}>
-        <span>TRADEDGE WATCHLIST v4.0 · HLC·OHLC·Line·P&F·Renko · Keyboard: H T F R M P</span>
-        <span style={{color:'var(--accent)'}}>◈ CYBERPUNK EDITION</span>
       </div>
+      {orderDialog && <OrderDialog symbol={orderDialog.symbol} type={orderDialog.type} lastPrice={orderDialog.price} onClose={()=>setOrderDialog(null)}/>}
     </div>
-    {orderDialog&&<OrderDialog symbol={orderDialog.symbol} type={orderDialog.type} lastPrice={orderDialog.price} onClose={()=>setOrderDialog(null)}/>}
-  </div>);
+  );
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<WatchlistDashboard/>);
