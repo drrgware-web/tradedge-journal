@@ -547,7 +547,7 @@ const StockRow=({s,active,isExp,isEd,onExpand,onEdit,onSaveEdit,onOrder,onRemove
 
     {/* Expanded chart — full width below the row */}
     {isExp&&<div className="wl-chart-wrap">
-      {chartData[s.symbol]?(<ChartErrorBoundary symbol={s.symbol}><TEChart symbol={s.symbol} prices={chartData[s.symbol]} onOrder={onOrder} onCollapse={()=>onExpand(null)}/></ChartErrorBoundary>
+      {chartData[s.symbol]?(<TEChart symbol={s.symbol} prices={chartData[s.symbol]}/>
       ):(<div style={{padding:24,textAlign:'center'}}>
         {!chartFailed[s.symbol]&&<div><div style={{width:20,height:20,border:'2px solid var(--border-low)',borderTop:'2px solid var(--accent)',borderRadius:'50%',animation:'spin .8s linear infinite',margin:'0 auto 8px'}}/><div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>Loading {s.symbol}...</div></div>}
         {chartFailed[s.symbol]&&<div style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:8}}>No data for <b style={{color:'#fff'}}>{s.symbol}</b></div>}
