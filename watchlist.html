@@ -151,7 +151,7 @@ const[drawMode,setDrawMode]=useState(null);const[drawings,setDrawings]=useState(
   const[measureResult,setMeasureResult]=useState(null);const[dragLine,setDragLine]=useState(null);const[ctx,setCtx]=useState(null);
 
   // Persist
-  (()=>{DrawingStore.save(symbol,drawings)},[drawings,symbol]);
+  useEffect(()=>{DrawingStore.save(symbol,drawings)},[drawings,symbol]);
   useEffect(()=>{CS.saveAlerts(symbol,alerts)},[alerts,symbol]);
   useEffect(()=>{CS.savePlan(symbol,plan)},[plan,symbol]);
   useEffect(()=>{CS.savePosConfig(posCfg)},[posCfg]);
