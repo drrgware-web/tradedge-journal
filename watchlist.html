@@ -62,31 +62,32 @@ const CS={
   savePosConfig:v=>LS.set('te_chart_pos_config',v),
 };
 
-// ═══ SUPABASE CLOUD SYNC ═══
-const SUPABASE_URL='https://urnrdpyhncezljirpnmy.supabase.co';
-const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzY5MDIsImV4cCI6MjA4ODM1MjkwMn0.eExEFw1XGAlYBGECqCpl928UvXv5Jchuyr1YYkcrbdw';
+// ═══ GOOGLE SHEETS HYBRID CLOUD SYNC ═══
+// Deploy TEChartDrawingsSync.gs as Web App and paste URL below
+const GSHEET_WEB_APP_URL=localStorage.getItem('te_gsheet_url')||'https://script.google.com/macros/s/AKfycbzIgm80nPOG6CVwcSAwS-7qvXvcI4cER__n_Jk60bjKKuwHvg0TnnGYZf3HF4TjhlCV/exec';
 
 const DrawingCloudSync={
   async load(symbol){
+    if(!GSHEET_WEB_APP_URL){console.log('GSheet URL not set');return null}
     try{
-      const res=await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings?symbol=eq.${symbol}&select=data`,{
-        method:'GET',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json'}
-      });
+      const res=await fetch(`${GSHEET_WEB_APP_URL}?symbol=${encodeURIComponent(symbol)}`);
       if(!res.ok)return null;
-      const rows=await res.json();
-      return rows.length?rows[0].data:null;
-    }catch(e){console.warn('Cloud load error:',e);return null}
+      const json=await res.json();
+      return json.data;
+    }catch(e){console.warn('GSheet load error:',e);return null}
   },
   async save(symbol,data){
+    if(!GSHEET_WEB_APP_URL){return}
     try{
-      const res=await fetch(`${SUPABASE_URL}/rest/v1/te_chart_drawings`,{
+      await fetch(GSHEET_WEB_APP_URL,{
         method:'POST',
-        headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
-        body:JSON.stringify({symbol,data,updated_at:new Date().toISOString()})
+        headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({symbol,data})
       });
-      if(!res.ok)console.warn('Cloud save failed:',res.status);
-    }catch(e){console.warn('Cloud save error:',e)}
-  }
+    }catch(e){console.warn('GSheet save error:',e)}
+  },
+  isConfigured(){return!!GSHEET_WEB_APP_URL},
+  setUrl(url){localStorage.setItem('te_gsheet_url',url);location.reload()}
 };
 
 const DrawingStore={
@@ -290,7 +291,7 @@ const TEChart=({symbol,prices,onOrder,onCollapse})=>{
         c.fillStyle="rgba(255,255,255,0.05)";c.font="11px 'JetBrains Mono',monospace";c.fillText("QTY "+qty+" | "+posCfg.riskPct+"% R",W/2,(yE+yS)/2+22)}}
 
     if(crosshair&&!ctx){const{x:mx,y:my}=crosshair;if(mx>=PAD.L&&mx<=W-PAD.R){
-      c.strokeStyle=drawMode?"rgba(255,255,255,.1)":"rgba(0,255,136,.12)";c.lineWidth=0.5;c.setLineDash([3,3]);
+      c.strokeStyle=drawMode?"rgba(255,255,255,.35)":"rgba(0,255,136,.4)";c.lineWidth=0.5;c.setLineDash([3,3]);
       c.beginPath();c.moveTo(mx,PAD.T);c.lineTo(mx,CH-PAD.B);c.stroke();c.beginPath();c.moveTo(PAD.L,my);c.lineTo(W-PAD.R,my);c.stroke();c.setLineDash([]);
       if(my>=PAD.T&&my<=PAD.T+cH){const pr=toP(my);c.fillStyle="#0a1520";c.fillRect(0,my-9,PAD.L-2,18);c.strokeStyle="#00ff88";c.lineWidth=0.5;c.strokeRect(0,my-9,PAD.L-2,18);
         c.fillStyle="#00ff88";c.font="bold 9px 'JetBrains Mono',monospace";c.textAlign="right";c.fillText(pr.toFixed(2),PAD.L-6,my+3)}}}
@@ -460,10 +461,11 @@ const WatchlistDashboard=()=>{
     <div style={{maxWidth:1440,margin:"0 auto",padding:"16px 20px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:14,paddingBottom:12,borderBottom:"1px solid var(--border-dim)"}}>
         <div><h1 style={{fontSize:24,fontWeight:900,letterSpacing:3,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>WATCHLISTS</h1>
-          <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginTop:4}}>{lists.length} lists | TEChart v5.0 + Cloud Sync | Keys: H T R C F B X M S V P</div></div>
+          <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginTop:4}}>{lists.length} lists | TEChart v5.0 + GSheet Sync {DrawingCloudSync.isConfigured()?<span style={{color:"var(--accent)"}}>✓</span>:<span style={{color:"var(--amber)"}}>⚠</span>} | Keys: H T R C F B X M S V P</div></div>
         <div style={{display:"flex",gap:6}}>
           <button className="ob ob-b" style={{padding:"5px 12px",fontSize:10}} onClick={()=>{const n=prompt("Name:");if(n){window.teWatchlist.createList(n);setRefresh(r=>r+1)}}}>+ New</button>
-          <button className="ob ob-i" style={{padding:"5px 12px",fontSize:10}} onClick={async()=>{await window.teWatchlist.sync();await window.teWatchlist.pullFromCloud();setLists(window.teWatchlist.getLists());setRefresh(r=>r+1)}}>Sync</button></div>
+          <button className="ob ob-i" style={{padding:"5px 12px",fontSize:10}} onClick={async()=>{await window.teWatchlist.sync();await window.teWatchlist.pullFromCloud();setLists(window.teWatchlist.getLists());setRefresh(r=>r+1)}}>Sync</button>
+          <button className="ob" style={{padding:"5px 12px",fontSize:10,borderColor:"var(--border-low)",color:"var(--text-muted)"}} onClick={()=>{const url=prompt("Google Sheets Web App URL:",localStorage.getItem('te_gsheet_url')||'');if(url!==null){localStorage.setItem('te_gsheet_url',url);location.reload()}}}>⚙️</button></div>
       </div>
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",paddingBottom:10,borderBottom:"1px solid var(--border-dim)"}}>{lists.map(l=><button key={l.id} onClick={()=>{setActiveList(l.id);setExpandedStock(null)}} style={{padding:"6px 14px",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,background:active?.id===l.id?"var(--accent-dim)":"rgba(255,255,255,0.02)",border:"1px solid "+(active?.id===l.id?"var(--accent)":"rgba(255,255,255,0.06)"),color:active?.id===l.id?"var(--accent)":"var(--text-secondary)",borderRadius:6,cursor:"pointer",transition:"all .15s",boxShadow:active?.id===l.id?"0 0 12px rgba(0,255,136,0.06)":"none"}}>{l.name} ({l.stocks.length})</button>)}</div>
       {active?(<div className="card">
@@ -511,7 +513,7 @@ const WatchlistDashboard=()=>{
         {active.stocks.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text-muted)",fontSize:11,fontFamily:"var(--font-mono)"}}>Empty watchlist. Add stocks or save a scan.</div>}
       </div>):(<div style={{padding:60,textAlign:"center",color:"var(--text-muted)"}}><div style={{fontSize:48,marginBottom:12,opacity:0.3}}>📋</div><div style={{fontSize:14,fontWeight:700}}>No Watchlists</div><div style={{fontSize:10,fontFamily:"var(--font-mono)",marginTop:4,opacity:0.5}}>Create one to get started</div></div>)}
       <div style={{padding:"14px 0",marginTop:12,borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:8,fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>
-        <span>TRADEDGE WATCHLIST v5.0 · TEChart + Cloud Sync · Keys: H T R C F B X M S V P</span><span style={{color:"var(--accent)"}}>◈ CYBERPUNK EDITION</span>
+        <span>TRADEDGE WATCHLIST v5.0 · TEChart + GSheet Sync · Keys: H T R C F B X M S V P</span><span style={{color:"var(--accent)"}}>◈ CYBERPUNK EDITION</span>
       </div>
     </div>
     {orderDialog&&<OrderDialog symbol={orderDialog.symbol} type={orderDialog.type} lastPrice={orderDialog.price} onClose={()=>setOrderDialog(null)}/>}
