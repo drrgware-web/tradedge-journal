@@ -302,12 +302,12 @@ const[drawMode,setDrawMode]=useState(null);const[drawings,setDrawings]=useState(
 
   const onMD=e=>{if(e.button===2||ctx)return;const L=getL();if(!L)return;const r=canvasRef.current.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,price=L.toP(my),bi=(L.toBi(mx)||0)+si;
     const hit=hitTest(my,L);if(hit&&!drawMode){setDragLine(hit);return}
-    if(drawMode==='hline'){setDrawings(p=>[...p,{type:'hline',price,color:"#ffaa00",dash:[6,4],label:"LINE",ts:Date.now()}]);setDrawMode(null)}
+    if(drawMode==='hline'){addDrawing({type:'hline',price,color:"#ffaa00",dash:[6,4]});setDrawMode(null)}
     else if((drawMode==='trendline'||drawMode==='fib'||drawMode==='rect'||drawMode==='measure')&&!drawStart){setDrawStart({sx:mx,sy:my,price,bi})}
     else if(drawStart&&drawMode!=='measure'){
-      if(drawMode==='trendline')setDrawings(p=>[...p,{type:'trendline',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,color:"#00c8ff",ts:Date.now()}]);
-      else if(drawMode==='fib')setDrawings(p=>[...p,{type:'fib',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,ts:Date.now()}]);
-      else if(drawMode==='rect')setDrawings(p=>[...p,{type:'rect',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,color:"#8844ff",ts:Date.now()}]);
+     if(drawMode==='trendline')addDrawing({type:'trendline',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,color:"#00c8ff"});
+      else if(drawMode==='fib')addDrawing({type:'fib',p1:drawStart.price,p2:price,color:"#00c8ff"});
+    else if(drawMode==='rect')addDrawing({type:'rect',bi1:drawStart.bi,p1:drawStart.price,bi2:bi,p2:price,color:"#8844ff"});
       setDrawStart(null);setDrawPreview(null);setDrawMode(null)}
     else if(drawMode==='measure'&&drawStart){setMeasureResult({from:drawStart.price,to:price,diff:price-drawStart.price,pct:((price-drawStart.price)/drawStart.price*100)});setDrawStart(null);setDrawPreview(null);setDrawMode(null)}
     else if(!drawMode){setIsDrag(true);setDragX(e.clientX)}};
