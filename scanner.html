@@ -557,11 +557,154 @@ const OrderDialog=({symbol,type,onClose,lastPrice})=>{
 };
 
 // ═══════════════════════════════════════════════════════════════
-// SCAN BUILDER (SIMPLIFIED)
+// FUNDA SCANS PANEL — 3 modes: Fundamental / TechnoFunda / FundaTech
 // ═══════════════════════════════════════════════════════════════
 
-const ScanBuilder=({onApplyFilter,fundaData,activeFundaScan,setActiveFundaScan,onFilterByFunda,allStocks})=>{
+const FundaScansPanel=({fundaData,activeFundaScan,setActiveFundaScan,onFilterByFunda,allStocks})=>{
+  if(!fundaData?.scans)return null;
+  const scans=Object.values(fundaData.scans);
+  const tfBack=fundaData.technofunda?Object.values(fundaData.technofunda):[];
+  const[mode,setMode]=useState('funda');
+  const[savedCI,setSavedCI]=useState(()=>getCI());
+  const ciMap=useMemo(()=>getCIMap(),[savedCI]);
+
+  // FundaTech: funda picks with bullish technicals
+  const ftScans=useMemo(()=>{
+    if(!allStocks?.length)return[];
+    const sm={};allStocks.forEach(s=>{sm[s.symbol.toUpperCase()]=s});
+    return scans.filter(s=>s.count>0).map(scan=>{
+      const matches=[];
+      scan.stocks.forEach(fs=>{
+        const t=sm[fs.symbol.toUpperCase()];if(!t)return;
+        const sigs=[];
+        if(['bullish','bullish_crossover'].includes(t.macd?.crossover))sigs.push('MACD Bull');
+        if(['golden_cross','bullish'].includes(t.ema?.cross_9_21))sigs.push('EMA 9/21▲');
+        if(['golden_cross'].includes(t.ema?.cross_50_200))sigs.push('GoldenCross');
+        if(['new_52w_high','near_52w_high'].includes(t.breakout?.signal))sigs.push('52WHigh');
+        if(['spike','extreme_spike'].includes(t.volume?.signal))sigs.push('VolSpike');
+        if(['upper_breakout'].includes(t.bollinger?.signal))sigs.push('BBBreak');
+        if(t.rsi>=55&&t.rsi<=75)sigs.push(`RSI${t.rsi?.toFixed(0)}`);
+        if(t.composite_score>=3)sigs.push(`Score+${t.composite_score}`);
+        const ci=ciMap[fs.symbol.toUpperCase()]||[];ci.forEach(n=>sigs.push(`CI:${n}`));
+        if(sigs.length>0)matches.push({...fs,technical_signals:sigs,composite_score:t.composite_score||0,rsi:t.rsi||0,change_pct:t.change_pct||0});
+      });
+      matches.sort((a,b)=>(b.composite_score||0)-(a.composite_score||0));
+      return{id:`ft_${scan.id}`,name:`FT: ${scan.name}`,funda_scan:scan.id,category:scan.category,description:`${scan.name} + bullish technicals`,count:matches.length,stocks:matches};
+    }).filter(s=>s.count>0);
+  },[scans,allStocks,ciMap]);
+
+  // TechnoFunda: ChartInk → funda
+  const tfScans=useMemo(()=>{
+    if(Object.keys(ciMap).length===0)return tfBack;
+    const ciS=new Set(Object.keys(ciMap));
+    return scans.filter(s=>s.count>0).map(scan=>{
+      const ol=scan.stocks.filter(fs=>ciS.has(fs.symbol.toUpperCase()));
+      const en=ol.map(fs=>({...fs,technical_scans:ciMap[fs.symbol.toUpperCase()]||[]}));
+      en.sort((a,b)=>(b.technical_scans?.length||0)-(a.technical_scans?.length||0));
+      return{id:`tf_${scan.id}`,name:`TF: ${scan.name}`,funda_scan:scan.id,category:scan.category,description:`'${scan.name}' + ChartInk scans`,count:en.length,stocks:en};
+    }).filter(s=>s.count>0);
+  },[scans,ciMap,tfBack]);
+
+  const disp=mode==='funda'?scans:mode==='technofunda'?tfScans:ftScans;
+  const total=disp.reduce((a,s)=>a+s.count,0);
+  const CAT_COLORS={growth:{bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"},ownership:{bg:"rgba(0,200,255,0.08)",border:"rgba(0,200,255,0.25)",color:"#00c8ff"},capex:{bg:"rgba(255,170,0,0.08)",border:"rgba(255,170,0,0.25)",color:"#ffaa00"},momentum:{bg:"rgba(136,68,255,0.08)",border:"rgba(136,68,255,0.25)",color:"#8844ff"},earnings:{bg:"rgba(255,100,0,0.08)",border:"rgba(255,100,0,0.25)",color:"#ff6400"},quality:{bg:"rgba(0,230,200,0.08)",border:"rgba(0,230,200,0.25)",color:"#00e6c8"}};
+
+  return(
+  <div className="fade-in">
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+      <span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>
+        {mode==='funda'?'📊 FUNDAMENTAL':mode==='technofunda'?'⚡ TECHNOFUNDA':'🔀 FUNDATECH'} • {disp.length} SCANS • {total} MATCHES
+      </span>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+        <button className={`btn ${mode==='funda'?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setMode('funda')}>📊 Fundamental</button>
+        <button className={`btn ${mode==='technofunda'?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setMode('technofunda')}>⚡ TechnoFunda ({tfScans.length})</button>
+        <button className={`btn ${mode==='fundatech'?"btn-accent":""}`} style={{fontSize:9,padding:"4px 10px"}} onClick={()=>setMode('fundatech')}>🔀 FundaTech ({ftScans.length})</button>
+        {activeFundaScan&&<button className="btn" style={{fontSize:9,padding:"4px 10px",borderColor:"var(--red)",color:"var(--red)"}} onClick={()=>{setActiveFundaScan(null);onFilterByFunda(null)}}>✕ Clear</button>}
+      </div>
+    </div>
+
+    <div style={{padding:"6px 10px",borderRadius:4,marginBottom:10,fontSize:10,fontFamily:"var(--font-mono)",background:mode==='funda'?"rgba(0,255,136,0.04)":mode==='technofunda'?"rgba(136,68,255,0.04)":"rgba(0,200,255,0.04)",border:`1px solid ${mode==='funda'?"rgba(0,255,136,0.1)":mode==='technofunda'?"rgba(136,68,255,0.1)":"rgba(0,200,255,0.1)"}`,color:"var(--text-secondary)"}}>
+      {mode==='funda'&&"📊 Definedge-style fundamental scans. Click card → filter main table."}
+      {mode==='technofunda'&&`⚡ Tech→Funda: Your ${Object.keys(savedCI).length} saved ChartInk scans filtered by fundamentals. Run scans via ChartInk tab first.`}
+      {mode==='fundatech'&&"🔀 Funda→Tech: Fundamentally strong stocks with bullish MACD, EMA, Volume, RSI, Breakouts, ChartInk matches."}
+    </div>
+
+    {mode==='technofunda'&&Object.keys(savedCI).length>0&&<div style={{marginBottom:10,display:"flex",flexWrap:"wrap",gap:4,alignItems:"center"}}>
+      <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>SAVED SCANS:</span>
+      {Object.entries(savedCI).map(([n,d])=><span key={n} style={{fontSize:9,fontFamily:"var(--font-mono)",padding:"2px 6px",borderRadius:3,background:"rgba(136,68,255,0.08)",border:"1px solid rgba(136,68,255,0.2)",color:"#8844ff"}}>{n} ({d.count})</span>)}
+      <button style={{fontSize:8,padding:"2px 6px",background:"transparent",border:"1px solid rgba(255,68,85,0.2)",color:"var(--red)",borderRadius:3,cursor:"pointer"}} onClick={()=>{localStorage.removeItem(CI_KEY);setSavedCI({})}}>Clear</button>
+    </div>}
+    {mode==='technofunda'&&Object.keys(savedCI).length===0&&<div style={{padding:16,textAlign:"center",color:"var(--text-muted)",fontSize:11,fontFamily:"var(--font-mono)",border:"1px dashed var(--border-low)",borderRadius:6,marginBottom:10}}>No saved ChartInk scans. Go to <b>ChartInk tab</b> → run scans → they auto-save for TechnoFunda.</div>}
+
+    <div className="funda-grid">
+      {disp.map(scan=>{const cc=CAT_COLORS[scan.category]||CAT_COLORS.growth;const isSel=activeFundaScan===(scan.funda_scan||scan.id);
+        return<div key={scan.id||scan.name} className={`funda-card ${isSel?"selected":""}`}
+          onClick={()=>{const id=scan.funda_scan||scan.id;if(isSel){setActiveFundaScan(null);onFilterByFunda(null)}else{setActiveFundaScan(id);onFilterByFunda(scan.stocks.map(s=>s.symbol))}}}>
+          <div className="funda-card-count" style={{color:cc.color}}>{scan.count}</div>
+          <div className="funda-card-name">{scan.name}</div>
+          <div className="funda-card-desc">{scan.description}</div>
+          <div className="funda-card-meta">
+            <span className="funda-cat" style={{background:cc.bg,border:`1px solid ${cc.border}`,color:cc.color}}>{scan.category||"scan"}</span>
+            <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{scan.count} stocks</span>
+            {mode==='technofunda'&&<span className="tf-badge">TECHNOFUNDA</span>}
+            {mode==='fundatech'&&<span className="ft-badge">FUNDATECH</span>}
+          </div>
+          {scan.stocks?.length>0&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>
+            {scan.stocks.slice(0,5).map(s=><span key={s.symbol} style={{fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,padding:"1px 5px",borderRadius:2,background:"rgba(255,255,255,0.04)",color:"var(--text-secondary)"}}>{s.symbol}</span>)}
+            {scan.stocks.length>5&&<span style={{fontSize:8,color:"var(--text-muted)"}}>+{scan.stocks.length-5}</span>}
+          </div>}
+          {mode==='technofunda'&&scan.stocks?.[0]?.technical_scans?.length>0&&<div style={{marginTop:4,fontSize:8,color:"#8844ff",fontFamily:"var(--font-mono)"}}>CI: {scan.stocks[0].technical_scans.slice(0,3).join(", ")}</div>}
+          {mode==='fundatech'&&scan.stocks?.[0]?.technical_signals?.length>0&&<div style={{marginTop:4,fontSize:8,color:"#00c8ff",fontFamily:"var(--font-mono)"}}>{scan.stocks[0].technical_signals.slice(0,3).join(" • ")}</div>}
+        </div>})}
+    </div>
+
+    {activeFundaScan&&(()=>{const sel=disp.find(s=>(s.funda_scan||s.id)===activeFundaScan);if(!sel)return null;
+      return<div style={{marginTop:12,border:"1px solid var(--border-low)",borderRadius:6,overflow:"hidden"}} className="fade-in">
+        <div style={{padding:"8px 12px",background:"rgba(0,255,136,0.03)",borderBottom:"1px solid var(--border-dim)",fontSize:10,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>{sel.name} — {sel.count} stocks</div>
+        <div style={{maxHeight:350,overflowY:"auto"}}>
+          <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}><thead><tr style={{background:"rgba(0,255,136,0.02)"}}>
+            {["#","SYMBOL","SECTOR","PRICE","MCAP","ROCE","D/E","P/E","NPM","52WH%",mode==='fundatech'?"TECH SIGNALS":mode==='technofunda'?"CI SCANS":null].filter(Boolean).map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:8,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)"}}>{h}</th>)}
+          </tr></thead><tbody>
+            {sel.stocks.map((s,i)=><tr key={s.symbol} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${s.symbol}`,'_blank')}>
+              <td style={{padding:"5px 8px",color:"var(--text-muted)"}}>{i+1}</td>
+              <td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{s.symbol}</td>
+              <td style={{padding:"5px 8px",color:"var(--text-muted)",fontSize:9}}>{s.sector||""}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>₹{s.price?.toFixed(0)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-secondary)"}}>{s.market_cap?.toFixed(0)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.roce>15?"#00ff88":s.roce>8?"#ffaa00":"#889"}}>{s.roce?.toFixed(1)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.de<0.5?"#00ff88":s.de<1?"#ffaa00":"#ff4455"}}>{s.de?.toFixed(2)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>{s.pe?.toFixed(1)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s.npm>10?"#00ff88":"var(--text-secondary)"}}>{s.npm?.toFixed(1)}</td>
+              <td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:s["52wh_dist"]<10?"#00ff88":s["52wh_dist"]<25?"#ffaa00":"var(--text-muted)"}}>{s["52wh_dist"]}%</td>
+              {mode==='fundatech'&&<td style={{padding:"5px 8px",maxWidth:220}}><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{(s.technical_signals||[]).slice(0,4).map((sig,j)=><span key={j} style={{padding:"1px 5px",borderRadius:2,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:600,background:sig.includes('CI:')?"rgba(136,68,255,0.1)":"rgba(0,255,136,0.1)",color:sig.includes('CI:')?"#8844ff":"#00ff88"}}>{sig}</span>)}</div></td>}
+              {mode==='technofunda'&&<td style={{padding:"5px 8px"}}><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{(s.technical_scans||[]).slice(0,3).map((n,j)=><span key={j} style={{padding:"1px 5px",borderRadius:2,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:600,background:"rgba(136,68,255,0.1)",color:"#8844ff"}}>{n}</span>)}</div></td>}
+            </tr>)}
+          </tbody></table>
+        </div>
+      </div>})()}
+  </div>);
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SCAN BUILDER — Full version with tabs
+// ═══════════════════════════════════════════════════════════════
+
+const ScanBuilder=({onApplyFilter,onScanResults,fundaData,activeFundaScan,setActiveFundaScan,onFilterByFunda,allStocks})=>{
   const[isOpen,setIsOpen]=useState(false);
+  const[activeTab,setActiveTab]=useState("funda_scans");
+  const[clauseText,setClauseText]=useState("");
+  const[scanRunning,setScanRunning]=useState(false);
+  const[scanResults,setScanResults]=useState(null);
+  const[savedPresets,setSavedPresets]=useState(()=>{try{return JSON.parse(localStorage.getItem('te_chartink_presets')||'[]')}catch{return[]}});
+  const saveP=p=>{setSavedPresets(p);try{localStorage.setItem('te_chartink_presets',JSON.stringify(p))}catch{}};
+  const[fundaFilters,setFF]=useState({pe_on:false,pe_min:0,pe_max:50,roe_on:false,roe_min:10,de_on:false,de_max:1});
+  const[ciSyms,setCISyms]=useState(null);
+
+  const applyAll=()=>{const n={funda:null,chartink:null};if(fundaFilters.pe_on||fundaFilters.roe_on||fundaFilters.de_on)n.funda={...fundaFilters};if(scanResults?.stocks?.length>0){const s=scanResults.stocks.map(s=>s.symbol.toUpperCase());setCISyms(s);n.chartink=s}if(onApplyFilter)onApplyFilter(n)};
+  const resetAll=()=>{setClauseText("");setScanResults(null);setCISyms(null);setFF({pe_on:false,pe_min:0,pe_max:50,roe_on:false,roe_min:10,de_on:false,de_max:1});if(onApplyFilter)onApplyFilter({funda:null,chartink:null});if(onScanResults)onScanResults(null);setActiveFundaScan(null);onFilterByFunda(null)};
+
+  const tabs=[{id:"funda_scans",label:"Funda Scans",icon:"📊"},{id:"scans",label:"Tech Scans",icon:"📋"},{id:"technicals",label:"Technicals",icon:"📈"},{id:"fundamentals",label:"Filters",icon:"⚙"},{id:"clause",label:"ChartInk",icon:"⌨"}];
+
   return(
   <div className="card" style={{marginBottom:12}}>
     <div style={{padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:isOpen?"1px solid var(--border-dim)":"none"}} onClick={()=>setIsOpen(!isOpen)}>
@@ -569,10 +712,58 @@ const ScanBuilder=({onApplyFilter,fundaData,activeFundaScan,setActiveFundaScan,o
         <span style={{color:"var(--accent)",fontSize:14}}>◈</span>
         <span style={{fontFamily:"var(--font-mono)",fontSize:12,fontWeight:600}}>SCAN BUILDER</span>
         {fundaData?.scans&&<span style={{fontSize:9,fontFamily:"var(--font-mono)",color:"var(--accent3)",padding:"1px 6px",borderRadius:3,background:"rgba(136,68,255,0.1)"}}>{Object.values(fundaData.scans).reduce((a,s)=>a+s.count,0)} funda</span>}
+        {activeFundaScan&&<span style={{fontSize:9,fontFamily:"var(--font-mono)",color:"var(--accent)",padding:"1px 6px",borderRadius:3,background:"var(--accent-dim)"}}>FILTER ACTIVE</span>}
       </div>
       <span style={{color:"var(--text-muted)",fontSize:14,transform:isOpen?"rotate(180deg)":"",transition:"transform 0.2s"}}>▾</span>
     </div>
-    {isOpen&&<div className="fade-in" style={{padding:16,color:"var(--text-muted)",fontSize:11}}>Scan Builder panel - click stocks to expand TEChart below</div>}
+    {isOpen&&<div className="fade-in" style={{padding:16}}>
+      <div className="tabs" style={{marginBottom:12,flexWrap:"wrap"}}>{tabs.map(t=><button key={t.id} className={`tab ${activeTab===t.id?"active":""}`} onClick={()=>setActiveTab(t.id)}>{t.icon} {t.label}</button>)}</div>
+
+      {activeTab==="funda_scans"&&<FundaScansPanel fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={onFilterByFunda} allStocks={allStocks}/>}
+
+      {activeTab==="scans"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{["Inside Bar (D)","NR7","VCP","Tight Setup","Volume Breakout","Gap Up > 3%","Earnings Gap Up","Positive Earnings Reaction","Momentum Scanner","200MA Turnaround","SuperTrend Buy","Pocket Pivot"].map((s,i)=><label key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--text-primary)",cursor:"pointer"}}><input type="checkbox" defaultChecked={i<2||i===4||i===6||i===7} style={{accentColor:"var(--accent)"}}/>{s}</label>)}</div>}
+
+      {activeTab==="technicals"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{[["Price(₹)","25","10000"],["MCap(Cr)","300","5000000"],["MA50 Vol >","100000",""]].map(([l,d1,d2],i)=><label key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" defaultChecked style={{accentColor:"var(--accent)"}}/> {l} <input type="number" placeholder={d1} defaultValue={d1} style={{width:60}}/>{d2&&<>-<input type="number" placeholder={d2} defaultValue={d2} style={{width:70}}/></>}</label>)}</div>}
+
+      {activeTab==="fundamentals"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" checked={fundaFilters.pe_on} onChange={e=>setFF(p=>({...p,pe_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> P/E <input type="number" value={fundaFilters.pe_min} onChange={e=>setFF(p=>({...p,pe_min:+e.target.value||0}))} style={{width:50}}/> - <input type="number" value={fundaFilters.pe_max} onChange={e=>setFF(p=>({...p,pe_max:+e.target.value||0}))} style={{width:50}}/></label>
+        <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" checked={fundaFilters.roe_on} onChange={e=>setFF(p=>({...p,roe_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> ROE {">"} <input type="number" value={fundaFilters.roe_min} onChange={e=>setFF(p=>({...p,roe_min:+e.target.value||0}))} style={{width:50}}/></label>
+        <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--text-secondary)"}}><input type="checkbox" checked={fundaFilters.de_on} onChange={e=>setFF(p=>({...p,de_on:e.target.checked}))} style={{accentColor:"var(--accent)"}}/> D/E {"<"} <input type="number" value={fundaFilters.de_max} onChange={e=>setFF(p=>({...p,de_max:+e.target.value||0}))} style={{width:50}}/></label>
+      </div>}
+
+      {activeTab==="clause"&&<div>
+        <div style={{fontSize:10,color:"var(--text-muted)",marginBottom:6,fontFamily:"var(--font-mono)"}}>Paste ChartInk scan clause:</div>
+        <textarea rows={4} style={{width:"100%",resize:"vertical",fontSize:11}} placeholder='( cash ( latest close > latest sma( latest close, 200 ) and latest rsi( 14 ) > 50 ) )' value={clauseText} onChange={e=>setClauseText(e.target.value)}/>
+        <div style={{marginTop:8,display:"flex",gap:8,alignItems:"center"}}>
+          <button className="btn btn-accent" onClick={async()=>{
+            if(!clauseText.trim())return;const wUrl=localStorage.getItem('zd_worker_url');if(!wUrl){alert('Set zd_worker_url in localStorage first');return}
+            setScanRunning(true);setScanResults(null);
+            try{const r=await fetch(wUrl,{method:'POST',headers:{'X-Kite-Action':'chartink-scan','Content-Type':'application/json'},body:JSON.stringify({scan_clause:clauseText.trim()})});const data=await r.json();
+              if(data.error){setScanResults({error:data.error})}
+              else{setScanResults(data);if(onScanResults)onScanResults(data);
+                const sName=savedPresets.find(p=>p.clause===clauseText.trim())?.name||"Scan "+new Date().toLocaleTimeString("en-IN");
+                saveCI(sName,data.stocks||[]);
+              }
+            }catch(e){setScanResults({error:e.message})}setScanRunning(false);
+          }}>{scanRunning?"⏳ Scanning...":"▶ Run Scan"}</button>
+          <button className="btn" onClick={()=>{if(!clauseText.trim())return;const name=prompt("Name:");if(!name)return;saveP([...savedPresets,{name,clause:clauseText.trim(),date:new Date().toLocaleDateString("en-IN")}])}}>💾 Save</button>
+          {scanResults?.count!=null&&<span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700}}>{scanResults.count} found — saved for TechnoFunda ✓</span>}
+          {scanResults?.error&&<span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--red)"}}>{scanResults.error}</span>}
+        </div>
+        {scanResults?.stocks?.length>0&&<div style={{marginTop:12,maxHeight:300,overflowY:"auto",border:"1px solid var(--border-low)",borderRadius:6}}>
+          <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}><thead><tr style={{background:"rgba(0,255,136,0.05)"}}>{["#","SYMBOL","NAME","CLOSE","CHG%","VOL"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)"}}>{h}</th>)}</tr></thead>
+          <tbody>{scanResults.stocks.map((s,i)=><tr key={i} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`stock.html?s=${s.symbol}`,'_blank')}><td style={{padding:"5px 8px",color:"var(--text-muted)"}}>{i+1}</td><td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{s.symbol}</td><td style={{padding:"5px 8px",color:"var(--text-secondary)"}}>{s.name}</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)"}}>₹{s.close}</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",fontWeight:600,color:s.change_pct>=0?"#00ff88":"#ff4455"}}>{s.change_pct>=0?"+":""}{s.change_pct?.toFixed(2)}%</td><td style={{padding:"5px 8px",fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>{(s.volume/1000).toFixed(0)}K</td></tr>)}</tbody></table>
+        </div>}
+        {savedPresets.length>0&&<div style={{marginTop:12}}><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:6}}>SAVED PRESETS ({savedPresets.length})</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{savedPresets.map((p,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"var(--bg-hover)",border:"1px solid var(--border-low)",borderRadius:4,cursor:"pointer",fontSize:10,fontFamily:"var(--font-mono)"}} onClick={()=>{setClauseText(p.clause);setScanResults(null)}}><span style={{color:"var(--accent)",fontWeight:700}}>{p.name}</span><span style={{color:"var(--text-muted)",fontSize:8}}>{p.date}</span><span style={{color:"var(--red)",cursor:"pointer",marginLeft:4,fontSize:12}} onClick={e=>{e.stopPropagation();if(confirm(`Delete "${p.name}"?`))saveP(savedPresets.filter((_,j)=>j!==i))}}>×</span></div>)}</div></div>}
+      </div>}
+
+      <div style={{marginTop:12,display:"flex",gap:8,justifyContent:"flex-end",alignItems:"center"}}>
+        {ciSyms?.length>0&&<span style={{fontSize:9,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>CHARTINK: {ciSyms.length}</span>}
+        {activeFundaScan&&<span style={{fontSize:9,color:"var(--accent3)",fontFamily:"var(--font-mono)"}}>FUNDA: {activeFundaScan}</span>}
+        <button className="btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={resetAll}>Reset All</button>
+        <button className="btn btn-accent" onClick={applyAll}>Apply Filters</button>
+      </div>
+    </div>}
   </div>);
 };
 
@@ -591,11 +782,15 @@ const ScannerDashboard=()=>{
   const[orderDialog,setOrderDialog]=useState(null);
   const[activeFundaScan,setActiveFundaScan]=useState(null);
   const[fundaFilterSyms,setFundaFilterSyms]=useState(null);
+  const[appliedFilters,setAppliedFilters]=useState({funda:null,chartink:null});
+  const[chartinkResults,setChartinkResults]=useState(null);
 
   const filteredStocks=useMemo(()=>{
     let list=[...stocks];
     if(excludeCircuit)list=list.filter(s=>!s.circuit?.is_restricted);
+    if(appliedFilters.chartink?.length>0){const sy=new Set(appliedFilters.chartink);list=list.filter(s=>sy.has(s.symbol.toUpperCase()))}
     if(fundaFilterSyms?.length>0){const fs=new Set(fundaFilterSyms.map(s=>s.toUpperCase()));list=list.filter(s=>fs.has(s.symbol.toUpperCase()))}
+    if(appliedFilters.funda){const ff=appliedFilters.funda;list=list.filter(s=>{const f=s.fundamentals||{};if(ff.pe_on&&f.pe_ratio!=null&&(f.pe_ratio<ff.pe_min||f.pe_ratio>ff.pe_max))return false;if(ff.roe_on&&(f.roe==null||f.roe<ff.roe_min))return false;if(ff.de_on&&f.debt_to_equity!=null&&f.debt_to_equity>ff.de_max)return false;return true})}
     if(activePreset==="catalyst")list=list.filter(s=>s.catalysts?.length>0);
     else if(activePreset==="bullish")list=list.filter(s=>s.composite_score>=3);
     else if(activePreset==="bearish")list=list.filter(s=>s.composite_score<=-3);
@@ -606,7 +801,7 @@ const ScannerDashboard=()=>{
     if(searchQuery){const q=searchQuery.toUpperCase();list=list.filter(s=>s.symbol.includes(q)||s.name.toUpperCase().includes(q)||s.sector.toUpperCase().includes(q))}
     const srt={score_desc:(a,b)=>b.composite_score-a.composite_score,score_asc:(a,b)=>a.composite_score-b.composite_score,change_desc:(a,b)=>b.change_pct-a.change_pct,rsi_desc:(a,b)=>(b.rsi||0)-(a.rsi||0),funds_desc:(a,b)=>(b.fund_holdings?.no_of_funds||0)-(a.fund_holdings?.no_of_funds||0),mcap_desc:(a,b)=>(b.fundamentals?.market_cap_cr||0)-(a.fundamentals?.market_cap_cr||0)};
     list.sort(srt[sortBy]||srt.score_desc);return list;
-  },[stocks,activePreset,sortBy,searchQuery,excludeCircuit,fundaFilterSyms]);
+  },[stocks,activePreset,sortBy,searchQuery,excludeCircuit,fundaFilterSyms,appliedFilters]);
 
   const summary=useMemo(()=>({bullish:stocks.filter(s=>s.composite_score>=3).length,bearish:stocks.filter(s=>s.composite_score<=-3).length,catalysts:stocks.filter(s=>s.catalysts?.length>0).length,volume:stocks.filter(s=>["spike","extreme_spike"].includes(s.volume?.signal)).length,earnings:stocks.filter(s=>s.earnings_alert).length,funda:fundaData?.scans?Object.values(fundaData.scans).reduce((a,s)=>a+s.count,0):0}),[stocks,fundaData]);
 
@@ -634,7 +829,7 @@ const ScannerDashboard=()=>{
         {[{label:"BULLISH",count:summary.bullish,color:"#00ff88",icon:"▲"},{label:"BEARISH",count:summary.bearish,color:"#ff4455",icon:"▼"},{label:"CATALYSTS",count:summary.catalysts,color:"#ffaa00",icon:"⚡"},{label:"VOL SPIKE",count:summary.volume,color:"#ff00ff",icon:"📊"},{label:"EARNINGS",count:summary.earnings,color:"#00c8ff",icon:"📅"},{label:"FUNDA",count:summary.funda,color:"#8844ff",icon:"📊"}].map((c,i)=><div key={i} style={{background:`linear-gradient(135deg,${c.color}06,${c.color}03)`,border:`1px solid ${c.color}18`,borderRadius:6,padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>{c.icon} {c.label}</div><div style={{fontSize:20,fontWeight:800,color:c.color}}>{c.count}</div></div>)}
       </div>
 
-      <ScanBuilder fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={setFundaFilterSyms} allStocks={stocks}/>
+      <ScanBuilder onApplyFilter={setAppliedFilters} onScanResults={setChartinkResults} fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={setFundaFilterSyms} allStocks={stocks}/>
 
       <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10,padding:"8px 0",borderTop:"1px solid var(--border-dim)",borderBottom:"1px solid var(--border-dim)"}}>
         {SCAN_CATS.map(p=><button key={p.id} onClick={()=>setActivePreset(activePreset===p.id?"all":p.id)} style={{background:activePreset===p.id?"var(--accent-dim)":"rgba(255,255,255,0.02)",border:`1px solid ${activePreset===p.id?"var(--accent)":"rgba(255,255,255,0.06)"}`,borderRadius:4,padding:"4px 10px",color:activePreset===p.id?"var(--accent)":"var(--text-muted)",fontSize:10,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer"}}>{p.icon} {p.label}</button>)}
