@@ -131,6 +131,45 @@ const DrawingStore={
 
 const genDrawingId=()=>Date.now().toString(36)+Math.random().toString(36).substr(2,6);
 
+// ═══ P&F (Point & Figure) Chart Conversion ═══
+function buildPnF(data,boxPct=1,reversal=3){
+  if(!data?.length)return{columns:[],boxSize:1,minP:0,maxP:0};
+  const avgPrice=data.reduce((s,d)=>s+d.c,0)/data.length;
+  const boxSize=avgPrice*(boxPct/100);
+  const getBox=p=>Math.floor(p/boxSize)*boxSize;
+  const columns=[];let dir=0,colTop=0,colBot=0,colBoxes=[];
+  let minP=Infinity,maxP=-Infinity;
+  for(const bar of data){
+    const h=bar.h,l=bar.l;
+    if(dir===0){dir=1;colTop=getBox(h);colBot=getBox(l);colBoxes=[{p:colTop,t:'X'}];continue}
+    if(dir===1){
+      const nt=getBox(h);
+      if(nt>colTop){for(let p=colTop+boxSize;p<=nt;p+=boxSize)colBoxes.push({p,t:'X'});colTop=nt}
+      else{const nb=getBox(l);if(colTop-nb>=reversal*boxSize){columns.push({dir:1,boxes:[...colBoxes],top:colTop,bot:colBot});minP=Math.min(minP,colBot);maxP=Math.max(maxP,colTop);dir=-1;colTop=colTop-boxSize;colBot=nb;colBoxes=[];for(let p=colTop;p>=nb;p-=boxSize)colBoxes.push({p,t:'O'})}}}
+    else{
+      const nb=getBox(l);
+      if(nb<colBot){for(let p=colBot-boxSize;p>=nb;p-=boxSize)colBoxes.push({p,t:'O'});colBot=nb}
+      else{const nt=getBox(h);if(nt-colBot>=reversal*boxSize){columns.push({dir:-1,boxes:[...colBoxes],top:colTop,bot:colBot});minP=Math.min(minP,colBot);maxP=Math.max(maxP,colTop);dir=1;colBot=colBot+boxSize;colTop=nt;colBoxes=[];for(let p=colBot;p<=nt;p+=boxSize)colBoxes.push({p,t:'X'})}}}}
+  if(colBoxes.length){columns.push({dir,boxes:colBoxes,top:colTop,bot:colBot});minP=Math.min(minP,colBot);maxP=Math.max(maxP,colTop)}
+  return{columns,boxSize,minP,maxP};
+}
+
+// ═══ Renko Chart Conversion ═══
+function buildRenko(data,boxPct=1){
+  if(!data?.length)return{bricks:[],boxSize:1,minP:0,maxP:0};
+  const avgPrice=data.reduce((s,d)=>s+d.c,0)/data.length;
+  const boxSize=avgPrice*(boxPct/100);
+  const getBox=p=>Math.floor(p/boxSize)*boxSize;
+  const bricks=[];let lastBox=getBox(data[0].c),dir=0;
+  let minP=lastBox,maxP=lastBox;
+  for(const bar of data){
+    const c=bar.c,cb=getBox(c);
+    if(dir===0){if(cb>lastBox){dir=1;for(let p=lastBox;p<cb;p+=boxSize){bricks.push({o:p,c:p+boxSize,dir:1});maxP=Math.max(maxP,p+boxSize)}lastBox=cb}else if(cb<lastBox){dir=-1;for(let p=lastBox;p>cb;p-=boxSize){bricks.push({o:p,c:p-boxSize,dir:-1});minP=Math.min(minP,p-boxSize)}lastBox=cb}}
+    else if(dir===1){if(cb>=lastBox+boxSize){for(let p=lastBox;p<cb;p+=boxSize){bricks.push({o:p,c:p+boxSize,dir:1});maxP=Math.max(maxP,p+boxSize)}lastBox=cb}else if(cb<=lastBox-2*boxSize){dir=-1;for(let p=lastBox-boxSize;p>cb;p-=boxSize){bricks.push({o:p+boxSize,c:p,dir:-1});minP=Math.min(minP,p)}lastBox=cb}}
+    else{if(cb<=lastBox-boxSize){for(let p=lastBox;p>cb;p-=boxSize){bricks.push({o:p,c:p-boxSize,dir:-1});minP=Math.min(minP,p-boxSize)}lastBox=cb}else if(cb>=lastBox+2*boxSize){dir=1;for(let p=lastBox+boxSize;p<cb;p+=boxSize){bricks.push({o:p-boxSize,c:p,dir:1});maxP=Math.max(maxP,p)}lastBox=cb}}}
+  return{bricks,boxSize,minP,maxP};
+}
+
 // ── ChartInk results storage ──
 const CI_KEY='te_chartink_results';
 function saveCI(name,stocks){try{const ex=JSON.parse(localStorage.getItem(CI_KEY)||'{}');ex[name]={stocks:stocks.map(s=>s.symbol||s),count:stocks.length,at:new Date().toISOString()};const ks=Object.keys(ex);if(ks.length>20)delete ex[ks.sort((a,b)=>new Date(ex[a].at)-new Date(ex[b].at))[0]];localStorage.setItem(CI_KEY,JSON.stringify(ex));return ex}catch{return{}}}
@@ -176,6 +215,7 @@ const TEChartScanner=({symbol,onOrder})=>{
   const[crosshair,setCrosshair]=useState(null);const[isDrag,setIsDrag]=useState(false);const[dragX,setDragX]=useState(null);
   const[showEMA,setShowEMA]=useState({e20:true,e50:true,e200:true});const[hoverBar,setHoverBar]=useState(null);
   const[chartType,setChartType]=useState('hlc');
+  const[boxPct,setBoxPct]=useState(1); // Box size % for P&F/Renko (0.25, 0.5, 1, 2, 3)
   const[drawMode,setDrawMode]=useState(null);const[drawings,setDrawings]=useState(()=>DrawingStore.load(symbol));
   const[drawStart,setDrawStart]=useState(null);const[drawPreview,setDrawPreview]=useState(null);
   const[drawPoints,setDrawPoints]=useState([]);const[showDrawings,setShowDrawings]=useState(true);
@@ -293,16 +333,56 @@ const TEChartScanner=({symbol,onOrder})=>{
       c.fillStyle="#334";c.font="9px 'JetBrains Mono',monospace";c.textAlign="right";c.fillText(p.toFixed(1),PAD.L-6,y+3)}
 
     const dE=(ed,col)=>{c.strokeStyle=col;c.lineWidth=1.2;c.beginPath();let s=false;for(let i=0;i<vis.length;i++){const g=si+i;if(g>=ed.length)break;const x=toX(i),y=toY(ed[g]);if(!s){c.moveTo(x,y);s=true}else c.lineTo(x,y)}c.stroke()};
-    if(showEMA.e200&&ema200.length)dE(ema200,"#ff6644");if(showEMA.e50&&ema50.length)dE(ema50,"#ffaa00");if(showEMA.e20&&ema20.length)dE(ema20,"#00bbff");
+    if(chartType!=='pnf'&&chartType!=='renko'){if(showEMA.e200&&ema200.length)dE(ema200,"#ff6644");if(showEMA.e50&&ema50.length)dE(ema50,"#ffaa00");if(showEMA.e20&&ema20.length)dE(ema20,"#00bbff")}
 
-    for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i),bu=b.c>=b.o,col=bu?"#00cc66":"#ee3344";
-      if(chartType==='candle'){c.strokeStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x,toY(b.h));c.lineTo(x,toY(b.l));c.stroke();
-        const bT=toY(Math.max(b.o,b.c)),bB=toY(Math.min(b.o,b.c)),bw=Math.max(bW*0.6,2);c.fillStyle=bu?col+"55":col;c.fillRect(x-bw/2,bT,bw,Math.max(bB-bT,1));c.strokeRect(x-bw/2,bT,bw,Math.max(bB-bT,1))}
-      else{c.strokeStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x,toY(b.h));c.lineTo(x,toY(b.l));c.stroke();c.lineWidth=1.5;c.beginPath();c.moveTo(x,toY(b.c));c.lineTo(x+bW*0.35,toY(b.c));c.stroke()}}
+    // ═══ CHART RENDERING ═══
+    if(chartType==='pnf'){
+      const pnf=buildPnF(priceData,boxPct,3);
+      if(pnf.columns.length){
+        const colW=(W-PAD.L-PAD.R)/Math.min(pnf.columns.length,80);
+        const boxH=cH/((pnf.maxP-pnf.minP)/pnf.boxSize+2);
+        const pnfToY=p=>PAD.T+cH-((p-pnf.minP)/pnf.boxSize)*boxH;
+        const startCol=Math.max(0,pnf.columns.length-80);
+        pnf.columns.slice(startCol).forEach((col,ci)=>{
+          const cx=PAD.L+ci*colW+colW/2;
+          col.boxes.forEach(b=>{
+            const by=pnfToY(b.p);const sz=Math.min(colW*0.8,boxH*0.9);
+            if(b.t==='X'){c.strokeStyle="#00cc66";c.lineWidth=1.5;c.beginPath();c.moveTo(cx-sz/2,by-sz/2);c.lineTo(cx+sz/2,by+sz/2);c.moveTo(cx+sz/2,by-sz/2);c.lineTo(cx-sz/2,by+sz/2);c.stroke()}
+            else{c.strokeStyle="#ee3344";c.lineWidth=1.5;c.beginPath();c.arc(cx,by,sz/2,0,Math.PI*2);c.stroke()}
+          });
+        });
+        c.fillStyle="#8844ff";c.font="bold 9px 'JetBrains Mono'";c.textAlign="left";c.fillText(`P&F ${boxPct}% 3-box`,PAD.L+4,PAD.T+cH-6);
+      }
+    }else if(chartType==='renko'){
+      const renko=buildRenko(priceData,boxPct);
+      if(renko.bricks.length){
+        const maxBricks=Math.min(renko.bricks.length,100);
+        const brickW=(W-PAD.L-PAD.R)/maxBricks;
+        const boxH=cH/((renko.maxP-renko.minP)/renko.boxSize+2);
+        const renkoToY=p=>PAD.T+cH-((p-renko.minP)/renko.boxSize)*boxH;
+        const startBrick=Math.max(0,renko.bricks.length-maxBricks);
+        renko.bricks.slice(startBrick).forEach((br,bi)=>{
+          const bx=PAD.L+bi*brickW;const y1=renkoToY(br.o),y2=renkoToY(br.c);
+          const col=br.dir===1?"#00cc66":"#ee3344";
+          c.fillStyle=col+"88";c.strokeStyle=col;c.lineWidth=1;
+          c.fillRect(bx+1,Math.min(y1,y2),brickW-2,Math.abs(y2-y1)||boxH);
+          c.strokeRect(bx+1,Math.min(y1,y2),brickW-2,Math.abs(y2-y1)||boxH);
+        });
+        c.fillStyle="#00c8ff";c.font="bold 9px 'JetBrains Mono'";c.textAlign="left";c.fillText(`Renko ${boxPct}%`,PAD.L+4,PAD.T+cH-6);
+      }
+    }else{
+      for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i),bu=b.c>=b.o,col=bu?"#00cc66":"#ee3344";
+        if(chartType==='candle'){c.strokeStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x,toY(b.h));c.lineTo(x,toY(b.l));c.stroke();
+          const bT=toY(Math.max(b.o,b.c)),bB=toY(Math.min(b.o,b.c)),bw=Math.max(bW*0.6,2);c.fillStyle=bu?col+"55":col;c.fillRect(x-bw/2,bT,bw,Math.max(bB-bT,1));c.strokeRect(x-bw/2,bT,bw,Math.max(bB-bT,1))}
+        else{c.strokeStyle=col;c.lineWidth=1;c.beginPath();c.moveTo(x,toY(b.h));c.lineTo(x,toY(b.l));c.stroke();c.lineWidth=1.5;c.beginPath();c.moveTo(x,toY(b.c));c.lineTo(x+bW*0.35,toY(b.c));c.stroke()}}
+    }
 
-    const maxV=Math.max(...vis.map(d=>d.v))||1;const vTop=PAD.T+cH+8;
-    for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i);c.fillStyle=b.c>=b.o?"rgba(0,204,102,0.25)":"rgba(238,51,68,0.25)";
-      c.fillRect(x-bW*0.35,vTop+VH-(b.v/maxV)*VH,bW*0.7,(b.v/maxV)*VH)}
+    // Volume (skip for P&F/Renko)
+    if(chartType!=='pnf'&&chartType!=='renko'){
+      const maxV=Math.max(...vis.map(d=>d.v))||1;const vTop=PAD.T+cH+8;
+      for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i);c.fillStyle=b.c>=b.o?"rgba(0,204,102,0.25)":"rgba(238,51,68,0.25)";
+        c.fillRect(x-bW*0.35,vTop+VH-(b.v/maxV)*VH,bW*0.7,(b.v/maxV)*VH)}
+    }
 
     c.fillStyle="#ddd";c.font="bold 12px 'Outfit',sans-serif";c.textAlign="left";c.fillText("NSE:"+symbol,PAD.L+4,PAD.T+14);
     const hb=hoverBar||vis[vis.length-1];
@@ -335,7 +415,7 @@ const TEChartScanner=({symbol,onOrder})=>{
       if(my>=PAD.T&&my<=PAD.T+cH){const pr=toP(my);c.fillStyle="#0a1520";c.fillRect(0,my-9,PAD.L-2,18);c.strokeStyle="#00ff88";c.lineWidth=0.5;c.strokeRect(0,my-9,PAD.L-2,18);
         c.fillStyle="#00ff88";c.font="bold 9px 'JetBrains Mono',monospace";c.textAlign="right";c.fillText(pr.toFixed(2),PAD.L-6,my+3)}}}
     if(drawMode){c.fillStyle="#0c1220bb";c.fillRect(W/2-45,PAD.T+2,90,14);c.fillStyle="#00ff88";c.font="bold 8px 'JetBrains Mono',monospace";c.textAlign="center";c.fillText("✏ "+drawMode.toUpperCase(),W/2,PAD.T+11)}
-  },[vis,viewCount,si,crosshair,showEMA,hoverBar,symbol,ema20,ema50,ema200,priceData,drawings,drawMode,alerts,plan,ctx,chartType,getL,showDrawings]);
+  },[vis,viewCount,si,crosshair,showEMA,hoverBar,symbol,ema20,ema50,ema200,priceData,drawings,drawMode,alerts,plan,ctx,chartType,boxPct,getL,showDrawings]);
 
   useEffect(()=>{draw()},[draw]);
   useEffect(()=>{const h=()=>draw();window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h)},[draw]);
@@ -397,15 +477,17 @@ const TEChartScanner=({symbol,onOrder})=>{
     <div style={{background:"var(--bg-card)",borderRadius:6,border:"1px solid var(--border-low)",overflow:"hidden"}}>
       <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",background:"var(--bg-secondary)",borderBottom:"1px solid var(--border-dim)",flexWrap:"wrap"}}>
         <span style={{fontSize:10,fontWeight:800,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>◈ {symbol}</span>
-        <div className="dtb">{[{k:'hlc',l:'HLC'},{k:'candle',l:'OHLC'}].map(ct=><button key={ct.k} className={`dtb-btn ${chartType===ct.k?'active':''}`} onClick={()=>setChartType(ct.k)}>{ct.l}</button>)}</div>
-        {[{k:"e20",l:"20",c:"#00bbff"},{k:"e50",l:"50",c:"#ffaa00"},{k:"e200",l:"200",c:"#ff6644"}].map(em=><button key={em.k} onClick={()=>setShowEMA(p=>({...p,[em.k]:!p[em.k]}))} style={{padding:"1px 4px",borderRadius:3,fontSize:7,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:`1px solid ${showEMA[em.k]?em.c+"55":"var(--border-dim)"}`,background:showEMA[em.k]?em.c+"10":"transparent",color:showEMA[em.k]?em.c:"var(--text-muted)"}}>E{em.l}</button>)}
+        <div className="dtb">{[{k:'hlc',l:'HLC'},{k:'candle',l:'OHLC'},{k:'pnf',l:'P&F'},{k:'renko',l:'REN'}].map(ct=><button key={ct.k} className={`dtb-btn ${chartType===ct.k?'active':''}`} onClick={()=>setChartType(ct.k)}>{ct.l}</button>)}</div>
+        {(chartType==='pnf'||chartType==='renko')&&<select value={boxPct} onChange={e=>setBoxPct(+e.target.value)} style={{padding:"1px 4px",fontSize:8,fontFamily:"var(--font-mono)",background:"var(--bg-tertiary)",border:"1px solid var(--border-low)",borderRadius:3,color:"var(--accent)"}}><option value={0.25}>0.25%</option><option value={0.5}>0.5%</option><option value={1}>1%</option><option value={2}>2%</option><option value={3}>3%</option></select>}
+        {chartType!=='pnf'&&chartType!=='renko'&&[{k:"e20",l:"20",c:"#00bbff"},{k:"e50",l:"50",c:"#ffaa00"},{k:"e200",l:"200",c:"#ff6644"}].map(em=><button key={em.k} onClick={()=>setShowEMA(p=>({...p,[em.k]:!p[em.k]}))} style={{padding:"1px 4px",borderRadius:3,fontSize:7,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:`1px solid ${showEMA[em.k]?em.c+"55":"var(--border-dim)"}`,background:showEMA[em.k]?em.c+"10":"transparent",color:showEMA[em.k]?em.c:"var(--text-muted)"}}>E{em.l}</button>)}
         <div style={{width:1,height:12,background:"var(--border-dim)"}}/>
         <div className="dtb">{[{k:'hline',l:'─',t:'H-Line'},{k:'trendline',l:'╲',t:'Trend'},{k:'ray',l:'↗',t:'Ray'},{k:'fib',l:'⊞',t:'Fib'},{k:'measure',l:'📏',t:'Measure'}].map(dt=><button key={dt.k} className={`dtb-btn ${drawMode===dt.k?'active':''}`} title={dt.t} onClick={()=>{setDrawMode(drawMode===dt.k?null:dt.k);setDrawStart(null);setDrawPreview(null);setDrawPoints([])}}>{dt.l}</button>)}</div>
         <button className="dtb-btn" onClick={undo} disabled={!DrawingStore.hasUndo(symbol)} title="Undo">↶</button>
         <button className="dtb-btn" onClick={redo} disabled={!DrawingStore.hasRedo(symbol)} title="Redo">↷</button>
         <button className="dtb-btn" onClick={()=>{if(drawings.length&&confirm('Delete all?')){saveUndo();setDrawings([])}}} title="Clear">🗑</button>
         {measureResult&&<span style={{fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,color:measureResult.diff>=0?"#00ff88":"#ff4455"}}>📏{measureResult.diff>=0?"+":""}{measureResult.diff.toFixed(1)} ({measureResult.pct>=0?"+":""}{measureResult.pct.toFixed(1)}%)</span>}
-        <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+        <div style={{marginLeft:"auto",display:"flex",gap:4,alignItems:"center"}}>
+          {(chartType==='pnf'||chartType==='renko')&&<button onClick={()=>window.open(`https://zone.definedge.com/chart/NSE/${symbol}/${chartType==='pnf'?'pf':'renko'}`,'_blank')} style={{padding:"1px 5px",borderRadius:3,fontSize:8,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.3)",background:"transparent",color:"#8844ff"}}>DEF</button>}
           <button onClick={()=>onOrder&&onOrder({symbol,type:'BUY',price:vis[vis.length-1]?.c||0})} className="ob ob-b">BUY</button>
           <button onClick={()=>onOrder&&onOrder({symbol,type:'SELL',price:vis[vis.length-1]?.c||0})} className="ob ob-s">SELL</button>
           <button onClick={()=>onOrder&&onOrder({symbol,type:'GTT',price:vis[vis.length-1]?.c||0})} className="ob ob-g">GTT</button>
