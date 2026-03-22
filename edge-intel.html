@@ -457,8 +457,14 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[executing,setExecuting]=useState(false);
   const[execResult,setExecResult]=useState(null);
   const[enableBracket,setEnableBracket]=useState(false);
+  const[enableGTT,setEnableGTT]=useState(false);
   const[enableTrail,setEnableTrail]=useState(false);
+  const[trailMethod,setTrailMethod]=useState('pct'); // 'pct' or 'atr'
   const[trailValue,setTrailValue]=useState(2);
+  const[trailATR,setTrailATR]=useState(1); // ATR multiplier
+
+  // Calculate ATR from stockData if available
+  const atr = stockData?.atr || stockData?.technicals?.atr || (entry * 0.015); // fallback 1.5%
 
   useEffect(()=>{
     if(stockData?.price){
@@ -475,6 +481,14 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const maxLoss=positionSize*Math.abs(entry-sl);
   const maxProfit=positionSize*Math.abs(target-entry);
   const winRate=rr>=2?'40-45%':rr>=1.5?'50-55%':rr>=1?'60%+':'70%+';
+
+  // Calculate trail value based on method
+  const getTrailValue = () => {
+    if(trailMethod === 'atr') {
+      return +(atr * trailATR).toFixed(2);
+    }
+    return trailValue;
+  };
 
   const generateSetup=async()=>{
     setLoading(true);
@@ -534,34 +548,102 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       const headers={'Content-Type':'application/json'};
       let res;
       
-      if(enableBracket){
+      // Get broker-specific action prefix
+      const brokerPrefix = broker === 'dhan' ? 'dhan-' : broker === 'definedge' ? 'de-' : '';
+      
+      // Get Zerodha auth if needed
+      if(broker === 'zerodha') {
+        const auth = localStorage.getItem('kite_auth');
+        if(auth) headers['Authorization'] = auth;
+      } else if(broker === 'dhan') {
+        headers['X-Dhan-Token'] = localStorage.getItem('dhan_token') || '';
+        headers['X-Dhan-ID'] = localStorage.getItem('dhan_client_id') || '';
+      } else if(broker === 'definedge') {
+        headers['X-DE-Session'] = localStorage.getItem('de_session') || '';
+      }
+      
+      if(enableGTT){
+        // GTT Order (SL + Target as OCO)
+        headers['X-Kite-Action'] = broker === 'dhan' ? 'dhan-forever-place' : 'gtt-place';
+        
+        if(broker === 'zerodha') {
+          const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
+            type: 'two-leg',
+            condition: {
+              tradingsymbol: symbol,
+              exchange: 'NSE',
+              trigger_values: [sl, target],
+              last_price: entry
+            },
+            orders: [
+              { transaction_type: 'SELL', quantity: positionSize||qty, price: sl, order_type: 'LIMIT', product },
+              { transaction_type: 'SELL', quantity: positionSize||qty, price: target, order_type: 'LIMIT', product }
+            ]
+          })});
+          res=await r.json();
+        } else if(broker === 'dhan') {
+          // Dhan Forever OCO
+          const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
+            orderFlag: 'OCO',
+            transaction_type: 'SELL',
+            exchange: 'NSE_EQ',
+            security_id: stockData?.security_id || symbol,
+            quantity: positionSize||qty,
+            price: target,
+            triggerPrice: target,
+            price1: sl,
+            triggerPrice1: sl,
+            product
+          })});
+          res=await r.json();
+        }
+      } else if(enableBracket){
         // Bracket Order (Entry + SL + Target)
-        headers['X-Kite-Action']='bracket-order';
+        headers['X-Kite-Action'] = brokerPrefix + 'bracket-order';
+        if(broker === 'dhan') headers['X-Kite-Action'] = 'dhan-bracket';
+        if(broker === 'definedge') headers['X-Kite-Action'] = 'de-bracket';
+        
+        const trailVal = enableTrail ? getTrailValue() : 0;
+        
         const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
-          tradingsymbol:symbol,exchange:'NSE',transaction_type:txnType,
-          quantity:positionSize||qty,price:entry,
-          stoploss:Math.abs(entry-sl),target:Math.abs(target-entry),
-          trailing_stoploss:enableTrail?trailValue:0
+          tradingsymbol:symbol,
+          exchange: broker === 'dhan' ? 'NSE_EQ' : 'NSE',
+          transaction_type:txnType,
+          quantity:positionSize||qty,
+          price:entry,
+          stoploss:Math.abs(entry-sl),
+          target:Math.abs(target-entry),
+          trailing_stoploss: trailVal,
+          security_id: stockData?.security_id || ''
         })});
         res=await r.json();
       }else{
         // Regular Order
-        headers['X-Kite-Action']='place-order';
+        headers['X-Kite-Action'] = brokerPrefix + 'place-order';
+        if(broker === 'dhan') headers['X-Kite-Action'] = 'dhan-place';
+        if(broker === 'definedge') headers['X-Kite-Action'] = 'de-place';
+        
         const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
-          tradingsymbol:symbol,exchange:'NSE',transaction_type:txnType,
-          order_type:orderType,quantity:positionSize||qty,product,
+          tradingsymbol:symbol,
+          exchange: broker === 'dhan' ? 'NSE_EQ' : 'NSE',
+          transaction_type:txnType,
+          order_type:orderType,
+          quantity:positionSize||qty,
+          product,
           price:orderType==='LIMIT'?entry:0,
-          trigger_price:orderType.includes('SL')?sl:0
+          trigger_price:orderType.includes('SL')?sl:0,
+          security_id: stockData?.security_id || ''
         })});
         res=await r.json();
       }
       
       setExecResult(res);
-      if(res?.data||res?.status==='success'){
+      if(res?.data||res?.status==='success'||res?.orderId){
         // Log to journal
         const trades=JSON.parse(localStorage.getItem('te_trades')||'[]');
         trades.push({id:Date.now(),symbol,action:txnType,price:entry,qty:positionSize||qty,
-          ts:new Date().toISOString(),status:'executed',target,sl,rr,broker});
+          ts:new Date().toISOString(),status:'executed',target,sl,rr,broker,
+          orderType: enableGTT ? 'GTT' : enableBracket ? 'BRACKET' : 'REGULAR'});
         localStorage.setItem('te_trades',JSON.stringify(trades));
       }
     }catch(e){setExecResult({error:e.message})}
@@ -671,18 +753,39 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
 
         <div style={{display:'flex',gap:16,marginBottom:16,flexWrap:'wrap'}}>
           <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--accent2)',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
-            <input type="checkbox" checked={enableBracket} onChange={e=>setEnableBracket(e.target.checked)} style={{accentColor:'var(--accent2)'}}/>
+            <input type="checkbox" checked={enableBracket} onChange={e=>{setEnableBracket(e.target.checked);if(e.target.checked)setEnableGTT(false)}} style={{accentColor:'var(--accent2)'}}/>
             🔲 Bracket Order (Entry + SL + Target)
           </label>
+          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'#ff88ff',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
+            <input type="checkbox" checked={enableGTT} onChange={e=>{setEnableGTT(e.target.checked);if(e.target.checked)setEnableBracket(false)}} style={{accentColor:'#ff88ff'}}/>
+            🎯 GTT (SL + Target OCO)
+          </label>
+        </div>
+
+        {enableBracket&&<div style={{display:'flex',gap:16,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
           <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--amber)',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
             <input type="checkbox" checked={enableTrail} onChange={e=>setEnableTrail(e.target.checked)} style={{accentColor:'var(--amber)'}}/>
             ⚡ Auto-Trail SL
           </label>
-          {enableTrail&&<div style={{display:'flex',alignItems:'center',gap:4}}>
-            <span style={{fontSize:9,color:'var(--text-muted)'}}>Trail %:</span>
-            <input type="number" value={trailValue} onChange={e=>setTrailValue(+e.target.value)} style={{width:50,padding:'4px 6px',fontSize:10}}/>
-          </div>}
-        </div>
+          {enableTrail&&<>
+            <div style={{display:'flex',alignItems:'center',gap:4,background:'var(--bg-tertiary)',padding:'4px 8px',borderRadius:4}}>
+              <button onClick={()=>setTrailMethod('pct')} style={{padding:'3px 8px',fontSize:9,fontWeight:700,borderRadius:3,border:'none',cursor:'pointer',background:trailMethod==='pct'?'var(--amber)':'transparent',color:trailMethod==='pct'?'#000':'var(--text-muted)'}}>%</button>
+              <button onClick={()=>setTrailMethod('atr')} style={{padding:'3px 8px',fontSize:9,fontWeight:700,borderRadius:3,border:'none',cursor:'pointer',background:trailMethod==='atr'?'var(--amber)':'transparent',color:trailMethod==='atr'?'#000':'var(--text-muted)'}}>ATR</button>
+            </div>
+            {trailMethod==='pct'?
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span style={{fontSize:9,color:'var(--text-muted)'}}>Trail %:</span>
+                <input type="number" value={trailValue} onChange={e=>setTrailValue(+e.target.value)} style={{width:50,padding:'4px 6px',fontSize:10}}/>
+              </div>
+            :
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span style={{fontSize:9,color:'var(--text-muted)'}}>ATR×:</span>
+                {[0.5,1,1.5,2,3].map(m=><button key={m} onClick={()=>setTrailATR(m)} style={{padding:'3px 6px',fontSize:9,fontWeight:700,borderRadius:3,border:'1px solid',cursor:'pointer',background:trailATR===m?'var(--amber)':'transparent',borderColor:trailATR===m?'var(--amber)':'var(--border-dim)',color:trailATR===m?'#000':'var(--text-muted)'}}>{m}x</button>)}
+                <span style={{fontSize:9,color:'var(--amber)',marginLeft:4}}>= ₹{(atr*trailATR).toFixed(2)}</span>
+              </div>
+            }
+          </>}
+        </div>}
 
         {enableBracket&&<div style={{padding:12,background:'rgba(0,200,255,0.05)',border:'1px solid rgba(0,200,255,0.2)',borderRadius:6,marginBottom:16,fontSize:10,fontFamily:'var(--font-mono)'}}>
           <div style={{color:'var(--accent2)',fontWeight:700,marginBottom:6}}>📋 BRACKET ORDER PREVIEW</div>
@@ -691,10 +794,24 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             <div><span style={{color:'var(--accent)'}}>Target:</span> ₹{target} (+{((target-entry)/entry*100).toFixed(1)}%)</div>
             <div><span style={{color:'var(--red)'}}>SL:</span> ₹{sl} (-{((entry-sl)/entry*100).toFixed(1)}%)</div>
           </div>
+          {enableTrail&&<div style={{marginTop:6,color:'var(--amber)'}}>
+            <span style={{color:'var(--text-muted)'}}>Trail:</span> ₹{getTrailValue()} ({trailMethod==='atr'?`${trailATR}× ATR`:`${trailValue}%`})
+          </div>}
         </div>}
 
-        <button onClick={executeOrder} disabled={executing} style={{width:'100%',padding:'12px',fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:6,border:'none',cursor:'pointer',background:txnType==='BUY'?'linear-gradient(135deg,#00cc66,#00ff88)':'linear-gradient(135deg,#ee3344,#ff5566)',color:'#000'}}>
-          {executing?'⏳ Executing...':enableBracket?`⚡ Place Bracket ${txnType}`:`⚡ Place ${txnType} Order`}
+        {enableGTT&&<div style={{padding:12,background:'rgba(255,136,255,0.05)',border:'1px solid rgba(255,136,255,0.2)',borderRadius:6,marginBottom:16,fontSize:10,fontFamily:'var(--font-mono)'}}>
+          <div style={{color:'#ff88ff',fontWeight:700,marginBottom:6}}>🎯 GTT ORDER PREVIEW (OCO - One Cancels Other)</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,color:'var(--text-secondary)'}}>
+            <div><span style={{color:'var(--red)'}}>SL Leg:</span> Sell @ ₹{sl} (trigger: ₹{sl})</div>
+            <div><span style={{color:'var(--accent)'}}>Target Leg:</span> Sell @ ₹{target} (trigger: ₹{target})</div>
+          </div>
+          <div style={{marginTop:6,color:'var(--text-muted)',fontSize:9}}>
+            ⚠️ Place BUY order first, then this GTT will set exit triggers. Valid till triggered/cancelled.
+          </div>
+        </div>}
+
+        <button onClick={executeOrder} disabled={executing} style={{width:'100%',padding:'12px',fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:6,border:'none',cursor:'pointer',background:enableGTT?'linear-gradient(135deg,#cc66ff,#ff88ff)':txnType==='BUY'?'linear-gradient(135deg,#00cc66,#00ff88)':'linear-gradient(135deg,#ee3344,#ff5566)',color:enableGTT?'#000':'#000'}}>
+          {executing?'⏳ Executing...':enableGTT?'🎯 Place GTT (SL + Target)':enableBracket?`⚡ Place Bracket ${txnType}`:`⚡ Place ${txnType} Order`}
         </button>
 
         {execResult&&<div style={{marginTop:12,padding:12,borderRadius:6,background:execResult.data||execResult.status==='success'?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',border:`1px solid ${execResult.data||execResult.status==='success'?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
