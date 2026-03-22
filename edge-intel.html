@@ -595,12 +595,59 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[gttTrigger,setGttTrigger]=useState(0);         // GTT trigger price
   const[autoPlaceGTT,setAutoPlaceGTT]=useState(true);  // Auto-place GTT after AMO fills
   const[enableTrail,setEnableTrail]=useState(false);
-  const[trailMethod,setTrailMethod]=useState('pct'); // 'pct' or 'atr'
+  const[trailMethod,setTrailMethod]=useState('pct'); // 'pct', 'atr', 'ema'
   const[trailValue,setTrailValue]=useState(2);
   const[trailATR,setTrailATR]=useState(1); // ATR multiplier
+  const[trailEMA,setTrailEMA]=useState(21); // EMA period for trailing
+  
+  // Staggered Exit System
+  const[enableStaggeredExit,setEnableStaggeredExit]=useState(false);
+  const[numTranches,setNumTranches]=useState(3); // 2, 3, or 4 tranches
+  const[tranches,setTranches]=useState([
+    {id:1, pct:34, type:'atr', value:3, enabled:true},  // Tranche 1: 34% at 3×ATR
+    {id:2, pct:33, type:'atr', value:5, enabled:true},  // Tranche 2: 33% at 5×ATR  
+    {id:3, pct:33, type:'atr', value:7, enabled:true},  // Tranche 3: 33% at 7×ATR
+    {id:4, pct:0,  type:'ema', value:21, enabled:false} // Tranche 4: Trail EMA21 (optional)
+  ]);
+  
+  // Update tranche
+  const updateTranche = (id, field, val) => {
+    setTranches(prev => prev.map(t => t.id === id ? {...t, [field]: val} : t));
+  };
+  
+  // Auto-balance percentages
+  const balanceTranches = () => {
+    const activeTranches = tranches.filter((t,i) => i < numTranches);
+    const pctEach = Math.floor(100 / numTranches);
+    const remainder = 100 - (pctEach * numTranches);
+    setTranches(prev => prev.map((t, i) => ({
+      ...t, 
+      pct: i < numTranches ? (i === 0 ? pctEach + remainder : pctEach) : 0,
+      enabled: i < numTranches
+    })));
+  };
 
   // Calculate ATR from stockData if available
   const atr = stockData?.atr || stockData?.technicals?.atr || (entry * 0.015); // fallback 1.5%
+  
+  // Calculate EMA values (from stockData or estimate)
+  const emaValues = {
+    10: stockData?.ema10 || stockData?.technicals?.ema10 || +(entry * 0.995).toFixed(2),
+    21: stockData?.ema21 || stockData?.technicals?.ema21 || +(entry * 0.985).toFixed(2),
+    50: stockData?.ema50 || stockData?.technicals?.ema50 || +(entry * 0.970).toFixed(2),
+    100: stockData?.ema100 || stockData?.technicals?.ema100 || +(entry * 0.950).toFixed(2),
+    200: stockData?.ema200 || stockData?.technicals?.ema200 || +(entry * 0.920).toFixed(2)
+  };
+  
+  // Calculate tranche exit prices
+  const calcTranchePrice = (t) => {
+    if(t.type === 'atr') return +(entry + (atr * t.value)).toFixed(2);
+    if(t.type === 'pct') return +(entry * (1 + t.value/100)).toFixed(2);
+    if(t.type === 'ema') return emaValues[t.value] || entry;
+    return entry;
+  };
+  
+  const calcTrancheQty = (t) => Math.floor((positionSize || qty) * (t.pct / 100));
 
   useEffect(()=>{
     if(stockData?.price){
@@ -1131,35 +1178,150 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             </div>
           </div>}
 
-          {/* TRAILING SL — Available for Bracket, GTT Entry */}
-          {(enableBracket||enableGTTEntry||enableAMO)&&<div style={{background:'linear-gradient(135deg,rgba(255,170,0,0.05),rgba(255,136,0,0.02))',border:'1px solid rgba(255,170,0,0.2)',borderRadius:12,padding:16,marginBottom:20}}>
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+          {/* ═══ TRAILING STOP LOSS — Available for ALL order types (except GTT Exit) ═══ */}
+          {!enableGTT&&<div style={{background:'linear-gradient(135deg,rgba(255,170,0,0.05),rgba(255,136,0,0.02))',border:'1px solid rgba(255,170,0,0.2)',borderRadius:12,padding:16,marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,flexWrap:'wrap'}}>
               <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
                 <input type="checkbox" checked={enableTrail} onChange={e=>setEnableTrail(e.target.checked)} style={{width:18,height:18,accentColor:'var(--amber)'}}/>
                 <span style={{fontSize:12,fontWeight:800,fontFamily:'var(--font-mono)',color:'var(--amber)'}}>⚡ TRAILING STOP LOSS</span>
               </label>
-              {enableTrail&&<div style={{marginLeft:'auto',display:'flex',gap:6,background:'var(--bg-tertiary)',padding:'4px',borderRadius:6}}>
-                <button onClick={()=>setTrailMethod('pct')} style={{padding:'6px 12px',fontSize:10,fontWeight:700,borderRadius:4,border:'none',cursor:'pointer',background:trailMethod==='pct'?'var(--amber)':'transparent',color:trailMethod==='pct'?'#000':'var(--text-muted)'}}>PERCENT</button>
-                <button onClick={()=>setTrailMethod('atr')} style={{padding:'6px 12px',fontSize:10,fontWeight:700,borderRadius:4,border:'none',cursor:'pointer',background:trailMethod==='atr'?'var(--amber)':'transparent',color:trailMethod==='atr'?'#000':'var(--text-muted)'}}>ATR</button>
+              {enableTrail&&<div style={{marginLeft:'auto',display:'flex',gap:4,background:'var(--bg-tertiary)',padding:'4px',borderRadius:8}}>
+                <button onClick={()=>setTrailMethod('pct')} style={{padding:'6px 12px',fontSize:10,fontWeight:700,borderRadius:5,border:'none',cursor:'pointer',background:trailMethod==='pct'?'var(--amber)':'transparent',color:trailMethod==='pct'?'#000':'var(--text-muted)',transition:'all 0.15s'}}>%</button>
+                <button onClick={()=>setTrailMethod('atr')} style={{padding:'6px 12px',fontSize:10,fontWeight:700,borderRadius:5,border:'none',cursor:'pointer',background:trailMethod==='atr'?'var(--amber)':'transparent',color:trailMethod==='atr'?'#000':'var(--text-muted)',transition:'all 0.15s'}}>ATR</button>
+                <button onClick={()=>setTrailMethod('ema')} style={{padding:'6px 12px',fontSize:10,fontWeight:700,borderRadius:5,border:'none',cursor:'pointer',background:trailMethod==='ema'?'linear-gradient(135deg,#00c8ff,#0088ff)':'transparent',color:trailMethod==='ema'?'#000':'#00c8ff',transition:'all 0.15s'}}>EMA</button>
               </div>}
             </div>
             
             {enableTrail&&<div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-              {trailMethod==='pct'?<>
+              {trailMethod==='pct'&&<>
                 <span style={{fontSize:10,color:'var(--text-muted)'}}>Trail by:</span>
-                {[1,2,3,5].map(p=><button key={p} onClick={()=>setTrailValue(p)} style={{padding:'8px 14px',fontSize:11,fontWeight:700,borderRadius:6,border:'2px solid',cursor:'pointer',background:trailValue===p?'var(--amber)':'transparent',borderColor:trailValue===p?'var(--amber)':'var(--border-dim)',color:trailValue===p?'#000':'var(--text-muted)'}}>{p}%</button>)}
+                {[1,2,3,5].map(p=><button key={p} onClick={()=>setTrailValue(p)} style={{padding:'8px 14px',fontSize:11,fontWeight:700,borderRadius:6,border:'2px solid',cursor:'pointer',background:trailValue===p?'var(--amber)':'transparent',borderColor:trailValue===p?'var(--amber)':'var(--border-dim)',color:trailValue===p?'#000':'var(--text-muted)',transition:'all 0.15s'}}>{p}%</button>)}
                 <input type="number" value={trailValue} onChange={e=>setTrailValue(+e.target.value)} style={{width:60,padding:'8px',fontSize:11,textAlign:'center'}} placeholder="Custom"/>
                 <span style={{fontSize:11,color:'var(--amber)',fontWeight:700}}>= ₹{(entry*trailValue/100).toFixed(2)}</span>
-              </>:<>
+              </>}
+              {trailMethod==='atr'&&<>
                 <span style={{fontSize:10,color:'var(--text-muted)'}}>Trail by ATR ×</span>
-                {[0.5,1,1.5,2,3].map(m=><button key={m} onClick={()=>setTrailATR(m)} style={{padding:'8px 14px',fontSize:11,fontWeight:700,borderRadius:6,border:'2px solid',cursor:'pointer',background:trailATR===m?'var(--amber)':'transparent',borderColor:trailATR===m?'var(--amber)':'var(--border-dim)',color:trailATR===m?'#000':'var(--text-muted)'}}>{m}×</button>)}
+                {[0.5,1,1.5,2,3].map(m=><button key={m} onClick={()=>setTrailATR(m)} style={{padding:'8px 14px',fontSize:11,fontWeight:700,borderRadius:6,border:'2px solid',cursor:'pointer',background:trailATR===m?'var(--amber)':'transparent',borderColor:trailATR===m?'var(--amber)':'var(--border-dim)',color:trailATR===m?'#000':'var(--text-muted)',transition:'all 0.15s'}}>{m}×</button>)}
                 <span style={{fontSize:11,color:'var(--amber)',fontWeight:700}}>= ₹{(atr*trailATR).toFixed(2)}</span>
+              </>}
+              {trailMethod==='ema'&&<>
+                <span style={{fontSize:10,color:'var(--text-muted)'}}>Exit below EMA:</span>
+                {[{p:10,c:'#00ff88'},{p:21,c:'#00c8ff'},{p:50,c:'#ff88ff'},{p:100,c:'#ffaa00'},{p:200,c:'#ff4455'}].map(e=><button key={e.p} onClick={()=>setTrailEMA(e.p)} style={{padding:'8px 12px',fontSize:10,fontWeight:700,borderRadius:6,border:'2px solid',cursor:'pointer',background:trailEMA===e.p?e.c:'transparent',borderColor:trailEMA===e.p?e.c:'var(--border-dim)',color:trailEMA===e.p?'#000':e.c,transition:'all 0.15s'}}>{e.p}</button>)}
               </>}
             </div>}
             
-            {enableTrail&&<div style={{marginTop:12,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
-              📈 SL will trail {trailMethod==='atr'?`${trailATR}× ATR (₹${(atr*trailATR).toFixed(2)})`:`${trailValue}% (₹${(entry*trailValue/100).toFixed(2)})`} behind the highest price reached.
+            {/* EMA Values Grid */}
+            {enableTrail&&trailMethod==='ema'&&<div style={{marginTop:12,display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8}}>
+              {[{ema:10,c:'#00ff88',use:'Scalp'},{ema:21,c:'#00c8ff',use:'Swing'},{ema:50,c:'#ff88ff',use:'Position'},{ema:100,c:'#ffaa00',use:'Trend'},{ema:200,c:'#ff4455',use:'Investor'}].map(e=>(
+                <div key={e.ema} onClick={()=>setTrailEMA(e.ema)} style={{padding:'10px',background:trailEMA===e.ema?'rgba(0,200,255,0.1)':'var(--bg-tertiary)',border:`2px solid ${trailEMA===e.ema?e.c:'var(--border-dim)'}`,borderRadius:8,cursor:'pointer',textAlign:'center',transition:'all 0.15s'}}>
+                  <div style={{fontSize:9,fontWeight:700,color:trailEMA===e.ema?e.c:'var(--text-muted)'}}>{e.use}</div>
+                  <div style={{fontSize:14,fontWeight:900,color:e.c,fontFamily:'var(--font-mono)'}}>₹{emaValues[e.ema]}</div>
+                  <div style={{fontSize:8,color:'var(--text-muted)'}}>EMA {e.ema}</div>
+                </div>
+              ))}
             </div>}
+            
+            {enableTrail&&<div style={{marginTop:12,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+              📈 {trailMethod==='ema'?`Exit when price closes below EMA(${trailEMA}) @ ₹${emaValues[trailEMA]}`:`SL trails ${trailMethod==='atr'?`${trailATR}× ATR (₹${(atr*trailATR).toFixed(2)})`:`${trailValue}% (₹${(entry*trailValue/100).toFixed(2)})`} behind highest price`}
+            </div>}
+          </div>}
+
+          {/* ═══ STAGGERED EXIT / SELL INTO STRENGTH ═══ */}
+          {!enableGTT&&<div style={{background:'linear-gradient(135deg,rgba(0,255,136,0.05),rgba(0,200,100,0.02))',border:'1px solid rgba(0,255,136,0.2)',borderRadius:12,padding:16,marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,flexWrap:'wrap'}}>
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
+                <input type="checkbox" checked={enableStaggeredExit} onChange={e=>setEnableStaggeredExit(e.target.checked)} style={{width:18,height:18,accentColor:'#00ff88'}}/>
+                <span style={{fontSize:12,fontWeight:800,fontFamily:'var(--font-mono)',color:'#00ff88'}}>📈 STAGGERED EXIT (Sell Into Strength)</span>
+              </label>
+              {enableStaggeredExit&&<div style={{marginLeft:'auto',display:'flex',gap:4,alignItems:'center'}}>
+                <span style={{fontSize:9,color:'var(--text-muted)'}}>Tranches:</span>
+                {[2,3,4].map(n=><button key={n} onClick={()=>{setNumTranches(n);balanceTranches()}} style={{padding:'6px 12px',fontSize:11,fontWeight:700,borderRadius:5,border:'2px solid',cursor:'pointer',background:numTranches===n?'#00ff88':'transparent',borderColor:numTranches===n?'#00ff88':'var(--border-dim)',color:numTranches===n?'#000':'var(--text-muted)',transition:'all 0.15s'}}>{n}</button>)}
+              </div>}
+            </div>
+            
+            {enableStaggeredExit&&<>
+              {/* Tranches Grid */}
+              <div style={{display:'grid',gridTemplateColumns:`repeat(${numTranches},1fr)`,gap:10,marginBottom:12}}>
+                {tranches.slice(0,numTranches).map((t,i)=>(
+                  <div key={t.id} style={{background:'var(--bg-tertiary)',border:'1px solid var(--border-dim)',borderRadius:10,padding:12,position:'relative'}}>
+                    <div style={{position:'absolute',top:-8,left:12,background:'var(--bg-card)',padding:'2px 8px',borderRadius:4,fontSize:9,fontWeight:700,color:['#00ff88','#00c8ff','#ff88ff','#ffaa00'][i]}}>
+                      T{i+1}
+                    </div>
+                    
+                    {/* Percentage */}
+                    <div style={{marginTop:4,marginBottom:8}}>
+                      <div style={{fontSize:8,color:'var(--text-muted)',marginBottom:2}}>SELL %</div>
+                      <div style={{display:'flex',gap:4}}>
+                        {[25,33,50].map(p=><button key={p} onClick={()=>updateTranche(t.id,'pct',p)} style={{flex:1,padding:'4px',fontSize:10,fontWeight:700,borderRadius:4,border:'1px solid',cursor:'pointer',background:t.pct===p?'var(--accent)':'transparent',borderColor:t.pct===p?'var(--accent)':'var(--border-dim)',color:t.pct===p?'#000':'var(--text-muted)'}}>{p}%</button>)}
+                      </div>
+                      <input type="number" value={t.pct} onChange={e=>updateTranche(t.id,'pct',+e.target.value)} style={{width:'100%',padding:'6px',fontSize:11,textAlign:'center',marginTop:4}} placeholder="%"/>
+                    </div>
+                    
+                    {/* Exit Type */}
+                    <div style={{marginBottom:8}}>
+                      <div style={{fontSize:8,color:'var(--text-muted)',marginBottom:2}}>EXIT AT</div>
+                      <div style={{display:'flex',gap:4}}>
+                        {[{k:'atr',l:'ATR'},{k:'pct',l:'%'},{k:'ema',l:'EMA'}].map(x=><button key={x.k} onClick={()=>updateTranche(t.id,'type',x.k)} style={{flex:1,padding:'4px',fontSize:9,fontWeight:700,borderRadius:4,border:'1px solid',cursor:'pointer',background:t.type===x.k?['#ffaa00','#ff88ff','#00c8ff'][['atr','pct','ema'].indexOf(x.k)]:'transparent',borderColor:t.type===x.k?['#ffaa00','#ff88ff','#00c8ff'][['atr','pct','ema'].indexOf(x.k)]:'var(--border-dim)',color:t.type===x.k?'#000':['#ffaa00','#ff88ff','#00c8ff'][['atr','pct','ema'].indexOf(x.k)]}}>{x.l}</button>)}
+                      </div>
+                    </div>
+                    
+                    {/* Value Selector */}
+                    <div>
+                      {t.type==='atr'&&<div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                        {[3,4,5,6,7,8].map(v=><button key={v} onClick={()=>updateTranche(t.id,'value',v)} style={{padding:'4px 8px',fontSize:10,fontWeight:700,borderRadius:4,border:'1px solid',cursor:'pointer',background:t.value===v?'#ffaa00':'transparent',borderColor:t.value===v?'#ffaa00':'var(--border-dim)',color:t.value===v?'#000':'#ffaa00'}}>{v}×</button>)}
+                      </div>}
+                      {t.type==='pct'&&<div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                        {[5,8,10,15,20,25].map(v=><button key={v} onClick={()=>updateTranche(t.id,'value',v)} style={{padding:'4px 8px',fontSize:10,fontWeight:700,borderRadius:4,border:'1px solid',cursor:'pointer',background:t.value===v?'#ff88ff':'transparent',borderColor:t.value===v?'#ff88ff':'var(--border-dim)',color:t.value===v?'#000':'#ff88ff'}}>{v}%</button>)}
+                      </div>}
+                      {t.type==='ema'&&<div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                        {[10,21,50,100,200].map(v=><button key={v} onClick={()=>updateTranche(t.id,'value',v)} style={{padding:'4px 8px',fontSize:10,fontWeight:700,borderRadius:4,border:'1px solid',cursor:'pointer',background:t.value===v?'#00c8ff':'transparent',borderColor:t.value===v?'#00c8ff':'var(--border-dim)',color:t.value===v?'#000':'#00c8ff'}}>{v}</button>)}
+                      </div>}
+                    </div>
+                    
+                    {/* Calculated Values */}
+                    <div style={{marginTop:10,padding:8,background:'rgba(0,0,0,0.3)',borderRadius:6,textAlign:'center'}}>
+                      <div style={{fontSize:16,fontWeight:900,color:['#00ff88','#00c8ff','#ff88ff','#ffaa00'][i],fontFamily:'var(--font-mono)'}}>₹{calcTranchePrice(t)}</div>
+                      <div style={{fontSize:9,color:'var(--text-muted)'}}>{calcTrancheQty(t)} shares • +{((calcTranchePrice(t)-entry)/entry*100).toFixed(1)}%</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Summary Bar */}
+              <div style={{background:'rgba(0,0,0,0.3)',borderRadius:8,padding:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <span style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>EXIT PLAN SUMMARY</span>
+                  <span style={{fontSize:10,color:tranches.slice(0,numTranches).reduce((a,t)=>a+t.pct,0)===100?'#00ff88':'#ff4455',fontWeight:700}}>
+                    {tranches.slice(0,numTranches).reduce((a,t)=>a+t.pct,0)}% allocated
+                  </span>
+                </div>
+                
+                {/* Visual Progress Bar */}
+                <div style={{display:'flex',height:24,borderRadius:6,overflow:'hidden',marginBottom:8}}>
+                  {tranches.slice(0,numTranches).map((t,i)=>(
+                    <div key={t.id} style={{width:`${t.pct}%`,background:['linear-gradient(135deg,#00cc66,#00ff88)','linear-gradient(135deg,#0088cc,#00c8ff)','linear-gradient(135deg,#cc66ff,#ff88ff)','linear-gradient(135deg,#cc8800,#ffaa00)'][i],display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:'#000',borderRight:i<numTranches-1?'2px solid var(--bg-card)':''}}>
+                      {t.pct}% @ ₹{calcTranchePrice(t)}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Total Profit Calculation */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,fontSize:10,fontFamily:'var(--font-mono)'}}>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{color:'var(--text-muted)'}}>AVG EXIT</div>
+                    <div style={{color:'#00ff88',fontWeight:700}}>₹{(tranches.slice(0,numTranches).reduce((a,t)=>a+(calcTranchePrice(t)*t.pct),0)/100).toFixed(2)}</div>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{color:'var(--text-muted)'}}>TOTAL QTY</div>
+                    <div style={{color:'var(--accent2)',fontWeight:700}}>{positionSize||qty}</div>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{color:'var(--text-muted)'}}>EST. PROFIT</div>
+                    <div style={{color:'#00ff88',fontWeight:700}}>₹{(tranches.slice(0,numTranches).reduce((a,t)=>a+((calcTranchePrice(t)-entry)*calcTrancheQty(t)),0)).toFixed(0)}</div>
+                  </div>
+                </div>
+              </div>
+            </>}
           </div>}
 
           {/* AMO Options */}
