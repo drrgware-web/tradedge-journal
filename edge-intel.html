@@ -1633,19 +1633,29 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
 
 // ═══ EARNINGS REACTION ANALYZER ═══
 const EarningsAnalyzer=({symbol,stockData})=>{
-  const[quarters,setQuarters]=useState(4);
+  const[quarters,setQuarters]=useState(8);
   const[analysis,setAnalysis]=useState(null);
   const[loading,setLoading]=useState(false);
+  const[earnings,setEarnings]=useState([]);
+  const[fetchingEarnings,setFetchingEarnings]=useState(false);
+  const[earningsSource,setEarningsSource]=useState('none'); // 'yahoo', 'scanner', 'ai', 'none'
 
   const runAnalysis=async()=>{
     setLoading(true);
     try{
+      // Use actual earnings data if available
+      const earningsContext = earnings.length > 0 
+        ? `Actual Earnings Data:\n${earnings.map(e => `${e.q}: EPS ₹${e.eps} (Est ₹${e.est}) - ${e.status.toUpperCase()}, Reaction: ${e.reaction}%`).join('\n')}`
+        : 'No actual earnings data available - use your knowledge of this company.';
+      
       const prompt=`Analyze the last ${quarters} earnings reports for ${symbol} (${stockData?.name||'Indian Stock'}).
 
 Current Stock Context:
 - Price: ₹${stockData?.price}
 - P/E: ${stockData?.fundamentals?.pe_ratio}
 - Market Cap: ₹${stockData?.fundamentals?.market_cap_cr} Cr
+
+${earningsContext}
 
 Provide a comprehensive earnings reaction analysis:
 
@@ -1695,18 +1705,108 @@ Format with 🟢 for beats, 🔴 for misses, 🟡 for inline.`;
     setLoading(false);
   };
 
-  const mockEarnings=[
-    {q:'Q3 FY24',eps:12.5,est:11.2,rev:2450,revEst:2380,reaction:3.2,status:'beat'},
-    {q:'Q2 FY24',eps:10.8,est:10.5,rev:2280,revEst:2250,reaction:-1.5,status:'beat'},
-    {q:'Q1 FY24',eps:9.2,est:9.8,rev:2150,revEst:2200,reaction:-4.2,status:'miss'},
-    {q:'Q4 FY23',eps:11.0,est:11.0,rev:2320,revEst:2310,reaction:0.8,status:'inline'},
-  ];
+  // Fetch real earnings data from Yahoo Finance via worker
+  const fetchEarningsData = async () => {
+    setFetchingEarnings(true);
+    try {
+      const wUrl = localStorage.getItem('zd_worker_url');
+      if (!wUrl) {
+        // Fallback: Use AI to generate earnings analysis from web
+        setEarningsSource('ai');
+        return;
+      }
+      
+      // Try Yahoo Finance earnings data
+      const res = await fetch(wUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-earnings' },
+        body: JSON.stringify({ ticker: `${symbol}.NS` })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.earnings && data.earnings.length > 0) {
+          setEarnings(data.earnings);
+          setEarningsSource('yahoo');
+          return;
+        }
+      }
+      
+      // Fallback: Try Screener.in style data from stockData
+      if (stockData?.fundamentals?.quarterly_results) {
+        const qResults = stockData.fundamentals.quarterly_results;
+        const formatted = qResults.map(q => ({
+          q: q.quarter,
+          eps: q.eps,
+          est: q.eps_estimate || q.eps * 0.95,
+          rev: q.revenue,
+          revEst: q.revenue_estimate || q.revenue * 0.98,
+          reaction: q.price_reaction || 0,
+          status: q.eps > (q.eps_estimate || q.eps * 0.95) ? 'beat' : q.eps < (q.eps_estimate || q.eps * 0.95) ? 'miss' : 'inline'
+        }));
+        setEarnings(formatted);
+        setEarningsSource('scanner');
+        return;
+      }
+      
+      // Ultimate fallback: Web search for earnings
+      setEarningsSource('search');
+      
+    } catch (e) {
+      console.error('Earnings fetch error:', e);
+      setEarningsSource('error');
+    }
+    setFetchingEarnings(false);
+  };
+  
+  // Fetch earnings on mount or symbol change
+  useEffect(() => {
+    if (symbol) {
+      fetchEarningsData();
+    }
+  }, [symbol]);
+
+  // Search web for earnings data using Groq
+  const searchEarningsData = async () => {
+    setFetchingEarnings(true);
+    try {
+      const searchPrompt = `Search for ${symbol} (${stockData?.name || symbol}) quarterly earnings results for last ${quarters} quarters.
+      
+For each quarter provide:
+- Quarter name (e.g., Q3 FY24)
+- EPS actual and estimate
+- Revenue actual and estimate  
+- Stock price reaction after earnings (%)
+- Whether it was a BEAT, MISS, or INLINE
+
+Return data in this exact JSON format:
+[
+  {"q": "Q3 FY24", "eps": 12.5, "est": 11.2, "rev": 2450, "revEst": 2380, "reaction": 3.2, "status": "beat"},
+  ...
+]
+
+Return ONLY the JSON array, no other text.`;
+
+      const response = await callGroqAI(searchPrompt, "You are a financial data assistant. Return only valid JSON data.");
+      
+      // Parse JSON from response
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        setEarnings(parsed);
+        setEarningsSource('ai');
+      }
+    } catch (e) {
+      console.error('AI earnings search error:', e);
+    }
+    setFetchingEarnings(false);
+  };
 
   return(
     <div className="fade-in">
       <div className="section-title">📊 EARNINGS REACTION ANALYZER</div>
       
-      <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'center'}}>
+      <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'center',flexWrap:'wrap'}}>
         <label style={{fontSize:11,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>ANALYZE LAST</label>
         <select value={quarters} onChange={e=>setQuarters(+e.target.value)} style={{width:80}}>
           <option value={4}>4 Qtrs</option>
@@ -1714,46 +1814,96 @@ Format with 🟢 for beats, 🔴 for misses, 🟡 for inline.`;
           <option value={12}>12 Qtrs</option>
         </select>
         <span style={{fontSize:11,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>QUARTERS</span>
+        
+        <button onClick={searchEarningsData} disabled={fetchingEarnings} style={{marginLeft:'auto',padding:'6px 12px',fontSize:10,background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+          {fetchingEarnings ? '⏳ Fetching...' : '🔄 Fetch Live Data'}
+        </button>
+      </div>
+      
+      {/* Data Source Indicator */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+        <span style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>DATA SOURCE:</span>
+        <span style={{fontSize:9,padding:'2px 8px',borderRadius:4,fontFamily:'var(--font-mono)',fontWeight:700,
+          background: earningsSource === 'yahoo' ? 'rgba(0,255,136,0.2)' : earningsSource === 'scanner' ? 'rgba(0,200,255,0.2)' : earningsSource === 'ai' ? 'rgba(255,136,255,0.2)' : 'rgba(255,170,0,0.2)',
+          color: earningsSource === 'yahoo' ? '#00ff88' : earningsSource === 'scanner' ? '#00c8ff' : earningsSource === 'ai' ? '#ff88ff' : '#ffaa00'
+        }}>
+          {earningsSource === 'yahoo' ? '🟢 YAHOO FINANCE' : earningsSource === 'scanner' ? '🔵 SCANNER DATA' : earningsSource === 'ai' ? '🟣 AI GENERATED' : '🟡 CLICK FETCH'}
+        </span>
+        {earnings.length > 0 && <span style={{fontSize:9,color:'var(--text-muted)'}}>({earnings.length} quarters)</span>}
       </div>
 
       <div style={{marginBottom:20}}>
-        <div style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:8}}>RECENT EARNINGS (SAMPLE DATA)</div>
-        {mockEarnings.map((e,i)=>(
-          <div key={i} className={`earnings-card ${e.status}`}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontWeight:700,fontSize:13}}>{e.q}</span>
-                <span className={`badge badge-${e.status==='beat'?'bull':e.status==='miss'?'bear':'neutral'}`}>
-                  {e.status==='beat'?'🟢 BEAT':e.status==='miss'?'🔴 MISS':'🟡 INLINE'}
+        {fetchingEarnings ? (
+          <div style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}>
+            <div style={{fontSize:24,marginBottom:8}}>⏳</div>
+            <div style={{fontSize:12}}>Fetching earnings data...</div>
+          </div>
+        ) : earnings.length === 0 ? (
+          <div style={{textAlign:'center',padding:'40px',background:'var(--bg-tertiary)',borderRadius:10,border:'1px dashed var(--border-dim)'}}>
+            <div style={{fontSize:24,marginBottom:8}}>📊</div>
+            <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>No earnings data loaded</div>
+            <button onClick={searchEarningsData} style={{padding:'10px 20px',background:'linear-gradient(135deg,#00c8ff,#0088ff)',border:'none',borderRadius:6,color:'#000',fontWeight:700,cursor:'pointer'}}>
+              🔍 Fetch Earnings Data via AI
+            </button>
+          </div>
+        ) : (
+          earnings.slice(0, quarters).map((e,i)=>(
+            <div key={i} className={`earnings-card ${e.status}`}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontWeight:700,fontSize:13}}>{e.q}</span>
+                  <span className={`badge badge-${e.status==='beat'?'bull':e.status==='miss'?'bear':'neutral'}`}>
+                    {e.status==='beat'?'🟢 BEAT':e.status==='miss'?'🔴 MISS':'🟡 INLINE'}
+                  </span>
+                </div>
+                <span style={{fontFamily:'var(--font-mono)',fontSize:13,fontWeight:700,color:e.reaction>=0?'#00ff88':'#ff4455'}}>
+                  {e.reaction>=0?'+':''}{e.reaction}%
                 </span>
               </div>
-              <span style={{fontFamily:'var(--font-mono)',fontSize:13,fontWeight:700,color:e.reaction>=0?'#00ff88':'#ff4455'}}>
-                {e.reaction>=0?'+':''}{e.reaction}%
-              </span>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,fontSize:11}}>
-              <div>
-                <span style={{color:'var(--text-muted)'}}>EPS: </span>
-                <span style={{fontFamily:'var(--font-mono)',fontWeight:600}}>₹{e.eps}</span>
-                <span style={{color:'var(--text-muted)'}}> vs Est ₹{e.est}</span>
-                <span style={{color:e.eps>e.est?'#00ff88':'#ff4455',marginLeft:6}}>({((e.eps-e.est)/e.est*100).toFixed(1)}%)</span>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,fontSize:11}}>
+                <div>
+                  <span style={{color:'var(--text-muted)'}}>EPS: </span>
+                  <span style={{fontFamily:'var(--font-mono)',fontWeight:600}}>₹{e.eps}</span>
+                  <span style={{color:'var(--text-muted)'}}> vs Est ₹{e.est}</span>
+                  <span style={{color:e.eps>e.est?'#00ff88':'#ff4455',marginLeft:6}}>({((e.eps-e.est)/e.est*100).toFixed(1)}%)</span>
+                </div>
+                <div>
+                  <span style={{color:'var(--text-muted)'}}>Rev: </span>
+                  <span style={{fontFamily:'var(--font-mono)',fontWeight:600}}>₹{e.rev}Cr</span>
+                  <span style={{color:'var(--text-muted)'}}> vs Est ₹{e.revEst}Cr</span>
+                </div>
               </div>
-              <div>
-                <span style={{color:'var(--text-muted)'}}>Rev: </span>
-                <span style={{fontFamily:'var(--font-mono)',fontWeight:600}}>₹{e.rev}Cr</span>
-                <span style={{color:'var(--text-muted)'}}> vs Est ₹{e.revEst}Cr</span>
+              <div className="reaction-bar">
+                <div className="reaction-fill" style={{
+                  width:`${Math.min(Math.abs(e.reaction)*10,100)}%`,
+                  background:e.reaction>=0?'linear-gradient(90deg,#00cc66,#00ff88)':'linear-gradient(90deg,#ff4455,#ff6655)',
+                  marginLeft:e.reaction<0?'auto':0
+                }}/>
               </div>
             </div>
-            <div className="reaction-bar">
-              <div className="reaction-fill" style={{
-                width:`${Math.min(Math.abs(e.reaction)*10,100)}%`,
-                background:e.reaction>=0?'linear-gradient(90deg,#00cc66,#00ff88)':'linear-gradient(90deg,#ff4455,#ff6655)',
-                marginLeft:e.reaction<0?'auto':0
-              }}/>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
+
+      {/* Earnings Summary Stats */}
+      {earnings.length > 0 && <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
+        <div style={{padding:'12px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+          <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:4}}>BEAT RATE</div>
+          <div style={{fontSize:18,fontWeight:900,color:'#00ff88',fontFamily:'var(--font-mono)'}}>{Math.round(earnings.filter(e=>e.status==='beat').length/earnings.length*100)}%</div>
+        </div>
+        <div style={{padding:'12px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+          <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:4}}>AVG REACTION</div>
+          <div style={{fontSize:18,fontWeight:900,color:earnings.reduce((a,e)=>a+e.reaction,0)/earnings.length>=0?'#00ff88':'#ff4455',fontFamily:'var(--font-mono)'}}>{(earnings.reduce((a,e)=>a+e.reaction,0)/earnings.length).toFixed(1)}%</div>
+        </div>
+        <div style={{padding:'12px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+          <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:4}}>BEAT ON BEAT</div>
+          <div style={{fontSize:18,fontWeight:900,color:'#00c8ff',fontFamily:'var(--font-mono)'}}>{(earnings.filter(e=>e.status==='beat').reduce((a,e)=>a+e.reaction,0)/(earnings.filter(e=>e.status==='beat').length||1)).toFixed(1)}%</div>
+        </div>
+        <div style={{padding:'12px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+          <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:4}}>MISS REACTION</div>
+          <div style={{fontSize:18,fontWeight:900,color:'#ff4455',fontFamily:'var(--font-mono)'}}>{(earnings.filter(e=>e.status==='miss').reduce((a,e)=>a+e.reaction,0)/(earnings.filter(e=>e.status==='miss').length||1)).toFixed(1)}%</div>
+        </div>
+      </div>}
 
       <button className="btn btn-accent" style={{width:'100%',padding:'14px'}} onClick={runAnalysis} disabled={loading}>
         {loading?'⚡ Analyzing Patterns...':'📈 Generate Earnings Analysis'}
