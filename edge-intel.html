@@ -580,6 +580,15 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[analysis,setAnalysis]=useState(null);
   const[loading,setLoading]=useState(false);
   
+  // Smart SL Calculator State
+  const[showSLCalculator,setShowSLCalculator]=useState(false);
+  const[slMethod,setSLMethod]=useState('atr'); // 'atr', 'pct', 'ema', 'fixed', 'swing'
+  const[slATRMult,setSLATRMult]=useState(2);   // ATR multiplier for SL
+  const[slPct,setSLPct]=useState(3);           // Percentage for SL
+  const[slEMA,setSLEMA]=useState(21);          // EMA period for SL
+  const[slFixedRisk,setSLFixedRisk]=useState(1000); // Fixed ₹ risk
+  const[slSwingLow,setSLSwingLow]=useState(0); // Manual swing low input
+  
   // Trade Execution State
   const[showExecution,setShowExecution]=useState(false);
   const[broker,setBroker]=useState('zerodha');
@@ -649,11 +658,47 @@ const SmartTradeSetup=({symbol,stockData})=>{
   
   const calcTrancheQty = (t) => Math.floor((positionSize || qty) * (t.pct / 100));
 
+  // Smart SL Calculation Functions
+  const calcSLByMethod = (method, params = {}) => {
+    const { atrMult = slATRMult, pct = slPct, ema = slEMA, fixedRisk = slFixedRisk, swing = slSwingLow } = params;
+    switch(method) {
+      case 'atr': return +(entry - (atr * atrMult)).toFixed(2);
+      case 'pct': return +(entry * (1 - pct/100)).toFixed(2);
+      case 'ema': return +(emaValues[ema] - 2).toFixed(2); // 2₹ buffer below EMA
+      case 'fixed': return +(entry - (fixedRisk / (positionSize || qty || 1))).toFixed(2);
+      case 'swing': return +(swing - 2).toFixed(2); // 2₹ buffer below swing low
+      default: return +(entry * 0.97).toFixed(2);
+    }
+  };
+  
+  // All SL options for comparison
+  const slOptions = [
+    { method: 'atr', label: 'ATR', icon: '📊', color: '#ffaa00', values: [1, 1.5, 2, 2.5, 3].map(m => ({ mult: m, price: +(entry - atr * m).toFixed(2), pct: +((atr * m) / entry * 100).toFixed(1) })) },
+    { method: 'pct', label: '%', icon: '📉', color: '#ff88ff', values: [2, 3, 4, 5, 7].map(p => ({ mult: p, price: +(entry * (1 - p/100)).toFixed(2), pct: p })) },
+    { method: 'ema', label: 'EMA', icon: '📈', color: '#00c8ff', values: [10, 21, 50, 100, 200].map(e => ({ mult: e, price: +(emaValues[e] - 2).toFixed(2), pct: +((entry - emaValues[e] + 2) / entry * 100).toFixed(1) })) },
+  ];
+  
+  // Apply selected SL method
+  const applySL = (method, value) => {
+    let newSL;
+    if(method === 'atr') { setSLATRMult(value); newSL = +(entry - atr * value).toFixed(2); }
+    else if(method === 'pct') { setSLPct(value); newSL = +(entry * (1 - value/100)).toFixed(2); }
+    else if(method === 'ema') { setSLEMA(value); newSL = +(emaValues[value] - 2).toFixed(2); }
+    else if(method === 'fixed') { newSL = +(entry - (value / (positionSize || qty || 1))).toFixed(2); }
+    else if(method === 'swing') { newSL = +(value - 2).toFixed(2); }
+    setSLMethod(method);
+    setSL(newSL);
+  };
+
   useEffect(()=>{
     if(stockData?.price){
       setEntry(stockData.price);
       setTarget(+(stockData.price*1.08).toFixed(2));
-      setSL(+(stockData.price*0.97).toFixed(2));
+      // Auto-suggest SL based on ATR (2× ATR is a good default)
+      const suggestedSL = stockData.atr ? +(stockData.price - (stockData.atr * 2)).toFixed(2) : +(stockData.price*0.97).toFixed(2);
+      setSL(suggestedSL);
+      setSLATRMult(2);
+      setSLMethod('atr');
     }
   },[stockData?.price]);
 
@@ -1014,9 +1059,28 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             <label style={{fontSize:10,color:'var(--accent)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>TARGET ₹</label>
             <input type="number" value={target} onChange={e=>setTarget(+e.target.value)} style={{width:'100%',borderColor:'rgba(0,255,136,0.3)'}}/>
           </div>
+          {/* SMART SL INPUT WITH CALCULATOR TOGGLE */}
           <div style={{marginBottom:12}}>
-            <label style={{fontSize:10,color:'var(--red)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>STOP LOSS ₹</label>
-            <input type="number" value={sl} onChange={e=>setSL(+e.target.value)} style={{width:'100%',borderColor:'rgba(255,68,85,0.3)'}}/>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <label style={{fontSize:10,color:'var(--red)',fontFamily:'var(--font-mono)'}}>STOP LOSS ₹</label>
+              <button onClick={()=>setShowSLCalculator(!showSLCalculator)} style={{fontSize:9,padding:'2px 8px',background:showSLCalculator?'rgba(255,68,85,0.2)':'transparent',border:'1px solid var(--red)',borderRadius:4,color:'var(--red)',cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+                {showSLCalculator?'✕ Close':'🧮 Smart SL'}
+              </button>
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              <input type="number" value={sl} onChange={e=>setSL(+e.target.value)} style={{flex:1,borderColor:'rgba(255,68,85,0.3)'}}/>
+              <div style={{padding:'8px 12px',background:'var(--bg-tertiary)',borderRadius:6,fontSize:10,fontFamily:'var(--font-mono)',color:'var(--red)',display:'flex',alignItems:'center'}}>
+                -{((entry-sl)/entry*100).toFixed(1)}%
+              </div>
+            </div>
+            {/* SL Method Badge */}
+            <div style={{marginTop:6,display:'flex',gap:6,alignItems:'center'}}>
+              <span style={{fontSize:9,color:'var(--text-muted)'}}>Method:</span>
+              <span style={{fontSize:9,padding:'2px 6px',background:slMethod==='atr'?'rgba(255,170,0,0.2)':slMethod==='pct'?'rgba(255,136,255,0.2)':slMethod==='ema'?'rgba(0,200,255,0.2)':'rgba(136,68,255,0.2)',color:slMethod==='atr'?'#ffaa00':slMethod==='pct'?'#ff88ff':slMethod==='ema'?'#00c8ff':'#8844ff',borderRadius:4,fontFamily:'var(--font-mono)',fontWeight:700}}>
+                {slMethod==='atr'?`${slATRMult}× ATR`:slMethod==='pct'?`${slPct}%`:slMethod==='ema'?`EMA${slEMA}`:slMethod==='fixed'?'Fixed ₹':'Swing'}
+              </span>
+              <span style={{fontSize:9,color:'var(--text-muted)'}}>= ₹{Math.abs(entry-sl).toFixed(2)} risk/share</span>
+            </div>
           </div>
         </div>
         <div>
@@ -1034,6 +1098,165 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
           </div>
         </div>
       </div>
+
+      {/* ═══ SMART SL CALCULATOR PANEL ═══ */}
+      {showSLCalculator&&<div className="fade-in" style={{background:'linear-gradient(135deg,rgba(255,68,85,0.05),rgba(200,50,60,0.02))',border:'1px solid rgba(255,68,85,0.2)',borderRadius:12,padding:16,marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
+          <span style={{fontSize:18}}>🛡️</span>
+          <span style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'var(--red)'}}>SMART STOP LOSS CALCULATOR</span>
+          <span style={{fontSize:9,color:'var(--text-muted)',marginLeft:'auto',fontFamily:'var(--font-mono)'}}>ATR(14) = ₹{atr.toFixed(2)}</span>
+        </div>
+        
+        {/* Method Selector */}
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {[
+            {m:'atr',icon:'📊',label:'ATR Based',desc:'Volatility adjusted',color:'#ffaa00'},
+            {m:'pct',icon:'📉',label:'Percentage',desc:'Fixed % below',color:'#ff88ff'},
+            {m:'ema',icon:'📈',label:'EMA Support',desc:'Below key EMA',color:'#00c8ff'},
+            {m:'fixed',icon:'💰',label:'Fixed ₹ Risk',desc:'Set max loss',color:'#8844ff'},
+            {m:'swing',icon:'📍',label:'Swing Low',desc:'Below support',color:'#ff4455'}
+          ].map(x=>(
+            <button key={x.m} onClick={()=>setSLMethod(x.m)} style={{flex:1,padding:'10px 8px',background:slMethod===x.m?`${x.color}15`:'var(--bg-tertiary)',border:`2px solid ${slMethod===x.m?x.color:'var(--border-dim)'}`,borderRadius:8,cursor:'pointer',transition:'all 0.15s'}}>
+              <div style={{fontSize:16,marginBottom:2}}>{x.icon}</div>
+              <div style={{fontSize:10,fontWeight:700,color:slMethod===x.m?x.color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>{x.label}</div>
+              <div style={{fontSize:8,color:'var(--text-muted)'}}>{x.desc}</div>
+            </button>
+          ))}
+        </div>
+        
+        {/* ATR-Based SL */}
+        {slMethod==='atr'&&<div>
+          <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8,fontFamily:'var(--font-mono)'}}>Select ATR Multiplier:</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8}}>
+            {[1, 1.5, 2, 2.5, 3].map(m=>{
+              const slPrice = +(entry - atr * m).toFixed(2);
+              const slPctVal = +((atr * m) / entry * 100).toFixed(1);
+              const riskAmt = +((entry - slPrice) * (positionSize || qty)).toFixed(0);
+              return(
+                <div key={m} onClick={()=>applySL('atr',m)} style={{padding:'12px 8px',background:slATRMult===m?'rgba(255,170,0,0.15)':'var(--bg-tertiary)',border:`2px solid ${slATRMult===m?'#ffaa00':'var(--border-dim)'}`,borderRadius:8,cursor:'pointer',textAlign:'center',transition:'all 0.15s'}}>
+                  <div style={{fontSize:12,fontWeight:800,color:slATRMult===m?'#ffaa00':'var(--text-muted)',fontFamily:'var(--font-mono)'}}>{m}× ATR</div>
+                  <div style={{fontSize:16,fontWeight:900,color:'var(--red)',fontFamily:'var(--font-mono)',margin:'4px 0'}}>₹{slPrice}</div>
+                  <div style={{fontSize:9,color:'var(--text-muted)'}}>-{slPctVal}%</div>
+                  <div style={{fontSize:9,color:'var(--red)',marginTop:4}}>Risk: ₹{riskAmt}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{marginTop:10,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+            💡 <strong style={{color:'#ffaa00'}}>Recommended:</strong> 2× ATR gives room for normal volatility. Use 1× for tight stops (scalping), 3× for wide stops (swing).
+          </div>
+        </div>}
+        
+        {/* Percentage-Based SL */}
+        {slMethod==='pct'&&<div>
+          <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8,fontFamily:'var(--font-mono)'}}>Select Risk Percentage:</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8}}>
+            {[2, 3, 4, 5, 7].map(p=>{
+              const slPrice = +(entry * (1 - p/100)).toFixed(2);
+              const riskAmt = +((entry - slPrice) * (positionSize || qty)).toFixed(0);
+              return(
+                <div key={p} onClick={()=>applySL('pct',p)} style={{padding:'12px 8px',background:slPct===p?'rgba(255,136,255,0.15)':'var(--bg-tertiary)',border:`2px solid ${slPct===p?'#ff88ff':'var(--border-dim)'}`,borderRadius:8,cursor:'pointer',textAlign:'center',transition:'all 0.15s'}}>
+                  <div style={{fontSize:12,fontWeight:800,color:slPct===p?'#ff88ff':'var(--text-muted)',fontFamily:'var(--font-mono)'}}>{p}%</div>
+                  <div style={{fontSize:16,fontWeight:900,color:'var(--red)',fontFamily:'var(--font-mono)',margin:'4px 0'}}>₹{slPrice}</div>
+                  <div style={{fontSize:9,color:'var(--text-muted)'}}>-₹{(entry*p/100).toFixed(0)}</div>
+                  <div style={{fontSize:9,color:'var(--red)',marginTop:4}}>Risk: ₹{riskAmt}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>}
+        
+        {/* EMA-Based SL */}
+        {slMethod==='ema'&&<div>
+          <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8,fontFamily:'var(--font-mono)'}}>Place SL Below EMA Support:</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8}}>
+            {[{e:10,c:'#00ff88',use:'Scalp'},{e:21,c:'#00c8ff',use:'Swing'},{e:50,c:'#ff88ff',use:'Position'},{e:100,c:'#ffaa00',use:'Trend'},{e:200,c:'#ff4455',use:'Investor'}].map(x=>{
+              const slPrice = +(emaValues[x.e] - 2).toFixed(2);
+              const slPctVal = +((entry - slPrice) / entry * 100).toFixed(1);
+              const riskAmt = +((entry - slPrice) * (positionSize || qty)).toFixed(0);
+              return(
+                <div key={x.e} onClick={()=>applySL('ema',x.e)} style={{padding:'12px 8px',background:slEMA===x.e?`${x.c}20`:'var(--bg-tertiary)',border:`2px solid ${slEMA===x.e?x.c:'var(--border-dim)'}`,borderRadius:8,cursor:'pointer',textAlign:'center',transition:'all 0.15s'}}>
+                  <div style={{fontSize:9,fontWeight:700,color:slEMA===x.e?x.c:'var(--text-muted)'}}>{x.use}</div>
+                  <div style={{fontSize:11,fontWeight:800,color:x.c,fontFamily:'var(--font-mono)'}}>EMA {x.e}</div>
+                  <div style={{fontSize:14,fontWeight:900,color:'var(--red)',fontFamily:'var(--font-mono)',margin:'4px 0'}}>₹{slPrice}</div>
+                  <div style={{fontSize:9,color:'var(--text-muted)'}}>-{slPctVal}%</div>
+                  <div style={{fontSize:9,color:'var(--red)',marginTop:4}}>Risk: ₹{riskAmt}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{marginTop:10,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+            📈 EMA values shown with ₹2 buffer below. <span style={{color:'#00c8ff'}}>EMA21</span> is most popular for swing trading.
+          </div>
+        </div>}
+        
+        {/* Fixed ₹ Risk SL */}
+        {slMethod==='fixed'&&<div>
+          <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8,fontFamily:'var(--font-mono)'}}>Set Maximum ₹ Loss:</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:12}}>
+            {[500, 1000, 2000, 3000, 5000].map(amt=>{
+              const slPrice = +(entry - (amt / (positionSize || qty || 1))).toFixed(2);
+              const slPctVal = +((entry - slPrice) / entry * 100).toFixed(1);
+              return(
+                <div key={amt} onClick={()=>{setSLFixedRisk(amt);applySL('fixed',amt)}} style={{padding:'12px 8px',background:slFixedRisk===amt?'rgba(136,68,255,0.15)':'var(--bg-tertiary)',border:`2px solid ${slFixedRisk===amt?'#8844ff':'var(--border-dim)'}`,borderRadius:8,cursor:'pointer',textAlign:'center',transition:'all 0.15s'}}>
+                  <div style={{fontSize:12,fontWeight:800,color:slFixedRisk===amt?'#8844ff':'var(--text-muted)',fontFamily:'var(--font-mono)'}}>₹{amt}</div>
+                  <div style={{fontSize:14,fontWeight:900,color:'var(--red)',fontFamily:'var(--font-mono)',margin:'4px 0'}}>₹{slPrice}</div>
+                  <div style={{fontSize:9,color:'var(--text-muted)'}}>-{slPctVal}%</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <span style={{fontSize:10,color:'var(--text-muted)'}}>Custom:</span>
+            <input type="number" value={slFixedRisk} onChange={e=>{setSLFixedRisk(+e.target.value);applySL('fixed',+e.target.value)}} style={{width:100,padding:'8px'}} placeholder="₹ amount"/>
+            <span style={{fontSize:10,color:'var(--text-muted)'}}>→ SL @ ₹{(entry - (slFixedRisk / (positionSize || qty || 1))).toFixed(2)}</span>
+          </div>
+        </div>}
+        
+        {/* Swing Low SL */}
+        {slMethod==='swing'&&<div>
+          <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8,fontFamily:'var(--font-mono)'}}>Enter Recent Swing Low from Chart:</div>
+          <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:12}}>
+            <input type="number" value={slSwingLow} onChange={e=>setSLSwingLow(+e.target.value)} style={{width:150,padding:'10px',fontSize:14}} placeholder="Swing low price"/>
+            <button onClick={()=>applySL('swing',slSwingLow)} style={{padding:'10px 20px',background:'linear-gradient(135deg,#ff4455,#ff6677)',border:'none',borderRadius:6,color:'#fff',fontWeight:700,cursor:'pointer'}}>Apply</button>
+            <span style={{fontSize:10,color:'var(--text-muted)'}}>SL will be set ₹2 below swing low</span>
+          </div>
+          {slSwingLow>0&&<div style={{padding:12,background:'var(--bg-tertiary)',borderRadius:8,display:'flex',justifyContent:'space-between'}}>
+            <div><span style={{color:'var(--text-muted)',fontSize:10}}>Swing Low:</span> <span style={{color:'#ff4455',fontWeight:700}}>₹{slSwingLow}</span></div>
+            <div><span style={{color:'var(--text-muted)',fontSize:10}}>SL (with buffer):</span> <span style={{color:'var(--red)',fontWeight:700}}>₹{(slSwingLow-2).toFixed(2)}</span></div>
+            <div><span style={{color:'var(--text-muted)',fontSize:10}}>Risk:</span> <span style={{color:'var(--red)',fontWeight:700}}>-{((entry-(slSwingLow-2))/entry*100).toFixed(1)}%</span></div>
+          </div>}
+          <div style={{marginTop:10,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+            📍 Identify the recent swing low from your chart and enter it here. A ₹2 buffer is added automatically.
+          </div>
+        </div>}
+        
+        {/* Visual Comparison */}
+        <div style={{marginTop:16,padding:12,background:'rgba(0,0,0,0.3)',borderRadius:8}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--text-muted)',marginBottom:10,fontFamily:'var(--font-mono)'}}>📊 VISUAL COMPARISON</div>
+          <div style={{position:'relative',height:40,background:'var(--bg-primary)',borderRadius:6,overflow:'hidden'}}>
+            {/* Entry marker */}
+            <div style={{position:'absolute',right:0,top:0,height:'100%',width:4,background:'var(--accent)'}}/>
+            <div style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',fontSize:9,color:'var(--accent)'}}>Entry ₹{entry}</div>
+            
+            {/* SL levels */}
+            {[
+              {m:'atr',v:slATRMult,p:+(entry-atr*slATRMult).toFixed(2),c:'#ffaa00',l:`${slATRMult}×ATR`},
+              {m:'pct',v:slPct,p:+(entry*(1-slPct/100)).toFixed(2),c:'#ff88ff',l:`${slPct}%`},
+              {m:'ema',v:slEMA,p:+(emaValues[slEMA]-2).toFixed(2),c:'#00c8ff',l:`EMA${slEMA}`}
+            ].sort((a,b)=>b.p-a.p).map((x,i)=>{
+              const pctFromEntry = ((entry-x.p)/entry*100);
+              const leftPos = 100 - (pctFromEntry * 10); // Scale for visualization
+              return(
+                <div key={x.m} style={{position:'absolute',left:`${Math.max(5,leftPos)}%`,top:8+i*10,display:'flex',alignItems:'center',gap:4}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:x.c,border:slMethod===x.m?'2px solid #fff':''}}/>
+                  <span style={{fontSize:8,color:x.c,fontFamily:'var(--font-mono)'}}>{x.l} ₹{x.p}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>}
 
       <div className="rr-bar" style={{marginBottom:16}}>
         <div className="rr-risk" style={{width:`${100/(1+parseFloat(rr)||1)}%`}}>RISK ₹{risk.toFixed(0)}</div>
