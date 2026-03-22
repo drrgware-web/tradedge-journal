@@ -58,6 +58,15 @@ input,textarea,select{background:var(--bg-tertiary);border:1px solid var(--borde
 .rr-risk{background:linear-gradient(90deg,#ff4455,#ff6655);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
 .rr-reward{background:linear-gradient(90deg,#00cc66,#00ff88);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#000}
 .earnings-card{background:var(--bg-tertiary);border:1px solid var(--border-dim);border-radius:8px;padding:14px;margin-bottom:8px}
+/* Toast Notifications */
+.toast-container{position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px}
+.toast{padding:14px 20px;border-radius:8px;font-family:var(--font-mono);font-size:12px;font-weight:600;display:flex;align-items:center;gap:10px;animation:slideIn 0.3s ease-out;box-shadow:0 10px 40px rgba(0,0,0,0.4);max-width:400px}
+.toast-success{background:linear-gradient(135deg,rgba(0,255,136,0.95),rgba(0,200,100,0.95));color:#000;border:1px solid #00ff88}
+.toast-error{background:linear-gradient(135deg,rgba(255,68,85,0.95),rgba(200,50,60,0.95));color:#fff;border:1px solid #ff4455}
+.toast-info{background:linear-gradient(135deg,rgba(0,200,255,0.95),rgba(0,150,200,0.95));color:#000;border:1px solid #00c8ff}
+.toast-exit{animation:slideOut 0.3s ease-in forwards}
+@keyframes slideIn{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(100px)}}
 .earnings-card.beat{border-left:3px solid #00ff88}.earnings-card.miss{border-left:3px solid #ff4455}.earnings-card.inline{border-left:3px solid #ffaa00}
 .reaction-bar{height:6px;border-radius:3px;background:var(--bg-secondary);overflow:hidden;margin-top:6px}
 .reaction-fill{height:100%;border-radius:3px}
@@ -74,6 +83,128 @@ const{useState,useEffect,useMemo,useCallback,useRef,Fragment}=React;
 
 const GROQ_API_KEY=localStorage.getItem('groq_api_key')||'';
 const GROQ_MODEL='llama-3.3-70b-versatile';
+
+// ═══ SUPABASE CONFIG ═══
+const SUPABASE_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NDMxMjUsImV4cCI6MjA1ODExOTEyNX0.aQpScm7RMwNP6PgPB1AqMNjkqVuBQfUHqT3BnME-rbdw';
+const DEVICE_ID = 'tradedge_main';
+
+// ═══ TOAST NOTIFICATION SYSTEM ═══
+let toastId = 0;
+const toastListeners = new Set();
+const toasts = [];
+
+const addToast = (message, type = 'info', duration = 4000) => {
+  const id = ++toastId;
+  const toast = { id, message, type, exiting: false };
+  toasts.push(toast);
+  toastListeners.forEach(fn => fn([...toasts]));
+  
+  setTimeout(() => {
+    const t = toasts.find(x => x.id === id);
+    if (t) t.exiting = true;
+    toastListeners.forEach(fn => fn([...toasts]));
+    
+    setTimeout(() => {
+      const idx = toasts.findIndex(x => x.id === id);
+      if (idx > -1) toasts.splice(idx, 1);
+      toastListeners.forEach(fn => fn([...toasts]));
+    }, 300);
+  }, duration);
+  
+  return id;
+};
+
+const ToastContainer = () => {
+  const [items, setItems] = useState([]);
+  
+  useEffect(() => {
+    toastListeners.add(setItems);
+    return () => toastListeners.delete(setItems);
+  }, []);
+  
+  if (!items.length) return null;
+  
+  return (
+    <div className="toast-container">
+      {items.map(t => (
+        <div key={t.id} className={`toast toast-${t.type} ${t.exiting ? 'toast-exit' : ''}`}>
+          {t.type === 'success' && '✓'}
+          {t.type === 'error' && '✗'}
+          {t.type === 'info' && 'ℹ'}
+          <span>{t.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ═══ SUPABASE SYNC FUNCTION ═══
+const syncTradesToSupabase = async (trades) => {
+  try {
+    // Check if row exists
+    const checkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/tradedge_trades?device_id=eq.${DEVICE_ID}&select=id`,
+      {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      }
+    );
+    const existing = await checkRes.json();
+    
+    const payload = {
+      device_id: DEVICE_ID,
+      trades_json: JSON.stringify(trades),
+      updated_at: new Date().toISOString()
+    };
+    
+    let res;
+    if (existing && existing.length > 0) {
+      // Update existing row
+      res = await fetch(
+        `${SUPABASE_URL}/rest/v1/tradedge_trades?device_id=eq.${DEVICE_ID}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+    } else {
+      // Insert new row
+      res = await fetch(
+        `${SUPABASE_URL}/rest/v1/tradedge_trades`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+    }
+    
+    if (res.ok) {
+      console.log('✓ Trades synced to Supabase');
+      return true;
+    } else {
+      console.error('Supabase sync failed:', res.status);
+      return false;
+    }
+  } catch (e) {
+    console.error('Supabase sync error:', e);
+    return false;
+  }
+};
 
 // ═══ NSE STOCK LIST FOR AUTOCOMPLETE ═══
 const NSE_STOCKS=[
@@ -638,15 +769,67 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       }
       
       setExecResult(res);
-      if(res?.data||res?.status==='success'||res?.orderId){
-        // Log to journal
-        const trades=JSON.parse(localStorage.getItem('te_trades')||'[]');
-        trades.push({id:Date.now(),symbol,action:txnType,price:entry,qty:positionSize||qty,
-          ts:new Date().toISOString(),status:'executed',target,sl,rr,broker,
-          orderType: enableGTT ? 'GTT' : enableBracket ? 'BRACKET' : 'REGULAR'});
-        localStorage.setItem('te_trades',JSON.stringify(trades));
+      
+      // Extract order ID from broker response
+      const orderId = res?.data?.order_id || res?.orderId || res?.order_id || res?._meta?.order_id || null;
+      const isSuccess = res?.data || res?.status === 'success' || res?.orderId || orderId;
+      
+      if(isSuccess){
+        // Build comprehensive trade object
+        const tradeRecord = {
+          id: Date.now(),
+          order_id: orderId,
+          symbol,
+          action: txnType,
+          entry_price: entry,
+          price: entry,
+          qty: positionSize || qty,
+          quantity: positionSize || qty,
+          target,
+          sl,
+          rr: parseFloat(rr) || 0,
+          risk_amt: maxLoss,
+          reward_amt: maxProfit,
+          broker,
+          product,
+          order_type: orderType,
+          execution_type: enableGTT ? 'GTT' : enableBracket ? 'BRACKET' : 'REGULAR',
+          trailing: enableTrail ? getTrailValue() : 0,
+          trail_method: enableTrail ? trailMethod : null,
+          atr: stockData?.atr || null,
+          ts: new Date().toISOString(),
+          status: 'Open',
+          broker_response: {
+            order_id: orderId,
+            raw: res?.data || res
+          }
+        };
+        
+        // Save to localStorage
+        const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+        trades.push(tradeRecord);
+        localStorage.setItem('te_trades', JSON.stringify(trades));
+        
+        // Show success toast
+        const orderTypeLabel = enableGTT ? 'GTT' : enableBracket ? 'Bracket' : 'Regular';
+        addToast(`✓ ${orderTypeLabel} ${txnType} order placed: ${symbol} × ${positionSize||qty} @ ₹${entry}`, 'success', 5000);
+        
+        // Sync to Supabase
+        const synced = await syncTradesToSupabase(trades);
+        if(synced){
+          addToast('📡 Synced to cloud (MATRIX)', 'info', 3000);
+        }
+        
+        console.log('Trade logged:', tradeRecord);
+      } else {
+        // Show error toast
+        const errorMsg = res?.message || res?.error || 'Order failed';
+        addToast(`✗ ${errorMsg}`, 'error', 6000);
       }
-    }catch(e){setExecResult({error:e.message})}
+    }catch(e){
+      setExecResult({error:e.message});
+      addToast(`✗ Error: ${e.message}`, 'error', 6000);
+    }
     setExecuting(false);
   };
 
@@ -696,8 +879,15 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         <div className="metric-box"><div className="metric-label">MAX LOSS</div><div className="metric-value" style={{color:'#ff4455'}}>₹{maxLoss.toFixed(0)}</div></div>
         <div className="metric-box"><div className="metric-label">MAX PROFIT</div><div className="metric-value" style={{color:'#00ff88'}}>₹{maxProfit.toFixed(0)}</div></div>
         <div className="metric-box"><div className="metric-label">POSITION VALUE</div><div className="metric-value" style={{color:'#8844ff'}}>₹{(positionSize*entry).toFixed(0)}</div></div>
-        <div className="metric-box"><div className="metric-label">REQ WIN RATE</div><div className="metric-value" style={{color:'#ffaa00'}}>{winRate}</div></div>
+        <div className="metric-box"><div className="metric-label">ATR(14)</div><div className="metric-value" style={{color:stockData?.volatility==='HIGH'?'#ff4455':stockData?.volatility==='MEDIUM'?'#ffaa00':'#00ff88'}}>₹{stockData?.atr||atr.toFixed(2)} <span style={{fontSize:9,opacity:0.7}}>({stockData?.atr_pct||(atr/entry*100).toFixed(1)}%)</span></div></div>
       </div>
+
+      {stockData?.atr && <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>VOLATILITY:</span>
+        <span style={{padding:'3px 8px',borderRadius:4,fontSize:10,fontWeight:700,fontFamily:'var(--font-mono)',background:stockData.volatility==='HIGH'?'rgba(255,68,85,0.2)':stockData.volatility==='MEDIUM'?'rgba(255,170,0,0.2)':'rgba(0,255,136,0.2)',color:stockData.volatility==='HIGH'?'#ff4455':stockData.volatility==='MEDIUM'?'#ffaa00':'#00ff88'}}>{stockData.volatility||'—'}</span>
+        <span style={{fontSize:9,color:'var(--text-muted)',marginLeft:8}}>Trail suggestions:</span>
+        {[0.5,1,2,3].map(m=><span key={m} style={{fontSize:9,color:'var(--amber)',fontFamily:'var(--font-mono)'}}>₹{(stockData.atr*m).toFixed(0)}({m}×)</span>)}
+      </div>}
 
       <div style={{display:'flex',gap:10,marginBottom:20}}>
         <button className="btn btn-accent" style={{flex:1,padding:'14px'}} onClick={generateSetup} disabled={loading}>
@@ -993,25 +1183,100 @@ const EdgeIntel=()=>{
     loadStock(s.s);
   };
 
+  // Fetch live ATR from Yahoo via worker
+  const fetchLiveATR = async (sym) => {
+    const wUrl = localStorage.getItem('zd_worker_url');
+    if (!wUrl) return null;
+    
+    try {
+      const res = await fetch(wUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+        body: JSON.stringify({ ticker: `${sym}.NS`, range: '3mo', interval: '1d' })
+      });
+      const data = await res.json();
+      
+      const result = data?.chart?.result?.[0];
+      if (!result) return null;
+      
+      const quotes = result.indicators?.quote?.[0];
+      if (!quotes) return null;
+      
+      const highs = quotes.high?.filter(v => v != null) || [];
+      const lows = quotes.low?.filter(v => v != null) || [];
+      const closes = quotes.close?.filter(v => v != null) || [];
+      
+      if (highs.length < 15 || lows.length < 15 || closes.length < 15) return null;
+      
+      // Calculate ATR(14)
+      const period = 14;
+      const trueRanges = [];
+      
+      for (let i = 1; i < Math.min(highs.length, lows.length, closes.length); i++) {
+        const h = highs[i], l = lows[i], pc = closes[i - 1];
+        const tr = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+        trueRanges.push(tr);
+      }
+      
+      if (trueRanges.length < period) return null;
+      
+      // Simple Moving Average of TR for ATR
+      const recentTRs = trueRanges.slice(-period);
+      const atr = recentTRs.reduce((a, b) => a + b, 0) / period;
+      const currentPrice = closes[closes.length - 1];
+      const atrPct = (atr / currentPrice) * 100;
+      
+      return {
+        atr: +atr.toFixed(2),
+        atr_pct: +atrPct.toFixed(2),
+        volatility: atrPct > 3 ? 'HIGH' : atrPct > 1.5 ? 'MEDIUM' : 'LOW',
+        price: +currentPrice.toFixed(2)
+      };
+    } catch (e) {
+      console.log('ATR fetch error:', e);
+      return null;
+    }
+  };
+
   const loadStock=async(sym)=>{
     if(!sym)return;
     setLoading(true);
     setShowSuggestions(false);
     try{
+      let data = null;
+      
+      // Try stock_details first
       const res=await fetch(`./data/stock_details/${sym.toUpperCase()}.json?t=${Date.now()}`);
       if(res.ok){
-        const data=await res.json();
-        setStockData(data);
-        setSymbol(sym.toUpperCase());
+        data=await res.json();
       }else{
         // Try scanner results
         const scanRes=await fetch(`./data/scanner_results.json?t=${Date.now()}`);
         if(scanRes.ok){
           const scanData=await scanRes.json();
           const found=scanData.stocks?.find(s=>s.symbol.toUpperCase()===sym.toUpperCase());
-          if(found){setStockData(found);setSymbol(sym.toUpperCase())}
-          else{alert('Stock not found');setStockData(null)}
+          if(found) data = found;
         }
+      }
+      
+      if(data){
+        // Fetch live ATR if not already present
+        if(!data.atr || !data.atr_pct){
+          console.log('Fetching live ATR for', sym);
+          const atrData = await fetchLiveATR(sym.toUpperCase());
+          if(atrData){
+            data.atr = atrData.atr;
+            data.atr_pct = atrData.atr_pct;
+            data.volatility = atrData.volatility;
+            if(!data.price) data.price = atrData.price;
+            console.log('Live ATR:', atrData);
+          }
+        }
+        setStockData(data);
+        setSymbol(sym.toUpperCase());
+      }else{
+        alert('Stock not found');
+        setStockData(null);
       }
     }catch(e){console.error(e);setStockData(null)}
     setLoading(false);
@@ -1032,6 +1297,7 @@ const EdgeIntel=()=>{
 
   return(
     <div>
+      <ToastContainer />
       <nav className="nav">
         <a href="index.html" style={{display:'flex',alignItems:'center'}}>
           <img src="assets/logo.jpeg" alt="TE" style={{height:80,marginRight:16}} onError={e=>e.target.style.display='none'}/>
