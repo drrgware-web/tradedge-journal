@@ -67,6 +67,7 @@ input,textarea,select{background:var(--bg-tertiary);border:1px solid var(--borde
 .toast-exit{animation:slideOut 0.3s ease-in forwards}
 @keyframes slideIn{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
 @keyframes slideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(100px)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .earnings-card.beat{border-left:3px solid #00ff88}.earnings-card.miss{border-left:3px solid #ff4455}.earnings-card.inline{border-left:3px solid #ffaa00}
 .reaction-bar{height:6px;border-radius:3px;background:var(--bg-secondary);overflow:hidden;margin-top:6px}
 .reaction-fill{height:100%;border-radius:3px}
@@ -589,6 +590,10 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[execResult,setExecResult]=useState(null);
   const[enableBracket,setEnableBracket]=useState(false);
   const[enableGTT,setEnableGTT]=useState(false);
+  const[enableAMO,setEnableAMO]=useState(false);       // AMO (After Market Order)
+  const[enableGTTEntry,setEnableGTTEntry]=useState(false); // GTT Buy (trigger-based entry)
+  const[gttTrigger,setGttTrigger]=useState(0);         // GTT trigger price
+  const[autoPlaceGTT,setAutoPlaceGTT]=useState(true);  // Auto-place GTT after AMO fills
   const[enableTrail,setEnableTrail]=useState(false);
   const[trailMethod,setTrailMethod]=useState('pct'); // 'pct' or 'atr'
   const[trailValue,setTrailValue]=useState(2);
@@ -693,7 +698,48 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         headers['X-DE-Session'] = localStorage.getItem('de_session') || '';
       }
       
-      if(enableGTT){
+      if(enableGTTEntry){
+        // GTT Single Buy (trigger-based entry)
+        headers['X-Kite-Action'] = broker === 'dhan' ? 'dhan-forever-place' : 'gtt-place';
+        const triggerPrice = gttTrigger || sl;
+        
+        if(broker === 'zerodha') {
+          const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
+            type: 'single',
+            condition: {
+              tradingsymbol: symbol,
+              exchange: 'NSE',
+              trigger_values: [triggerPrice],
+              last_price: stockData?.price || entry
+            },
+            orders: [
+              { transaction_type: 'BUY', quantity: positionSize||qty, price: entry, order_type: 'LIMIT', product: 'CNC' }
+            ]
+          })});
+          res=await r.json();
+          
+          // If GTT Buy placed successfully and trailing enabled, show info
+          if(res?.data || res?.trigger_id) {
+            addToast(`🎯 GTT Buy set! Will trigger when ${symbol} hits ₹${triggerPrice}`, 'success', 5000);
+          }
+        } else if(broker === 'dhan') {
+          const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
+            orderFlag: 'SINGLE',
+            transaction_type: 'BUY',
+            exchange: 'NSE_EQ',
+            security_id: stockData?.security_id || symbol,
+            quantity: positionSize||qty,
+            price: entry,
+            triggerPrice: triggerPrice,
+            product: 'CNC'
+          })});
+          res=await r.json();
+          
+          if(res?.orderId || res?.data) {
+            addToast(`🎯 Forever Buy set! Will trigger when ${symbol} hits ₹${triggerPrice}`, 'success', 5000);
+          }
+        }
+      } else if(enableGTT){
         // GTT Order (SL + Target as OCO)
         headers['X-Kite-Action'] = broker === 'dhan' ? 'dhan-forever-place' : 'gtt-place';
         
@@ -727,6 +773,80 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             product
           })});
           res=await r.json();
+        }
+      } else if(enableAMO){
+        // AMO Order (After Market Order)
+        headers['X-Kite-Action'] = broker === 'dhan' ? 'dhan-place' : 'place-order';
+        if(broker === 'definedge') headers['X-Kite-Action'] = 'de-place';
+        
+        const orderPayload = {
+          tradingsymbol: symbol,
+          exchange: broker === 'dhan' ? 'NSE_EQ' : 'NSE',
+          transaction_type: txnType,
+          order_type: orderType,
+          quantity: positionSize || qty,
+          product: 'CNC', // AMO is always delivery
+          price: orderType === 'LIMIT' ? entry : 0,
+          trigger_price: orderType.includes('SL') ? sl : 0,
+          security_id: stockData?.security_id || '',
+          variety: 'amo', // Zerodha AMO flag
+          amo: true       // Dhan AMO flag
+        };
+        
+        const r = await fetch(wUrl, { method: 'POST', headers, body: JSON.stringify(orderPayload) });
+        res = await r.json();
+        
+        // If AMO success and autoPlaceGTT is enabled, place GTT for exits
+        const amoSuccess = res?.data || res?.status === 'success' || res?.orderId;
+        if(amoSuccess && autoPlaceGTT) {
+          addToast('🌙 AMO placed! Now setting GTT for SL + Target...', 'info', 3000);
+          
+          // Place GTT for SL + Target
+          const gttHeaders = { ...headers };
+          gttHeaders['X-Kite-Action'] = broker === 'dhan' ? 'dhan-forever-place' : 'gtt-place';
+          
+          if(broker === 'zerodha') {
+            const gttRes = await fetch(wUrl, { method: 'POST', headers: gttHeaders, body: JSON.stringify({
+              type: 'two-leg',
+              condition: {
+                tradingsymbol: symbol,
+                exchange: 'NSE',
+                trigger_values: [sl, target],
+                last_price: entry
+              },
+              orders: [
+                { transaction_type: 'SELL', quantity: positionSize||qty, price: sl, order_type: 'LIMIT', product: 'CNC' },
+                { transaction_type: 'SELL', quantity: positionSize||qty, price: target, order_type: 'LIMIT', product: 'CNC' }
+              ]
+            })});
+            const gttData = await gttRes.json();
+            if(gttData?.data || gttData?.trigger_id) {
+              addToast('🎯 GTT set! SL @ ₹' + sl + ' | Target @ ₹' + target, 'success', 4000);
+              res._gtt = gttData;
+            } else {
+              addToast('⚠️ GTT failed: ' + (gttData?.message || 'Unknown error'), 'error', 5000);
+            }
+          } else if(broker === 'dhan') {
+            const gttRes = await fetch(wUrl, { method: 'POST', headers: gttHeaders, body: JSON.stringify({
+              orderFlag: 'OCO',
+              transaction_type: 'SELL',
+              exchange: 'NSE_EQ',
+              security_id: stockData?.security_id || symbol,
+              quantity: positionSize||qty,
+              price: target,
+              triggerPrice: target,
+              price1: sl,
+              triggerPrice1: sl,
+              product: 'CNC'
+            })});
+            const gttData = await gttRes.json();
+            if(gttData?.orderId || gttData?.data) {
+              addToast('🎯 Forever Order set! SL @ ₹' + sl + ' | Target @ ₹' + target, 'success', 4000);
+              res._gtt = gttData;
+            } else {
+              addToast('⚠️ Forever Order failed: ' + (gttData?.message || 'Unknown error'), 'error', 5000);
+            }
+          }
         }
       } else if(enableBracket){
         // Bracket Order (Entry + SL + Target)
@@ -898,118 +1018,227 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </button>
       </div>
 
-      {/* ═══ TRADE EXECUTION PANEL ═══ */}
-      {showExecution&&<div style={{background:'linear-gradient(135deg,rgba(0,255,136,0.03),rgba(136,68,255,0.03))',border:'1px solid var(--border-med)',borderRadius:10,padding:20,marginBottom:20}} className="fade-in">
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'var(--accent)'}}>⚡ TRADE EXECUTION</div>
-          <div style={{display:'flex',gap:4}}>
-            {['zerodha','dhan','definedge'].map(b=><button key={b} onClick={()=>setBroker(b)} style={{padding:'4px 10px',fontSize:9,fontWeight:700,fontFamily:'var(--font-mono)',borderRadius:4,border:'1px solid',cursor:'pointer',background:broker===b?b==='zerodha'?'rgba(0,200,0,0.2)':b==='dhan'?'rgba(100,150,255,0.2)':'rgba(200,100,255,0.2)':'transparent',borderColor:broker===b?b==='zerodha'?'#00c800':b==='dhan'?'#6496ff':'#c864ff':'var(--border-low)',color:broker===b?b==='zerodha'?'#00c800':b==='dhan'?'#6496ff':'#c864ff':'var(--text-muted)'}}>{b.charAt(0).toUpperCase()+b.slice(1)}</button>)}
+      {/* ═══ TRADE EXECUTION PANEL — REDESIGNED ═══ */}
+      {showExecution&&<div className="fade-in" style={{background:'linear-gradient(135deg,rgba(6,8,12,0.98),rgba(12,16,24,0.98))',border:'1px solid var(--border-med)',borderRadius:16,padding:0,marginBottom:20,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.05)'}}>
+        
+        {/* Header */}
+        <div style={{background:'linear-gradient(90deg,rgba(0,255,136,0.08),rgba(0,200,255,0.05),rgba(136,68,255,0.08))',padding:'16px 20px',borderBottom:'1px solid var(--border-dim)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:10,height:10,borderRadius:'50%',background:'linear-gradient(135deg,#00ff88,#00c8ff)',boxShadow:'0 0 20px rgba(0,255,136,0.5)',animation:'pulse 2s infinite'}}/>
+            <span style={{fontSize:14,fontWeight:900,fontFamily:'var(--font-mono)',background:'linear-gradient(90deg,#00ff88,#00c8ff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>TRADE EXECUTION</span>
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            {['zerodha','dhan','definedge'].map(b=>(
+              <button key={b} onClick={()=>setBroker(b)} style={{padding:'6px 14px',fontSize:10,fontWeight:700,fontFamily:'var(--font-mono)',borderRadius:6,border:'2px solid',cursor:'pointer',background:broker===b?b==='zerodha'?'linear-gradient(135deg,#00c800,#00ff00)':b==='dhan'?'linear-gradient(135deg,#4080ff,#60a0ff)':'linear-gradient(135deg,#a855f7,#c084fc)':'transparent',borderColor:broker===b?'transparent':b==='zerodha'?'#00c800':b==='dhan'?'#4080ff':'#a855f7',color:broker===b?'#000':b==='zerodha'?'#00c800':b==='dhan'?'#4080ff':'#a855f7',transition:'all 0.2s',transform:broker===b?'scale(1.05)':'scale(1)'}}>
+                {b==='zerodha'?'🟢':b==='dhan'?'🔵':'🟣'} {b.charAt(0).toUpperCase()+b.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
-          <div>
-            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>TRANSACTION</div>
-            <div style={{display:'flex',gap:4}}>
-              <button onClick={()=>setTxnType('BUY')} style={{flex:1,padding:'8px',fontSize:11,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:4,border:'none',cursor:'pointer',background:txnType==='BUY'?'var(--accent)':'var(--bg-tertiary)',color:txnType==='BUY'?'#000':'var(--accent)'}}>BUY</button>
-              <button onClick={()=>setTxnType('SELL')} style={{flex:1,padding:'8px',fontSize:11,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:4,border:'none',cursor:'pointer',background:txnType==='SELL'?'var(--red)':'var(--bg-tertiary)',color:txnType==='SELL'?'#000':'var(--red)'}}>SELL</button>
+        <div style={{padding:'20px'}}>
+          {/* ORDER TYPE SELECTOR — Visual Cards */}
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:10,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',marginBottom:10,letterSpacing:1}}>SELECT ORDER TYPE</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
+              {[
+                {id:'regular',icon:'⚡',label:'Regular',desc:'Simple buy/sell',color:'#00ff88',bg:'rgba(0,255,136,0.1)'},
+                {id:'bracket',icon:'🔲',label:'Bracket',desc:'Entry+SL+Target',color:'#00c8ff',bg:'rgba(0,200,255,0.1)'},
+                {id:'gtt-entry',icon:'🎯',label:'GTT Buy',desc:'Buy at trigger',color:'#ff88ff',bg:'rgba(255,136,255,0.1)'},
+                {id:'gtt-exit',icon:'🛡️',label:'GTT Exit',desc:'SL+Target OCO',color:'#ffaa00',bg:'rgba(255,170,0,0.1)'},
+                {id:'amo',icon:'🌙',label:'AMO',desc:'After market',color:'#00ddff',bg:'rgba(0,220,255,0.1)'}
+              ].map(t=>{
+                const isActive = (t.id==='regular'&&!enableBracket&&!enableGTT&&!enableAMO&&!enableGTTEntry)||(t.id==='bracket'&&enableBracket)||(t.id==='gtt-entry'&&enableGTTEntry)||(t.id==='gtt-exit'&&enableGTT)||(t.id==='amo'&&enableAMO);
+                return(
+                  <button key={t.id} onClick={()=>{
+                    setEnableBracket(t.id==='bracket');
+                    setEnableGTT(t.id==='gtt-exit');
+                    setEnableGTTEntry(t.id==='gtt-entry');
+                    setEnableAMO(t.id==='amo');
+                    if(t.id==='amo'||t.id==='gtt-entry'||t.id==='gtt-exit')setProduct('CNC');
+                    if(t.id==='bracket')setProduct('MIS');
+                  }} style={{padding:'14px 8px',borderRadius:10,border:`2px solid ${isActive?t.color:'var(--border-dim)'}`,background:isActive?t.bg:'var(--bg-tertiary)',cursor:'pointer',transition:'all 0.2s',transform:isActive?'scale(1.02)':'scale(1)',boxShadow:isActive?`0 0 20px ${t.color}33`:''}} >
+                    <div style={{fontSize:20,marginBottom:4}}>{t.icon}</div>
+                    <div style={{fontSize:11,fontWeight:800,fontFamily:'var(--font-mono)',color:isActive?t.color:'var(--text-primary)'}}>{t.label}</div>
+                    <div style={{fontSize:8,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginTop:2}}>{t.desc}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <div>
-            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>ORDER TYPE</div>
-            <div style={{display:'flex',gap:4}}>
-              {['MARKET','LIMIT','SL','SL-M'].map(t=><button key={t} onClick={()=>setOrderType(t)} style={{flex:1,padding:'6px 4px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',borderRadius:3,border:'1px solid',cursor:'pointer',background:orderType===t?'rgba(0,200,255,0.15)':'transparent',borderColor:orderType===t?'var(--accent2)':'var(--border-dim)',color:orderType===t?'var(--accent2)':'var(--text-muted)'}}>{t}</button>)}
+
+          {/* BUY/SELL Toggle */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
+            <button onClick={()=>setTxnType('BUY')} style={{padding:'14px',fontSize:14,fontWeight:900,fontFamily:'var(--font-mono)',borderRadius:8,border:'2px solid',cursor:'pointer',background:txnType==='BUY'?'linear-gradient(135deg,#00cc66,#00ff88)':'var(--bg-tertiary)',borderColor:txnType==='BUY'?'#00ff88':'var(--border-dim)',color:txnType==='BUY'?'#000':'#00ff88',transition:'all 0.2s',boxShadow:txnType==='BUY'?'0 0 30px rgba(0,255,136,0.3)':''}}>
+              ▲ BUY
+            </button>
+            <button onClick={()=>setTxnType('SELL')} style={{padding:'14px',fontSize:14,fontWeight:900,fontFamily:'var(--font-mono)',borderRadius:8,border:'2px solid',cursor:'pointer',background:txnType==='SELL'?'linear-gradient(135deg,#ee3344,#ff5566)':'var(--bg-tertiary)',borderColor:txnType==='SELL'?'#ff4455':'var(--border-dim)',color:txnType==='SELL'?'#fff':'#ff4455',transition:'all 0.2s',boxShadow:txnType==='SELL'?'0 0 30px rgba(255,68,85,0.3)':''}}>
+              ▼ SELL
+            </button>
+          </div>
+
+          {/* GTT ENTRY — Trigger Price Input */}
+          {enableGTTEntry&&<div style={{background:'linear-gradient(135deg,rgba(255,136,255,0.05),rgba(136,68,255,0.05))',border:'1px solid rgba(255,136,255,0.2)',borderRadius:12,padding:16,marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <span style={{fontSize:18}}>🎯</span>
+              <span style={{fontSize:12,fontWeight:800,fontFamily:'var(--font-mono)',color:'#ff88ff'}}>GTT BUY ORDER</span>
+              <span style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginLeft:'auto'}}>Valid for 1 year</span>
             </div>
-          </div>
-        </div>
-
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
-          <div>
-            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>PRODUCT</div>
-            <select value={product} onChange={e=>setProduct(e.target.value)} style={{width:'100%',padding:'8px'}}>
-              <option value="CNC">CNC (Delivery)</option>
-              <option value="MIS">MIS (Intraday)</option>
-            </select>
-          </div>
-          <div>
-            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>QUANTITY</div>
-            <input type="number" value={positionSize||qty} readOnly style={{width:'100%',padding:'8px',background:'var(--bg-card)'}}/>
-          </div>
-          <div>
-            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>PRICE ₹</div>
-            <input type="number" value={entry} onChange={e=>setEntry(+e.target.value)} style={{width:'100%',padding:'8px'}}/>
-          </div>
-        </div>
-
-        <div style={{display:'flex',gap:16,marginBottom:16,flexWrap:'wrap'}}>
-          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--accent2)',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
-            <input type="checkbox" checked={enableBracket} onChange={e=>{setEnableBracket(e.target.checked);if(e.target.checked)setEnableGTT(false)}} style={{accentColor:'var(--accent2)'}}/>
-            🔲 Bracket Order (Entry + SL + Target)
-          </label>
-          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'#ff88ff',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
-            <input type="checkbox" checked={enableGTT} onChange={e=>{setEnableGTT(e.target.checked);if(e.target.checked)setEnableBracket(false)}} style={{accentColor:'#ff88ff'}}/>
-            🎯 GTT (SL + Target OCO)
-          </label>
-        </div>
-
-        {enableBracket&&<div style={{display:'flex',gap:16,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
-          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--amber)',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
-            <input type="checkbox" checked={enableTrail} onChange={e=>setEnableTrail(e.target.checked)} style={{accentColor:'var(--amber)'}}/>
-            ⚡ Auto-Trail SL
-          </label>
-          {enableTrail&&<>
-            <div style={{display:'flex',alignItems:'center',gap:4,background:'var(--bg-tertiary)',padding:'4px 8px',borderRadius:4}}>
-              <button onClick={()=>setTrailMethod('pct')} style={{padding:'3px 8px',fontSize:9,fontWeight:700,borderRadius:3,border:'none',cursor:'pointer',background:trailMethod==='pct'?'var(--amber)':'transparent',color:trailMethod==='pct'?'#000':'var(--text-muted)'}}>%</button>
-              <button onClick={()=>setTrailMethod('atr')} style={{padding:'3px 8px',fontSize:9,fontWeight:700,borderRadius:3,border:'none',cursor:'pointer',background:trailMethod==='atr'?'var(--amber)':'transparent',color:trailMethod==='atr'?'#000':'var(--text-muted)'}}>ATR</button>
-            </div>
-            {trailMethod==='pct'?
-              <div style={{display:'flex',alignItems:'center',gap:4}}>
-                <span style={{fontSize:9,color:'var(--text-muted)'}}>Trail %:</span>
-                <input type="number" value={trailValue} onChange={e=>setTrailValue(+e.target.value)} style={{width:50,padding:'4px 6px',fontSize:10}}/>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+              <div>
+                <div style={{fontSize:9,color:'#ff88ff',fontFamily:'var(--font-mono)',marginBottom:4}}>TRIGGER WHEN ≤</div>
+                <input type="number" value={gttTrigger||sl} onChange={e=>setGttTrigger(+e.target.value)} placeholder="Trigger price" style={{width:'100%',padding:'10px',background:'var(--bg-primary)',border:'1px solid rgba(255,136,255,0.3)',borderRadius:6}}/>
               </div>
-            :
-              <div style={{display:'flex',alignItems:'center',gap:4}}>
-                <span style={{fontSize:9,color:'var(--text-muted)'}}>ATR×:</span>
-                {[0.5,1,1.5,2,3].map(m=><button key={m} onClick={()=>setTrailATR(m)} style={{padding:'3px 6px',fontSize:9,fontWeight:700,borderRadius:3,border:'1px solid',cursor:'pointer',background:trailATR===m?'var(--amber)':'transparent',borderColor:trailATR===m?'var(--amber)':'var(--border-dim)',color:trailATR===m?'#000':'var(--text-muted)'}}>{m}x</button>)}
-                <span style={{fontSize:9,color:'var(--amber)',marginLeft:4}}>= ₹{(atr*trailATR).toFixed(2)}</span>
+              <div>
+                <div style={{fontSize:9,color:'var(--accent)',fontFamily:'var(--font-mono)',marginBottom:4}}>BUY AT ₹</div>
+                <input type="number" value={entry} onChange={e=>setEntry(+e.target.value)} style={{width:'100%',padding:'10px',background:'var(--bg-primary)',border:'1px solid rgba(0,255,136,0.3)',borderRadius:6}}/>
               </div>
-            }
-          </>}
-        </div>}
-
-        {enableBracket&&<div style={{padding:12,background:'rgba(0,200,255,0.05)',border:'1px solid rgba(0,200,255,0.2)',borderRadius:6,marginBottom:16,fontSize:10,fontFamily:'var(--font-mono)'}}>
-          <div style={{color:'var(--accent2)',fontWeight:700,marginBottom:6}}>📋 BRACKET ORDER PREVIEW</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,color:'var(--text-secondary)'}}>
-            <div><span style={{color:'var(--text-muted)'}}>Entry:</span> ₹{entry}</div>
-            <div><span style={{color:'var(--accent)'}}>Target:</span> ₹{target} (+{((target-entry)/entry*100).toFixed(1)}%)</div>
-            <div><span style={{color:'var(--red)'}}>SL:</span> ₹{sl} (-{((entry-sl)/entry*100).toFixed(1)}%)</div>
-          </div>
-          {enableTrail&&<div style={{marginTop:6,color:'var(--amber)'}}>
-            <span style={{color:'var(--text-muted)'}}>Trail:</span> ₹{getTrailValue()} ({trailMethod==='atr'?`${trailATR}× ATR`:`${trailValue}%`})
+              <div>
+                <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>QUANTITY</div>
+                <input type="number" value={positionSize||qty} readOnly style={{width:'100%',padding:'10px',background:'var(--bg-card)'}}/>
+              </div>
+            </div>
+            <div style={{marginTop:12,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+              💡 <strong style={{color:'#ff88ff'}}>How it works:</strong> When {symbol} price falls to ₹{gttTrigger||sl}, your BUY order @ ₹{entry} will trigger automatically.
+            </div>
           </div>}
-        </div>}
 
-        {enableGTT&&<div style={{padding:12,background:'rgba(255,136,255,0.05)',border:'1px solid rgba(255,136,255,0.2)',borderRadius:6,marginBottom:16,fontSize:10,fontFamily:'var(--font-mono)'}}>
-          <div style={{color:'#ff88ff',fontWeight:700,marginBottom:6}}>🎯 GTT ORDER PREVIEW (OCO - One Cancels Other)</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,color:'var(--text-secondary)'}}>
-            <div><span style={{color:'var(--red)'}}>SL Leg:</span> Sell @ ₹{sl} (trigger: ₹{sl})</div>
-            <div><span style={{color:'var(--accent)'}}>Target Leg:</span> Sell @ ₹{target} (trigger: ₹{target})</div>
-          </div>
-          <div style={{marginTop:6,color:'var(--text-muted)',fontSize:9}}>
-            ⚠️ Place BUY order first, then this GTT will set exit triggers. Valid till triggered/cancelled.
-          </div>
-        </div>}
+          {/* Price & Quantity Inputs */}
+          {!enableGTTEntry&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
+            <div>
+              <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>PRODUCT</div>
+              <select value={product} onChange={e=>setProduct(e.target.value)} style={{width:'100%',padding:'10px',background:'var(--bg-tertiary)',borderRadius:6}}>
+                <option value="CNC">CNC (Delivery)</option>
+                <option value="MIS">MIS (Intraday)</option>
+              </select>
+            </div>
+            <div>
+              <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>ORDER TYPE</div>
+              <select value={orderType} onChange={e=>setOrderType(e.target.value)} style={{width:'100%',padding:'10px',background:'var(--bg-tertiary)',borderRadius:6}}>
+                <option value="LIMIT">LIMIT</option>
+                <option value="MARKET">MARKET</option>
+                <option value="SL">SL</option>
+                <option value="SL-M">SL-M</option>
+              </select>
+            </div>
+            <div>
+              <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>QUANTITY</div>
+              <input type="number" value={positionSize||qty} readOnly style={{width:'100%',padding:'10px',background:'var(--bg-card)',borderRadius:6,fontWeight:700,color:'var(--accent2)'}}/>
+            </div>
+            <div>
+              <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>PRICE ₹</div>
+              <input type="number" value={entry} onChange={e=>setEntry(+e.target.value)} style={{width:'100%',padding:'10px',borderRadius:6,fontWeight:700}}/>
+            </div>
+          </div>}
 
-        <button onClick={executeOrder} disabled={executing} style={{width:'100%',padding:'12px',fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:6,border:'none',cursor:'pointer',background:enableGTT?'linear-gradient(135deg,#cc66ff,#ff88ff)':txnType==='BUY'?'linear-gradient(135deg,#00cc66,#00ff88)':'linear-gradient(135deg,#ee3344,#ff5566)',color:enableGTT?'#000':'#000'}}>
-          {executing?'⏳ Executing...':enableGTT?'🎯 Place GTT (SL + Target)':enableBracket?`⚡ Place Bracket ${txnType}`:`⚡ Place ${txnType} Order`}
-        </button>
+          {/* TRAILING SL — Available for Bracket, GTT Entry */}
+          {(enableBracket||enableGTTEntry||enableAMO)&&<div style={{background:'linear-gradient(135deg,rgba(255,170,0,0.05),rgba(255,136,0,0.02))',border:'1px solid rgba(255,170,0,0.2)',borderRadius:12,padding:16,marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
+                <input type="checkbox" checked={enableTrail} onChange={e=>setEnableTrail(e.target.checked)} style={{width:18,height:18,accentColor:'var(--amber)'}}/>
+                <span style={{fontSize:12,fontWeight:800,fontFamily:'var(--font-mono)',color:'var(--amber)'}}>⚡ TRAILING STOP LOSS</span>
+              </label>
+              {enableTrail&&<div style={{marginLeft:'auto',display:'flex',gap:6,background:'var(--bg-tertiary)',padding:'4px',borderRadius:6}}>
+                <button onClick={()=>setTrailMethod('pct')} style={{padding:'6px 12px',fontSize:10,fontWeight:700,borderRadius:4,border:'none',cursor:'pointer',background:trailMethod==='pct'?'var(--amber)':'transparent',color:trailMethod==='pct'?'#000':'var(--text-muted)'}}>PERCENT</button>
+                <button onClick={()=>setTrailMethod('atr')} style={{padding:'6px 12px',fontSize:10,fontWeight:700,borderRadius:4,border:'none',cursor:'pointer',background:trailMethod==='atr'?'var(--amber)':'transparent',color:trailMethod==='atr'?'#000':'var(--text-muted)'}}>ATR</button>
+              </div>}
+            </div>
+            
+            {enableTrail&&<div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+              {trailMethod==='pct'?<>
+                <span style={{fontSize:10,color:'var(--text-muted)'}}>Trail by:</span>
+                {[1,2,3,5].map(p=><button key={p} onClick={()=>setTrailValue(p)} style={{padding:'8px 14px',fontSize:11,fontWeight:700,borderRadius:6,border:'2px solid',cursor:'pointer',background:trailValue===p?'var(--amber)':'transparent',borderColor:trailValue===p?'var(--amber)':'var(--border-dim)',color:trailValue===p?'#000':'var(--text-muted)'}}>{p}%</button>)}
+                <input type="number" value={trailValue} onChange={e=>setTrailValue(+e.target.value)} style={{width:60,padding:'8px',fontSize:11,textAlign:'center'}} placeholder="Custom"/>
+                <span style={{fontSize:11,color:'var(--amber)',fontWeight:700}}>= ₹{(entry*trailValue/100).toFixed(2)}</span>
+              </>:<>
+                <span style={{fontSize:10,color:'var(--text-muted)'}}>Trail by ATR ×</span>
+                {[0.5,1,1.5,2,3].map(m=><button key={m} onClick={()=>setTrailATR(m)} style={{padding:'8px 14px',fontSize:11,fontWeight:700,borderRadius:6,border:'2px solid',cursor:'pointer',background:trailATR===m?'var(--amber)':'transparent',borderColor:trailATR===m?'var(--amber)':'var(--border-dim)',color:trailATR===m?'#000':'var(--text-muted)'}}>{m}×</button>)}
+                <span style={{fontSize:11,color:'var(--amber)',fontWeight:700}}>= ₹{(atr*trailATR).toFixed(2)}</span>
+              </>}
+            </div>}
+            
+            {enableTrail&&<div style={{marginTop:12,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+              📈 SL will trail {trailMethod==='atr'?`${trailATR}× ATR (₹${(atr*trailATR).toFixed(2)})`:`${trailValue}% (₹${(entry*trailValue/100).toFixed(2)})`} behind the highest price reached.
+            </div>}
+          </div>}
 
-        {execResult&&<div style={{marginTop:12,padding:12,borderRadius:6,background:execResult.data||execResult.status==='success'?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',border:`1px solid ${execResult.data||execResult.status==='success'?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
-          <div style={{fontSize:12,fontWeight:700,color:execResult.data||execResult.status==='success'?'#00ff88':'#ff4455',marginBottom:4}}>
-            {execResult.data||execResult.status==='success'?'✓ Order Placed Successfully':'✗ Order Failed'}
+          {/* AMO Options */}
+          {enableAMO&&<div style={{background:'linear-gradient(135deg,rgba(0,220,255,0.05),rgba(0,150,255,0.02))',border:'1px solid rgba(0,220,255,0.2)',borderRadius:12,padding:16,marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <span style={{fontSize:18}}>🌙</span>
+              <span style={{fontSize:12,fontWeight:800,fontFamily:'var(--font-mono)',color:'#00ddff'}}>AFTER MARKET ORDER</span>
+              <span style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',padding:'3px 8px',background:'rgba(0,220,255,0.1)',borderRadius:4,marginLeft:'auto'}}>Executes 9:15 AM</span>
+            </div>
+            <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',padding:'12px',background:'rgba(0,0,0,0.2)',borderRadius:8}}>
+              <input type="checkbox" checked={autoPlaceGTT} onChange={e=>setAutoPlaceGTT(e.target.checked)} style={{width:18,height:18,accentColor:'#ff88ff'}}/>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:'#ff88ff'}}>🎯 Auto-place GTT after fill</div>
+                <div style={{fontSize:9,color:'var(--text-muted)'}}>Automatically set SL @ ₹{sl} & Target @ ₹{target} when AMO executes</div>
+              </div>
+            </label>
+          </div>}
+
+          {/* ORDER PREVIEW CARD */}
+          <div style={{background:'linear-gradient(135deg,rgba(0,0,0,0.4),rgba(0,0,0,0.2))',border:'1px solid var(--border-low)',borderRadius:12,padding:16,marginBottom:20}}>
+            <div style={{fontSize:10,fontWeight:700,fontFamily:'var(--font-mono)',color:'var(--text-muted)',marginBottom:12,letterSpacing:1}}>ORDER PREVIEW</div>
+            
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16,marginBottom:16}}>
+              <div style={{textAlign:'center',padding:'12px',background:'var(--bg-tertiary)',borderRadius:8,borderLeft:'3px solid var(--accent)'}}>
+                <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:4}}>ENTRY</div>
+                <div style={{fontSize:18,fontWeight:900,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>₹{entry}</div>
+              </div>
+              <div style={{textAlign:'center',padding:'12px',background:'var(--bg-tertiary)',borderRadius:8,borderLeft:'3px solid var(--red)'}}>
+                <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:4}}>STOP LOSS</div>
+                <div style={{fontSize:18,fontWeight:900,color:'var(--red)',fontFamily:'var(--font-mono)'}}>₹{sl}</div>
+                <div style={{fontSize:9,color:'var(--red)',marginTop:2}}>-{((entry-sl)/entry*100).toFixed(1)}%</div>
+              </div>
+              <div style={{textAlign:'center',padding:'12px',background:'var(--bg-tertiary)',borderRadius:8,borderLeft:'3px solid #00ff88'}}>
+                <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:4}}>TARGET</div>
+                <div style={{fontSize:18,fontWeight:900,color:'#00ff88',fontFamily:'var(--font-mono)'}}>₹{target}</div>
+                <div style={{fontSize:9,color:'#00ff88',marginTop:2}}>+{((target-entry)/entry*100).toFixed(1)}%</div>
+              </div>
+            </div>
+
+            {/* Visual Price Ladder */}
+            <div style={{position:'relative',height:8,background:'var(--bg-primary)',borderRadius:4,marginBottom:16}}>
+              <div style={{position:'absolute',left:0,top:0,height:'100%',width:`${((entry-sl)/(target-sl))*100}%`,background:'linear-gradient(90deg,#ff4455,#ffaa00)',borderRadius:'4px 0 0 4px'}}/>
+              <div style={{position:'absolute',left:`${((entry-sl)/(target-sl))*100}%`,top:0,height:'100%',right:0,background:'linear-gradient(90deg,#ffaa00,#00ff88)',borderRadius:'0 4px 4px 0'}}/>
+              <div style={{position:'absolute',left:`${((entry-sl)/(target-sl))*100}%`,top:'-4px',width:4,height:16,background:'#fff',borderRadius:2,transform:'translateX(-50%)'}}/>
+            </div>
+
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:10,fontFamily:'var(--font-mono)'}}>
+              <span><span style={{color:'var(--text-muted)'}}>Qty:</span> <strong style={{color:'var(--accent2)'}}>{positionSize||qty}</strong></span>
+              <span><span style={{color:'var(--text-muted)'}}>R:R:</span> <strong style={{color:parseFloat(rr)>=2?'#00ff88':'#ffaa00'}}>1:{rr}</strong></span>
+              <span><span style={{color:'var(--text-muted)'}}>Risk:</span> <strong style={{color:'var(--red)'}}>₹{maxLoss.toFixed(0)}</strong></span>
+              <span><span style={{color:'var(--text-muted)'}}>Reward:</span> <strong style={{color:'#00ff88'}}>₹{maxProfit.toFixed(0)}</strong></span>
+              {enableTrail&&<span><span style={{color:'var(--text-muted)'}}>Trail:</span> <strong style={{color:'var(--amber)'}}>₹{getTrailValue()}</strong></span>}
+            </div>
           </div>
-          <pre style={{fontSize:8,color:'var(--text-muted)',fontFamily:'var(--font-mono)',margin:0,whiteSpace:'pre-wrap'}}>{JSON.stringify(execResult,null,2)}</pre>
-        </div>}
+
+          {/* EXECUTE BUTTON */}
+          <button onClick={executeOrder} disabled={executing} style={{width:'100%',padding:'16px',fontSize:15,fontWeight:900,fontFamily:'var(--font-mono)',borderRadius:10,border:'none',cursor:executing?'not-allowed':'pointer',background:executing?'var(--bg-tertiary)':enableAMO?'linear-gradient(135deg,#0088cc,#00ddff)':enableGTTEntry?'linear-gradient(135deg,#cc66ff,#ff88ff)':enableGTT?'linear-gradient(135deg,#ff8800,#ffaa00)':enableBracket?'linear-gradient(135deg,#0088ff,#00c8ff)':txnType==='BUY'?'linear-gradient(135deg,#00aa55,#00ff88)':'linear-gradient(135deg,#cc2233,#ff4455)',color:executing?'var(--text-muted)':'#000',transition:'all 0.2s',boxShadow:executing?'':'0 4px 20px rgba(0,0,0,0.3)',transform:executing?'':'translateY(0)'}}>
+            {executing?<span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              <span style={{width:16,height:16,border:'2px solid var(--text-muted)',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}}/>
+              EXECUTING...
+            </span>:
+            enableAMO?(autoPlaceGTT?`🌙 PLACE AMO ${txnType} + AUTO GTT`:`🌙 PLACE AMO ${txnType} ORDER`):
+            enableGTTEntry?`🎯 PLACE GTT BUY @ ₹${gttTrigger||sl}`:
+            enableGTT?`🛡️ SET GTT EXIT (SL + TARGET)`:
+            enableBracket?`🔲 PLACE BRACKET ${txnType}`:
+            `⚡ PLACE ${txnType} ORDER`}
+          </button>
+
+          {/* Result Display */}
+          {execResult&&<div style={{marginTop:16,padding:16,borderRadius:10,background:(execResult.data||execResult.status==='success'||execResult.orderId)?'linear-gradient(135deg,rgba(0,255,136,0.1),rgba(0,200,100,0.05))':'linear-gradient(135deg,rgba(255,68,85,0.1),rgba(200,50,60,0.05))',border:`1px solid ${(execResult.data||execResult.status==='success'||execResult.orderId)?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <span style={{fontSize:20}}>{(execResult.data||execResult.status==='success'||execResult.orderId)?'✓':'✗'}</span>
+              <span style={{fontSize:13,fontWeight:800,color:(execResult.data||execResult.status==='success'||execResult.orderId)?'#00ff88':'#ff4455'}}>
+                {(execResult.data||execResult.status==='success'||execResult.orderId)?'ORDER PLACED SUCCESSFULLY':'ORDER FAILED'}
+              </span>
+            </div>
+            <pre style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',margin:0,whiteSpace:'pre-wrap',maxHeight:100,overflow:'auto'}}>{JSON.stringify(execResult,null,2)}</pre>
+          </div>}
+        </div>
       </div>}
 
       {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
