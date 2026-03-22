@@ -203,6 +203,28 @@ const TEChartScanner=({symbol,onOrder})=>{
     DrawingStore.syncFromCloud(symbol).then(m=>{if(m)setDrawings(m)});
   },[symbol]);
 
+  // Keyboard shortcuts
+  useEffect(()=>{
+    const h=e=>{
+      if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+      const k=e.key.toLowerCase();
+      if(k==='escape'){setDrawMode(null);setDrawStart(null);setDrawPreview(null);setCtx(null);setDragLine(null)}
+      else if(k==='h')setDrawMode(m=>m==='hline'?null:'hline');
+      else if(k==='t')setDrawMode(m=>m==='trendline'?null:'trendline');
+      else if(k==='r')setDrawMode(m=>m==='ray'?null:'ray');
+      else if(k==='f')setDrawMode(m=>m==='fib'?null:'fib');
+      else if(k==='m')setDrawMode(m=>m==='measure'?null:'measure');
+      else if(k==='s')setMagnetMode(v=>!v);
+      else if(k==='v')setShowDrawings(v=>!v);
+      else if(k==='p')setShowPos(v=>!v);
+      else if((k==='delete'||k==='backspace')&&dragLine?.type==='drawing'){saveUndo();setDrawings(prev=>prev.filter(d=>d.id!==dragLine.id));setDragLine(null)}
+      else if(e.ctrlKey&&k==='z'){e.preventDefault();undo()}
+      else if(e.ctrlKey&&k==='y'){e.preventDefault();redo()}
+    };
+    window.addEventListener("keydown",h);
+    return()=>window.removeEventListener("keydown",h);
+  },[dragLine,saveUndo,undo,redo]);
+
   const priceData=useMemo(()=>prices?.length?prices:[],[prices]);
   const closes=useMemo(()=>priceData.map(d=>d.c),[priceData]);
   const ema20=useMemo(()=>closes.length>=20?calcEMA(closes,20):[],[closes]);
