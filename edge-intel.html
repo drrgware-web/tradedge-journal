@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE INTEL | TradEdge</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{--bg-primary:#06080c;--bg-secondary:#0c1018;--bg-tertiary:#121820;--bg-card:#0f1520;--bg-hover:#141d2a;--border-dim:rgba(0,255,136,0.06);--border-low:rgba(0,255,136,0.1);--border-med:rgba(0,255,136,0.2);--border-hi:rgba(0,255,136,0.4);--accent:#00ff88;--accent-dim:rgba(0,255,136,0.15);--accent2:#00c8ff;--accent3:#8844ff;--red:#ff4455;--amber:#ffaa00;--text-primary:#e8e8e8;--text-secondary:#8899aa;--text-muted:#556677;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-display);min-height:100vh;-webkit-font-smoothing:antialiased}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.008) 2px,rgba(0,255,136,0.008) 4px);pointer-events:none;z-index:9999}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.015) 1px,transparent 1px);background-size:50px 50px;pointer-events:none}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.2);border-radius:3px}
+#root{position:relative;z-index:1}
+.nav{display:flex;align-items:center;gap:4px;padding:8px 20px;background:rgba(12,16,24,0.95);border-bottom:1px solid var(--border-dim);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-decoration:none;border-radius:4px;transition:all 0.15s;font-family:var(--font-mono)}.nav-link:hover{color:var(--text-primary);background:var(--bg-hover)}.nav-link.active{color:var(--accent);background:var(--accent-dim)}
+.card{background:var(--bg-card);border:1px solid var(--border-low);border-radius:10px;overflow:hidden}
+.btn{padding:8px 16px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;border:1px solid var(--border-med);background:var(--bg-tertiary);color:var(--text-primary)}.btn:hover{border-color:var(--accent);color:var(--accent)}.btn:disabled{opacity:0.5;cursor:not-allowed}.btn-accent{background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,200,255,0.1));border-color:var(--accent);color:var(--accent)}.btn-accent:hover{background:linear-gradient(135deg,rgba(0,255,136,0.25),rgba(0,200,255,0.15))}
+.tabs{display:flex;gap:2px;background:var(--bg-secondary);padding:4px;border-radius:8px;border:1px solid var(--border-dim)}.tab{padding:10px 20px;font-size:12px;font-weight:700;font-family:var(--font-mono);color:var(--text-muted);border-radius:6px;cursor:pointer;transition:all 0.15s;border:none;background:transparent;display:flex;align-items:center;gap:6px}.tab:hover{color:var(--text-primary);background:rgba(255,255,255,0.02)}.tab.active{color:#000;background:linear-gradient(135deg,var(--accent),var(--accent2))}
+input,textarea,select{background:var(--bg-tertiary);border:1px solid var(--border-low);border-radius:6px;padding:10px 14px;color:var(--accent);font-family:var(--font-mono);font-size:12px;outline:none;transition:all 0.15s}input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,255,136,0.1)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--font-mono)}
+.badge-bull{background:rgba(0,255,136,0.1);color:#00ff88;border:1px solid rgba(0,255,136,0.3)}
+.badge-bear{background:rgba(255,68,85,0.1);color:#ff4455;border:1px solid rgba(255,68,85,0.3)}
+.badge-neutral{background:rgba(136,153,170,0.1);color:#8899aa;border:1px solid rgba(136,153,170,0.2)}
+.thesis-card{background:var(--bg-tertiary);border-radius:8px;padding:16px;border:1px solid var(--border-low)}
+.thesis-bull{border-left:3px solid #00ff88}.thesis-bear{border-left:3px solid #ff4455}
+.metric-box{background:var(--bg-tertiary);border:1px solid var(--border-dim);border-radius:6px;padding:12px;text-align:center}
+.metric-label{font-size:9px;color:var(--text-muted);font-family:var(--font-mono);letter-spacing:1px;margin-bottom:4px}
+.metric-value{font-size:18px;font-weight:800;font-family:var(--font-mono)}
+.section-title{font-size:11px;font-weight:700;font-family:var(--font-mono);color:var(--text-muted);letter-spacing:1.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ai-response{background:linear-gradient(135deg,rgba(0,255,136,0.02),rgba(136,68,255,0.02));border:1px solid var(--border-low);border-radius:8px;padding:20px;line-height:1.7;font-size:13px}
+.ai-response h3{color:var(--accent);font-size:14px;margin:16px 0 8px;font-family:var(--font-mono)}
+.ai-response h3:first-child{margin-top:0}
+.ai-response ul{margin:8px 0;padding-left:20px}
+.ai-response li{margin:4px 0;color:var(--text-secondary)}
+.ai-response strong{color:var(--text-primary)}
+.ai-response .bull{color:#00ff88}.ai-response .bear{color:#ff4455}.ai-response .neutral{color:#ffaa00}
+.loading-pulse{animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.4s ease-out}
+.glow-border{box-shadow:0 0 20px rgba(0,255,136,0.1),inset 0 0 20px rgba(0,255,136,0.02)}
+.trade-setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.rr-bar{height:24px;border-radius:4px;display:flex;overflow:hidden;background:var(--bg-secondary)}
+.rr-risk{background:linear-gradient(90deg,#ff4455,#ff6655);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.rr-reward{background:linear-gradient(90deg,#00cc66,#00ff88);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#000}
+.earnings-card{background:var(--bg-tertiary);border:1px solid var(--border-dim);border-radius:8px;padding:14px;margin-bottom:8px}
+.earnings-card.beat{border-left:3px solid #00ff88}.earnings-card.miss{border-left:3px solid #ff4455}.earnings-card.inline{border-left:3px solid #ffaa00}
+.reaction-bar{height:6px;border-radius:3px;background:var(--bg-secondary);overflow:hidden;margin-top:6px}
+.reaction-fill{height:100%;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useMemo,useCallback,useRef,Fragment}=React;
+
+// ═══════════════════════════════════════════════════════════════
+// EDGE INTEL — 3-in-1 Professional Stock Analysis
+// ═══════════════════════════════════════════════════════════════
+
+const GROQ_API_KEY=localStorage.getItem('groq_api_key')||'';
+const GROQ_MODEL='llama-3.3-70b-versatile';
+
+const callGroqAI=async(prompt,systemPrompt="You are an expert equity research analyst.")=>{
+  if(!GROQ_API_KEY)throw new Error('Set groq_api_key in localStorage');
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${GROQ_API_KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify({model:GROQ_MODEL,messages:[{role:'system',content:systemPrompt},{role:'user',content:prompt}],temperature:0.7,max_tokens:2000})
+  });
+  if(!res.ok)throw new Error('API Error: '+res.status);
+  const data=await res.json();
+  return data.choices?.[0]?.message?.content||'No response';
+};
+
+const formatAIResponse=(text)=>{
+  return text
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^### (.*$)/gm,'<h3>$1</h3>')
+    .replace(/^## (.*$)/gm,'<h3>$1</h3>')
+    .replace(/^# (.*$)/gm,'<h3>$1</h3>')
+    .replace(/\n- /g,'\n• ')
+    .replace(/\n\d+\. /g,'\n• ')
+    .replace(/🟢|✅|📈|BULLISH/gi,'<span class="bull">$&</span>')
+    .replace(/🔴|❌|📉|BEARISH/gi,'<span class="bear">$&</span>')
+    .replace(/🟡|⚠️|NEUTRAL/gi,'<span class="neutral">$&</span>')
+    .replace(/\n/g,'<br/>');
+};
+
+// ═══ INSTITUTIONAL BREAKDOWN ═══
+const InstitutionalBreakdown=({symbol,stockData})=>{
+  const[analysis,setAnalysis]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState(null);
+
+  const runAnalysis=async()=>{
+    setLoading(true);setError(null);
+    try{
+      const prompt=`Analyze ${symbol} (${stockData?.name||'Indian Stock'}) for institutional investors.
+
+Stock Data:
+- Current Price: ₹${stockData?.price||'N/A'}
+- Market Cap: ₹${stockData?.fundamentals?.market_cap_cr||'N/A'} Cr
+- P/E Ratio: ${stockData?.fundamentals?.pe_ratio||'N/A'}
+- ROE: ${stockData?.fundamentals?.roe||'N/A'}%
+- Debt/Equity: ${stockData?.fundamentals?.debt_to_equity||'N/A'}
+- RSI: ${stockData?.rsi||'N/A'}
+- Fund Holdings: ${stockData?.fund_holdings?.no_of_funds||'N/A'} funds
+- Fund Change: ${stockData?.fund_holdings?.fund_shares_change_pct||'N/A'}%
+
+Provide a comprehensive institutional analysis with:
+
+### INVESTMENT THESIS
+Brief 2-3 sentence summary of the investment case.
+
+### BULL CASE 🟢
+Top 3-4 reasons why this stock could outperform:
+- Key growth drivers
+- Competitive advantages
+- Catalyst triggers
+
+### BEAR CASE 🔴
+Top 3-4 risks and concerns:
+- Valuation concerns
+- Industry headwinds
+- Execution risks
+
+### INSTITUTIONAL POSITIONING
+- Current fund activity (accumulation/distribution)
+- Smart money sentiment
+- Insider activity signals
+
+### TECHNICAL STRUCTURE
+- Key support/resistance levels
+- Trend assessment
+- Volume analysis
+
+### VERDICT
+Final rating: STRONG BUY / BUY / HOLD / SELL / STRONG SELL
+Target price range and timeframe.`;
+
+      const response=await callGroqAI(prompt);
+      setAnalysis(response);
+    }catch(e){setError(e.message)}
+    setLoading(false);
+  };
+
+  return(
+    <div className="fade-in">
+      <div className="section-title">🏛️ INSTITUTIONAL STOCK BREAKDOWN</div>
+      
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:10,marginBottom:20}}>
+        {[
+          {label:'PRICE',value:`₹${stockData?.price?.toLocaleString()||'—'}`,color:stockData?.change_pct>=0?'#00ff88':'#ff4455'},
+          {label:'CHANGE',value:`${stockData?.change_pct>=0?'+':''}${stockData?.change_pct?.toFixed(2)||'—'}%`,color:stockData?.change_pct>=0?'#00ff88':'#ff4455'},
+          {label:'P/E',value:stockData?.fundamentals?.pe_ratio?.toFixed(1)||'—',color:'#00c8ff'},
+          {label:'RSI',value:stockData?.rsi?.toFixed(1)||'—',color:stockData?.rsi>70?'#ff4455':stockData?.rsi<30?'#00ff88':'#ffaa00'},
+          {label:'FUNDS',value:stockData?.fund_holdings?.no_of_funds||'—',color:'#8844ff'},
+          {label:'FUND CHG',value:`${stockData?.fund_holdings?.fund_shares_change_pct>0?'+':''}${stockData?.fund_holdings?.fund_shares_change_pct?.toFixed(1)||'—'}%`,color:stockData?.fund_holdings?.fund_shares_change_pct>0?'#00ff88':'#ff4455'},
+        ].map((m,i)=><div key={i} className="metric-box"><div className="metric-label">{m.label}</div><div className="metric-value" style={{color:m.color}}>{m.value}</div></div>)}
+      </div>
+
+      {!analysis&&!loading&&<button className="btn btn-accent" style={{width:'100%',padding:'14px'}} onClick={runAnalysis}>🔍 Generate Institutional Analysis</button>}
+      
+      {loading&&<div style={{textAlign:'center',padding:40}}><div className="loading-pulse" style={{fontSize:14,color:'var(--accent)'}}>⚡ Analyzing {symbol}...</div><div style={{fontSize:11,color:'var(--text-muted)',marginTop:8}}>Running institutional-grade analysis</div></div>}
+      
+      {error&&<div style={{padding:16,background:'rgba(255,68,85,0.1)',border:'1px solid rgba(255,68,85,0.3)',borderRadius:8,color:'#ff4455',fontSize:12}}>{error}</div>}
+      
+      {analysis&&<div className="ai-response glow-border" dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
+    </div>
+  );
+};
+
+// ═══ SMART TRADE SETUP ═══
+const SmartTradeSetup=({symbol,stockData})=>{
+  const[entry,setEntry]=useState(stockData?.price||0);
+  const[target,setTarget]=useState(0);
+  const[sl,setSL]=useState(0);
+  const[qty,setQty]=useState(1);
+  const[capital,setCapital]=useState(100000);
+  const[riskPct,setRiskPct]=useState(1);
+  const[analysis,setAnalysis]=useState(null);
+  const[loading,setLoading]=useState(false);
+
+  useEffect(()=>{
+    if(stockData?.price){
+      setEntry(stockData.price);
+      setTarget(+(stockData.price*1.08).toFixed(2));
+      setSL(+(stockData.price*0.97).toFixed(2));
+    }
+  },[stockData?.price]);
+
+  const risk=entry>0&&sl>0?Math.abs(entry-sl)*qty:0;
+  const reward=entry>0&&target>0?Math.abs(target-entry)*qty:0;
+  const rr=risk>0?(reward/risk).toFixed(2):'—';
+  const positionSize=riskPct>0&&risk>0?Math.floor((capital*riskPct/100)/Math.abs(entry-sl)):0;
+  const maxLoss=positionSize*Math.abs(entry-sl);
+  const maxProfit=positionSize*Math.abs(target-entry);
+  const winRate=rr>=2?'40-45%':rr>=1.5?'50-55%':rr>=1?'60%+':'70%+';
+
+  const generateSetup=async()=>{
+    setLoading(true);
+    try{
+      const prompt=`Create a professional trade setup for ${symbol}:
+
+Current Price: ₹${stockData?.price}
+Entry: ₹${entry}
+Target: ₹${target} (${((target-entry)/entry*100).toFixed(1)}% upside)
+Stop Loss: ₹${sl} (${((entry-sl)/entry*100).toFixed(1)}% risk)
+Risk:Reward = 1:${rr}
+Position Size: ${positionSize} shares
+Max Risk: ₹${maxLoss.toFixed(0)}
+Max Profit: ₹${maxProfit.toFixed(0)}
+
+Technical Context:
+- RSI: ${stockData?.rsi}
+- MACD: ${stockData?.macd?.crossover}
+- EMA Trend: ${stockData?.ema?.cross_9_21}
+- Volume: ${stockData?.volume?.ratio}x avg
+
+Provide:
+### SETUP RATIONALE
+Why this entry makes sense technically.
+
+### KEY LEVELS
+- Primary target and stretch target
+- Stop loss rationale
+- Trailing stop strategy
+
+### ENTRY TRIGGERS
+Specific conditions to enter (breakout, pullback, confirmation).
+
+### EXIT RULES
+When to take profits, when to cut losses, when to trail.
+
+### POSITION MANAGEMENT
+- Scale-in strategy
+- Partial profit booking
+- Risk management rules
+
+### TRADE GRADE
+Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
+
+      const response=await callGroqAI(prompt);
+      setAnalysis(response);
+    }catch(e){alert(e.message)}
+    setLoading(false);
+  };
+
+  return(
+    <div className="fade-in">
+      <div className="section-title">📐 SMART TRADE SETUP BUILDER</div>
+      
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+        <div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>ENTRY PRICE</label>
+            <input type="number" value={entry} onChange={e=>setEntry(+e.target.value)} style={{width:'100%'}}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:10,color:'var(--accent)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>TARGET ₹</label>
+            <input type="number" value={target} onChange={e=>setTarget(+e.target.value)} style={{width:'100%',borderColor:'rgba(0,255,136,0.3)'}}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:10,color:'var(--red)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>STOP LOSS ₹</label>
+            <input type="number" value={sl} onChange={e=>setSL(+e.target.value)} style={{width:'100%',borderColor:'rgba(255,68,85,0.3)'}}/>
+          </div>
+        </div>
+        <div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>CAPITAL ₹</label>
+            <input type="number" value={capital} onChange={e=>setCapital(+e.target.value)} style={{width:'100%'}}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>RISK PER TRADE %</label>
+            <input type="number" value={riskPct} onChange={e=>setRiskPct(+e.target.value)} step={0.5} style={{width:'100%'}}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>QUANTITY</label>
+            <input type="number" value={qty} onChange={e=>setQty(+e.target.value)} style={{width:'100%'}}/>
+          </div>
+        </div>
+      </div>
+
+      <div className="rr-bar" style={{marginBottom:16}}>
+        <div className="rr-risk" style={{width:`${100/(1+parseFloat(rr)||1)}%`}}>RISK ₹{risk.toFixed(0)}</div>
+        <div className="rr-reward" style={{flex:1}}>REWARD ₹{reward.toFixed(0)}</div>
+      </div>
+
+      <div className="trade-setup-grid" style={{marginBottom:20}}>
+        <div className="metric-box"><div className="metric-label">R:R RATIO</div><div className="metric-value" style={{color:parseFloat(rr)>=2?'#00ff88':parseFloat(rr)>=1.5?'#ffaa00':'#ff4455'}}>1:{rr}</div></div>
+        <div className="metric-box"><div className="metric-label">POSITION SIZE</div><div className="metric-value" style={{color:'#00c8ff'}}>{positionSize}</div></div>
+        <div className="metric-box"><div className="metric-label">MAX LOSS</div><div className="metric-value" style={{color:'#ff4455'}}>₹{maxLoss.toFixed(0)}</div></div>
+        <div className="metric-box"><div className="metric-label">MAX PROFIT</div><div className="metric-value" style={{color:'#00ff88'}}>₹{maxProfit.toFixed(0)}</div></div>
+        <div className="metric-box"><div className="metric-label">POSITION VALUE</div><div className="metric-value" style={{color:'#8844ff'}}>₹{(positionSize*entry).toFixed(0)}</div></div>
+        <div className="metric-box"><div className="metric-label">REQ WIN RATE</div><div className="metric-value" style={{color:'#ffaa00'}}>{winRate}</div></div>
+      </div>
+
+      <button className="btn btn-accent" style={{width:'100%',padding:'14px'}} onClick={generateSetup} disabled={loading}>
+        {loading?'⚡ Generating...':'🎯 Generate AI Trade Plan'}
+      </button>
+
+      {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
+    </div>
+  );
+};
+
+// ═══ EARNINGS REACTION ANALYZER ═══
+const EarningsAnalyzer=({symbol,stockData})=>{
+  const[quarters,setQuarters]=useState(4);
+  const[analysis,setAnalysis]=useState(null);
+  const[loading,setLoading]=useState(false);
+
+  const runAnalysis=async()=>{
+    setLoading(true);
+    try{
+      const prompt=`Analyze the last ${quarters} earnings reports for ${symbol} (${stockData?.name||'Indian Stock'}).
+
+Current Stock Context:
+- Price: ₹${stockData?.price}
+- P/E: ${stockData?.fundamentals?.pe_ratio}
+- Market Cap: ₹${stockData?.fundamentals?.market_cap_cr} Cr
+
+Provide a comprehensive earnings reaction analysis:
+
+### EARNINGS HISTORY PATTERN
+For each of the last ${quarters} quarters, analyze:
+- Beat/Miss/Inline status
+- Revenue growth trend
+- EPS surprise percentage
+- Stock reaction (1-day, 1-week post earnings)
+- Guidance changes
+
+### MARKET REACTION PATTERNS
+- Average move on earnings day
+- Tendency to gap up/down
+- Post-earnings drift direction
+- Options implied move vs actual
+
+### KEY METRICS TO WATCH
+- Revenue growth trajectory
+- Margin trends (gross, operating, net)
+- Guidance patterns (raise/maintain/lower)
+- Management commentary themes
+
+### SENTIMENT ANALYSIS
+- Analyst estimate revisions
+- Institutional positioning pre-earnings
+- Short interest changes
+- Options flow signals
+
+### TRADING STRATEGY
+- Pre-earnings positioning (if any)
+- Earnings day strategy
+- Post-earnings playbook
+- Key price levels to watch
+
+### NEXT EARNINGS OUTLOOK
+- Expected report date
+- Consensus estimates
+- Likely surprises
+- Recommended approach
+
+Format with 🟢 for beats, 🔴 for misses, 🟡 for inline.`;
+
+      const response=await callGroqAI(prompt);
+      setAnalysis(response);
+    }catch(e){alert(e.message)}
+    setLoading(false);
+  };
+
+  const mockEarnings=[
+    {q:'Q3 FY24',eps:12.5,est:11.2,rev:2450,revEst:2380,reaction:3.2,status:'beat'},
+    {q:'Q2 FY24',eps:10.8,est:10.5,rev:2280,revEst:2250,reaction:-1.5,status:'beat'},
+    {q:'Q1 FY24',eps:9.2,est:9.8,rev:2150,revEst:2200,reaction:-4.2,status:'miss'},
+    {q:'Q4 FY23',eps:11.0,est:11.0,rev:2320,revEst:2310,reaction:0.8,status:'inline'},
+  ];
+
+  return(
+    <div className="fade-in">
+      <div className="section-title">📊 EARNINGS REACTION ANALYZER</div>
+      
+      <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'center'}}>
+        <label style={{fontSize:11,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>ANALYZE LAST</label>
+        <select value={quarters} onChange={e=>setQuarters(+e.target.value)} style={{width:80}}>
+          <option value={4}>4 Qtrs</option>
+          <option value={8}>8 Qtrs</option>
+          <option value={12}>12 Qtrs</option>
+        </select>
+        <span style={{fontSize:11,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>QUARTERS</span>
+      </div>
+
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:8}}>RECENT EARNINGS (SAMPLE DATA)</div>
+        {mockEarnings.map((e,i)=>(
+          <div key={i} className={`earnings-card ${e.status}`}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontWeight:700,fontSize:13}}>{e.q}</span>
+                <span className={`badge badge-${e.status==='beat'?'bull':e.status==='miss'?'bear':'neutral'}`}>
+                  {e.status==='beat'?'🟢 BEAT':e.status==='miss'?'🔴 MISS':'🟡 INLINE'}
+                </span>
+              </div>
+              <span style={{fontFamily:'var(--font-mono)',fontSize:13,fontWeight:700,color:e.reaction>=0?'#00ff88':'#ff4455'}}>
+                {e.reaction>=0?'+':''}{e.reaction}%
+              </span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,fontSize:11}}>
+              <div>
+                <span style={{color:'var(--text-muted)'}}>EPS: </span>
+                <span style={{fontFamily:'var(--font-mono)',fontWeight:600}}>₹{e.eps}</span>
+                <span style={{color:'var(--text-muted)'}}> vs Est ₹{e.est}</span>
+                <span style={{color:e.eps>e.est?'#00ff88':'#ff4455',marginLeft:6}}>({((e.eps-e.est)/e.est*100).toFixed(1)}%)</span>
+              </div>
+              <div>
+                <span style={{color:'var(--text-muted)'}}>Rev: </span>
+                <span style={{fontFamily:'var(--font-mono)',fontWeight:600}}>₹{e.rev}Cr</span>
+                <span style={{color:'var(--text-muted)'}}> vs Est ₹{e.revEst}Cr</span>
+              </div>
+            </div>
+            <div className="reaction-bar">
+              <div className="reaction-fill" style={{
+                width:`${Math.min(Math.abs(e.reaction)*10,100)}%`,
+                background:e.reaction>=0?'linear-gradient(90deg,#00cc66,#00ff88)':'linear-gradient(90deg,#ff4455,#ff6655)',
+                marginLeft:e.reaction<0?'auto':0
+              }}/>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button className="btn btn-accent" style={{width:'100%',padding:'14px'}} onClick={runAnalysis} disabled={loading}>
+        {loading?'⚡ Analyzing Patterns...':'📈 Generate Earnings Analysis'}
+      </button>
+
+      {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
+    </div>
+  );
+};
+
+// ═══ MAIN APP ═══
+const EdgeIntel=()=>{
+  const[symbol,setSymbol]=useState('');
+  const[inputSymbol,setInputSymbol]=useState('');
+  const[stockData,setStockData]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[activeTab,setActiveTab]=useState('institutional');
+  const[hasApiKey,setHasApiKey]=useState(!!GROQ_API_KEY);
+
+  const loadStock=async(sym)=>{
+    if(!sym)return;
+    setLoading(true);
+    try{
+      const res=await fetch(`./data/stock_details/${sym.toUpperCase()}.json?t=${Date.now()}`);
+      if(res.ok){
+        const data=await res.json();
+        setStockData(data);
+        setSymbol(sym.toUpperCase());
+      }else{
+        // Try scanner results
+        const scanRes=await fetch(`./data/scanner_results.json?t=${Date.now()}`);
+        if(scanRes.ok){
+          const scanData=await scanRes.json();
+          const found=scanData.stocks?.find(s=>s.symbol.toUpperCase()===sym.toUpperCase());
+          if(found){setStockData(found);setSymbol(sym.toUpperCase())}
+          else{alert('Stock not found');setStockData(null)}
+        }
+      }
+    }catch(e){console.error(e);setStockData(null)}
+    setLoading(false);
+  };
+
+  const handleSubmit=e=>{e.preventDefault();loadStock(inputSymbol)};
+
+  return(
+    <div>
+      <nav className="nav">
+        <a href="index.html" style={{display:'flex',alignItems:'center'}}>
+          <img src="assets/logo.jpeg" alt="TE" style={{height:80,marginRight:16}} onError={e=>e.target.style.display='none'}/>
+        </a>
+        <a href="scanner.html" className="nav-link">Scanner</a>
+        <a href="watchlist.html" className="nav-link">Watchlist</a>
+        <a href="matrix.html" className="nav-link">Matrix</a>
+        <a href="edge-intel.html" className="nav-link active">Edge Intel</a>
+      </nav>
+
+      <div style={{maxWidth:1200,margin:'0 auto',padding:'24px 20px'}}>
+        <div style={{textAlign:'center',marginBottom:32}}>
+          <h1 style={{fontSize:36,fontWeight:900,background:'linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
+            ◈ EDGE INTEL
+          </h1>
+          <p style={{fontSize:13,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+            INSTITUTIONAL BREAKDOWN • SMART TRADE SETUP • EARNINGS ANALYZER
+          </p>
+        </div>
+
+        {!hasApiKey&&<div style={{padding:16,background:'rgba(255,170,0,0.1)',border:'1px solid rgba(255,170,0,0.3)',borderRadius:8,marginBottom:20,textAlign:'center'}}>
+          <div style={{fontSize:12,color:'#ffaa00',marginBottom:8}}>⚠️ GROQ API Key Required</div>
+          <div style={{fontSize:11,color:'var(--text-muted)'}}>Set <code style={{background:'var(--bg-tertiary)',padding:'2px 6px',borderRadius:3}}>localStorage.setItem('groq_api_key', 'YOUR_KEY')</code> in console</div>
+          <a href="https://console.groq.com" target="_blank" style={{fontSize:10,color:'var(--accent2)'}}>Get free API key →</a>
+        </div>}
+
+        <form onSubmit={handleSubmit} style={{display:'flex',gap:12,marginBottom:24}}>
+          <input 
+            type="text" 
+            value={inputSymbol} 
+            onChange={e=>setInputSymbol(e.target.value.toUpperCase())}
+            placeholder="Enter NSE Symbol (e.g., RELIANCE, TCS, INFY)"
+            style={{flex:1,padding:'14px 18px',fontSize:14}}
+          />
+          <button type="submit" className="btn btn-accent" style={{padding:'14px 28px'}} disabled={loading}>
+            {loading?'Loading...':'🔍 Analyze'}
+          </button>
+        </form>
+
+        {stockData&&<div className="card glow-border" style={{marginBottom:24}}>
+          <div style={{padding:'16px 20px',background:'linear-gradient(90deg,rgba(0,255,136,0.03),transparent)',borderBottom:'1px solid var(--border-dim)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <span style={{fontSize:24,fontWeight:900,color:'#fff'}}>{symbol}</span>
+              <span style={{fontSize:13,color:'var(--text-secondary)',marginLeft:12}}>{stockData.name||stockData.sector}</span>
+              {stockData.sector&&<span style={{fontSize:10,padding:'3px 8px',borderRadius:4,background:'rgba(0,200,255,0.1)',color:'#00c8ff',marginLeft:8,fontFamily:'var(--font-mono)'}}>{stockData.sector}</span>}
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:24,fontWeight:800,fontFamily:'var(--font-mono)',color:'#fff'}}>₹{stockData.price?.toLocaleString()}</div>
+              <div style={{fontSize:13,fontFamily:'var(--font-mono)',fontWeight:700,color:stockData.change_pct>=0?'#00ff88':'#ff4455'}}>
+                {stockData.change_pct>=0?'▲':'▼'} {stockData.change_pct>=0?'+':''}{stockData.change_pct?.toFixed(2)}%
+              </div>
+            </div>
+          </div>
+        </div>}
+
+        {stockData&&<Fragment>
+          <div className="tabs" style={{marginBottom:24,justifyContent:'center'}}>
+            <button className={`tab ${activeTab==='institutional'?'active':''}`} onClick={()=>setActiveTab('institutional')}>
+              🏛️ Institutional
+            </button>
+            <button className={`tab ${activeTab==='trade'?'active':''}`} onClick={()=>setActiveTab('trade')}>
+              📐 Trade Setup
+            </button>
+            <button className={`tab ${activeTab==='earnings'?'active':''}`} onClick={()=>setActiveTab('earnings')}>
+              📊 Earnings
+            </button>
+          </div>
+
+          <div className="card" style={{padding:24}}>
+            {activeTab==='institutional'&&<InstitutionalBreakdown symbol={symbol} stockData={stockData}/>}
+            {activeTab==='trade'&&<SmartTradeSetup symbol={symbol} stockData={stockData}/>}
+            {activeTab==='earnings'&&<EarningsAnalyzer symbol={symbol} stockData={stockData}/>}
+          </div>
+        </Fragment>}
+
+        {!stockData&&!loading&&<div style={{textAlign:'center',padding:60,color:'var(--text-muted)'}}>
+          <div style={{fontSize:48,marginBottom:16,opacity:0.3}}>◈</div>
+          <div style={{fontSize:14}}>Enter a stock symbol to begin analysis</div>
+          <div style={{fontSize:11,marginTop:8,color:'var(--text-muted)'}}>Examples: RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK</div>
+        </div>}
+
+        <div style={{marginTop:32,padding:'16px 0',borderTop:'1px solid var(--border-dim)',display:'flex',justifyContent:'space-between',fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+          <span>EDGE INTEL v1.0 • TRADEDGE</span>
+          <span>Powered by Groq llama-3.3-70b</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<EdgeIntel/>);
+</script>
+</body>
+</html>
