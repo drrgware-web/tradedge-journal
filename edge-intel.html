@@ -42,6 +42,15 @@ input,textarea,select{background:var(--bg-tertiary);border:1px solid var(--borde
 .loading-pulse{animation:pulse 1.5s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes titleGlow{0%,100%{text-shadow:0 0 20px rgba(0,255,136,0.5),0 0 40px rgba(0,200,255,0.3),0 0 60px rgba(136,68,255,0.2);filter:brightness(1)}50%{text-shadow:0 0 30px rgba(0,255,136,0.8),0 0 60px rgba(0,200,255,0.5),0 0 90px rgba(136,68,255,0.4);filter:brightness(1.1)}}
+.title-glow{animation:titleGlow 2.5s ease-in-out infinite}
+.autocomplete-wrapper{position:relative}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;max-height:300px;overflow-y:auto;background:var(--bg-secondary);border:1px solid var(--border-med);border-radius:0 0 8px 8px;z-index:50;box-shadow:0 10px 40px rgba(0,0,0,0.5)}
+.autocomplete-item{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-dim);font-family:var(--font-mono);font-size:12px}
+.autocomplete-item:hover{background:rgba(0,255,136,0.05)}
+.autocomplete-item .symbol{font-weight:700;color:var(--accent)}
+.autocomplete-item .name{color:var(--text-muted);font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.autocomplete-item .sector{font-size:9px;padding:2px 6px;background:rgba(0,200,255,0.1);color:var(--accent2);border-radius:3px}
 .fade-in{animation:fadeIn 0.4s ease-out}
 .glow-border{box-shadow:0 0 20px rgba(0,255,136,0.1),inset 0 0 20px rgba(0,255,136,0.02)}
 .trade-setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
@@ -65,6 +74,258 @@ const{useState,useEffect,useMemo,useCallback,useRef,Fragment}=React;
 
 const GROQ_API_KEY=localStorage.getItem('groq_api_key')||'';
 const GROQ_MODEL='llama-3.3-70b-versatile';
+
+// ═══ NSE STOCK LIST FOR AUTOCOMPLETE ═══
+const NSE_STOCKS=[
+  {s:"RELIANCE",n:"Reliance Industries",sec:"Oil & Gas"},
+  {s:"TCS",n:"Tata Consultancy Services",sec:"IT"},
+  {s:"HDFCBANK",n:"HDFC Bank",sec:"Banking"},
+  {s:"INFY",n:"Infosys",sec:"IT"},
+  {s:"ICICIBANK",n:"ICICI Bank",sec:"Banking"},
+  {s:"HINDUNILVR",n:"Hindustan Unilever",sec:"FMCG"},
+  {s:"SBIN",n:"State Bank of India",sec:"Banking"},
+  {s:"BHARTIARTL",n:"Bharti Airtel",sec:"Telecom"},
+  {s:"ITC",n:"ITC Limited",sec:"FMCG"},
+  {s:"KOTAKBANK",n:"Kotak Mahindra Bank",sec:"Banking"},
+  {s:"LT",n:"Larsen & Toubro",sec:"Infrastructure"},
+  {s:"AXISBANK",n:"Axis Bank",sec:"Banking"},
+  {s:"ASIANPAINT",n:"Asian Paints",sec:"Paints"},
+  {s:"MARUTI",n:"Maruti Suzuki",sec:"Auto"},
+  {s:"SUNPHARMA",n:"Sun Pharma",sec:"Pharma"},
+  {s:"TITAN",n:"Titan Company",sec:"Consumer"},
+  {s:"BAJFINANCE",n:"Bajaj Finance",sec:"NBFC"},
+  {s:"WIPRO",n:"Wipro",sec:"IT"},
+  {s:"ULTRACEMCO",n:"UltraTech Cement",sec:"Cement"},
+  {s:"HCLTECH",n:"HCL Technologies",sec:"IT"},
+  {s:"NTPC",n:"NTPC Limited",sec:"Power"},
+  {s:"POWERGRID",n:"Power Grid Corp",sec:"Power"},
+  {s:"TATAMOTORS",n:"Tata Motors",sec:"Auto"},
+  {s:"M&M",n:"Mahindra & Mahindra",sec:"Auto"},
+  {s:"TATASTEEL",n:"Tata Steel",sec:"Metals"},
+  {s:"ONGC",n:"ONGC",sec:"Oil & Gas"},
+  {s:"JSWSTEEL",n:"JSW Steel",sec:"Metals"},
+  {s:"ADANIENT",n:"Adani Enterprises",sec:"Diversified"},
+  {s:"ADANIPORTS",n:"Adani Ports",sec:"Infrastructure"},
+  {s:"COALINDIA",n:"Coal India",sec:"Mining"},
+  {s:"BAJAJFINSV",n:"Bajaj Finserv",sec:"NBFC"},
+  {s:"TECHM",n:"Tech Mahindra",sec:"IT"},
+  {s:"INDUSINDBK",n:"IndusInd Bank",sec:"Banking"},
+  {s:"HDFCLIFE",n:"HDFC Life",sec:"Insurance"},
+  {s:"SBILIFE",n:"SBI Life Insurance",sec:"Insurance"},
+  {s:"DIVISLAB",n:"Divi's Labs",sec:"Pharma"},
+  {s:"DRREDDY",n:"Dr. Reddy's Labs",sec:"Pharma"},
+  {s:"CIPLA",n:"Cipla",sec:"Pharma"},
+  {s:"APOLLOHOSP",n:"Apollo Hospitals",sec:"Healthcare"},
+  {s:"EICHERMOT",n:"Eicher Motors",sec:"Auto"},
+  {s:"GRASIM",n:"Grasim Industries",sec:"Cement"},
+  {s:"BRITANNIA",n:"Britannia Industries",sec:"FMCG"},
+  {s:"NESTLEIND",n:"Nestle India",sec:"FMCG"},
+  {s:"HEROMOTOCO",n:"Hero MotoCorp",sec:"Auto"},
+  {s:"HINDALCO",n:"Hindalco Industries",sec:"Metals"},
+  {s:"TATACONSUM",n:"Tata Consumer",sec:"FMCG"},
+  {s:"BPCL",n:"BPCL",sec:"Oil & Gas"},
+  {s:"VEDL",n:"Vedanta",sec:"Mining"},
+  {s:"HAL",n:"Hindustan Aeronautics",sec:"Defence"},
+  {s:"BEL",n:"Bharat Electronics",sec:"Defence"},
+  {s:"IRCTC",n:"IRCTC",sec:"Railways"},
+  {s:"ZOMATO",n:"Zomato",sec:"Consumer Tech"},
+  {s:"PAYTM",n:"One97 Communications",sec:"Fintech"},
+  {s:"NYKAA",n:"FSN E-Commerce",sec:"Consumer Tech"},
+  {s:"DMART",n:"Avenue Supermarts",sec:"Retail"},
+  {s:"PIDILITIND",n:"Pidilite Industries",sec:"Chemicals"},
+  {s:"SIEMENS",n:"Siemens India",sec:"Capital Goods"},
+  {s:"ABB",n:"ABB India",sec:"Capital Goods"},
+  {s:"HAVELLS",n:"Havells India",sec:"Consumer Durables"},
+  {s:"VOLTAS",n:"Voltas",sec:"Consumer Durables"},
+  {s:"TRENT",n:"Trent Limited",sec:"Retail"},
+  {s:"JINDALSTEL",n:"Jindal Steel",sec:"Metals"},
+  {s:"SAIL",n:"Steel Authority",sec:"Metals"},
+  {s:"NMDC",n:"NMDC",sec:"Mining"},
+  {s:"GAIL",n:"GAIL India",sec:"Oil & Gas"},
+  {s:"IOC",n:"Indian Oil Corp",sec:"Oil & Gas"},
+  {s:"PNB",n:"Punjab National Bank",sec:"Banking"},
+  {s:"BANKBARODA",n:"Bank of Baroda",sec:"Banking"},
+  {s:"CANBK",n:"Canara Bank",sec:"Banking"},
+  {s:"UNIONBANK",n:"Union Bank",sec:"Banking"},
+  {s:"FEDERALBNK",n:"Federal Bank",sec:"Banking"},
+  {s:"IDFCFIRSTB",n:"IDFC First Bank",sec:"Banking"},
+  {s:"BANDHANBNK",n:"Bandhan Bank",sec:"Banking"},
+  {s:"AUBANK",n:"AU Small Finance Bank",sec:"Banking"},
+  {s:"CHOLAFIN",n:"Cholamandalam Inv",sec:"NBFC"},
+  {s:"MUTHOOTFIN",n:"Muthoot Finance",sec:"NBFC"},
+  {s:"SHRIRAMFIN",n:"Shriram Finance",sec:"NBFC"},
+  {s:"LTIM",n:"LTIMindtree",sec:"IT"},
+  {s:"MPHASIS",n:"Mphasis",sec:"IT"},
+  {s:"COFORGE",n:"Coforge",sec:"IT"},
+  {s:"PERSISTENT",n:"Persistent Systems",sec:"IT"},
+  {s:"LTTS",n:"L&T Technology",sec:"IT"},
+  {s:"TATAELXSI",n:"Tata Elxsi",sec:"IT"},
+  {s:"HAPPSTMNDS",n:"Happiest Minds",sec:"IT"},
+  {s:"ROUTE",n:"Route Mobile",sec:"IT"},
+  {s:"BIOCON",n:"Biocon",sec:"Pharma"},
+  {s:"LUPIN",n:"Lupin",sec:"Pharma"},
+  {s:"AUROPHARMA",n:"Aurobindo Pharma",sec:"Pharma"},
+  {s:"ALKEM",n:"Alkem Laboratories",sec:"Pharma"},
+  {s:"TORNTPHARM",n:"Torrent Pharma",sec:"Pharma"},
+  {s:"IPCALAB",n:"IPCA Laboratories",sec:"Pharma"},
+  {s:"LAURUSLABS",n:"Laurus Labs",sec:"Pharma"},
+  {s:"GRANULES",n:"Granules India",sec:"Pharma"},
+  {s:"POLYCAB",n:"Polycab India",sec:"Cables"},
+  {s:"KEI",n:"KEI Industries",sec:"Cables"},
+  {s:"AMBER",n:"Amber Enterprises",sec:"Consumer Durables"},
+  {s:"BLUESTARCO",n:"Blue Star",sec:"Consumer Durables"},
+  {s:"CROMPTON",n:"Crompton Greaves",sec:"Consumer Durables"},
+  {s:"DIXON",n:"Dixon Technologies",sec:"Electronics"},
+  {s:"KAYNES",n:"Kaynes Technology",sec:"Electronics"},
+  {s:"DEEPAKNI",n:"Deepak Nitrite",sec:"Chemicals"},
+  {s:"ATUL",n:"Atul Limited",sec:"Chemicals"},
+  {s:"NAVINFLUOR",n:"Navin Fluorine",sec:"Chemicals"},
+  {s:"SRF",n:"SRF Limited",sec:"Chemicals"},
+  {s:"AARTIIND",n:"Aarti Industries",sec:"Chemicals"},
+  {s:"CLEAN",n:"Clean Science",sec:"Chemicals"},
+  {s:"ASTRAL",n:"Astral Limited",sec:"Pipes"},
+  {s:"SUPREMEIND",n:"Supreme Industries",sec:"Pipes"},
+  {s:"PRINCEPI",n:"Prince Pipes",sec:"Pipes"},
+  {s:"FINOLEX",n:"Finolex Cables",sec:"Cables"},
+  {s:"AMBUJACEM",n:"Ambuja Cements",sec:"Cement"},
+  {s:"ACC",n:"ACC Limited",sec:"Cement"},
+  {s:"SHREECEM",n:"Shree Cement",sec:"Cement"},
+  {s:"RAMCOCEM",n:"Ramco Cements",sec:"Cement"},
+  {s:"DALBHARAT",n:"Dalmia Bharat",sec:"Cement"},
+  {s:"JKCEMENT",n:"JK Cement",sec:"Cement"},
+  {s:"BERGEPAINT",n:"Berger Paints",sec:"Paints"},
+  {s:"KANSAINER",n:"Kansai Nerolac",sec:"Paints"},
+  {s:"INDIGO",n:"InterGlobe Aviation",sec:"Aviation"},
+  {s:"TATAPOWER",n:"Tata Power",sec:"Power"},
+  {s:"ADANIGREEN",n:"Adani Green Energy",sec:"Power"},
+  {s:"TORNTPOWER",n:"Torrent Power",sec:"Power"},
+  {s:"CESC",n:"CESC Limited",sec:"Power"},
+  {s:"NHPC",n:"NHPC Limited",sec:"Power"},
+  {s:"SJVN",n:"SJVN Limited",sec:"Power"},
+  {s:"RECLTD",n:"REC Limited",sec:"NBFC"},
+  {s:"PFC",n:"Power Finance Corp",sec:"NBFC"},
+  {s:"IRFC",n:"IRFC",sec:"NBFC"},
+  {s:"CANFINHOME",n:"Can Fin Homes",sec:"Housing Finance"},
+  {s:"LICHSGFIN",n:"LIC Housing Finance",sec:"Housing Finance"},
+  {s:"HUDCO",n:"HUDCO",sec:"Housing Finance"},
+  {s:"MOTHERSON",n:"Samvardhana Motherson",sec:"Auto Ancillary"},
+  {s:"BHARATFORG",n:"Bharat Forge",sec:"Auto Ancillary"},
+  {s:"SONACOMS",n:"Sona BLW",sec:"Auto Ancillary"},
+  {s:"EXIDEIND",n:"Exide Industries",sec:"Auto Ancillary"},
+  {s:"AMARAJABAT",n:"Amara Raja Energy",sec:"Auto Ancillary"},
+  {s:"BOSCHLTD",n:"Bosch Limited",sec:"Auto Ancillary"},
+  {s:"BALKRISIND",n:"Balkrishna Industries",sec:"Tyres"},
+  {s:"MRF",n:"MRF Limited",sec:"Tyres"},
+  {s:"APOLLOTYRE",n:"Apollo Tyres",sec:"Tyres"},
+  {s:"CEATLTD",n:"CEAT Limited",sec:"Tyres"},
+  {s:"JKPAPER",n:"JK Paper",sec:"Paper"},
+  {s:"CENTURYTEX",n:"Century Textiles",sec:"Textiles"},
+  {s:"PAGEIND",n:"Page Industries",sec:"Textiles"},
+  {s:"TATACOMM",n:"Tata Communications",sec:"Telecom"},
+  {s:"IDEA",n:"Vodafone Idea",sec:"Telecom"},
+  {s:"MANAPPURAM",n:"Manappuram Finance",sec:"NBFC"},
+  {s:"IIFL",n:"IIFL Finance",sec:"NBFC"},
+  {s:"L&TFH",n:"L&T Finance",sec:"NBFC"},
+  {s:"POONAWALLA",n:"Poonawalla Fincorp",sec:"NBFC"},
+  {s:"MARICO",n:"Marico",sec:"FMCG"},
+  {s:"DABUR",n:"Dabur India",sec:"FMCG"},
+  {s:"GODREJCP",n:"Godrej Consumer",sec:"FMCG"},
+  {s:"COLPAL",n:"Colgate Palmolive",sec:"FMCG"},
+  {s:"EMAMILTD",n:"Emami",sec:"FMCG"},
+  {s:"TATACONSUM",n:"Tata Consumer",sec:"FMCG"},
+  {s:"UBL",n:"United Breweries",sec:"Beverages"},
+  {s:"VBL",n:"Varun Beverages",sec:"Beverages"},
+  {s:"RADICO",n:"Radico Khaitan",sec:"Beverages"},
+  {s:"UNITDSPR",n:"United Spirits",sec:"Beverages"},
+  {s:"MCDOWELL-N",n:"United Spirits",sec:"Beverages"},
+  {s:"ZYDUSLIFE",n:"Zydus Lifesciences",sec:"Pharma"},
+  {s:"GLENMARK",n:"Glenmark Pharma",sec:"Pharma"},
+  {s:"NATCOPHARM",n:"Natco Pharma",sec:"Pharma"},
+  {s:"METROPOLIS",n:"Metropolis Healthcare",sec:"Healthcare"},
+  {s:"LALPATHLAB",n:"Dr Lal PathLabs",sec:"Healthcare"},
+  {s:"MAXHEALTH",n:"Max Healthcare",sec:"Healthcare"},
+  {s:"FORTIS",n:"Fortis Healthcare",sec:"Healthcare"},
+  {s:"SYNGENE",n:"Syngene International",sec:"Pharma"},
+  {s:"GODREJPROP",n:"Godrej Properties",sec:"Real Estate"},
+  {s:"DLF",n:"DLF Limited",sec:"Real Estate"},
+  {s:"OBEROIRLTY",n:"Oberoi Realty",sec:"Real Estate"},
+  {s:"PRESTIGE",n:"Prestige Estates",sec:"Real Estate"},
+  {s:"BRIGADE",n:"Brigade Enterprises",sec:"Real Estate"},
+  {s:"LODHA",n:"Macrotech Developers",sec:"Real Estate"},
+  {s:"PHOENIXLTD",n:"Phoenix Mills",sec:"Real Estate"},
+  {s:"SOBHA",n:"Sobha Limited",sec:"Real Estate"},
+  {s:"SUNTV",n:"Sun TV Network",sec:"Media"},
+  {s:"ZEEL",n:"Zee Entertainment",sec:"Media"},
+  {s:"PVR",n:"PVR INOX",sec:"Media"},
+  {s:"NETWORK18",n:"Network18 Media",sec:"Media"},
+  {s:"NAUKRI",n:"Info Edge India",sec:"Internet"},
+  {s:"INDIAMART",n:"IndiaMART",sec:"Internet"},
+  {s:"JUSTDIAL",n:"Just Dial",sec:"Internet"},
+  {s:"LATENTVIEW",n:"Latent View Analytics",sec:"IT"},
+  {s:"TANLA",n:"Tanla Platforms",sec:"IT"},
+  {s:"CAMS",n:"CAMS",sec:"Financial Services"},
+  {s:"CDSL",n:"CDSL",sec:"Financial Services"},
+  {s:"BSE",n:"BSE Limited",sec:"Financial Services"},
+  {s:"MCX",n:"MCX India",sec:"Financial Services"},
+  {s:"KPITTECH",n:"KPIT Technologies",sec:"IT"},
+  {s:"ZENSARTECH",n:"Zensar Technologies",sec:"IT"},
+  {s:"MASTEK",n:"Mastek",sec:"IT"},
+  {s:"CYIENT",n:"Cyient",sec:"IT"},
+  {s:"BIRLASOFT",n:"Birlasoft",sec:"IT"},
+  {s:"NIITLTD",n:"NIIT",sec:"IT"},
+  {s:"DELTACORP",n:"Delta Corp",sec:"Gaming"},
+  {s:"NAZARA",n:"Nazara Technologies",sec:"Gaming"},
+  {s:"RVNL",n:"Rail Vikas Nigam",sec:"Railways"},
+  {s:"RAILTEL",n:"RailTel Corporation",sec:"Railways"},
+  {s:"IRCON",n:"IRCON International",sec:"Infrastructure"},
+  {s:"NBCC",n:"NBCC India",sec:"Infrastructure"},
+  {s:"NCC",n:"NCC Limited",sec:"Infrastructure"},
+  {s:"KEC",n:"KEC International",sec:"Infrastructure"},
+  {s:"KALPATPOWR",n:"Kalpataru Projects",sec:"Infrastructure"},
+  {s:"PNCINFRA",n:"PNC Infratech",sec:"Infrastructure"},
+  {s:"GMRINFRA",n:"GMR Airports",sec:"Infrastructure"},
+  {s:"BHEL",n:"BHEL",sec:"Capital Goods"},
+  {s:"THERMAX",n:"Thermax",sec:"Capital Goods"},
+  {s:"CUMMINSIND",n:"Cummins India",sec:"Capital Goods"},
+  {s:"GRINDWELL",n:"Grindwell Norton",sec:"Capital Goods"},
+  {s:"APLAPOLLO",n:"APL Apollo Tubes",sec:"Metals"},
+  {s:"RATNAMANI",n:"Ratnamani Metals",sec:"Metals"},
+  {s:"WELCORP",n:"Welspun Corp",sec:"Metals"},
+  {s:"COCHINSHIP",n:"Cochin Shipyard",sec:"Defence"},
+  {s:"GRSE",n:"Garden Reach Ship",sec:"Defence"},
+  {s:"MAZAGON",n:"Mazagon Dock Ship",sec:"Defence"},
+  {s:"PARAS",n:"Paras Defence",sec:"Defence"},
+  {s:"DATAPATTNS",n:"Data Patterns",sec:"Defence"},
+  {s:"ZENTEC",n:"Zen Technologies",sec:"Defence"},
+  {s:"SOLARINDS",n:"Solar Industries",sec:"Explosives"},
+  {s:"LXCHEM",n:"Laxmi Organic",sec:"Chemicals"},
+  {s:"FINEORG",n:"Fine Organic",sec:"Chemicals"},
+  {s:"ALKYLAMINE",n:"Alkyl Amines",sec:"Chemicals"},
+  {s:"TATACHEM",n:"Tata Chemicals",sec:"Chemicals"},
+  {s:"PIIND",n:"PI Industries",sec:"Agrochemicals"},
+  {s:"UPL",n:"UPL Limited",sec:"Agrochemicals"},
+  {s:"SUMICHEM",n:"Sumitomo Chemical",sec:"Agrochemicals"},
+  {s:"BSOFT",n:"Birlasoft",sec:"IT"},
+  {s:"ICICIPRULI",n:"ICICI Prudential Life",sec:"Insurance"},
+  {s:"ICICIGI",n:"ICICI Lombard",sec:"Insurance"},
+  {s:"STARHEALTH",n:"Star Health",sec:"Insurance"},
+  {s:"NIACL",n:"New India Assurance",sec:"Insurance"},
+  {s:"GICRE",n:"General Insurance",sec:"Insurance"},
+].sort((a,b)=>a.s.localeCompare(b.s));
+
+// Load more stocks from scanner if available
+let FULL_STOCK_LIST=[...NSE_STOCKS];
+fetch('./data/scanner_results.json').then(r=>r.json()).then(d=>{
+  if(d?.stocks){
+    const existing=new Set(NSE_STOCKS.map(s=>s.s));
+    d.stocks.forEach(st=>{
+      if(!existing.has(st.symbol)){
+        FULL_STOCK_LIST.push({s:st.symbol,n:st.name||st.symbol,sec:st.sector||''});
+      }
+    });
+    FULL_STOCK_LIST.sort((a,b)=>a.s.localeCompare(b.s));
+  }
+}).catch(()=>{});
 
 const callGroqAI=async(prompt,systemPrompt="You are an expert equity research analyst.")=>{
   if(!GROQ_API_KEY)throw new Error('Set groq_api_key in localStorage');
@@ -186,6 +447,18 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[riskPct,setRiskPct]=useState(1);
   const[analysis,setAnalysis]=useState(null);
   const[loading,setLoading]=useState(false);
+  
+  // Trade Execution State
+  const[showExecution,setShowExecution]=useState(false);
+  const[broker,setBroker]=useState('zerodha');
+  const[orderType,setOrderType]=useState('LIMIT');
+  const[product,setProduct]=useState('CNC');
+  const[txnType,setTxnType]=useState('BUY');
+  const[executing,setExecuting]=useState(false);
+  const[execResult,setExecResult]=useState(null);
+  const[enableBracket,setEnableBracket]=useState(false);
+  const[enableTrail,setEnableTrail]=useState(false);
+  const[trailValue,setTrailValue]=useState(2);
 
   useEffect(()=>{
     if(stockData?.price){
@@ -252,6 +525,49 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
     setLoading(false);
   };
 
+  const executeOrder=async()=>{
+    const wUrl=localStorage.getItem('zd_worker_url');
+    if(!wUrl){alert('Set zd_worker_url in localStorage');return}
+    
+    setExecuting(true);setExecResult(null);
+    try{
+      const headers={'Content-Type':'application/json'};
+      let res;
+      
+      if(enableBracket){
+        // Bracket Order (Entry + SL + Target)
+        headers['X-Kite-Action']='bracket-order';
+        const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
+          tradingsymbol:symbol,exchange:'NSE',transaction_type:txnType,
+          quantity:positionSize||qty,price:entry,
+          stoploss:Math.abs(entry-sl),target:Math.abs(target-entry),
+          trailing_stoploss:enableTrail?trailValue:0
+        })});
+        res=await r.json();
+      }else{
+        // Regular Order
+        headers['X-Kite-Action']='place-order';
+        const r=await fetch(wUrl,{method:'POST',headers,body:JSON.stringify({
+          tradingsymbol:symbol,exchange:'NSE',transaction_type:txnType,
+          order_type:orderType,quantity:positionSize||qty,product,
+          price:orderType==='LIMIT'?entry:0,
+          trigger_price:orderType.includes('SL')?sl:0
+        })});
+        res=await r.json();
+      }
+      
+      setExecResult(res);
+      if(res?.data||res?.status==='success'){
+        // Log to journal
+        const trades=JSON.parse(localStorage.getItem('te_trades')||'[]');
+        trades.push({id:Date.now(),symbol,action:txnType,price:entry,qty:positionSize||qty,
+          ts:new Date().toISOString(),status:'executed',target,sl,rr,broker});
+        localStorage.setItem('te_trades',JSON.stringify(trades));
+      }
+    }catch(e){setExecResult({error:e.message})}
+    setExecuting(false);
+  };
+
   return(
     <div className="fade-in">
       <div className="section-title">📐 SMART TRADE SETUP BUILDER</div>
@@ -301,9 +617,93 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         <div className="metric-box"><div className="metric-label">REQ WIN RATE</div><div className="metric-value" style={{color:'#ffaa00'}}>{winRate}</div></div>
       </div>
 
-      <button className="btn btn-accent" style={{width:'100%',padding:'14px'}} onClick={generateSetup} disabled={loading}>
-        {loading?'⚡ Generating...':'🎯 Generate AI Trade Plan'}
-      </button>
+      <div style={{display:'flex',gap:10,marginBottom:20}}>
+        <button className="btn btn-accent" style={{flex:1,padding:'14px'}} onClick={generateSetup} disabled={loading}>
+          {loading?'⚡ Generating...':'🎯 Generate AI Trade Plan'}
+        </button>
+        <button className="btn" style={{padding:'14px',background:showExecution?'rgba(0,255,136,0.1)':'transparent',borderColor:showExecution?'var(--accent)':'var(--border-med)',color:showExecution?'var(--accent)':'var(--text-primary)'}} onClick={()=>setShowExecution(!showExecution)}>
+          ⚡ Execute Trade
+        </button>
+      </div>
+
+      {/* ═══ TRADE EXECUTION PANEL ═══ */}
+      {showExecution&&<div style={{background:'linear-gradient(135deg,rgba(0,255,136,0.03),rgba(136,68,255,0.03))',border:'1px solid var(--border-med)',borderRadius:10,padding:20,marginBottom:20}} className="fade-in">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'var(--accent)'}}>⚡ TRADE EXECUTION</div>
+          <div style={{display:'flex',gap:4}}>
+            {['zerodha','dhan','definedge'].map(b=><button key={b} onClick={()=>setBroker(b)} style={{padding:'4px 10px',fontSize:9,fontWeight:700,fontFamily:'var(--font-mono)',borderRadius:4,border:'1px solid',cursor:'pointer',background:broker===b?b==='zerodha'?'rgba(0,200,0,0.2)':b==='dhan'?'rgba(100,150,255,0.2)':'rgba(200,100,255,0.2)':'transparent',borderColor:broker===b?b==='zerodha'?'#00c800':b==='dhan'?'#6496ff':'#c864ff':'var(--border-low)',color:broker===b?b==='zerodha'?'#00c800':b==='dhan'?'#6496ff':'#c864ff':'var(--text-muted)'}}>{b.charAt(0).toUpperCase()+b.slice(1)}</button>)}
+          </div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+          <div>
+            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>TRANSACTION</div>
+            <div style={{display:'flex',gap:4}}>
+              <button onClick={()=>setTxnType('BUY')} style={{flex:1,padding:'8px',fontSize:11,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:4,border:'none',cursor:'pointer',background:txnType==='BUY'?'var(--accent)':'var(--bg-tertiary)',color:txnType==='BUY'?'#000':'var(--accent)'}}>BUY</button>
+              <button onClick={()=>setTxnType('SELL')} style={{flex:1,padding:'8px',fontSize:11,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:4,border:'none',cursor:'pointer',background:txnType==='SELL'?'var(--red)':'var(--bg-tertiary)',color:txnType==='SELL'?'#000':'var(--red)'}}>SELL</button>
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>ORDER TYPE</div>
+            <div style={{display:'flex',gap:4}}>
+              {['MARKET','LIMIT','SL','SL-M'].map(t=><button key={t} onClick={()=>setOrderType(t)} style={{flex:1,padding:'6px 4px',fontSize:8,fontWeight:700,fontFamily:'var(--font-mono)',borderRadius:3,border:'1px solid',cursor:'pointer',background:orderType===t?'rgba(0,200,255,0.15)':'transparent',borderColor:orderType===t?'var(--accent2)':'var(--border-dim)',color:orderType===t?'var(--accent2)':'var(--text-muted)'}}>{t}</button>)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
+          <div>
+            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>PRODUCT</div>
+            <select value={product} onChange={e=>setProduct(e.target.value)} style={{width:'100%',padding:'8px'}}>
+              <option value="CNC">CNC (Delivery)</option>
+              <option value="MIS">MIS (Intraday)</option>
+            </select>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>QUANTITY</div>
+            <input type="number" value={positionSize||qty} readOnly style={{width:'100%',padding:'8px',background:'var(--bg-card)'}}/>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:'var(--text-muted)',fontFamily:'var(--font-mono)',marginBottom:4}}>PRICE ₹</div>
+            <input type="number" value={entry} onChange={e=>setEntry(+e.target.value)} style={{width:'100%',padding:'8px'}}/>
+          </div>
+        </div>
+
+        <div style={{display:'flex',gap:16,marginBottom:16,flexWrap:'wrap'}}>
+          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--accent2)',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
+            <input type="checkbox" checked={enableBracket} onChange={e=>setEnableBracket(e.target.checked)} style={{accentColor:'var(--accent2)'}}/>
+            🔲 Bracket Order (Entry + SL + Target)
+          </label>
+          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'var(--amber)',fontFamily:'var(--font-mono)',cursor:'pointer'}}>
+            <input type="checkbox" checked={enableTrail} onChange={e=>setEnableTrail(e.target.checked)} style={{accentColor:'var(--amber)'}}/>
+            ⚡ Auto-Trail SL
+          </label>
+          {enableTrail&&<div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:9,color:'var(--text-muted)'}}>Trail %:</span>
+            <input type="number" value={trailValue} onChange={e=>setTrailValue(+e.target.value)} style={{width:50,padding:'4px 6px',fontSize:10}}/>
+          </div>}
+        </div>
+
+        {enableBracket&&<div style={{padding:12,background:'rgba(0,200,255,0.05)',border:'1px solid rgba(0,200,255,0.2)',borderRadius:6,marginBottom:16,fontSize:10,fontFamily:'var(--font-mono)'}}>
+          <div style={{color:'var(--accent2)',fontWeight:700,marginBottom:6}}>📋 BRACKET ORDER PREVIEW</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,color:'var(--text-secondary)'}}>
+            <div><span style={{color:'var(--text-muted)'}}>Entry:</span> ₹{entry}</div>
+            <div><span style={{color:'var(--accent)'}}>Target:</span> ₹{target} (+{((target-entry)/entry*100).toFixed(1)}%)</div>
+            <div><span style={{color:'var(--red)'}}>SL:</span> ₹{sl} (-{((entry-sl)/entry*100).toFixed(1)}%)</div>
+          </div>
+        </div>}
+
+        <button onClick={executeOrder} disabled={executing} style={{width:'100%',padding:'12px',fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',borderRadius:6,border:'none',cursor:'pointer',background:txnType==='BUY'?'linear-gradient(135deg,#00cc66,#00ff88)':'linear-gradient(135deg,#ee3344,#ff5566)',color:'#000'}}>
+          {executing?'⏳ Executing...':enableBracket?`⚡ Place Bracket ${txnType}`:`⚡ Place ${txnType} Order`}
+        </button>
+
+        {execResult&&<div style={{marginTop:12,padding:12,borderRadius:6,background:execResult.data||execResult.status==='success'?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',border:`1px solid ${execResult.data||execResult.status==='success'?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
+          <div style={{fontSize:12,fontWeight:700,color:execResult.data||execResult.status==='success'?'#00ff88':'#ff4455',marginBottom:4}}>
+            {execResult.data||execResult.status==='success'?'✓ Order Placed Successfully':'✗ Order Failed'}
+          </div>
+          <pre style={{fontSize:8,color:'var(--text-muted)',fontFamily:'var(--font-mono)',margin:0,whiteSpace:'pre-wrap'}}>{JSON.stringify(execResult,null,2)}</pre>
+        </div>}
+      </div>}
 
       {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
     </div>
@@ -451,10 +851,35 @@ const EdgeIntel=()=>{
   const[loading,setLoading]=useState(false);
   const[activeTab,setActiveTab]=useState('institutional');
   const[hasApiKey,setHasApiKey]=useState(!!GROQ_API_KEY);
+  const[showSuggestions,setShowSuggestions]=useState(false);
+  const[suggestions,setSuggestions]=useState([]);
+  const inputRef=useRef(null);
+
+  // Autocomplete filter
+  useEffect(()=>{
+    if(inputSymbol.length>=1){
+      const q=inputSymbol.toUpperCase();
+      const matches=FULL_STOCK_LIST.filter(s=>
+        s.s.startsWith(q)||s.n.toUpperCase().includes(q)
+      ).slice(0,12);
+      setSuggestions(matches);
+      setShowSuggestions(matches.length>0);
+    }else{
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  },[inputSymbol]);
+
+  const selectStock=(s)=>{
+    setInputSymbol(s.s);
+    setShowSuggestions(false);
+    loadStock(s.s);
+  };
 
   const loadStock=async(sym)=>{
     if(!sym)return;
     setLoading(true);
+    setShowSuggestions(false);
     try{
       const res=await fetch(`./data/stock_details/${sym.toUpperCase()}.json?t=${Date.now()}`);
       if(res.ok){
@@ -477,6 +902,17 @@ const EdgeIntel=()=>{
 
   const handleSubmit=e=>{e.preventDefault();loadStock(inputSymbol)};
 
+  // Close suggestions when clicking outside
+  useEffect(()=>{
+    const handleClick=(e)=>{
+      if(inputRef.current&&!inputRef.current.contains(e.target)){
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('click',handleClick);
+    return()=>document.removeEventListener('click',handleClick);
+  },[]);
+
   return(
     <div>
       <nav className="nav">
@@ -491,7 +927,7 @@ const EdgeIntel=()=>{
 
       <div style={{maxWidth:1200,margin:'0 auto',padding:'24px 20px'}}>
         <div style={{textAlign:'center',marginBottom:32}}>
-          <h1 style={{fontSize:36,fontWeight:900,background:'linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
+          <h1 className="title-glow" style={{fontSize:36,fontWeight:900,background:'linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
             ◈ EDGE INTEL
           </h1>
           <p style={{fontSize:13,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
@@ -506,13 +942,28 @@ const EdgeIntel=()=>{
         </div>}
 
         <form onSubmit={handleSubmit} style={{display:'flex',gap:12,marginBottom:24}}>
-          <input 
-            type="text" 
-            value={inputSymbol} 
-            onChange={e=>setInputSymbol(e.target.value.toUpperCase())}
-            placeholder="Enter NSE Symbol (e.g., RELIANCE, TCS, INFY)"
-            style={{flex:1,padding:'14px 18px',fontSize:14}}
-          />
+          <div className="autocomplete-wrapper" style={{flex:1}} ref={inputRef}>
+            <input 
+              type="text" 
+              value={inputSymbol} 
+              onChange={e=>setInputSymbol(e.target.value.toUpperCase())}
+              onFocus={()=>inputSymbol.length>=1&&suggestions.length>0&&setShowSuggestions(true)}
+              placeholder="Enter NSE Symbol (e.g., RELIANCE, TCS, INFY)"
+              style={{width:'100%',padding:'14px 18px',fontSize:14,borderRadius:showSuggestions?'8px 8px 0 0':'8px'}}
+              autoComplete="off"
+            />
+            {showSuggestions&&<div className="autocomplete-list">
+              {suggestions.map((s,i)=>(
+                <div key={i} className="autocomplete-item" onClick={()=>selectStock(s)}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <span className="symbol">{s.s}</span>
+                    <span className="name">{s.n}</span>
+                  </div>
+                  {s.sec&&<span className="sector">{s.sec}</span>}
+                </div>
+              ))}
+            </div>}
+          </div>
           <button type="submit" className="btn btn-accent" style={{padding:'14px 28px'}} disabled={loading}>
             {loading?'Loading...':'🔍 Analyze'}
           </button>
