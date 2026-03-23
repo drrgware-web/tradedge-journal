@@ -580,6 +580,16 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[analysis,setAnalysis]=useState(null);
   const[loading,setLoading]=useState(false);
   
+  // Existing Position Management
+  const[isExistingPosition,setIsExistingPosition]=useState(false);
+  const[existingEntry,setExistingEntry]=useState(0);      // Original buy price
+  const[existingQty,setExistingQty]=useState(0);          // Total quantity held
+  const[existingDate,setExistingDate]=useState('');       // Buy date
+  const[currentSL,setCurrentSL]=useState(0);              // Current SL if any
+  const[currentTarget,setCurrentTarget]=useState(0);      // Current target if any
+  const[partialExitPct,setPartialExitPct]=useState(50);   // % to exit
+  const[addQty,setAddQty]=useState(0);                    // Qty to add (pyramid)
+  
   // Smart SL Calculator State
   const[showSLCalculator,setShowSLCalculator]=useState(false);
   const[slMethod,setSLMethod]=useState('atr'); // 'atr', 'pct', 'ema', 'fixed', 'swing'
@@ -689,18 +699,57 @@ const SmartTradeSetup=({symbol,stockData})=>{
     setSLMethod(method);
     setSL(newSL);
   };
+  
+  // Load existing position from localStorage (te_trades)
+  const loadExistingPosition = () => {
+    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+    const openTrade = trades.find(t => t.symbol?.toUpperCase() === symbol?.toUpperCase() && (t.status === 'Open' || t.status === 'Partial'));
+    if (openTrade) {
+      setIsExistingPosition(true);
+      setExistingEntry(openTrade.entry_price || openTrade.price || 0);
+      setExistingQty(openTrade.qty || openTrade.quantity || 0);
+      setExistingDate(openTrade.ts ? new Date(openTrade.ts).toLocaleDateString() : '');
+      setCurrentSL(openTrade.sl || 0);
+      setCurrentTarget(openTrade.target || 0);
+      setEntry(openTrade.entry_price || openTrade.price || stockData?.price || 0);
+      setQty(openTrade.qty || openTrade.quantity || 1);
+      setSL(openTrade.sl || 0);
+      setTarget(openTrade.target || 0);
+      return openTrade;
+    }
+    return null;
+  };
+  
+  // Calculate P&L for existing position
+  const currentPrice = stockData?.price || 0;
+  const unrealizedPnL = isExistingPosition && existingEntry > 0 ? (currentPrice - existingEntry) * existingQty : 0;
+  const unrealizedPnLPct = isExistingPosition && existingEntry > 0 ? ((currentPrice - existingEntry) / existingEntry * 100) : 0;
+  const positionValue = isExistingPosition ? currentPrice * existingQty : 0;
+  const investedValue = isExistingPosition ? existingEntry * existingQty : 0;
+  
+  // Calculate partial exit amounts
+  const partialQty = Math.floor(existingQty * partialExitPct / 100);
+  const partialValue = partialQty * currentPrice;
+  const partialProfit = partialQty * (currentPrice - existingEntry);
 
   useEffect(()=>{
     if(stockData?.price){
-      setEntry(stockData.price);
-      setTarget(+(stockData.price*1.08).toFixed(2));
-      // Auto-suggest SL based on ATR (2× ATR is a good default)
-      const suggestedSL = stockData.atr ? +(stockData.price - (stockData.atr * 2)).toFixed(2) : +(stockData.price*0.97).toFixed(2);
-      setSL(suggestedSL);
-      setSLATRMult(2);
-      setSLMethod('atr');
+      // Check if we have an existing position for this stock
+      const existingTrade = loadExistingPosition();
+      
+      if (!existingTrade) {
+        // New position mode
+        setIsExistingPosition(false);
+        setEntry(stockData.price);
+        setTarget(+(stockData.price*1.08).toFixed(2));
+        // Auto-suggest SL based on ATR (2× ATR is a good default)
+        const suggestedSL = stockData.atr ? +(stockData.price - (stockData.atr * 2)).toFixed(2) : +(stockData.price*0.97).toFixed(2);
+        setSL(suggestedSL);
+        setSLATRMult(2);
+        setSLMethod('atr');
+      }
     }
-  },[stockData?.price]);
+  },[stockData?.price, symbol]);
 
   const risk=entry>0&&sl>0?Math.abs(entry-sl)*qty:0;
   const reward=entry>0&&target>0?Math.abs(target-entry)*qty:0;
@@ -1047,7 +1096,119 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
 
   return(
     <div className="fade-in">
-      <div className="section-title">📐 SMART TRADE SETUP BUILDER</div>
+      {/* ═══ EXISTING POSITION BANNER ═══ */}
+      {isExistingPosition && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:18}}>📦</span>
+            <span style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'#8844ff'}}>EXISTING POSITION</span>
+            <span style={{fontSize:9,padding:'3px 8px',background:'rgba(136,68,255,0.2)',borderRadius:4,color:'#a855f7'}}>Bought {existingDate}</span>
+          </div>
+          <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0)}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
+            ✕ New Trade Mode
+          </button>
+        </div>
+        
+        {/* Position Overview */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:16}}>
+          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>ENTRY</div>
+            <div style={{fontSize:16,fontWeight:900,color:'#8844ff',fontFamily:'var(--font-mono)'}}>₹{existingEntry}</div>
+          </div>
+          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>QTY</div>
+            <div style={{fontSize:16,fontWeight:900,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{existingQty}</div>
+          </div>
+          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>CMP</div>
+            <div style={{fontSize:16,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{currentPrice.toFixed(2)}</div>
+          </div>
+          <div style={{padding:'10px',background:unrealizedPnL>=0?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',borderRadius:8,textAlign:'center',border:`1px solid ${unrealizedPnL>=0?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
+            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>P&L</div>
+            <div style={{fontSize:16,fontWeight:900,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontFamily:'var(--font-mono)'}}>{unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)}</div>
+            <div style={{fontSize:9,color:unrealizedPnL>=0?'#00ff88':'#ff4455'}}>{unrealizedPnL>=0?'+':''}{unrealizedPnLPct.toFixed(1)}%</div>
+          </div>
+          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>VALUE</div>
+            <div style={{fontSize:14,fontWeight:700,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{positionValue.toFixed(0)}</div>
+          </div>
+        </div>
+        
+        {/* Current SL/Target if set */}
+        {(currentSL > 0 || currentTarget > 0) && <div style={{display:'flex',gap:12,marginBottom:16}}>
+          {currentSL > 0 && <div style={{flex:1,padding:'8px 12px',background:'rgba(255,68,85,0.1)',borderRadius:6,border:'1px solid rgba(255,68,85,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:10,color:'var(--red)'}}>Current SL</span>
+            <span style={{fontSize:12,fontWeight:700,color:'var(--red)',fontFamily:'var(--font-mono)'}}>₹{currentSL}</span>
+          </div>}
+          {currentTarget > 0 && <div style={{flex:1,padding:'8px 12px',background:'rgba(0,255,136,0.1)',borderRadius:6,border:'1px solid rgba(0,255,136,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:10,color:'var(--accent)'}}>Current Target</span>
+            <span style={{fontSize:12,fontWeight:700,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>₹{currentTarget}</span>
+          </div>}
+        </div>}
+        
+        {/* Action Buttons */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'10px',background:'rgba(255,170,0,0.1)',border:'1px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            🛡️ Set/Update GTT
+          </button>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(partialQty)}} style={{padding:'10px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            📤 Partial Exit
+          </button>
+          <button onClick={()=>{setShowExecution(true);setTxnType('BUY');setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(0,255,136,0.1)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            📈 Add (Pyramid)
+          </button>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(existingQty)}} style={{padding:'10px',background:'rgba(255,68,85,0.1)',border:'1px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            🚪 Full Exit
+          </button>
+        </div>
+        
+        {/* Partial Exit Slider */}
+        <div style={{marginTop:12,padding:12,background:'rgba(0,0,0,0.2)',borderRadius:8}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <span style={{fontSize:10,color:'var(--text-muted)'}}>Partial Exit:</span>
+            <span style={{fontSize:11,fontWeight:700,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{partialExitPct}% = {partialQty} shares = ₹{partialValue.toFixed(0)}</span>
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            {[25,33,50,67,75,100].map(p=>(
+              <button key={p} onClick={()=>setPartialExitPct(p)} style={{flex:1,padding:'6px',fontSize:10,fontWeight:700,borderRadius:4,border:'1px solid',cursor:'pointer',background:partialExitPct===p?'var(--accent2)':'transparent',borderColor:partialExitPct===p?'var(--accent2)':'var(--border-dim)',color:partialExitPct===p?'#000':'var(--text-muted)'}}>{p}%</button>
+            ))}
+          </div>
+          {partialProfit !== 0 && <div style={{marginTop:8,fontSize:10,color:partialProfit>=0?'#00ff88':'#ff4455',textAlign:'center'}}>
+            Partial profit: {partialProfit>=0?'+':''}₹{partialProfit.toFixed(0)} ({((partialQty*(currentPrice-existingEntry))/investedValue*100).toFixed(1)}% of invested)
+          </div>}
+        </div>
+      </div>}
+      
+      {/* Manual Position Entry (if not auto-loaded) */}
+      {!isExistingPosition && <div style={{display:'flex',gap:10,marginBottom:16}}>
+        <button onClick={()=>setIsExistingPosition(true)} style={{padding:'8px 16px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:6,color:'#8844ff',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+          📦 I have an existing position
+        </button>
+        <button onClick={loadExistingPosition} style={{padding:'8px 16px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+          🔄 Load from Trade Log
+        </button>
+      </div>}
+      
+      {/* Manual Entry for Existing Position */}
+      {isExistingPosition && existingEntry === 0 && <div style={{background:'var(--bg-tertiary)',borderRadius:10,padding:16,marginBottom:20}}>
+        <div style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',marginBottom:12}}>Enter your existing position details:</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+          <div>
+            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY PRICE ₹</label>
+            <input type="number" value={existingEntry||''} onChange={e=>{setExistingEntry(+e.target.value);setEntry(+e.target.value)}} placeholder="Your entry price" style={{width:'100%',padding:'10px'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>QUANTITY</label>
+            <input type="number" value={existingQty||''} onChange={e=>{setExistingQty(+e.target.value);setQty(+e.target.value)}} placeholder="Shares held" style={{width:'100%',padding:'10px'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE</label>
+            <input type="date" value={existingDate} onChange={e=>setExistingDate(e.target.value)} style={{width:'100%',padding:'10px'}}/>
+          </div>
+        </div>
+      </div>}
+
+      <div className="section-title">📐 {isExistingPosition ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
       
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
         <div>
