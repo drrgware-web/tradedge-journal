@@ -637,11 +637,10 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[cmpLoading,setCmpLoading]=useState(false);
   const[lastCMPUpdate,setLastCMPUpdate]=useState(null);
   
-  // Fetch live CMP - use daily data for accurate regularMarketPrice
+  // Fetch live CMP - use intraday data for live prices
   const refreshCMP = async () => {
     const wUrl = localStorage.getItem('zd_worker_url');
     if (!wUrl || !symbol) {
-      // Fallback to stockData.price if no worker
       if (stockData?.price) {
         setLiveCMP(stockData.price);
         setLastCMPUpdate(new Date());
@@ -650,45 +649,49 @@ const SmartTradeSetup=({symbol,stockData})=>{
     }
     setCmpLoading(true);
     try {
-      // Use daily interval - has accurate regularMarketPrice
+      // Use 1-minute intraday for live price during market hours
       const res = await fetch(wUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
-        body: JSON.stringify({ ticker: `${symbol}.NS`, range: '5d', interval: '1d' })
+        body: JSON.stringify({ ticker: `${symbol}.NS`, range: '1d', interval: '1m' })
       });
       const data = await res.json();
       const result = data?.chart?.result?.[0];
       
-      // Priority 1: regularMarketPrice (most accurate current price)
+      // Priority 1: regularMarketPrice from meta (most accurate live price)
       const metaPrice = result?.meta?.regularMarketPrice;
       if (metaPrice && metaPrice > 0) {
         setLiveCMP(+metaPrice.toFixed(2));
         setLastCMPUpdate(new Date());
         setCmpLoading(false);
+        console.log('CMP from regularMarketPrice:', metaPrice);
         return;
       }
       
-      // Priority 2: previousClose as fallback
+      // Priority 2: Latest close from intraday candles (most recent 1-min candle)
+      const closes = result?.indicators?.quote?.[0]?.close;
+      if (closes && closes.length > 0) {
+        // Get the last non-null close value
+        const validCloses = closes.filter(c => c != null && c > 0);
+        if (validCloses.length > 0) {
+          const latestPrice = validCloses[validCloses.length - 1];
+          setLiveCMP(+latestPrice.toFixed(2));
+          setLastCMPUpdate(new Date());
+          setCmpLoading(false);
+          console.log('CMP from latest candle:', latestPrice);
+          return;
+        }
+      }
+      
+      // Priority 3: previousClose as fallback (market closed)
       const prevClose = result?.meta?.previousClose || result?.meta?.chartPreviousClose;
       if (prevClose && prevClose > 0) {
         setLiveCMP(+prevClose.toFixed(2));
         setLastCMPUpdate(new Date());
-        setCmpLoading(false);
-        return;
-      }
-      
-      // Priority 3: Latest close from candles
-      const closes = result?.indicators?.quote?.[0]?.close;
-      if (closes && closes.length > 0) {
-        const latestPrice = closes.filter(c => c != null).pop();
-        if (latestPrice) {
-          setLiveCMP(+latestPrice.toFixed(2));
-          setLastCMPUpdate(new Date());
-        }
+        console.log('CMP from previousClose (market may be closed):', prevClose);
       }
     } catch (e) { 
       console.error('CMP refresh error:', e);
-      // Fallback to stockData.price
       if (stockData?.price) {
         setLiveCMP(stockData.price);
       }
@@ -2662,8 +2665,35 @@ const EdgeIntel=()=>{
       
       const recentTRs = trueRanges.slice(-period);
       const atr = recentTRs.reduce((a, b) => a + b, 0) / period;
-      const currentPrice = validCloses[validCloses.length - 1];
+      let currentPrice = validCloses[validCloses.length - 1]; // fallback to last daily close
       const atrPct = (atr / currentPrice) * 100;
+      
+      // ═══ FETCH LIVE INTRADAY PRICE ═══
+      try {
+        const liveRes = await fetch(wUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+          body: JSON.stringify({ ticker: `${sym}.NS`, range: '1d', interval: '1m' })
+        });
+        const liveData = await liveRes.json();
+        const liveResult = liveData?.chart?.result?.[0];
+        
+        // Priority 1: regularMarketPrice
+        if (liveResult?.meta?.regularMarketPrice > 0) {
+          currentPrice = liveResult.meta.regularMarketPrice;
+          console.log('Live price from regularMarketPrice:', currentPrice);
+        } else {
+          // Priority 2: Latest intraday candle close
+          const liveCloses = liveResult?.indicators?.quote?.[0]?.close || [];
+          const validLiveCloses = liveCloses.filter(c => c != null && c > 0);
+          if (validLiveCloses.length > 0) {
+            currentPrice = validLiveCloses[validLiveCloses.length - 1];
+            console.log('Live price from intraday candle:', currentPrice);
+          }
+        }
+      } catch (e) {
+        console.log('Live price fetch failed, using daily close:', currentPrice);
+      }
       
       // ═══ SWING LOW DETECTION ═══
       const findPeriodLow = (days) => {
