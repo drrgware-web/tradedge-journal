@@ -1355,93 +1355,96 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
 
   return(
     <div className="fade-in">
-      {/* ═══ EXISTING POSITION BANNER ═══ */}
-      {isExistingPosition && existingEntry > 0 && existingQty > 0 && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
+      {/* ═══ EXISTING POSITION SECTION ═══ */}
+      {isExistingPosition && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <span style={{fontSize:18}}>📦</span>
             <span style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'#8844ff'}}>EXISTING POSITION</span>
-            <span style={{fontSize:9,padding:'3px 8px',background:'rgba(136,68,255,0.2)',borderRadius:4,color:'#a855f7'}}>{existingDate ? `Bought ${existingDate}` : 'Manual Entry'}</span>
+            {existingEntry > 0 && existingQty > 0 && <span style={{fontSize:9,padding:'3px 8px',background:unrealizedPnL>=0?'rgba(0,255,136,0.2)':'rgba(255,68,85,0.2)',borderRadius:4,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontWeight:700}}>
+              {unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)} ({unrealizedPnLPct.toFixed(1)}%)
+            </span>}
           </div>
           <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0);setExistingDate('')}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
             ✕ New Trade Mode
           </button>
         </div>
         
-        {/* Position Overview */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:16}}>
-          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>ENTRY</div>
-            <div style={{fontSize:16,fontWeight:900,color:'#8844ff',fontFamily:'var(--font-mono)'}}>₹{existingEntry}</div>
+        {/* Entry Form - always visible for editing */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
+          <div>
+            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>BUY PRICE ₹</label>
+            <input type="number" value={existingEntry||''} onChange={e=>{const v=+e.target.value;setExistingEntry(v);setEntry(v)}} placeholder="2350" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700,background:'var(--bg-secondary)'}}/>
           </div>
-          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>QTY</div>
-            <div style={{fontSize:16,fontWeight:900,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{existingQty}</div>
+          <div>
+            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>QUANTITY</label>
+            <input type="number" value={existingQty||''} onChange={e=>{const v=+e.target.value;setExistingQty(v);setQty(v)}} placeholder="50" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700,background:'var(--bg-secondary)'}}/>
           </div>
-          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center',position:'relative'}}>
-            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>
-              CMP 
-              <button onClick={refreshCMP} disabled={cmpLoading} style={{marginLeft:4,padding:'1px 4px',fontSize:8,background:'transparent',border:'1px solid var(--border-dim)',borderRadius:3,color:'var(--text-muted)',cursor:cmpLoading?'wait':'pointer'}}>
-                {cmpLoading?'⏳':'🔄'}
-              </button>
+          <div>
+            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE</label>
+            <input type="date" value={existingDate} onChange={e=>setExistingDate(e.target.value)} style={{width:'100%',padding:'10px',background:'var(--bg-secondary)'}}/>
+          </div>
+        </div>
+        
+        {/* Position Overview - shows when values entered */}
+        {existingEntry > 0 && existingQty > 0 && <>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:12}}>
+            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+              <div style={{fontSize:8,color:'var(--text-muted)'}}>ENTRY</div>
+              <div style={{fontSize:14,fontWeight:900,color:'#8844ff',fontFamily:'var(--font-mono)'}}>₹{existingEntry}</div>
             </div>
-            <div style={{fontSize:16,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{currentPrice.toFixed(2)}</div>
-            {lastCMPUpdate && <div style={{fontSize:7,color:'var(--text-muted)',marginTop:2}}>{lastCMPUpdate.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>}
+            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+              <div style={{fontSize:8,color:'var(--text-muted)'}}>QTY</div>
+              <div style={{fontSize:14,fontWeight:900,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{existingQty}</div>
+            </div>
+            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+              <div style={{fontSize:8,color:'var(--text-muted)'}}>CMP <button onClick={refreshCMP} disabled={cmpLoading} style={{fontSize:7,padding:'1px 3px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:2,color:'var(--text-muted)',cursor:'pointer'}}>{cmpLoading?'⏳':'🔄'}</button></div>
+              <div style={{fontSize:14,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{currentPrice.toFixed(2)}</div>
+            </div>
+            <div style={{padding:'8px',background:unrealizedPnL>=0?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',borderRadius:6,textAlign:'center',border:`1px solid ${unrealizedPnL>=0?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
+              <div style={{fontSize:8,color:'var(--text-muted)'}}>UNREALIZED P&L</div>
+              <div style={{fontSize:14,fontWeight:900,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontFamily:'var(--font-mono)'}}>{unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)}</div>
+            </div>
+            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+              <div style={{fontSize:8,color:'var(--text-muted)'}}>VALUE</div>
+              <div style={{fontSize:14,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{positionValue.toFixed(0)}</div>
+            </div>
           </div>
-          <div style={{padding:'10px',background:unrealizedPnL>=0?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',borderRadius:8,textAlign:'center',border:`1px solid ${unrealizedPnL>=0?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
-            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>P&L</div>
-            <div style={{fontSize:16,fontWeight:900,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontFamily:'var(--font-mono)'}}>{unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)}</div>
-            <div style={{fontSize:9,color:unrealizedPnL>=0?'#00ff88':'#ff4455'}}>{unrealizedPnL>=0?'+':''}{unrealizedPnLPct.toFixed(1)}%</div>
+          
+          {/* Action Buttons */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
+            <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'10px',background:'rgba(255,170,0,0.1)',border:'1px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+              🛡️ Set GTT (SL+TGT)
+            </button>
+            <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(Math.floor(existingQty*partialExitPct/100))}} style={{padding:'10px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+              📤 Partial Exit ({partialExitPct}%)
+            </button>
+            <button onClick={()=>{setShowExecution(true);setTxnType('BUY');setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(0,255,136,0.1)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+              📈 Add (Pyramid)
+            </button>
+            <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(existingQty)}} style={{padding:'10px',background:'rgba(255,68,85,0.1)',border:'1px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+              🚪 Full Exit
+            </button>
           </div>
-          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>VALUE</div>
-            <div style={{fontSize:14,fontWeight:700,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{positionValue.toFixed(0)}</div>
+          
+          {/* Partial Exit Selector */}
+          <div style={{padding:10,background:'rgba(0,0,0,0.2)',borderRadius:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <span style={{fontSize:9,color:'var(--text-muted)'}}>Partial Exit Amount:</span>
+              <span style={{fontSize:10,fontWeight:700,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{partialExitPct}% = {Math.floor(existingQty*partialExitPct/100)} shares = ₹{(Math.floor(existingQty*partialExitPct/100)*currentPrice).toFixed(0)}</span>
+            </div>
+            <div style={{display:'flex',gap:4}}>
+              {[25,33,50,67,75,100].map(p=>(
+                <button key={p} onClick={()=>setPartialExitPct(p)} style={{flex:1,padding:'5px',fontSize:9,fontWeight:700,borderRadius:4,border:'none',cursor:'pointer',background:partialExitPct===p?'var(--accent2)':'var(--bg-tertiary)',color:partialExitPct===p?'#000':'var(--text-muted)'}}>{p}%</button>
+              ))}
+            </div>
           </div>
-        </div>
+        </>}
         
-        {/* Current SL/Target if set */}
-        {(currentSL > 0 || currentTarget > 0) && <div style={{display:'flex',gap:12,marginBottom:16}}>
-          {currentSL > 0 && <div style={{flex:1,padding:'8px 12px',background:'rgba(255,68,85,0.1)',borderRadius:6,border:'1px solid rgba(255,68,85,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:10,color:'var(--red)'}}>Current SL</span>
-            <span style={{fontSize:12,fontWeight:700,color:'var(--red)',fontFamily:'var(--font-mono)'}}>₹{currentSL}</span>
-          </div>}
-          {currentTarget > 0 && <div style={{flex:1,padding:'8px 12px',background:'rgba(0,255,136,0.1)',borderRadius:6,border:'1px solid rgba(0,255,136,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:10,color:'var(--accent)'}}>Current Target</span>
-            <span style={{fontSize:12,fontWeight:700,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>₹{currentTarget}</span>
-          </div>}
+        {/* Hint when values not entered */}
+        {(existingEntry <= 0 || existingQty <= 0) && <div style={{padding:10,background:'rgba(255,170,0,0.1)',borderRadius:6,fontSize:10,color:'#ffaa00',textAlign:'center'}}>
+          ⚠️ Enter Buy Price and Quantity above to see position details and action buttons
         </div>}
-        
-        {/* Action Buttons */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'10px',background:'rgba(255,170,0,0.1)',border:'1px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-            🛡️ Set/Update GTT
-          </button>
-          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(partialQty)}} style={{padding:'10px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-            📤 Partial Exit
-          </button>
-          <button onClick={()=>{setShowExecution(true);setTxnType('BUY');setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(0,255,136,0.1)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-            📈 Add (Pyramid)
-          </button>
-          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(existingQty)}} style={{padding:'10px',background:'rgba(255,68,85,0.1)',border:'1px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-            🚪 Full Exit
-          </button>
-        </div>
-        
-        {/* Partial Exit Slider */}
-        <div style={{marginTop:12,padding:12,background:'rgba(0,0,0,0.2)',borderRadius:8}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <span style={{fontSize:10,color:'var(--text-muted)'}}>Partial Exit:</span>
-            <span style={{fontSize:11,fontWeight:700,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{partialExitPct}% = {partialQty} shares = ₹{partialValue.toFixed(0)}</span>
-          </div>
-          <div style={{display:'flex',gap:6}}>
-            {[25,33,50,67,75,100].map(p=>(
-              <button key={p} onClick={()=>setPartialExitPct(p)} style={{flex:1,padding:'6px',fontSize:10,fontWeight:700,borderRadius:4,border:'1px solid',cursor:'pointer',background:partialExitPct===p?'var(--accent2)':'transparent',borderColor:partialExitPct===p?'var(--accent2)':'var(--border-dim)',color:partialExitPct===p?'#000':'var(--text-muted)'}}>{p}%</button>
-            ))}
-          </div>
-          {partialProfit !== 0 && <div style={{marginTop:8,fontSize:10,color:partialProfit>=0?'#00ff88':'#ff4455',textAlign:'center'}}>
-            Partial profit: {partialProfit>=0?'+':''}₹{partialProfit.toFixed(0)} ({((partialQty*(currentPrice-existingEntry))/investedValue*100).toFixed(1)}% of invested)
-          </div>}
-        </div>
       </div>}
       
       {/* Load from Trade Log + Manual Entry Fallback */}
@@ -1460,34 +1463,7 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </div>
       </div>}
       
-      {/* Manual Entry Form (fallback) - shows until both values entered */}
-      {isExistingPosition && (existingEntry <= 0 || existingQty <= 0) && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-          <div style={{fontSize:12,fontWeight:700,color:'#8844ff'}}>📦 Enter position for {symbol}:</div>
-          <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0)}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
-            ✕ Cancel
-          </button>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,alignItems:'end'}}>
-          <div>
-            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>BUY PRICE ₹</label>
-            <input type="number" value={existingEntry||''} onChange={e=>{setExistingEntry(+e.target.value);setEntry(+e.target.value)}} placeholder="2350" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700}}/>
-          </div>
-          <div>
-            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>QUANTITY</label>
-            <input type="number" value={existingQty||''} onChange={e=>{setExistingQty(+e.target.value);setQty(+e.target.value)}} placeholder="50" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700}}/>
-          </div>
-          <div>
-            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE (optional)</label>
-            <input type="date" value={existingDate} onChange={e=>setExistingDate(e.target.value)} style={{width:'100%',padding:'10px'}}/>
-          </div>
-        </div>
-        <div style={{marginTop:10,fontSize:9,color:'var(--text-muted)'}}>
-          💡 Enter both Buy Price and Quantity, then the position panel will appear with GTT, Trailing SL, and Exit options.
-        </div>
-      </div>}
-      
-      <div className="section-title">📐 {isExistingPosition ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
+      <div className="section-title">📐 {isExistingPosition && existingEntry > 0 && existingQty > 0 ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
       
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
         <div>
