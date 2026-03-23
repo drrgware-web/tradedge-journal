@@ -619,6 +619,48 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[trailATR,setTrailATR]=useState(1); // ATR multiplier
   const[trailEMA,setTrailEMA]=useState(21); // EMA period for trailing
   
+  // Live CMP State
+  const[liveCMP,setLiveCMP]=useState(stockData?.price || 0);
+  const[cmpLoading,setCmpLoading]=useState(false);
+  const[lastCMPUpdate,setLastCMPUpdate]=useState(null);
+  
+  // Fetch live CMP
+  const refreshCMP = async () => {
+    const wUrl = localStorage.getItem('zd_worker_url');
+    if (!wUrl || !symbol) return;
+    setCmpLoading(true);
+    try {
+      const res = await fetch(wUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+        body: JSON.stringify({ ticker: `${symbol}.NS`, range: '1d', interval: '1m' })
+      });
+      const data = await res.json();
+      const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+      if (closes && closes.length > 0) {
+        const latestPrice = closes.filter(c => c != null).pop();
+        if (latestPrice) {
+          setLiveCMP(+latestPrice.toFixed(2));
+          setLastCMPUpdate(new Date());
+        }
+      }
+    } catch (e) { console.error('CMP refresh error:', e); }
+    setCmpLoading(false);
+  };
+  
+  // Auto-refresh CMP every 60s
+  useEffect(() => {
+    if (!symbol) return;
+    refreshCMP(); // Initial fetch
+    const interval = setInterval(refreshCMP, 60000); // Every 60s
+    return () => clearInterval(interval);
+  }, [symbol]);
+  
+  // Update liveCMP when stockData changes
+  useEffect(() => {
+    if (stockData?.price) setLiveCMP(stockData.price);
+  }, [stockData?.price]);
+  
   // Staggered Exit System
   const[enableStaggeredExit,setEnableStaggeredExit]=useState(false);
   const[numTranches,setNumTranches]=useState(3); // 2, 3, or 4 tranches
@@ -720,8 +762,8 @@ const SmartTradeSetup=({symbol,stockData})=>{
     return null;
   };
   
-  // Calculate P&L for existing position
-  const currentPrice = stockData?.price || 0;
+  // Calculate P&L for existing position (using live CMP)
+  const currentPrice = liveCMP || stockData?.price || 0;
   const unrealizedPnL = isExistingPosition && existingEntry > 0 ? (currentPrice - existingEntry) * existingQty : 0;
   const unrealizedPnLPct = isExistingPosition && existingEntry > 0 ? ((currentPrice - existingEntry) / existingEntry * 100) : 0;
   const positionValue = isExistingPosition ? currentPrice * existingQty : 0;
@@ -1119,9 +1161,15 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>QTY</div>
             <div style={{fontSize:16,fontWeight:900,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{existingQty}</div>
           </div>
-          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center'}}>
-            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>CMP</div>
+          <div style={{padding:'10px',background:'var(--bg-tertiary)',borderRadius:8,textAlign:'center',position:'relative'}}>
+            <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>
+              CMP 
+              <button onClick={refreshCMP} disabled={cmpLoading} style={{marginLeft:4,padding:'1px 4px',fontSize:8,background:'transparent',border:'1px solid var(--border-dim)',borderRadius:3,color:'var(--text-muted)',cursor:cmpLoading?'wait':'pointer'}}>
+                {cmpLoading?'⏳':'🔄'}
+              </button>
+            </div>
             <div style={{fontSize:16,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{currentPrice.toFixed(2)}</div>
+            {lastCMPUpdate && <div style={{fontSize:7,color:'var(--text-muted)',marginTop:2}}>{lastCMPUpdate.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>}
           </div>
           <div style={{padding:'10px',background:unrealizedPnL>=0?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',borderRadius:8,textAlign:'center',border:`1px solid ${unrealizedPnL>=0?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
             <div style={{fontSize:9,color:'var(--text-muted)',marginBottom:2}}>P&L</div>
@@ -1213,7 +1261,19 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
         <div>
           <div style={{marginBottom:12}}>
-            <label style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',display:'block',marginBottom:4}}>ENTRY PRICE</label>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <label style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>ENTRY PRICE</label>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{fontSize:9,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>CMP: ₹{liveCMP.toFixed(2)}</span>
+                <button onClick={refreshCMP} disabled={cmpLoading} style={{padding:'2px 6px',fontSize:8,background:'transparent',border:'1px solid var(--accent2)',borderRadius:3,color:'var(--accent2)',cursor:cmpLoading?'wait':'pointer'}} title="Refresh CMP">
+                  {cmpLoading?'⏳':'🔄'}
+                </button>
+                <button onClick={()=>setEntry(liveCMP)} style={{padding:'2px 6px',fontSize:8,background:'rgba(0,200,255,0.2)',border:'1px solid var(--accent2)',borderRadius:3,color:'var(--accent2)',cursor:'pointer'}} title="Use CMP as Entry">
+                  ↓
+                </button>
+                {lastCMPUpdate && <span style={{fontSize:7,color:'var(--text-muted)'}}>@{lastCMPUpdate.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span>}
+              </div>
+            </div>
             <input type="number" value={entry} onChange={e=>setEntry(+e.target.value)} style={{width:'100%'}}/>
           </div>
           <div style={{marginBottom:12}}>
