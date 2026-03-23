@@ -638,10 +638,35 @@ def generate_ai_analysis(rrm_output):
         sorted_by_mom = sorted(w_sectors, key=lambda s: s.get("current", {}).get("rs_momentum", 100), reverse=True)
         top3, bot3 = sorted_by_mom[:3], sorted_by_mom[-3:]
         d_map = {s["symbol"]: s.get("quadrant", "") for s in d_sectors}
-        rotating = [f"{s['name']}: {s.get('quadrant','')} → {d_map.get(s['symbol'],'')}" for s in w_sectors if d_map.get(s["symbol"],"") and d_map[s["symbol"]] != s.get("quadrant","")]
-        global_summary = [f"{g['name']}: RS={g.get('current',{}).get('rs_ratio',100):.1f}, Q={g.get('quadrant','?')}" for g in w_globals[:10]]
+        rotating = []
+        for s in w_sectors:
+            dq = d_map.get(s["symbol"], "")
+            wq = s.get("quadrant", "")
+            if dq and wq and dq != wq:
+                rotating.append(s["name"] + ": " + wq + " → " + dq)
+        global_summary = []
+        for g in w_globals[:10]:
+            cur = g.get("current", {})
+            global_summary.append(g["name"] + ": RS=" + str(round(cur.get("rs_ratio", 100), 1)) + ", Q=" + g.get("quadrant", "?"))
 
-        context = f"DATE:{today}\nQuadrant:L{q_dist['Leading']} I{q_dist['Improving']} W{q_dist['Weakening']} Lg{q_dist['Lagging']}\nRight:{right_pct}% Regime:{regime}\nTop3:{'; '.join([f'{s[\"name\"]}:RS{s[\"current\"][\"rs_ratio\"]:.1f},M{s[\"current\"][\"rs_momentum\"]:.1f}' for s in top3])}\nBot3:{'; '.join([f'{s[\"name\"]}:RS{s[\"current\"][\"rs_ratio\"]:.1f},M{s[\"current\"][\"rs_momentum\"]:.1f}' for s in bot3])}\nRotation:{'; '.join(rotating) if rotating else 'None'}\nGlobal:{'; '.join(global_summary)}\nAll:{'; '.join([f'{s[\"name\"]}:{s[\"quadrant\"]},RSI{s[\"current\"].get(\"rsi\",\"?\")}' for s in w_sectors])}"
+        # Build context parts without backslashes in f-strings
+        top3_str = "; ".join([s["name"] + ":RS" + str(round(s["current"]["rs_ratio"], 1)) + ",M" + str(round(s["current"]["rs_momentum"], 1)) for s in top3])
+        bot3_str = "; ".join([s["name"] + ":RS" + str(round(s["current"]["rs_ratio"], 1)) + ",M" + str(round(s["current"]["rs_momentum"], 1)) for s in bot3])
+        rot_str = "; ".join(rotating) if rotating else "None"
+        glob_str = "; ".join(global_summary)
+        all_str = "; ".join([s["name"] + ":" + s["quadrant"] + ",RSI" + str(s["current"].get("rsi", "?")) for s in w_sectors])
+
+        context = (
+            "DATE:" + today + "\n"
+            "Quadrant:L" + str(q_dist["Leading"]) + " I" + str(q_dist["Improving"]) +
+            " W" + str(q_dist["Weakening"]) + " Lg" + str(q_dist["Lagging"]) + "\n"
+            "Right:" + str(right_pct) + "% Regime:" + regime + "\n"
+            "Top3:" + top3_str + "\n"
+            "Bot3:" + bot3_str + "\n"
+            "Rotation:" + rot_str + "\n"
+            "Global:" + glob_str + "\n"
+            "All:" + all_str
+        )
 
         prompt = f"You are a senior equity analyst. Write an EOD note for Indian markets. Bloomberg style, opinionated, specific numbers, 2-3 themes, OW/UW recs, 3 actionable calls for swing traders. Under 600 words. ## headers.\n\n{context}"
 
