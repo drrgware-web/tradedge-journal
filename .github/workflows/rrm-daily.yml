@@ -1,12 +1,20 @@
 name: RRM Daily Fetch
+
 on:
   schedule:
-    - cron: '0 12 * * 1-5'  # 5:30 PM IST (12:00 UTC) Mon-Fri
+    # 5:37 PM IST (12:07 UTC) Mon-Fri
+    # Shifted from :00 to :07 to avoid GitHub's peak-load queue drops
+    - cron: '7 12 * * 1-5'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,12 +27,44 @@ jobs:
         run: pip install yfinance numpy
 
       - name: Run RRM Fetcher
+        id: fetch
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           cd scripts
           python rrm_fetcher.py -o ../data/rrm_data.json \
             --daily-tail 8 --weekly-tail 8 --monthly-tail 8
+        continue-on-error: true
+
+      - name: Retry on failure
+        if: steps.fetch.outcome == 'failure'
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          echo "⚠ First attempt failed, retrying in 60s..."
+          sleep 60
+          cd scripts
+          python rrm_fetcher.py -o ../data/rrm_data.json \
+            --daily-tail 8 --weekly-tail 8 --monthly-tail 8
+
+      - name: Inject generation timestamp
+        if: success()
+        run: |
+          python3 -c "
+          import json
+          from datetime import datetime, timezone
+          try:
+              with open('data/rrm_data.json', 'r') as f:
+                  data = json.load(f)
+              if 'metadata' not in data:
+                  data['metadata'] = {}
+              data['metadata']['generated_at'] = datetime.now(timezone.utc).isoformat()
+              with open('data/rrm_data.json', 'w') as f:
+                  json.dump(data, f)
+              print('Timestamp injected')
+          except Exception as e:
+              print(f'Timestamp skip: {e}')
+          "
 
       - name: Commit and push
         run: |
