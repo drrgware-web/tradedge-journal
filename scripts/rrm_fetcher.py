@@ -601,58 +601,137 @@ def quadrant(r, m):
     return "Weakening"
 
 # =============================================================================
-# FETCH PRICES — UPDATED with NSE API fallback
+# TICKER ALIASES — yfinance alternative formats for thematic indices
+# =============================================================================
+# Problem: NIFTY_XXXXX.NS format fails on yfinance ("Period 'max' invalid")
+# Solution: Map to ^CNX prefix tickers (proven working) or no-underscore format
+# The fetch_prices() function tries: original → alias → NSE API fallback
+
+TICKER_ALIASES = {
+    # ── Sectoral indices → ^CNX equivalents (CONFIRMED WORKING) ──
+    "NIFTY_AUTO.NS":            ["^CNXAUTO"],
+    "NIFTY_BANK.NS":            ["^NSEBANK"],
+    "NIFTY_ENERGY.NS":          ["^CNXENERGY"],
+    "NIFTY_FMCG.NS":            ["^CNXFMCG"],
+    "NIFTY_IT.NS":              ["^CNXIT"],
+    "NIFTY_MEDIA.NS":           ["^CNXMEDIA"],
+    "NIFTY_METAL.NS":           ["^CNXMETAL"],
+    "NIFTY_REALTY.NS":          ["^CNXREALTY"],
+    "NIFTY_PSU_BANK.NS":        ["^CNXPSUBANK"],
+    "NIFTY_PHARMA.NS":          ["^CNXPHARMA"],
+    "NIFTY_COMMODITIES.NS":     ["^CNXCMDT"],
+    "NIFTY_CONSUMPTION.NS":     ["^CNXCONSUM"],
+    "NIFTY_INFRA.NS":           ["^CNXINFRA"],
+    "NIFTY_MNC.NS":             ["^CNXMNC"],
+    "NIFTY_PSE.NS":             ["^CNXPSE"],
+    "NIFTY_SERV_SECTOR.NS":     ["^CNXSERVICE"],
+    "NIFTY_FIN_SERVICE.NS":     ["^CNXFIN"],
+    # ── Sectoral (no ^CNX but try no-underscore) ──
+    "NIFTY_CONSR_DURBL.NS":     ["NIFTYCONSRDURBL.NS", "NIFTYCONSDURBL.NS"],
+    "NIFTY_HEALTHCARE.NS":      ["NIFTYHEALTHCARE.NS", "NIFTYPHARMA.NS"],
+    "NIFTY_OIL_AND_GAS.NS":     ["NIFTYOILGAS.NS", "^CNXENERGY"],
+    "NIFTY_PVT_BANK.NS":        [],  # Works as-is
+    "NIFTY_CHEMICALS.NS":       ["NIFTYCHEM.NS"],
+    # ── Thematic (try no-underscore format) ──
+    "NIFTY_CPSE.NS":            ["NIFTYCPSE.NS", "^CNXPSE"],
+    "NIFTY_IND_DIGITAL.NS":     ["NIFTYINDDIGITAL.NS"],
+    "NIFTY_INDIA_MFG.NS":       ["NIFTYINDIAMFG.NS"],
+    "NIFTY_GROWSECT_15.NS":     ["NIFTYGROWSECT15.NS"],
+    "NIFTY_IND_DEFENCE.NS":     ["NIFTYINDDEFENCE.NS"],
+    "NIFTY_IND_TOURISM.NS":     ["NIFTYINDTOURISM.NS"],
+    "NIFTY_CAPITAL_MKT.NS":     ["NIFTYCAPMKT.NS"],
+    "NIFTY_EV.NS":              ["NIFTYEV.NS"],
+    "NIFTY_HOUSING.NS":         ["NIFTYHOUSING.NS"],
+    "NIFTY_COREHOUSING.NS":     ["NIFTYCOREHOUSING.NS"],
+    "NIFTY_INTERNET.NS":        ["NIFTYINTERNET.NS"],
+    "NIFTY_MOBILITY.NS":        ["NIFTYMOBILITY.NS"],
+    "NIFTY_RURAL.NS":           ["NIFTYRURAL.NS"],
+    "NIFTY_WAVES.NS":           ["NIFTYWAVES.NS"],
+    # ── Strategy ──
+    "NIFTY_FIN_SRV_25_50.NS":   ["NIFTYFINSRV2550.NS", "^CNXFIN"],
+    "NIFTY_FINSRV_EX_BANK.NS":  ["NIFTYFINSRVEXBANK.NS"],
+    "NIFTY_MS_FIN_SERV.NS":     ["NIFTYMSFINSRV.NS"],
+    "NIFTY_MS_IT_TELECOM.NS":   ["NIFTYMSITTELECOM.NS"],
+    "NIFTY_MS_IND_CONS.NS":     ["NIFTYMSINDCONS.NS"],
+    "NIFTY_MIDSML_HLTH.NS":     ["NIFTYMIDSMLHLTH.NS"],
+    "NIFTY_NEW_CONSUMP.NS":     ["NIFTYNEWCONSUMP.NS"],
+    "NIFTY_NONCYC_CONS.NS":     ["NIFTYNONCYCCONS.NS"],
+    "NIFTY_TRANS_LOGIS.NS":     ["NIFTYTRANSLOGIS.NS"],
+    "NIFTY_INFRA_LOG.NS":       ["NIFTYINFRALOG.NS"],
+    "NIFTY_CORP_MAATR.NS":      ["NIFTYCORPMAATR.NS"],
+    "NIFTY_TELECOM.NS":         ["NIFTYTELECOM.NS"],
+}
+
+# =============================================================================
+# FETCH PRICES — with ticker alias retry + NSE API fallback
 # =============================================================================
 def is_thematic_ticker(sym):
     """Check if a symbol is a NIFTY_XXXXX.NS thematic index ticker."""
     return sym.startswith("NIFTY_") and sym.endswith(".NS")
 
+def _try_yfinance(sym, period="5y"):
+    """Try fetching a single symbol from yfinance. Returns (closes, dates) or None."""
+    try:
+        h = yf.Ticker(sym).history(period=period, interval="1d")
+        if (h.empty or len(h) < 30) and period != "max":
+            h = yf.Ticker(sym).history(period="max", interval="1d")
+        if not h.empty and len(h) >= 30:
+            return {
+                "closes": h['Close'].dropna().tolist(),
+                "dates": [d.strftime("%Y-%m-%d") for d in h.index],
+            }
+    except Exception:
+        pass
+    return None
+
 def fetch_prices(symbols, period="5y", thematic_tickers=None):
     """
-    Fetch prices for all symbols. For thematic index tickers that fail on 
-    yfinance, automatically falls back to NSE Direct API.
+    Fetch prices with multi-format retry for thematic indices.
     
-    Args:
-        symbols: List of ticker symbols
-        period: yfinance period string (default "5y")
-        thematic_tickers: Set of tickers that are thematic indices (for NSE fallback)
+    Strategy:
+    1. Try original ticker on yfinance
+    2. If thematic ticker fails → try each alias in TICKER_ALIASES
+    3. If all aliases fail → queue for NSE Direct API fallback
     """
     if thematic_tickers is None:
         thematic_tickers = set()
     
     log.info(f"Fetching {len(symbols)} symbols from Yahoo Finance...")
     out = {}
-    failed_thematic = []  # Track thematic tickers that fail on yfinance
+    failed_thematic = []
     
     for sym in symbols:
-        try:
-            h = yf.Ticker(sym).history(period=period, interval="1d")
-            if (h.empty or len(h) < 30) and period != "max":
-                h = yf.Ticker(sym).history(period="max", interval="1d")
-                if not h.empty and len(h) >= 30:
-                    log.info(f"  ✓ {sym}: {len(h)} days (fallback: max)")
-            if h.empty or len(h) < 30:
-                if sym in thematic_tickers or is_thematic_ticker(sym):
-                    failed_thematic.append(sym)
-                    log.info(f"  ⚠ {sym}: yfinance failed, queued for NSE API")
-                else:
-                    log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows")
-                continue
-            out[sym] = {
-                "closes": h['Close'].dropna().tolist(),
-                "dates": [d.strftime("%Y-%m-%d") for d in h.index],
-            }
-            log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days")
-        except Exception as e:
-            if sym in thematic_tickers or is_thematic_ticker(sym):
+        # Step 1: Try original ticker
+        result = _try_yfinance(sym, period)
+        
+        if result:
+            out[sym] = result
+            log.info(f"  ✓ {sym}: {len(result['closes'])} days")
+            continue
+        
+        # Step 2: If thematic, try aliases
+        if sym in thematic_tickers or is_thematic_ticker(sym):
+            aliases = TICKER_ALIASES.get(sym, [])
+            alias_found = False
+            
+            for alias in aliases:
+                alias_result = _try_yfinance(alias, period)
+                if alias_result:
+                    # Store under ORIGINAL symbol name (so config mapping works)
+                    out[sym] = alias_result
+                    log.info(f"  ✓ {sym}: {len(alias_result['closes'])} days (via alias {alias})")
+                    alias_found = True
+                    break
+            
+            if not alias_found:
                 failed_thematic.append(sym)
-                log.info(f"  ⚠ {sym}: yfinance error ({e}), queued for NSE API")
-            else:
-                log.error(f"  ✗ {sym}: {e}")
+                log.info(f"  ⚠ {sym}: yfinance + aliases failed, queued for NSE API")
+        else:
+            log.warning(f"  ✗ {sym}: no data")
     
     log.info(f"  yfinance: {len(out)}/{len(symbols)} symbols")
     
-    # ── NSE Direct API Fallback ──
+    # Step 3: NSE Direct API Fallback for remaining failures
     if failed_thematic:
         log.info(f"\n═══ NSE DIRECT API FALLBACK: {len(failed_thematic)} thematic indices ═══")
         nse = get_nse_fetcher()
@@ -671,6 +750,8 @@ def fetch_prices(symbols, period="5y", thematic_tickers=None):
                 log.error(f"  NSE ✗ {sym}: {e}")
         
         log.info(f"  NSE API: {nse_success}/{len(failed_thematic)} recovered")
+    else:
+        log.info("  All thematic tickers resolved via yfinance aliases!")
     
     log.info(f"  Total fetched: {len(out)}/{len(symbols)} symbols")
     return out
