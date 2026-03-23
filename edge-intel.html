@@ -899,36 +899,45 @@ const SmartTradeSetup=({symbol,stockData})=>{
       setCurrentSL(0);
       setCurrentTarget(0);
       
-      // Helper: Check if trade is an open BUY position
-      const isOpenBuyPosition = (t) => {
+      // Helper: Check if trade is an OPEN BUY position for this symbol
+      const isOpenPosition = (t) => {
+        // Match symbol
         const sym = (t.symbol || t.stock || '').toUpperCase();
         if(sym !== symbol.toUpperCase()) return false;
         
-        // Check status field - could be Open, Partial, or not set
+        // Must be Open or Partial status (NOT Closed)
         const status = (t.status || '').toLowerCase();
         if(status === 'closed' || status === 'exited' || status === 'sold') return false;
+        if(status !== 'open' && status !== 'partial') return false;
         
-        // Check if it's a BUY trade (not a SELL)
-        const side = (t.side || t.action || t.txnType || 'buy').toUpperCase();
-        if(side === 'SELL') return false;
-        
-        // Check if qty > 0
-        const qty = t.qty || t.quantity || t.open_qty || 0;
-        if(qty <= 0) return false;
+        // Must be a BUY side (we want long positions, not shorts)
+        const side = (t.side || t.action || t.txnType || '').toUpperCase();
+        if(side === 'SELL') return false; // Skip short positions for now
         
         return true;
       };
       
-      // Check localStorage first (te_trades key)
-      let localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-      let openTrade = localTrades.find(isOpenBuyPosition);
+      // Calculate open qty from entries/exits
+      const calcOpenQty = (trade) => {
+        const entries = trade.entries || [];
+        const exits = trade.exits || [];
+        const totalBought = entries.reduce((sum, e) => sum + (e.qty || 0), 0);
+        const totalSold = exits.reduce((sum, e) => sum + (e.qty || 0), 0);
+        return totalBought - totalSold;
+      };
       
-      // Also check tradedge_trades if not found (alternate key)
-      if(!openTrade) {
-        const altTrades = JSON.parse(localStorage.getItem('tradedge_trades') || '[]');
-        openTrade = altTrades.find(isOpenBuyPosition);
-        if(openTrade) localTrades = altTrades;
-      }
+      // Calculate average entry price
+      const calcAvgEntry = (trade) => {
+        const entries = trade.entries || [];
+        if(entries.length === 0) return trade.price || trade.entry_price || 0;
+        const totalValue = entries.reduce((sum, e) => sum + (e.price * e.qty), 0);
+        const totalQty = entries.reduce((sum, e) => sum + e.qty, 0);
+        return totalQty > 0 ? totalValue / totalQty : 0;
+      };
+      
+      // Check localStorage
+      const localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+      let openTrade = localTrades.find(isOpenPosition);
       
       // If not found locally, try Supabase
       if(!openTrade) {
@@ -946,9 +955,8 @@ const SmartTradeSetup=({symbol,stockData})=>{
               const cloudTrades = typeof rows[0].trades_json === 'string' 
                 ? JSON.parse(rows[0].trades_json) 
                 : rows[0].trades_json;
-              openTrade = cloudTrades.find(isOpenBuyPosition);
+              openTrade = (Array.isArray(cloudTrades) ? cloudTrades : []).find(isOpenPosition);
               
-              // Sync cloud trades to local if found
               if(openTrade) {
                 localStorage.setItem('te_trades', JSON.stringify(cloudTrades));
                 console.log('Synced trades from Supabase');
@@ -960,27 +968,28 @@ const SmartTradeSetup=({symbol,stockData})=>{
         }
       }
       
-      // Debug: Log what we found
+      // Debug log
       console.log('Trade Log Check for', symbol, ':', openTrade ? 'FOUND' : 'NOT FOUND', openTrade);
       
       // Apply found position
       if(openTrade) {
-        const entryPrice = openTrade.avg_entry || openTrade.avg_price || openTrade.entry_price || openTrade.price || openTrade.buy_price || 0;
-        const quantity = openTrade.open_qty || openTrade.qty || openTrade.quantity || 0;
+        const avgEntry = calcAvgEntry(openTrade);
+        const openQty = calcOpenQty(openTrade);
+        const lastEntry = openTrade.entries?.[openTrade.entries.length - 1];
         
         setIsExistingPosition(true);
-        setExistingEntry(+entryPrice);
-        setExistingQty(+quantity);
-        setExistingDate(openTrade.ts || openTrade.date || openTrade.buy_date ? new Date(openTrade.ts || openTrade.date || openTrade.buy_date).toLocaleDateString('en-IN') : '');
-        setCurrentSL(+(openTrade.sl || openTrade.stop_loss || 0));
+        setExistingEntry(+avgEntry.toFixed(2));
+        setExistingQty(openQty);
+        setExistingDate(lastEntry?.date || openTrade.ts || '');
+        setCurrentSL(+(openTrade.sl || 0));
         setCurrentTarget(+(openTrade.target || openTrade.tgt || 0));
-        setEntry(+entryPrice);
-        setQty(+quantity);
-        setSL(+(openTrade.sl || openTrade.stop_loss || 0));
+        setEntry(+avgEntry.toFixed(2));
+        setQty(openQty);
+        setSL(+(openTrade.sl || 0));
         setTarget(+(openTrade.target || openTrade.tgt || 0));
         
-        console.log('✓ Auto-loaded position:', symbol, 'Qty:', quantity, 'Entry:', entryPrice);
-        addToast(`📦 Loaded: ${symbol} × ${quantity} @ ₹${entryPrice}`, 'info', 3000);
+        console.log('✓ Auto-loaded position:', symbol, 'Qty:', openQty, 'Avg Entry:', avgEntry.toFixed(2));
+        addToast(`📦 Loaded: ${symbol} × ${openQty} @ ₹${avgEntry.toFixed(2)}`, 'info', 3000);
       } else {
         // No position found - new trade mode with defaults
         console.log('No open position for', symbol, '- setting defaults');
@@ -1550,69 +1559,105 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       </div>}
       
       {/* No position in Trade Log - just show info */}
-      {!isExistingPosition && <div style={{marginBottom:16,padding:'10px 14px',background:'rgba(0,0,0,0.2)',borderRadius:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span style={{fontSize:10,color:'var(--text-muted)'}}>No open position for <strong style={{color:'var(--accent2)'}}>{symbol}</strong> in Trade Log</span>
-        <button onClick={async()=>{
-          setLoadingPosition(true);
-          
-          // Helper: Check if trade is an open BUY position
-          const isOpenBuy = (t) => {
-            const sym = (t.symbol || t.stock || '').toUpperCase();
-            if(sym !== symbol.toUpperCase()) return false;
-            const status = (t.status || '').toLowerCase();
-            if(status === 'closed' || status === 'exited' || status === 'sold') return false;
-            const side = (t.side || t.action || t.txnType || 'buy').toUpperCase();
-            if(side === 'SELL') return false;
-            const qty = t.qty || t.quantity || t.open_qty || 0;
-            return qty > 0;
-          };
-          
-          // Check both localStorage keys
-          let localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-          let found = localTrades.find(isOpenBuy);
-          
-          if(!found) {
-            const altTrades = JSON.parse(localStorage.getItem('tradedge_trades') || '[]');
-            found = altTrades.find(isOpenBuy);
-          }
-          
-          // Also try Supabase
-          if(!found) {
-            try {
-              const SB_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
-              const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NDYwNzYsImV4cCI6MjA1ODEyMjA3Nn0.sHYFRy1U-oSVwVaLqPX1qSTBE5_sXCYCzPnC5Wrbdw';
-              const res = await fetch(`${SB_URL}/rest/v1/tradedge_trades?select=trades_json&order=updated_at.desc&limit=1`, {
-                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-              });
-              if (res.ok) {
-                const rows = await res.json();
-                if (rows.length > 0 && rows[0].trades_json) {
-                  const cloudTrades = typeof rows[0].trades_json === 'string' ? JSON.parse(rows[0].trades_json) : rows[0].trades_json;
-                  found = cloudTrades.find(isOpenBuy);
-                  if(found) localStorage.setItem('te_trades', JSON.stringify(cloudTrades));
+      {!isExistingPosition && <div style={{marginBottom:16,padding:'10px 14px',background:'rgba(0,0,0,0.2)',borderRadius:8}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <span style={{fontSize:10,color:'var(--text-muted)'}}>No open position for <strong style={{color:'var(--accent2)'}}>{symbol}</strong> in Trade Log</span>
+          <button onClick={async()=>{
+            setLoadingPosition(true);
+            
+            // Helper: Check if trade is OPEN for this symbol
+            const isOpenPosition = (t) => {
+              const sym = (t.symbol || '').toUpperCase();
+              if(sym !== symbol.toUpperCase()) return false;
+              const status = (t.status || '').toLowerCase();
+              return status === 'open' || status === 'partial';
+            };
+            
+            // Calculate from entries/exits
+            const calcOpenQty = (trade) => {
+              const entries = trade.entries || [];
+              const exits = trade.exits || [];
+              return entries.reduce((s,e) => s + (e.qty||0), 0) - exits.reduce((s,e) => s + (e.qty||0), 0);
+            };
+            const calcAvgEntry = (trade) => {
+              const entries = trade.entries || [];
+              if(entries.length === 0) return 0;
+              const totalValue = entries.reduce((s,e) => s + (e.price * e.qty), 0);
+              const totalQty = entries.reduce((s,e) => s + e.qty, 0);
+              return totalQty > 0 ? totalValue / totalQty : 0;
+            };
+            
+            // Check localStorage
+            const localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+            let found = localTrades.find(isOpenPosition);
+            let foundSource = 'localStorage';
+            
+            // Also try Supabase
+            if(!found) {
+              try {
+                const SB_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+                const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NDYwNzYsImV4cCI6MjA1ODEyMjA3Nn0.sHYFRy1U-oSVwVaLqPX1qSTBE5_sXCYCzPnC5Wrbdw';
+                const res = await fetch(`${SB_URL}/rest/v1/tradedge_trades?select=trades_json&order=updated_at.desc&limit=1`, {
+                  headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+                });
+                if (res.ok) {
+                  const rows = await res.json();
+                  if (rows.length > 0 && rows[0].trades_json) {
+                    const cloudTrades = typeof rows[0].trades_json === 'string' ? JSON.parse(rows[0].trades_json) : rows[0].trades_json;
+                    found = (Array.isArray(cloudTrades) ? cloudTrades : []).find(isOpenPosition);
+                    if(found) {
+                      foundSource = 'Supabase';
+                      localStorage.setItem('te_trades', JSON.stringify(cloudTrades));
+                    }
+                  }
                 }
-              }
-            } catch(e) { console.log('Supabase check failed'); }
-          }
-          
-          if(found) {
-            const ep = +(found.avg_entry || found.avg_price || found.entry_price || found.price || found.buy_price || 0);
-            const q = +(found.open_qty || found.qty || found.quantity || 0);
-            setIsExistingPosition(true);
-            setExistingEntry(ep);
-            setExistingQty(q);
-            setEntry(ep);
-            setQty(q);
-            setCurrentSL(+(found.sl || found.stop_loss || 0));
-            setCurrentTarget(+(found.target || found.tgt || 0));
-            addToast(`📦 Found: ${symbol} × ${q} @ ₹${ep}`, 'success', 3000);
-          } else {
-            addToast(`No open position for ${symbol}`, 'info', 2000);
-          }
-          setLoadingPosition(false);
-        }} disabled={loadingPosition} style={{padding:'6px 12px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:4,color:'#8844ff',fontSize:9,fontWeight:700,cursor:loadingPosition?'wait':'pointer'}}>
-          {loadingPosition ? '⏳' : '🔄 Re-check'}
-        </button>
+              } catch(e) { console.log('Supabase check failed:', e); }
+            }
+            
+            if(found) {
+              const avgEntry = calcAvgEntry(found);
+              const openQty = calcOpenQty(found);
+              setIsExistingPosition(true);
+              setExistingEntry(+avgEntry.toFixed(2));
+              setExistingQty(openQty);
+              setEntry(+avgEntry.toFixed(2));
+              setQty(openQty);
+              setCurrentSL(+(found.sl || 0));
+              setCurrentTarget(+(found.target || 0));
+              addToast(`📦 Found in ${foundSource}: ${symbol} × ${openQty} @ ₹${avgEntry.toFixed(2)}`, 'success', 3000);
+            } else {
+              addToast(`No open position for ${symbol}`, 'info', 2000);
+            }
+            setLoadingPosition(false);
+          }} disabled={loadingPosition} style={{padding:'6px 12px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:4,color:'#8844ff',fontSize:9,fontWeight:700,cursor:loadingPosition?'wait':'pointer'}}>
+            {loadingPosition ? '⏳' : '🔄 Re-check'}
+          </button>
+        </div>
+        
+        {/* Debug: Show what's in localStorage */}
+        <details style={{fontSize:9,color:'var(--text-muted)'}}>
+          <summary style={{cursor:'pointer',marginBottom:4}}>🔍 Debug: Check localStorage</summary>
+          <div style={{padding:8,background:'rgba(0,0,0,0.3)',borderRadius:4,fontFamily:'var(--font-mono)',fontSize:8,maxHeight:150,overflow:'auto'}}>
+            {(() => {
+              try {
+                const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+                const matching = trades.filter(t => (t.symbol||'').toUpperCase() === symbol.toUpperCase());
+                return <div>
+                  <div style={{marginBottom:4}}>Total trades: {trades.length}</div>
+                  <div style={{marginBottom:4}}>Matching {symbol}: {matching.length}</div>
+                  {matching.map((t,i) => (
+                    <div key={i} style={{marginBottom:4,padding:4,background:'rgba(255,255,255,0.05)',borderRadius:2}}>
+                      <strong style={{color: t.status==='Open'||t.status==='Partial' ? '#00ff88' : '#ff4455'}}>{t.status}</strong> | 
+                      Side: {t.side} | 
+                      Entries: {t.entries?.length||0} (₹{t.entries?.[0]?.price} × {t.entries?.[0]?.qty}) | 
+                      Exits: {t.exits?.length||0}
+                    </div>
+                  ))}
+                </div>;
+              } catch(e) { return 'Error: ' + e.message; }
+            })()}
+          </div>
+        </details>
       </div>}
       
       <div className="section-title">📐 {isExistingPosition && existingEntry > 0 && existingQty > 0 ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
