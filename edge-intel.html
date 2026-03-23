@@ -1174,7 +1174,126 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       const isSuccess = res?.data || res?.status === 'success' || res?.orderId || orderId;
       
       if(isSuccess){
-        // Build comprehensive trade object
+        const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+        const orderQty = positionSize || qty;
+        const now = new Date().toISOString();
+        
+        // ═══ AUTO-UPDATE EXISTING POSITION ═══
+        if(isExistingPosition && existingEntry > 0) {
+          // Find the existing trade for this symbol
+          const existingIdx = trades.findIndex(t => 
+            t.symbol?.toUpperCase() === symbol?.toUpperCase() && 
+            (t.status === 'Open' || t.status === 'Partial')
+          );
+          
+          if(existingIdx >= 0) {
+            const existingTrade = trades[existingIdx];
+            
+            if(txnType === 'SELL') {
+              // ── PARTIAL or FULL EXIT ──
+              const newQty = (existingTrade.qty || existingTrade.quantity || 0) - orderQty;
+              const exitPrice = entry;
+              const exitValue = orderQty * exitPrice;
+              const costBasis = orderQty * (existingTrade.entry_price || existingTrade.price);
+              const realizedPnL = exitValue - costBasis;
+              
+              // Initialize partial_exits array if not exists
+              if(!existingTrade.partial_exits) existingTrade.partial_exits = [];
+              
+              // Record this exit
+              existingTrade.partial_exits.push({
+                qty: orderQty,
+                price: exitPrice,
+                pnl: +realizedPnL.toFixed(2),
+                ts: now,
+                order_id: orderId
+              });
+              
+              // Update remaining quantity
+              existingTrade.qty = newQty;
+              existingTrade.quantity = newQty;
+              
+              // Calculate total realized P&L
+              existingTrade.realized_pnl = (existingTrade.realized_pnl || 0) + realizedPnL;
+              
+              if(newQty <= 0) {
+                // ── FULL EXIT ──
+                existingTrade.status = 'Closed';
+                existingTrade.exit_price = exitPrice;
+                existingTrade.exit_date = now;
+                existingTrade.qty = 0;
+                existingTrade.quantity = 0;
+                addToast(`🚪 Position CLOSED: ${symbol} — Realized P&L: ₹${existingTrade.realized_pnl.toFixed(0)}`, 'success', 5000);
+                
+                // Reset existing position state
+                setIsExistingPosition(false);
+                setExistingEntry(0);
+                setExistingQty(0);
+              } else {
+                // ── PARTIAL EXIT ──
+                existingTrade.status = 'Partial';
+                addToast(`📤 Partial Exit: Sold ${orderQty} @ ₹${exitPrice} — Remaining: ${newQty} shares`, 'success', 5000);
+                
+                // Update state to reflect new quantity
+                setExistingQty(newQty);
+                setQty(newQty);
+              }
+              
+              existingTrade.last_updated = now;
+              trades[existingIdx] = existingTrade;
+              
+            } else if(txnType === 'BUY') {
+              // ── ADD TO POSITION (PYRAMID) ──
+              const oldQty = existingTrade.qty || existingTrade.quantity || 0;
+              const oldAvg = existingTrade.avg_price || existingTrade.entry_price || existingTrade.price;
+              const newQty = oldQty + orderQty;
+              
+              // Calculate new average price
+              const totalCost = (oldQty * oldAvg) + (orderQty * entry);
+              const newAvg = totalCost / newQty;
+              
+              // Initialize additions array if not exists
+              if(!existingTrade.additions) existingTrade.additions = [];
+              
+              // Record this addition
+              existingTrade.additions.push({
+                qty: orderQty,
+                price: entry,
+                ts: now,
+                order_id: orderId
+              });
+              
+              // Update position
+              existingTrade.qty = newQty;
+              existingTrade.quantity = newQty;
+              existingTrade.avg_price = +newAvg.toFixed(2);
+              existingTrade.last_updated = now;
+              
+              trades[existingIdx] = existingTrade;
+              
+              addToast(`📈 Pyramid: Added ${orderQty} @ ₹${entry} — New Avg: ₹${newAvg.toFixed(2)}, Total: ${newQty} shares`, 'success', 5000);
+              
+              // Update state
+              setExistingQty(newQty);
+              setExistingEntry(+newAvg.toFixed(2));
+              setEntry(+newAvg.toFixed(2));
+              setQty(newQty);
+            }
+            
+            // Save updated trades
+            localStorage.setItem('te_trades', JSON.stringify(trades));
+            
+            // Sync to Supabase
+            const synced = await syncTradesToSupabase(trades);
+            if(synced) addToast('📡 Synced to cloud', 'info', 2000);
+            
+            console.log('Position updated:', trades[existingIdx]);
+            setExecuting(false);
+            return;
+          }
+        }
+        
+        // ═══ NEW TRADE (not existing position) ═══
         const tradeRecord = {
           id: Date.now(),
           order_id: orderId,
@@ -1182,8 +1301,9 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
           action: txnType,
           entry_price: entry,
           price: entry,
-          qty: positionSize || qty,
-          quantity: positionSize || qty,
+          avg_price: entry,
+          qty: orderQty,
+          quantity: orderQty,
           target,
           sl,
           rr: parseFloat(rr) || 0,
@@ -1192,26 +1312,27 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
           broker,
           product,
           order_type: orderType,
-          execution_type: enableGTT ? 'GTT' : enableBracket ? 'BRACKET' : 'REGULAR',
+          execution_type: enableGTTEntry ? 'GTT_ENTRY' : enableAMO ? 'AMO' : enableGTT ? 'GTT' : enableBracket ? 'BRACKET' : 'REGULAR',
           trailing: enableTrail ? getTrailValue() : 0,
           trail_method: enableTrail ? trailMethod : null,
           atr: stockData?.atr || null,
-          ts: new Date().toISOString(),
+          ts: now,
           status: 'Open',
+          partial_exits: [],
+          additions: [],
+          realized_pnl: 0,
           broker_response: {
             order_id: orderId,
             raw: res?.data || res
           }
         };
         
-        // Save to localStorage
-        const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
         trades.push(tradeRecord);
         localStorage.setItem('te_trades', JSON.stringify(trades));
         
         // Show success toast
-        const orderTypeLabel = enableGTT ? 'GTT' : enableBracket ? 'Bracket' : 'Regular';
-        addToast(`✓ ${orderTypeLabel} ${txnType} order placed: ${symbol} × ${positionSize||qty} @ ₹${entry}`, 'success', 5000);
+        const orderTypeLabel = enableGTTEntry ? 'GTT Entry' : enableAMO ? 'AMO' : enableGTT ? 'GTT' : enableBracket ? 'Bracket' : 'Regular';
+        addToast(`✓ ${orderTypeLabel} ${txnType}: ${symbol} × ${orderQty} @ ₹${entry}`, 'success', 5000);
         
         // Sync to Supabase
         const synced = await syncTradesToSupabase(trades);
@@ -1339,15 +1460,15 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </div>
       </div>}
       
-      {/* Manual Entry Form (fallback) */}
-      {isExistingPosition && (existingEntry === 0 || existingQty === 0) && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
+      {/* Manual Entry Form (fallback) - shows until both values entered */}
+      {isExistingPosition && (existingEntry <= 0 || existingQty <= 0) && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:700,color:'#8844ff'}}>📦 Enter position for {symbol}:</div>
           <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0)}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
             ✕ Cancel
           </button>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 100px',gap:12,alignItems:'end'}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,alignItems:'end'}}>
           <div>
             <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>BUY PRICE ₹</label>
             <input type="number" value={existingEntry||''} onChange={e=>{setExistingEntry(+e.target.value);setEntry(+e.target.value)}} placeholder="2350" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700}}/>
@@ -1357,18 +1478,13 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             <input type="number" value={existingQty||''} onChange={e=>{setExistingQty(+e.target.value);setQty(+e.target.value)}} placeholder="50" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700}}/>
           </div>
           <div>
-            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE</label>
+            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE (optional)</label>
             <input type="date" value={existingDate} onChange={e=>setExistingDate(e.target.value)} style={{width:'100%',padding:'10px'}}/>
           </div>
-          <button onClick={()=>{if(existingEntry>0&&existingQty>0){addToast(`✓ Position: ${symbol} × ${existingQty} @ ₹${existingEntry}`,'success',3000)}}} disabled={existingEntry<=0||existingQty<=0} style={{padding:'10px',background:existingEntry>0&&existingQty>0?'linear-gradient(135deg,#8844ff,#aa66ff)':'var(--bg-tertiary)',border:'none',borderRadius:6,color:existingEntry>0&&existingQty>0?'#fff':'var(--text-muted)',fontWeight:700,cursor:existingEntry>0&&existingQty>0?'pointer':'not-allowed',fontSize:10}}>
-            ✓ Set
-          </button>
         </div>
-        {existingEntry>0&&existingQty>0&&<div style={{marginTop:10,padding:8,background:'rgba(0,0,0,0.2)',borderRadius:6,display:'flex',justifyContent:'space-between',fontSize:10}}>
-          <span>Invested: <strong style={{color:'#8844ff'}}>₹{(existingEntry*existingQty).toLocaleString()}</strong></span>
-          <span>Current: <strong style={{color:currentPrice>=existingEntry?'#00ff88':'#ff4455'}}>₹{(currentPrice*existingQty).toLocaleString()}</strong></span>
-          <span>P&L: <strong style={{color:currentPrice>=existingEntry?'#00ff88':'#ff4455'}}>{currentPrice>=existingEntry?'+':''}₹{((currentPrice-existingEntry)*existingQty).toFixed(0)} ({((currentPrice-existingEntry)/existingEntry*100).toFixed(1)}%)</strong></span>
-        </div>}
+        <div style={{marginTop:10,fontSize:9,color:'var(--text-muted)'}}>
+          💡 Enter both Buy Price and Quantity, then the position panel will appear with GTT, Trailing SL, and Exit options.
+        </div>
       </div>}
       
       <div className="section-title">📐 {isExistingPosition ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
