@@ -619,6 +619,18 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[trailATR,setTrailATR]=useState(1); // ATR multiplier
   const[trailEMA,setTrailEMA]=useState(21); // EMA period for trailing
   
+  // Initialize entry from stockData when it becomes available
+  useEffect(() => {
+    if(stockData?.price && stockData.price > 0 && entry === 0) {
+      setEntry(stockData.price);
+      setTarget(+(stockData.price * 1.08).toFixed(2));
+      const suggestedSL = stockData.atr 
+        ? +(stockData.price - (stockData.atr * 2)).toFixed(2) 
+        : +(stockData.price * 0.97).toFixed(2);
+      setSL(suggestedSL);
+    }
+  }, [stockData?.price]);
+  
   // Live CMP State
   const[liveCMP,setLiveCMP]=useState(stockData?.price || 0);
   const[cmpLoading,setCmpLoading]=useState(false);
@@ -873,7 +885,11 @@ const SmartTradeSetup=({symbol,stockData})=>{
   // Auto-load existing position from Trade Log when stock changes
   useEffect(()=>{
     const autoLoadPosition = async () => {
-      if(!symbol || !stockData?.price) return;
+      if(!symbol) return;
+      
+      // Get current price with fallback
+      const currentStockPrice = stockData?.price || liveCMP || 0;
+      const currentATR = stockData?.atr || atr || 0;
       
       // Reset existing position state first
       setIsExistingPosition(false);
@@ -939,20 +955,23 @@ const SmartTradeSetup=({symbol,stockData})=>{
         console.log('✓ Auto-loaded position:', symbol, 'Qty:', quantity, 'Entry:', entryPrice);
         addToast(`📦 Loaded: ${symbol} × ${quantity} @ ₹${entryPrice}`, 'info', 3000);
       } else {
-        // No position found - new trade mode
-        setEntry(stockData.price);
-        setTarget(+(stockData.price * 1.08).toFixed(2));
-        const suggestedSL = stockData.atr 
-          ? +(stockData.price - (stockData.atr * 2)).toFixed(2) 
-          : +(stockData.price * 0.97).toFixed(2);
-        setSL(suggestedSL);
-        setSLATRMult(2);
-        setSLMethod('atr');
+        // No position found - new trade mode with defaults
+        if(currentStockPrice > 0) {
+          setEntry(currentStockPrice);
+          setTarget(+(currentStockPrice * 1.08).toFixed(2));
+          const suggestedSL = currentATR > 0
+            ? +(currentStockPrice - (currentATR * 2)).toFixed(2) 
+            : +(currentStockPrice * 0.97).toFixed(2);
+          setSL(suggestedSL);
+          setSLATRMult(2);
+          setSLMethod('atr');
+          setQty(1);
+        }
       }
     };
     
     autoLoadPosition();
-  },[symbol, stockData?.price]);
+  },[symbol, stockData?.price, liveCMP]);
 
   const risk=entry>0&&sl>0?Math.abs(entry-sl)*qty:0;
   const reward=entry>0&&target>0?Math.abs(target-entry)*qty:0;
