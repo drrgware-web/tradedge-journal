@@ -624,16 +624,24 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[cmpLoading,setCmpLoading]=useState(false);
   const[lastCMPUpdate,setLastCMPUpdate]=useState(null);
   
-  // Fetch live CMP - prioritize regularMarketPrice, fallback to latest candle
+  // Fetch live CMP - use daily data for accurate regularMarketPrice
   const refreshCMP = async () => {
     const wUrl = localStorage.getItem('zd_worker_url');
-    if (!wUrl || !symbol) return;
+    if (!wUrl || !symbol) {
+      // Fallback to stockData.price if no worker
+      if (stockData?.price) {
+        setLiveCMP(stockData.price);
+        setLastCMPUpdate(new Date());
+      }
+      return;
+    }
     setCmpLoading(true);
     try {
+      // Use daily interval - has accurate regularMarketPrice
       const res = await fetch(wUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
-        body: JSON.stringify({ ticker: `${symbol}.NS`, range: '1d', interval: '1m' })
+        body: JSON.stringify({ ticker: `${symbol}.NS`, range: '5d', interval: '1d' })
       });
       const data = await res.json();
       const result = data?.chart?.result?.[0];
@@ -647,7 +655,16 @@ const SmartTradeSetup=({symbol,stockData})=>{
         return;
       }
       
-      // Priority 2: Latest close from candles
+      // Priority 2: previousClose as fallback
+      const prevClose = result?.meta?.previousClose || result?.meta?.chartPreviousClose;
+      if (prevClose && prevClose > 0) {
+        setLiveCMP(+prevClose.toFixed(2));
+        setLastCMPUpdate(new Date());
+        setCmpLoading(false);
+        return;
+      }
+      
+      // Priority 3: Latest close from candles
       const closes = result?.indicators?.quote?.[0]?.close;
       if (closes && closes.length > 0) {
         const latestPrice = closes.filter(c => c != null).pop();
@@ -656,7 +673,13 @@ const SmartTradeSetup=({symbol,stockData})=>{
           setLastCMPUpdate(new Date());
         }
       }
-    } catch (e) { console.error('CMP refresh error:', e); }
+    } catch (e) { 
+      console.error('CMP refresh error:', e);
+      // Fallback to stockData.price
+      if (stockData?.price) {
+        setLiveCMP(stockData.price);
+      }
+    }
     setCmpLoading(false);
   };
   
@@ -668,9 +691,12 @@ const SmartTradeSetup=({symbol,stockData})=>{
     return () => clearInterval(interval);
   }, [symbol]);
   
-  // Update liveCMP when stockData changes
+  // Update liveCMP when stockData changes (stockData.price is the most accurate)
   useEffect(() => {
-    if (stockData?.price) setLiveCMP(stockData.price);
+    if (stockData?.price && stockData.price > 0) {
+      setLiveCMP(stockData.price);
+      setLastCMPUpdate(new Date());
+    }
   }, [stockData?.price]);
   
   // Staggered Exit System
@@ -832,8 +858,8 @@ const SmartTradeSetup=({symbol,stockData})=>{
     return null;
   };
   
-  // Calculate P&L for existing position (using live CMP)
-  const currentPrice = liveCMP || stockData?.price || 0;
+  // Calculate P&L for existing position (prioritize stockData.price, fallback to liveCMP)
+  const currentPrice = stockData?.price || liveCMP || 0;
   const unrealizedPnL = isExistingPosition && existingEntry > 0 ? (currentPrice - existingEntry) * existingQty : 0;
   const unrealizedPnLPct = isExistingPosition && existingEntry > 0 ? ((currentPrice - existingEntry) / existingEntry * 100) : 0;
   const positionValue = isExistingPosition ? currentPrice * existingQty : 0;
@@ -1297,64 +1323,54 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </div>
       </div>}
       
-      {/* Manual Position Entry (if not auto-loaded) */}
+      {/* Load from Trade Log + Manual Entry Fallback */}
       {!isExistingPosition && <div style={{marginBottom:16}}>
         <div style={{display:'flex',gap:10,marginBottom:8}}>
-          <button onClick={()=>setIsExistingPosition(true)} style={{padding:'10px 16px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:6,color:'#8844ff',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',flex:1}}>
-            📦 I have an existing position
+          <button onClick={loadExistingPosition} disabled={loadingPosition} style={{padding:'10px 16px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:6,color:'#8844ff',fontSize:11,fontWeight:700,cursor:loadingPosition?'wait':'pointer',fontFamily:'var(--font-mono)',flex:1,opacity:loadingPosition?0.7:1}}>
+            {loadingPosition ? '⏳ Checking...' : '📦 Load from Trade Log'}
           </button>
-          <button onClick={loadExistingPosition} disabled={loadingPosition} style={{padding:'10px 16px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',fontSize:11,fontWeight:700,cursor:loadingPosition?'wait':'pointer',fontFamily:'var(--font-mono)',flex:1,opacity:loadingPosition?0.7:1}}>
-            {loadingPosition ? '⏳ Checking...' : '🔄 Load from Trade Log'}
+          <button onClick={()=>setIsExistingPosition(true)} style={{padding:'10px 16px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',flex:1}}>
+            ✏️ Enter Manually
           </button>
         </div>
         <div style={{fontSize:9,color:'var(--text-muted)',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          <span>↑ Enter position manually (buy price, qty)</span>
-          <span>↑ Checks Local + Cloud ☁️ for {symbol}</span>
+          <span>↑ Auto-load from Local + Cloud ☁️</span>
+          <span>↑ For positions not in trade log</span>
         </div>
       </div>}
       
-      {/* Manual Entry for Existing Position */}
+      {/* Manual Entry Form (fallback) */}
       {isExistingPosition && (existingEntry === 0 || existingQty === 0) && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-          <div style={{fontSize:12,fontWeight:700,color:'#8844ff'}}>📦 Enter your existing position for {symbol}:</div>
+          <div style={{fontSize:12,fontWeight:700,color:'#8844ff'}}>📦 Enter position for {symbol}:</div>
           <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0)}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
             ✕ Cancel
           </button>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 120px',gap:12,alignItems:'end'}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 100px',gap:12,alignItems:'end'}}>
           <div>
-            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY PRICE ₹</label>
-            <input type="number" value={existingEntry||''} onChange={e=>{setExistingEntry(+e.target.value);setEntry(+e.target.value)}} placeholder="e.g. 2350" style={{width:'100%',padding:'12px',fontSize:14,fontWeight:700}}/>
+            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>BUY PRICE ₹</label>
+            <input type="number" value={existingEntry||''} onChange={e=>{setExistingEntry(+e.target.value);setEntry(+e.target.value)}} placeholder="2350" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700}}/>
           </div>
           <div>
-            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>QUANTITY</label>
-            <input type="number" value={existingQty||''} onChange={e=>{setExistingQty(+e.target.value);setQty(+e.target.value)}} placeholder="e.g. 50" style={{width:'100%',padding:'12px',fontSize:14,fontWeight:700}}/>
+            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>QUANTITY</label>
+            <input type="number" value={existingQty||''} onChange={e=>{setExistingQty(+e.target.value);setQty(+e.target.value)}} placeholder="50" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700}}/>
           </div>
           <div>
-            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE (optional)</label>
-            <input type="date" value={existingDate} onChange={e=>setExistingDate(e.target.value)} style={{width:'100%',padding:'12px'}}/>
+            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE</label>
+            <input type="date" value={existingDate} onChange={e=>setExistingDate(e.target.value)} style={{width:'100%',padding:'10px'}}/>
           </div>
-          <button 
-            onClick={()=>{
-              if(existingEntry > 0 && existingQty > 0) {
-                addToast(`✓ Position set: ${symbol} × ${existingQty} @ ₹${existingEntry}`, 'success', 3000);
-              } else {
-                addToast('Enter both Buy Price and Quantity', 'error', 3000);
-              }
-            }} 
-            disabled={existingEntry <= 0 || existingQty <= 0}
-            style={{padding:'12px',background:existingEntry>0&&existingQty>0?'linear-gradient(135deg,#8844ff,#aa66ff)':'var(--bg-tertiary)',border:'none',borderRadius:6,color:existingEntry>0&&existingQty>0?'#fff':'var(--text-muted)',fontWeight:700,cursor:existingEntry>0&&existingQty>0?'pointer':'not-allowed',fontSize:11}}
-          >
-            ✓ Confirm
+          <button onClick={()=>{if(existingEntry>0&&existingQty>0){addToast(`✓ Position: ${symbol} × ${existingQty} @ ₹${existingEntry}`,'success',3000)}}} disabled={existingEntry<=0||existingQty<=0} style={{padding:'10px',background:existingEntry>0&&existingQty>0?'linear-gradient(135deg,#8844ff,#aa66ff)':'var(--bg-tertiary)',border:'none',borderRadius:6,color:existingEntry>0&&existingQty>0?'#fff':'var(--text-muted)',fontWeight:700,cursor:existingEntry>0&&existingQty>0?'pointer':'not-allowed',fontSize:10}}>
+            ✓ Set
           </button>
         </div>
-        {existingEntry > 0 && existingQty > 0 && <div style={{marginTop:12,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,display:'flex',justifyContent:'space-between',fontSize:11}}>
-          <span>Investment: <strong style={{color:'#8844ff'}}>₹{(existingEntry * existingQty).toLocaleString()}</strong></span>
-          <span>Current Value: <strong style={{color:currentPrice>=existingEntry?'#00ff88':'#ff4455'}}>₹{(currentPrice * existingQty).toLocaleString()}</strong></span>
+        {existingEntry>0&&existingQty>0&&<div style={{marginTop:10,padding:8,background:'rgba(0,0,0,0.2)',borderRadius:6,display:'flex',justifyContent:'space-between',fontSize:10}}>
+          <span>Invested: <strong style={{color:'#8844ff'}}>₹{(existingEntry*existingQty).toLocaleString()}</strong></span>
+          <span>Current: <strong style={{color:currentPrice>=existingEntry?'#00ff88':'#ff4455'}}>₹{(currentPrice*existingQty).toLocaleString()}</strong></span>
           <span>P&L: <strong style={{color:currentPrice>=existingEntry?'#00ff88':'#ff4455'}}>{currentPrice>=existingEntry?'+':''}₹{((currentPrice-existingEntry)*existingQty).toFixed(0)} ({((currentPrice-existingEntry)/existingEntry*100).toFixed(1)}%)</strong></span>
         </div>}
       </div>}
-
+      
       <div className="section-title">📐 {isExistingPosition ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
       
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
