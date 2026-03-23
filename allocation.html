@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradEdge — Dynamic Asset Allocation</title>
+<title>TradEdge — Smart Asset Allocation Engine</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#050810;--s1:rgba(255,255,255,.02);--s2:rgba(255,255,255,.04);--bd:rgba(255,255,255,.06);--green:#00ff88;--yellow:#ffd000;--blue:#00c8ff;--red:#ff3366;--cyan:#00e5ff;--mono:'JetBrains Mono',monospace;--sans:'Outfit',sans-serif;--t1:#fff;--t2:rgba(255,255,255,.45);--t3:rgba(255,255,255,.18)}
@@ -11,42 +11,67 @@
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes logoPulse{0%,100%{box-shadow:0 0 8px rgba(0,229,255,.2),0 0 20px rgba(0,229,255,.1)}50%{box-shadow:0 0 16px rgba(0,229,255,.5),0 0 40px rgba(0,229,255,.2),0 0 60px rgba(0,229,255,.1)}}
+.logo-pulse{width:44px;height:44px;border-radius:10px;border:1px solid rgba(0,229,255,.2);animation:logoPulse 2.5s ease-in-out infinite;object-fit:cover}
+.logo-fallback{display:none;width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9,#6366f1,#a855f7);align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:800;color:#fff;animation:logoPulse 2.5s ease-in-out infinite}
 .card{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:16px;animation:fadeUp .4s ease-out both}
+.profile-btn{padding:5px 14px;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--t3);transition:all .2s}
+.profile-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.profile-btn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08);box-shadow:0 0 12px rgba(0,229,255,.1)}
 </style>
 </head>
 <body>
 <div id="app" style="max-width:1200px;margin:0 auto">
-  <div style="text-align:center;padding:20px 0;font-family:var(--mono);color:var(--t3)">Loading allocation data...</div>
+  <div style="text-align:center;padding:20px 0;font-family:var(--mono);color:var(--t3)">Loading...</div>
 </div>
 <script>
 const DATA_URL='./data/rrm_data.json';
-const Q_COLORS={Leading:'#00ff88',Improving:'#00c8ff',Weakening:'#ffd000',Lagging:'#ff3366'};
 const LIGHT_MAP={GREEN:'#00ff88',YELLOW:'#ffd000',BLUE:'#00c8ff',RED:'#ff3366'};
+const CAT_COLORS={Equity:'#00c8ff','Indian Equity':'#a78bfa',Commodity:'#ffd000',Bond:'#00ff88',Forex:'#c084fc',Crypto:'#ff3366',Cash:'#64748b'};
 
-// Asset class categories + base weights (total = 100%)
-const ASSET_CATEGORIES={
-  'Dow Jones':{cat:'Equity',base:8,icon:'📈'},
-  'S&P 500':{cat:'Equity',base:8,icon:'📈'},
-  'NASDAQ':{cat:'Equity',base:8,icon:'📈'},
-  'Gold':{cat:'Commodity',base:12,icon:'🥇'},
-  'Silver':{cat:'Commodity',base:5,icon:'🥈'},
-  'Crude Oil':{cat:'Commodity',base:5,icon:'🛢'},
-  'USD/INR':{cat:'Forex',base:8,icon:'💱'},
-  'Bitcoin':{cat:'Crypto',base:5,icon:'₿'},
-  'US 10Y Yield':{cat:'Bond',base:8,icon:'📊'},
-  'ICICI G-Sec 2027':{cat:'Bond',base:8,icon:'🏛'},
-  'Gilt 5Y ETF':{cat:'Bond',base:8,icon:'🏛'},
-  'Liquid Fund':{cat:'Cash',base:7,icon:'💵'},
+// ═══════════════════════════════════════════════════════════════
+// ASSET CONFIG — base weights per risk profile
+// ═══════════════════════════════════════════════════════════════
+const ASSETS={
+  // Global Equity
+  'Dow Jones':     {cat:'Equity',icon:'📈',base:{C:5,M:8,A:12}},
+  'S&P 500':       {cat:'Equity',icon:'📈',base:{C:5,M:8,A:12}},
+  'NASDAQ':        {cat:'Equity',icon:'📈',base:{C:3,M:6,A:10}},
+  // Indian Equity (from sectors)
+  'Nifty IT':      {cat:'Indian Equity',icon:'🇮🇳',base:{C:2,M:4,A:6}},
+  'Nifty Pharma':  {cat:'Indian Equity',icon:'🇮🇳',base:{C:2,M:4,A:6}},
+  'Nifty Bank':    {cat:'Indian Equity',icon:'🇮🇳',base:{C:2,M:4,A:6}},
+  'Nifty Auto':    {cat:'Indian Equity',icon:'🇮🇳',base:{C:1,M:3,A:5}},
+  'Nifty FMCG':    {cat:'Indian Equity',icon:'🇮🇳',base:{C:2,M:3,A:4}},
+  'Nifty Metal':   {cat:'Indian Equity',icon:'🇮🇳',base:{C:1,M:2,A:4}},
+  // Commodities
+  'Gold':          {cat:'Commodity',icon:'🥇',base:{C:15,M:10,A:5},safeHaven:true},
+  'Silver':        {cat:'Commodity',icon:'🥈',base:{C:5,M:4,A:3}},
+  'Crude Oil':     {cat:'Commodity',icon:'🛢',base:{C:2,M:4,A:5}},
+  // Bonds
+  'US 10Y Yield':  {cat:'Bond',icon:'📊',base:{C:10,M:8,A:3}},
+  'ICICI G-Sec 2027':{cat:'Bond',icon:'🏛',base:{C:10,M:7,A:3}},
+  'Gilt 5Y ETF':   {cat:'Bond',icon:'🏛',base:{C:10,M:7,A:3}},
+  'Liquid Fund':   {cat:'Bond',icon:'💧',base:{C:8,M:5,A:2}},
+  // Forex
+  'USD/INR':       {cat:'Forex',icon:'💱',base:{C:5,M:6,A:4}},
+  // Crypto
+  'Bitcoin':       {cat:'Crypto',icon:'₿',base:{C:1,M:3,A:7}},
 };
 
-const CAT_COLORS={Equity:'#00c8ff',Commodity:'#ffd000',Bond:'#00ff88',Forex:'#a78bfa',Crypto:'#ff3366',Cash:'#64748b'};
+const PROFILES={
+  C:{label:'Conservative',desc:'Capital preservation first',color:'#00c8ff',cashMin:15,cashMax:30,bondBoost:1.4,equityDamp:0.7},
+  M:{label:'Moderate',desc:'Balanced growth',color:'#ffd000',cashMin:8,cashMax:20,bondBoost:1.1,equityDamp:0.9},
+  A:{label:'Aggressive',desc:'Momentum chaser',color:'#ff3366',cashMin:3,cashMax:15,bondBoost:0.8,equityDamp:1.2},
+};
+
+let PROFILE='A'; // Default aggressive
+let rrmDataGlobal=null;
 
 function transformData(raw,benchKey,groupKey){
   const bm=raw?.benchmarks_data?.[benchKey];if(!bm)return[];
   const d=bm.daily?.[groupKey]||[],w=bm.weekly?.[groupKey]||[],m=bm.monthly?.[groupKey]||[];
-  const wM={};w.forEach(s=>wM[s.symbol]=s);
-  const mM={};m.forEach(s=>mM[s.symbol]=s);
+  const wM={};w.forEach(s=>wM[s.symbol]=s);const mM={};m.forEach(s=>mM[s.symbol]=s);
   return d.map(dd=>{const ww=wM[dd.symbol]||{},mm=mM[dd.symbol]||{};
     return{symbol:dd.symbol,name:dd.name,color:dd.color,
       daily:{q:dd.quadrant||'',rsr:dd.current?.rs_ratio||100,rsm:dd.current?.rs_momentum||100},
@@ -60,8 +85,7 @@ function computeSignal(item){
   let score=0;
   if(right(m.q))score+=(m.rsr>=100&&m.rsm>=100)?2:1;
   if(right(w.q))score+=(w.rsr>=100&&w.rsm>=100)?2:1;
-  if(right(d.q))score+=1;
-  score=Math.min(score,5);
+  if(right(d.q))score+=1;score=Math.min(score,5);
   let light;
   if(right(m.q)&&right(w.q)&&right(d.q))light='GREEN';
   else if(right(m.q)&&!right(w.q)&&right(d.q))light='YELLOW';
@@ -69,67 +93,115 @@ function computeSignal(item){
   else light='RED';
   const weeklyMomOk=w.rsm>=98&&w.rsm<=106;
   const rsiOk=right(w.q)&&weeklyMomOk;
-  let sz=0;if(w.rsr>100)sz++;if(weeklyMomOk)sz++;
-  if(w.rsm>=98&&w.rsm<=103)sz++;if(right(w.q))sz++;if(score>=3)sz++;
-  let action;
-  if(score>=4&&rsiOk)action='AGGRESSIVE BUY';
-  else if(score>=3&&rsiOk)action='BUY ON DIP';
-  else if(light==='YELLOW')action='HOOK ENTRY';
-  else if(light==='BLUE')action='SCALP ONLY';
-  else if(score>=3)action='HOLD';
-  else action='AVOID';
+  let sz=0;if(w.rsr>100)sz++;if(weeklyMomOk)sz++;if(w.rsm>=98&&w.rsm<=103)sz++;if(right(w.q))sz++;if(score>=3)sz++;
+  let action;if(score>=4&&rsiOk)action='AGGRESSIVE BUY';else if(score>=3&&rsiOk)action='BUY ON DIP';else if(light==='YELLOW')action='HOOK ENTRY';else if(light==='BLUE')action='SCALP ONLY';else if(score>=3)action='HOLD';else action='AVOID';
   return{score,light,rsiOk,action,sz};
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ALLOCATION ENGINE v2 — Tuned
+// ═══════════════════════════════════════════════════════════════
 function computeAllocation(assets){
-  // Step 1: Get signal-adjusted weights
+  const P=PROFILES[PROFILE];
   const adjusted=[];
   let totalRaw=0;
 
+  // Step 1: Detect regime FIRST
+  const greenCount=assets.filter(a=>a.sig.light==='GREEN').length;
+  const redCount=assets.filter(a=>a.sig.light==='RED').length;
+  const blueCount=assets.filter(a=>a.sig.light==='BLUE').length;
+  const total=assets.length||1;
+  const greenPct=greenCount/total;
+  const redPct=redCount/total;
+
+  let regime,regimeColor;
+  if(greenPct>=0.5){regime='RISK-ON';regimeColor='#00ff88';}
+  else if(redPct>=0.5){regime='RISK-OFF';regimeColor='#ff3366';}
+  else if(greenPct>=0.35){regime='TILT-BULL';regimeColor='#4ade80';}
+  else if(redPct>=0.35){regime='TILT-BEAR';regimeColor='#fb7185';}
+  else{regime='BALANCED';regimeColor='#ffd000';}
+
+  const isRiskOff=regime==='RISK-OFF'||regime==='TILT-BEAR';
+  const isRiskOn=regime==='RISK-ON'||regime==='TILT-BULL';
+
+  // Step 2: Signal-based weight multiplier
   assets.forEach(a=>{
-    const meta=ASSET_CATEGORIES[a.name];
-    if(!meta)return;
-    const sig=computeSignal(a);
-    let multiplier=1;
-    if(sig.light==='GREEN'&&sig.score>=4)multiplier=1.6;
-    else if(sig.light==='GREEN'&&sig.score>=3)multiplier=1.3;
-    else if(sig.light==='GREEN')multiplier=1.1;
-    else if(sig.light==='BLUE')multiplier=1.0;
-    else if(sig.light==='YELLOW')multiplier=0.75;
-    else if(sig.light==='RED'&&sig.score>=3)multiplier=0.5;
-    else multiplier=0.25;
+    const meta=ASSETS[a.name];if(!meta)return;
+    const base=meta.base[PROFILE];
+    let mult=1;
 
-    // RSM bonus
-    if(sig.rsiOk)multiplier*=1.1;
+    // Signal multiplier
+    if(a.sig.light==='GREEN'&&a.sig.score>=4)mult=1.6;
+    else if(a.sig.light==='GREEN'&&a.sig.score>=3)mult=1.3;
+    else if(a.sig.light==='GREEN')mult=1.1;
+    else if(a.sig.light==='BLUE'&&a.sig.score>=3)mult=1.05;
+    else if(a.sig.light==='BLUE')mult=0.9;
+    else if(a.sig.light==='YELLOW')mult=0.7;
+    else if(a.sig.light==='RED'&&a.sig.score>=3)mult=0.45;
+    else mult=0.2;
 
-    const raw=meta.base*multiplier;
+    // RSM sweet zone bonus
+    if(a.sig.rsiOk)mult*=1.15;
+
+    // FIX: Gold safe-haven boost in RISK-OFF
+    if(meta.safeHaven&&isRiskOff){
+      mult=Math.max(mult,1.3);
+      mult*=1.4; // Extra 40% boost
+    }
+
+    // Profile-based category adjustments
+    if(meta.cat==='Bond'||meta.cat==='Cash'){
+      if(isRiskOff)mult*=P.bondBoost;
+    }
+    if(meta.cat==='Equity'||meta.cat==='Indian Equity'){
+      if(isRiskOff)mult*=P.equityDamp;
+      if(isRiskOn)mult*=P.equityDamp>1?P.equityDamp:1.1; // Boost equity in risk-on for aggressive
+    }
+    if(meta.cat==='Crypto'){
+      if(isRiskOff)mult*=0.3;
+      if(isRiskOn&&PROFILE==='A')mult*=1.3;
+    }
+
+    const raw=base*mult;
     totalRaw+=raw;
-    adjusted.push({...a,...meta,sig,rawWeight:raw});
+    adjusted.push({...a,...meta,base,sig:a.sig,rawWeight:raw});
   });
 
-  // Step 2: Normalize to 100%
-  // Reserve some for cash if regime is bearish
-  const greenCount=adjusted.filter(a=>a.sig.light==='GREEN').length;
-  const redCount=adjusted.filter(a=>a.sig.light==='RED').length;
-  const total=adjusted.length||1;
-  
-  let regime,regimeColor,cashReserve;
-  if(greenCount/total>=0.5){regime='RISK-ON';regimeColor='#00ff88';cashReserve=5;}
-  else if(redCount/total>=0.5){regime='RISK-OFF';regimeColor='#ff3366';cashReserve=25;}
-  else{regime='BALANCED';regimeColor='#ffd000';cashReserve=12;}
+  // Step 3: Cash reserve based on regime + profile
+  let cashReserve;
+  if(isRiskOff)cashReserve=P.cashMax;
+  else if(isRiskOn)cashReserve=P.cashMin;
+  else cashReserve=Math.round((P.cashMin+P.cashMax)/2);
 
+  // FIX: Cap cash at 20% (unless Conservative in RISK-OFF)
+  if(PROFILE!=='C')cashReserve=Math.min(cashReserve,20);
+
+  // Step 4: Normalize to 100%
   const allocatable=100-cashReserve;
   adjusted.forEach(a=>{
     a.weight=Math.round((a.rawWeight/totalRaw)*allocatable*10)/10;
     a.change=Math.round((a.weight-a.base)*10)/10;
-    a.stance=a.change>2?'OW':a.change<-2?'UW':'N';
+    a.stance=a.change>1.5?'OW':a.change<-1.5?'UW':'N';
   });
 
-  // Step 3: Risk score (0-100, higher = more aggressive)
-  const avgScore=adjusted.reduce((s,a)=>s+a.sig.score,0)/total;
-  const riskScore=Math.round(avgScore*20);
+  // FIX: Risk score aligned with regime
+  // Low risk score = defensive, high = aggressive
+  let riskScore;
+  const signalStrength=adjusted.reduce((s,a)=>s+(a.sig.light==='GREEN'?a.sig.score:a.sig.light==='BLUE'?a.sig.score*0.5:0),0);
+  const maxPossible=total*5;
+  const signalPct=signalStrength/maxPossible;
 
-  // Step 4: Category rollup
+  if(regime==='RISK-ON')riskScore=Math.round(70+signalPct*30);
+  else if(regime==='TILT-BULL')riskScore=Math.round(55+signalPct*25);
+  else if(regime==='BALANCED')riskScore=Math.round(40+signalPct*20);
+  else if(regime==='TILT-BEAR')riskScore=Math.round(25+signalPct*15);
+  else riskScore=Math.round(10+signalPct*20); // RISK-OFF
+
+  // Profile modifier
+  if(PROFILE==='A')riskScore=Math.min(99,riskScore+10);
+  if(PROFILE==='C')riskScore=Math.max(5,riskScore-10);
+
+  // Step 5: Category rollup
   const catWeights={};
   adjusted.forEach(a=>{
     if(!catWeights[a.cat])catWeights[a.cat]={weight:0,base:0,assets:[]};
@@ -137,218 +209,185 @@ function computeAllocation(assets){
     catWeights[a.cat].base+=a.base;
     catWeights[a.cat].assets.push(a);
   });
-  catWeights['Cash']={weight:cashReserve,base:10,assets:[{name:'Cash Reserve',weight:cashReserve,base:10,sig:{light:'GREEN',score:5,action:'HOLD'},cat:'Cash',icon:'💵',change:cashReserve-10,stance:cashReserve>12?'OW':'N'}]};
+  catWeights['Cash']={weight:cashReserve,base:PROFILE==='C'?15:PROFILE==='M'?8:3,assets:[]};
 
-  return{adjusted,regime,regimeColor,cashReserve,riskScore,catWeights,greenCount,redCount,total};
+  return{adjusted,regime,regimeColor,cashReserve,riskScore,catWeights,greenCount,redCount,blueCount,total};
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DONUT CHART
+// ═══════════════════════════════════════════════════════════════
 function drawDonut(canvas,catWeights){
-  const ctx=canvas.getContext('2d');
-  const dpr=window.devicePixelRatio||1;
-  const size=240;
-  canvas.width=size*dpr;canvas.height=size*dpr;
-  canvas.style.width=size+'px';canvas.style.height=size+'px';
-  ctx.scale(dpr,dpr);
-  
+  const ctx=canvas.getContext('2d');const dpr=window.devicePixelRatio||1;const size=240;
+  canvas.width=size*dpr;canvas.height=size*dpr;canvas.style.width=size+'px';canvas.style.height=size+'px';ctx.scale(dpr,dpr);
   const cx=size/2,cy=size/2,r=90,inner=55;
-  const cats=Object.entries(catWeights).sort((a,b)=>b[1].weight-a[1].weight);
+  const cats=Object.entries(catWeights).filter(([,d])=>d.weight>0).sort((a,b)=>b[1].weight-a[1].weight);
   let angle=-Math.PI/2;
-  
   cats.forEach(([cat,data])=>{
-    const sweep=(data.weight/100)*Math.PI*2;
-    const color=CAT_COLORS[cat]||'#666';
-    ctx.beginPath();
-    ctx.arc(cx,cy,r,angle,angle+sweep);
-    ctx.arc(cx,cy,inner,angle+sweep,angle,true);
-    ctx.closePath();
-    ctx.fillStyle=color;
-    ctx.globalAlpha=0.8;
-    ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.strokeStyle=color;
-    ctx.lineWidth=1;
-    ctx.stroke();
-    
-    // Label
-    const mid=angle+sweep/2;
-    if(data.weight>=5){
-      const lx=cx+Math.cos(mid)*(r-18);
-      const ly=cy+Math.sin(mid)*(r-18);
-      ctx.font='700 9px JetBrains Mono';
-      ctx.fillStyle='#000';
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-      ctx.fillText(Math.round(data.weight)+'%',lx,ly);
-    }
-    angle+=sweep;
-  });
-  
-  // Center text
-  ctx.font='800 22px Outfit';
-  ctx.fillStyle='#fff';
-  ctx.textAlign='center';
-  ctx.textBaseline='middle';
-  const totalAlloc=Object.values(catWeights).reduce((s,c)=>s+c.weight,0);
-  ctx.fillText(Math.round(totalAlloc)+'%',cx,cy-6);
-  ctx.font='500 9px JetBrains Mono';
-  ctx.fillStyle='rgba(255,255,255,.3)';
-  ctx.fillText('ALLOCATED',cx,cy+12);
+    const sweep=(data.weight/100)*Math.PI*2;const color=CAT_COLORS[cat]||'#666';
+    ctx.beginPath();ctx.arc(cx,cy,r,angle,angle+sweep);ctx.arc(cx,cy,inner,angle+sweep,angle,true);ctx.closePath();
+    ctx.fillStyle=color;ctx.globalAlpha=0.8;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();
+    if(data.weight>=4){const mid=angle+sweep/2;const lx=cx+Math.cos(mid)*(r-18);const ly=cy+Math.sin(mid)*(r-18);
+      ctx.font='700 9px JetBrains Mono';ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(Math.round(data.weight)+'%',lx,ly);}
+    angle+=sweep;});
+  ctx.font='800 22px Outfit';ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('100%',cx,cy-6);
+  ctx.font='500 9px JetBrains Mono';ctx.fillStyle='rgba(255,255,255,.3)';ctx.fillText('ALLOCATED',cx,cy+12);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
 function render(rrmData){
   const benchmark='^NSEI';
-  const all=[
-    ...transformData(rrmData,benchmark,'market_segments'),
-    ...transformData(rrmData,benchmark,'asset_classes'),
-    ...transformData(rrmData,benchmark,'global_indices'),
-    ...transformData(rrmData,benchmark,'sectors')
-  ];
+  const all=[...transformData(rrmData,benchmark,'market_segments'),...transformData(rrmData,benchmark,'asset_classes'),...transformData(rrmData,benchmark,'global_indices'),...transformData(rrmData,benchmark,'sectors')];
   
-  const macroNames=Object.keys(ASSET_CATEGORIES);
-  const assets=macroNames.map(k=>all.find(a=>a.name?.includes(k))).filter(Boolean);
-  
-  if(!assets.length){
-    document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red);font-family:var(--mono)">No asset data found</div>';
-    return;
-  }
+  const assetNames=Object.keys(ASSETS);
+  const assets=assetNames.map(k=>{
+    const found=all.find(a=>a.name?.includes(k)||k.includes(a.name?.replace('Nifty ','')));
+    if(!found)return null;
+    return{...found,name:k,sig:computeSignal(found)};
+  }).filter(Boolean);
+
+  if(!assets.length){document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red);font-family:var(--mono)">No data</div>';return;}
   
   const alloc=computeAllocation(assets);
   const date=rrmData?.metadata?.date||'';
-  
-  const app=document.getElementById('app');
-  app.innerHTML=`
+  const P=PROFILES[PROFILE];
+
+  document.getElementById('app').innerHTML=`
     <!-- HEADER -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-      <div>
-        <h1 style="font-family:var(--mono);font-size:18px;font-weight:800;letter-spacing:.12em;background:linear-gradient(90deg,var(--green),var(--cyan),#fff,var(--green));background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s ease-in-out infinite">ALLOCATION ENGINE</h1>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--t3);margin-top:3px">Dynamic Asset Allocation · Powered by MATRIX Signals · ${date}</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <img src="assets/logo.jpeg" alt="TE" class="logo-pulse" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="logo-fallback">TE</div>
+        <div>
+          <h1 style="font-family:var(--mono);font-size:16px;font-weight:800;letter-spacing:.1em;background:linear-gradient(90deg,var(--green),var(--cyan),#fff,var(--green));background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s ease-in-out infinite">SMART ASSET ALLOCATION</h1>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--t3);margin-top:3px">Powered by MATRIX v4.3 Signals · ${date}</div>
+        </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:6px;align-items:center">
+        ${['C','M','A'].map(p=>`<button class="profile-btn ${PROFILE===p?'active':''}" onclick="setProfile('${p}')" style="${PROFILE===p?'border-color:'+PROFILES[p].color+';color:'+PROFILES[p].color+';background:'+PROFILES[p].color+'12':''}">${PROFILES[p].label}</button>`).join('')}
+        <div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div>
         <div style="padding:6px 14px;border-radius:6px;background:${alloc.regimeColor}0a;border:1px solid ${alloc.regimeColor}25;font-family:var(--mono);font-size:11px;font-weight:700;color:${alloc.regimeColor}">${alloc.regime}</div>
-        <div style="padding:6px 14px;border-radius:6px;background:var(--s2);border:1px solid var(--bd);font-family:var(--mono);font-size:10px;color:var(--t2)">Risk: <span style="color:${alloc.riskScore>=60?'var(--green)':alloc.riskScore>=40?'var(--yellow)':'var(--red)'}; font-weight:700">${alloc.riskScore}/100</span></div>
       </div>
     </div>
 
-    <!-- TOP ROW: Donut + Category breakdown + Regime -->
+    <!-- TOP ROW -->
     <div style="display:grid;grid-template-columns:260px 1fr 280px;gap:14px;margin-bottom:16px" id="top-row">
-      
       <!-- DONUT -->
       <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;animation-delay:.1s">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">RECOMMENDED ALLOCATION</div>
-        <canvas id="donut" width="240" height="240"></canvas>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">RECOMMENDED · ${P.label.toUpperCase()}</div>
+        <canvas id="donut"></canvas>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;justify-content:center">
-          ${Object.entries(alloc.catWeights).map(([cat,d])=>`<span style="font-family:var(--mono);font-size:8px;color:${CAT_COLORS[cat]||'#666'};display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:${CAT_COLORS[cat]||'#666'}"></span>${cat} ${Math.round(d.weight)}%</span>`).join('')}
+          ${Object.entries(alloc.catWeights).filter(([,d])=>d.weight>0).sort((a,b)=>b[1].weight-a[1].weight).map(([cat,d])=>`<span style="font-family:var(--mono);font-size:8px;color:${CAT_COLORS[cat]||'#666'};display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:${CAT_COLORS[cat]||'#666'}"></span>${cat} ${Math.round(d.weight)}%</span>`).join('')}
         </div>
       </div>
 
       <!-- CATEGORY BARS -->
       <div class="card" style="animation-delay:.2s">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">CATEGORY WEIGHTS · BASE vs SIGNAL</div>
-        ${Object.entries(alloc.catWeights).sort((a,b)=>b[1].weight-a[1].weight).map(([cat,d])=>{
-          const c=CAT_COLORS[cat]||'#666';
-          const change=Math.round(d.weight-d.base);
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">CATEGORY WEIGHTS · BASE vs SIGNAL-ADJUSTED</div>
+        ${Object.entries(alloc.catWeights).filter(([,d])=>d.weight>0).sort((a,b)=>b[1].weight-a[1].weight).map(([cat,d])=>{
+          const c=CAT_COLORS[cat]||'#666';const change=Math.round(d.weight-d.base);
           const changeC=change>0?'var(--green)':change<0?'var(--red)':'var(--t3)';
-          return`<div style="margin-bottom:10px">
+          return`<div style="margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
               <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${c}">${cat}</span>
               <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--t1)">${Math.round(d.weight)}% <span style="font-size:8px;color:${changeC}">(${change>0?'+':''}${change})</span></span>
             </div>
-            <div style="position:relative;height:8px;background:var(--s2);border-radius:4px;overflow:hidden">
-              <div style="position:absolute;height:100%;width:${d.base}%;background:${c}20;border-radius:4px"></div>
-              <div style="position:absolute;height:100%;width:${d.weight}%;background:${c};border-radius:4px;box-shadow:0 0 8px ${c}30;transition:width .5s ease"></div>
+            <div style="position:relative;height:6px;background:var(--s2);border-radius:3px;overflow:hidden">
+              <div style="position:absolute;height:100%;width:${Math.min(d.base,100)}%;background:${c}20;border-radius:3px"></div>
+              <div style="position:absolute;height:100%;width:${Math.min(d.weight,100)}%;background:${c};border-radius:3px;box-shadow:0 0 8px ${c}30;transition:width .5s"></div>
             </div>
-          </div>`;
-        }).join('')}
+          </div>`;}).join('')}
       </div>
 
-      <!-- REGIME + SIGNALS -->
+      <!-- REGIME -->
       <div class="card" style="animation-delay:.3s">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">REGIME ANALYSIS</div>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">REGIME · ${P.label.toUpperCase()} PROFILE</div>
         <div style="text-align:center;padding:12px;background:${alloc.regimeColor}06;border:1px solid ${alloc.regimeColor}15;border-radius:8px;margin-bottom:12px">
           <div style="font-family:var(--mono);font-size:20px;font-weight:800;color:${alloc.regimeColor}">${alloc.regime}</div>
-          <div style="font-family:var(--mono);font-size:10px;color:var(--t2);margin-top:4px">${alloc.greenCount} green · ${alloc.redCount} red · ${alloc.total-alloc.greenCount-alloc.redCount} other</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--t2);margin-top:4px">${alloc.greenCount}G · ${alloc.blueCount}B · ${alloc.redCount}R · ${alloc.total} total</div>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
           <div style="flex:1;text-align:center;padding:8px;background:var(--s2);border-radius:6px">
             <div style="font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.1em;margin-bottom:2px">RISK</div>
-            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:${alloc.riskScore>=60?'var(--green)':alloc.riskScore>=40?'var(--yellow)':'var(--red)'}">${alloc.riskScore}</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:${alloc.riskScore>=60?'var(--green)':alloc.riskScore>=35?'var(--yellow)':'var(--red)'}">${alloc.riskScore}</div>
           </div>
           <div style="flex:1;text-align:center;padding:8px;background:var(--s2);border-radius:6px">
             <div style="font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.1em;margin-bottom:2px">CASH</div>
             <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--t1)">${alloc.cashReserve}%</div>
           </div>
         </div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--t3);line-height:1.6;border-top:1px solid var(--bd);padding-top:8px">
-          ${alloc.regime==='RISK-ON'?'<span style="color:var(--green)">●</span> Markets showing broad strength. Overweight equities, reduce cash. Momentum favors risk assets.':''}
-          ${alloc.regime==='RISK-OFF'?'<span style="color:var(--red)">●</span> Structural weakness detected. Shift to gold + bonds + cash. Reduce equity exposure.':''}
-          ${alloc.regime==='BALANCED'?'<span style="color:var(--yellow)">●</span> Mixed signals. Maintain balanced allocation. Selective opportunities in high-score assets.':''}
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);line-height:1.6;border-top:1px solid var(--bd);padding-top:8px">
+          ${alloc.regime==='RISK-ON'?'<span style="color:var(--green)">●</span> Full risk-on. Max equity + momentum. Gold reduced. Ride the wave.':''}
+          ${alloc.regime==='TILT-BULL'?'<span style="color:#4ade80">●</span> Leaning bullish. Overweight strong sectors. Keep some hedges.':''}
+          ${alloc.regime==='RISK-OFF'?'<span style="color:var(--red)">●</span> Defensive mode. <b style="color:var(--yellow)">Gold boosted</b> as safe haven. Bonds up, equity reduced. Cash raised.':''}
+          ${alloc.regime==='TILT-BEAR'?'<span style="color:#fb7185">●</span> Caution. Reduce equity. Increase bonds + gold. Tighter stops.':''}
+          ${alloc.regime==='BALANCED'?'<span style="color:var(--yellow)">●</span> Mixed signals. Selective positioning in high-score assets only.':''}
         </div>
       </div>
     </div>
 
     <!-- ASSET TABLE -->
     <div class="card" style="animation-delay:.4s;padding:0;overflow:hidden">
-      <div style="padding:12px 16px;border-bottom:1px solid var(--bd)">
-        <span style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;font-weight:700">ASSET-LEVEL ALLOCATION</span>
+      <div style="padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;font-weight:700">ASSET-LEVEL ALLOCATION · ${assets.length} ASSETS</span>
+        <span style="font-family:var(--mono);font-size:8px;color:var(--t3)">${P.label} profile</span>
       </div>
-      <div style="display:grid;grid-template-columns:0.3fr 1.5fr 0.8fr 0.8fr 0.8fr 0.6fr 0.6fr 1fr;gap:4px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.03)">
-        ${['','ASSET','SIGNAL','BASE','ALLOC','CHANGE','STANCE','ACTION'].map(h=>`<span style="font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.1em;font-weight:700">${h}</span>`).join('')}
+      <div style="display:grid;grid-template-columns:0.3fr 1.5fr 0.7fr 0.6fr 0.7fr 0.5fr 0.5fr 0.9fr;gap:4px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.03)">
+        ${['','ASSET','SIGNAL','BASE','ALLOC','Δ','STANCE','ACTION'].map(h=>`<span style="font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.1em;font-weight:700">${h}</span>`).join('')}
       </div>
-      ${alloc.adjusted.sort((a,b)=>b.weight-a.weight).map(a=>{
+      ${alloc.adjusted.sort((a,b)=>b.weight-a.weight).map((a,i)=>{
         const lc=LIGHT_MAP[a.sig.light];
         const changeC=a.change>0?'var(--green)':a.change<0?'var(--red)':'var(--t3)';
         const stanceC=a.stance==='OW'?'var(--green)':a.stance==='UW'?'var(--red)':'var(--t3)';
         const stanceBg=a.stance==='OW'?'rgba(0,255,136,.06)':a.stance==='UW'?'rgba(255,51,102,.06)':'var(--s1)';
-        return`<div style="display:grid;grid-template-columns:0.3fr 1.5fr 0.8fr 0.8fr 0.8fr 0.6fr 0.6fr 1fr;gap:4px;padding:8px 16px;align-items:center;border-bottom:1px solid rgba(255,255,255,.02)">
+        const isGold=a.name==='Gold'&&(alloc.regime==='RISK-OFF'||alloc.regime==='TILT-BEAR');
+        return`<div style="display:grid;grid-template-columns:0.3fr 1.5fr 0.7fr 0.6fr 0.7fr 0.5fr 0.5fr 0.9fr;gap:4px;padding:7px 16px;align-items:center;border-bottom:1px solid rgba(255,255,255,.02);${isGold?'background:rgba(255,208,0,.03);border-left:2px solid #ffd000':''}">
           <span style="font-size:14px">${a.icon}</span>
-          <div><div style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--t1)">${a.name}</div><div style="font-family:var(--mono);font-size:8px;color:var(--t3)">${a.cat}</div></div>
-          <span style="font-family:var(--mono);font-size:9px;font-weight:700;color:${lc}">${a.sig.light} · ${a.sig.score}</span>
+          <div><div style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--t1)">${a.name}${isGold?' 🛡':''}${a.safeHaven&&!isGold?' ⚡':''}</div><div style="font-family:var(--mono);font-size:8px;color:var(--t3)">${a.cat}</div></div>
+          <span style="font-family:var(--mono);font-size:9px;font-weight:700;color:${lc}">${a.sig.light}·${a.sig.score}</span>
           <span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${a.base}%</span>
           <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--t1)">${a.weight}%</span>
           <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${changeC}">${a.change>0?'+':''}${a.change}</span>
-          <span style="font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:${stanceBg};color:${stanceC};text-align:center">${a.stance==='OW'?'OW ↑':a.stance==='UW'?'UW ↓':'N ='}</span>
-          <span style="font-family:var(--mono);font-size:8px;font-weight:700;color:${lc};padding:3px 6px;border-radius:3px;background:${lc}06;border:1px solid ${lc}12;text-align:center">${a.sig.action}</span>
-        </div>`;
-      }).join('')}
+          <span style="font-family:var(--mono);font-size:8px;font-weight:700;padding:2px 5px;border-radius:3px;background:${stanceBg};color:${stanceC};text-align:center">${a.stance==='OW'?'OW↑':a.stance==='UW'?'UW↓':'N'}</span>
+          <span style="font-family:var(--mono);font-size:7px;font-weight:700;color:${lc};padding:2px 5px;border-radius:3px;background:${lc}06;border:1px solid ${lc}12;text-align:center;white-space:nowrap">${a.sig.action}</span>
+        </div>`;}).join('')}
     </div>
 
-    <!-- REBALANCING ACTIONS -->
+    <!-- REBALANCING -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
       <div class="card" style="animation-delay:.5s">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--green);letter-spacing:.12em;margin-bottom:10px;font-weight:700">▲ INCREASE (OVERWEIGHT)</div>
-        ${alloc.adjusted.filter(a=>a.stance==='OW').sort((a,b)=>b.change-a.change).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.02)">
-          <span style="font-family:var(--mono);font-size:10px;color:var(--t2)">${a.icon} ${a.name}</span>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--green);letter-spacing:.12em;margin-bottom:10px;font-weight:700">▲ OVERWEIGHT — INCREASE</div>
+        ${alloc.adjusted.filter(a=>a.stance==='OW').sort((a,b)=>b.change-a.change).map(a=>{
+          const isGold=a.name==='Gold'&&(alloc.regime==='RISK-OFF'||alloc.regime==='TILT-BEAR');
+          return`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.02)">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--t2)">${a.icon} ${a.name}${isGold?' 🛡':''}</span>
           <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--green)">+${a.change}% → ${a.weight}%</span>
-        </div>`).join('')||'<div style="font-family:var(--mono);font-size:9px;color:var(--t3)">No overweight positions</div>'}
+        </div>`;}).join('')||'<div style="font-family:var(--mono);font-size:9px;color:var(--t3)">—</div>'}
       </div>
       <div class="card" style="animation-delay:.6s">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--red);letter-spacing:.12em;margin-bottom:10px;font-weight:700">▼ DECREASE (UNDERWEIGHT)</div>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--red);letter-spacing:.12em;margin-bottom:10px;font-weight:700">▼ UNDERWEIGHT — DECREASE</div>
         ${alloc.adjusted.filter(a=>a.stance==='UW').sort((a,b)=>a.change-b.change).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.02)">
           <span style="font-family:var(--mono);font-size:10px;color:var(--t2)">${a.icon} ${a.name}</span>
           <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--red)">${a.change}% → ${a.weight}%</span>
-        </div>`).join('')||'<div style="font-family:var(--mono);font-size:9px;color:var(--t3)">No underweight positions</div>'}
+        </div>`).join('')||'<div style="font-family:var(--mono);font-size:9px;color:var(--t3)">—</div>'}
       </div>
     </div>
 
     <!-- FOOTER -->
     <div style="text-align:center;padding:16px 0;margin-top:16px;border-top:1px solid var(--bd);font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.1em">
-      TRADEDGE ALLOCATION ENGINE · Signals from MATRIX v4.3 · ${date} · Educational purposes only
-    </div>
-  `;
+      TRADEDGE SMART ASSET ALLOCATION ENGINE · ${P.label} Profile · MATRIX v4.3 · ${date} · Educational only · Not financial advice
+    </div>`;
 
-  // Draw donut chart
-  const donut=document.getElementById('donut');
-  if(donut)drawDonut(donut,alloc.catWeights);
+  const donut=document.getElementById('donut');if(donut)drawDonut(donut,alloc.catWeights);
+  fixGrid();
 }
 
-// Responsive grid fix
-function fixGrid(){
-  const row=document.getElementById('top-row');
-  if(row&&window.innerWidth<900)row.style.gridTemplateColumns='1fr';
-}
+function setProfile(p){PROFILE=p;if(rrmDataGlobal)render(rrmDataGlobal);}
+function fixGrid(){const row=document.getElementById('top-row');if(row&&window.innerWidth<900)row.style.gridTemplateColumns='1fr';}
 
-// Load data and render
-fetch(DATA_URL).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(data=>{render(data);fixGrid();window.addEventListener('resize',fixGrid)}).catch(err=>{document.getElementById('app').innerHTML=`<div style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">⚠</div><div style="font-family:var(--mono);font-size:12px;color:var(--red)">Failed to load: ${err.message}</div><div style="font-family:var(--mono);font-size:9px;color:var(--t3);margin-top:8px">Place this file alongside rrm-signals.html in your repo</div></div>`});
+fetch(DATA_URL).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(data=>{rrmDataGlobal=data;render(data);window.addEventListener('resize',fixGrid)}).catch(err=>{document.getElementById('app').innerHTML=`<div style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">⚠</div><div style="font-family:var(--mono);font-size:12px;color:var(--red)">Failed: ${err.message}</div></div>`});
 </script>
 </body>
 </html>
