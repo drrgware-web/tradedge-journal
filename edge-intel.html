@@ -1679,11 +1679,11 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
               <label style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>ENTRY PRICE</label>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <span style={{fontSize:9,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>CMP: ₹{liveCMP.toFixed(2)}</span>
+                <span style={{fontSize:9,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>CMP: ₹{currentPrice.toFixed(2)}</span>
                 <button onClick={refreshCMP} disabled={cmpLoading} style={{padding:'2px 6px',fontSize:8,background:'transparent',border:'1px solid var(--accent2)',borderRadius:3,color:'var(--accent2)',cursor:cmpLoading?'wait':'pointer'}} title="Refresh CMP">
                   {cmpLoading?'⏳':'🔄'}
                 </button>
-                <button onClick={()=>setEntry(liveCMP)} style={{padding:'2px 6px',fontSize:8,background:'rgba(0,200,255,0.2)',border:'1px solid var(--accent2)',borderRadius:3,color:'var(--accent2)',cursor:'pointer'}} title="Use CMP as Entry">
+                <button onClick={()=>setEntry(currentPrice)} style={{padding:'2px 6px',fontSize:8,background:'rgba(0,200,255,0.2)',border:'1px solid var(--accent2)',borderRadius:3,color:'var(--accent2)',cursor:'pointer'}} title="Use CMP as Entry">
                   ↓
                 </button>
                 {lastCMPUpdate && <span style={{fontSize:7,color:'var(--text-muted)'}}>@{lastCMPUpdate.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span>}
