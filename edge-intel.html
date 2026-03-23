@@ -1374,21 +1374,53 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
           </div>
         </div>}
         
-        {/* Swing Low SL */}
+        {/* Swing Low SL — AUTO-DETECTED */}
         {slMethod==='swing'&&<div>
-          <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8,fontFamily:'var(--font-mono)'}}>Enter Recent Swing Low from Chart:</div>
-          <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:12}}>
-            <input type="number" value={slSwingLow} onChange={e=>setSLSwingLow(+e.target.value)} style={{width:150,padding:'10px',fontSize:14}} placeholder="Swing low price"/>
-            <button onClick={()=>applySL('swing',slSwingLow)} style={{padding:'10px 20px',background:'linear-gradient(135deg,#ff4455,#ff6677)',border:'none',borderRadius:6,color:'#fff',fontWeight:700,cursor:'pointer'}}>Apply</button>
-            <span style={{fontSize:10,color:'var(--text-muted)'}}>SL will be set ₹2 below swing low</span>
+          <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8,fontFamily:'var(--font-mono)'}}>
+            {stockData?.swingLows ? '🎯 AUTO-DETECTED SWING LOWS (Daily)' : 'Enter Recent Swing Low:'}
           </div>
+          
+          {/* Auto-detected swing lows */}
+          {stockData?.swingLows && <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
+            {[
+              {key:'low5', label:'5-Day Low', color:'#00ff88'},
+              {key:'low10', label:'10-Day Low', color:'#00c8ff'},
+              {key:'low20', label:'20-Day Low', color:'#ff88ff'},
+              {key:'low50', label:'50-Day Low', color:'#ffaa00'}
+            ].map(x => {
+              const data = stockData.swingLows[x.key];
+              if (!data) return null;
+              const slPrice = +(data.price - 2).toFixed(2);
+              const riskPct = +((entry - slPrice) / entry * 100).toFixed(1);
+              const riskAmt = +((entry - slPrice) * (positionSize || qty)).toFixed(0);
+              const isSelected = slSwingLow === data.price;
+              return (
+                <div key={x.key} onClick={()=>{setSLSwingLow(data.price);applySL('swing',data.price)}} style={{padding:'12px 8px',background:isSelected?`${x.color}20`:'var(--bg-tertiary)',border:`2px solid ${isSelected?x.color:'var(--border-dim)'}`,borderRadius:8,cursor:'pointer',textAlign:'center',transition:'all 0.15s'}}>
+                  <div style={{fontSize:9,fontWeight:700,color:isSelected?x.color:'var(--text-muted)'}}>{x.label}</div>
+                  <div style={{fontSize:16,fontWeight:900,color:'var(--red)',fontFamily:'var(--font-mono)',margin:'4px 0'}}>₹{data.price}</div>
+                  <div style={{fontSize:8,color:x.color}}>{data.date} ({data.daysAgo}d ago)</div>
+                  <div style={{fontSize:9,color:'var(--text-muted)',marginTop:4}}>SL: ₹{slPrice} (-{riskPct}%)</div>
+                  <div style={{fontSize:9,color:'var(--red)'}}>Risk: ₹{riskAmt}</div>
+                </div>
+              );
+            })}
+          </div>}
+          
+          {/* Manual entry fallback */}
+          <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:12}}>
+            <span style={{fontSize:10,color:'var(--text-muted)'}}>Or manual:</span>
+            <input type="number" value={slSwingLow||''} onChange={e=>setSLSwingLow(+e.target.value)} style={{width:120,padding:'8px',fontSize:12}} placeholder="Price"/>
+            <button onClick={()=>applySL('swing',slSwingLow)} disabled={!slSwingLow} style={{padding:'8px 16px',background:slSwingLow?'linear-gradient(135deg,#ff4455,#ff6677)':'var(--bg-tertiary)',border:'none',borderRadius:6,color:slSwingLow?'#fff':'var(--text-muted)',fontWeight:700,cursor:slSwingLow?'pointer':'not-allowed'}}>Apply</button>
+          </div>
+          
           {slSwingLow>0&&<div style={{padding:12,background:'var(--bg-tertiary)',borderRadius:8,display:'flex',justifyContent:'space-between'}}>
             <div><span style={{color:'var(--text-muted)',fontSize:10}}>Swing Low:</span> <span style={{color:'#ff4455',fontWeight:700}}>₹{slSwingLow}</span></div>
-            <div><span style={{color:'var(--text-muted)',fontSize:10}}>SL (with buffer):</span> <span style={{color:'var(--red)',fontWeight:700}}>₹{(slSwingLow-2).toFixed(2)}</span></div>
+            <div><span style={{color:'var(--text-muted)',fontSize:10}}>SL (₹2 buffer):</span> <span style={{color:'var(--red)',fontWeight:700}}>₹{(slSwingLow-2).toFixed(2)}</span></div>
             <div><span style={{color:'var(--text-muted)',fontSize:10}}>Risk:</span> <span style={{color:'var(--red)',fontWeight:700}}>-{((entry-(slSwingLow-2))/entry*100).toFixed(1)}%</span></div>
           </div>}
+          
           <div style={{marginTop:10,padding:10,background:'rgba(0,0,0,0.2)',borderRadius:6,fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
-            📍 Identify the recent swing low from your chart and enter it here. A ₹2 buffer is added automatically.
+            📍 {stockData?.swingLows ? 'Swing lows auto-detected from daily chart. Click to apply.' : 'Load stock to auto-detect swing lows, or enter manually.'}
           </div>
         </div>}
         
@@ -2108,7 +2140,7 @@ const EdgeIntel=()=>{
     loadStock(s.s);
   };
 
-  // Fetch live ATR from Yahoo via worker
+  // Fetch live ATR and Swing Lows from Yahoo via worker
   const fetchLiveATR = async (sym) => {
     const wUrl = localStorage.getItem('zd_worker_url');
     if (!wUrl) return null;
@@ -2125,37 +2157,63 @@ const EdgeIntel=()=>{
       if (!result) return null;
       
       const quotes = result.indicators?.quote?.[0];
+      const timestamps = result.timestamp || [];
       if (!quotes) return null;
       
-      const highs = quotes.high?.filter(v => v != null) || [];
-      const lows = quotes.low?.filter(v => v != null) || [];
-      const closes = quotes.close?.filter(v => v != null) || [];
+      const highs = quotes.high || [];
+      const lows = quotes.low || [];
+      const closes = quotes.close || [];
       
-      if (highs.length < 15 || lows.length < 15 || closes.length < 15) return null;
+      // Filter out nulls but keep indices for date mapping
+      const validIndices = closes.map((c, i) => c != null ? i : -1).filter(i => i >= 0);
+      if (validIndices.length < 15) return null;
+      
+      const validHighs = validIndices.map(i => highs[i]);
+      const validLows = validIndices.map(i => lows[i]);
+      const validCloses = validIndices.map(i => closes[i]);
+      const validTimestamps = validIndices.map(i => timestamps[i]);
       
       // Calculate ATR(14)
       const period = 14;
       const trueRanges = [];
       
-      for (let i = 1; i < Math.min(highs.length, lows.length, closes.length); i++) {
-        const h = highs[i], l = lows[i], pc = closes[i - 1];
+      for (let i = 1; i < validHighs.length; i++) {
+        const h = validHighs[i], l = validLows[i], pc = validCloses[i - 1];
         const tr = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
         trueRanges.push(tr);
       }
       
       if (trueRanges.length < period) return null;
       
-      // Simple Moving Average of TR for ATR
       const recentTRs = trueRanges.slice(-period);
       const atr = recentTRs.reduce((a, b) => a + b, 0) / period;
-      const currentPrice = closes[closes.length - 1];
+      const currentPrice = validCloses[validCloses.length - 1];
       const atrPct = (atr / currentPrice) * 100;
+      
+      // ═══ SWING LOW DETECTION ═══
+      const findPeriodLow = (days) => {
+        const slice = validLows.slice(-days);
+        const tsSlice = validTimestamps.slice(-days);
+        const minVal = Math.min(...slice);
+        const minIdx = slice.lastIndexOf(minVal);
+        const daysAgo = days - minIdx - 1;
+        const date = tsSlice[minIdx] ? new Date(tsSlice[minIdx] * 1000).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '';
+        return { price: +minVal.toFixed(2), daysAgo, date };
+      };
+      
+      const swingLows = {
+        low5: findPeriodLow(5),   // 5-day low
+        low10: findPeriodLow(10), // 10-day low
+        low20: findPeriodLow(20), // 20-day low (swing low)
+        low50: validLows.length >= 50 ? findPeriodLow(50) : null // 50-day low
+      };
       
       return {
         atr: +atr.toFixed(2),
         atr_pct: +atrPct.toFixed(2),
         volatility: atrPct > 3 ? 'HIGH' : atrPct > 1.5 ? 'MEDIUM' : 'LOW',
-        price: +currentPrice.toFixed(2)
+        price: +currentPrice.toFixed(2),
+        swingLows // ← NEW: swing low data
       };
     } catch (e) {
       console.log('ATR fetch error:', e);
@@ -2185,7 +2243,7 @@ const EdgeIntel=()=>{
       }
       
       if(data){
-        // Fetch live ATR if not already present
+        // Fetch live ATR and Swing Lows if not already present
         if(!data.atr || !data.atr_pct){
           console.log('Fetching live ATR for', sym);
           const atrData = await fetchLiveATR(sym.toUpperCase());
@@ -2193,8 +2251,9 @@ const EdgeIntel=()=>{
             data.atr = atrData.atr;
             data.atr_pct = atrData.atr_pct;
             data.volatility = atrData.volatility;
+            data.swingLows = atrData.swingLows; // ← NEW: swing lows
             if(!data.price) data.price = atrData.price;
-            console.log('Live ATR:', atrData);
+            console.log('Live ATR + Swing Lows:', atrData);
           }
         }
         setStockData(data);
