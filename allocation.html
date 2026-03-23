@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Dynamic Asset Allocation</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050810;--s1:rgba(255,255,255,.02);--s2:rgba(255,255,255,.04);--bd:rgba(255,255,255,.06);--green:#00ff88;--yellow:#ffd000;--blue:#00c8ff;--red:#ff3366;--cyan:#00e5ff;--mono:'JetBrains Mono',monospace;--sans:'Outfit',sans-serif;--t1:#fff;--t2:rgba(255,255,255,.45);--t3:rgba(255,255,255,.18)}
+*{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--t1);font-family:var(--sans);min-height:100vh;padding:20px}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:16px;animation:fadeUp .4s ease-out both}
+</style>
+</head>
+<body>
+<div id="app" style="max-width:1200px;margin:0 auto">
+  <div style="text-align:center;padding:20px 0;font-family:var(--mono);color:var(--t3)">Loading allocation data...</div>
+</div>
+<script>
+const DATA_URL='./data/rrm_data.json';
+const Q_COLORS={Leading:'#00ff88',Improving:'#00c8ff',Weakening:'#ffd000',Lagging:'#ff3366'};
+const LIGHT_MAP={GREEN:'#00ff88',YELLOW:'#ffd000',BLUE:'#00c8ff',RED:'#ff3366'};
+
+// Asset class categories + base weights (total = 100%)
+const ASSET_CATEGORIES={
+  'Dow Jones':{cat:'Equity',base:8,icon:'📈'},
+  'S&P 500':{cat:'Equity',base:8,icon:'📈'},
+  'NASDAQ':{cat:'Equity',base:8,icon:'📈'},
+  'Gold':{cat:'Commodity',base:12,icon:'🥇'},
+  'Silver':{cat:'Commodity',base:5,icon:'🥈'},
+  'Crude Oil':{cat:'Commodity',base:5,icon:'🛢'},
+  'USD/INR':{cat:'Forex',base:8,icon:'💱'},
+  'Bitcoin':{cat:'Crypto',base:5,icon:'₿'},
+  'US 10Y Yield':{cat:'Bond',base:8,icon:'📊'},
+  'ICICI G-Sec 2027':{cat:'Bond',base:8,icon:'🏛'},
+  'Gilt 5Y ETF':{cat:'Bond',base:8,icon:'🏛'},
+  'Liquid Fund':{cat:'Cash',base:7,icon:'💵'},
+};
+
+const CAT_COLORS={Equity:'#00c8ff',Commodity:'#ffd000',Bond:'#00ff88',Forex:'#a78bfa',Crypto:'#ff3366',Cash:'#64748b'};
+
+function transformData(raw,benchKey,groupKey){
+  const bm=raw?.benchmarks_data?.[benchKey];if(!bm)return[];
+  const d=bm.daily?.[groupKey]||[],w=bm.weekly?.[groupKey]||[],m=bm.monthly?.[groupKey]||[];
+  const wM={};w.forEach(s=>wM[s.symbol]=s);
+  const mM={};m.forEach(s=>mM[s.symbol]=s);
+  return d.map(dd=>{const ww=wM[dd.symbol]||{},mm=mM[dd.symbol]||{};
+    return{symbol:dd.symbol,name:dd.name,color:dd.color,
+      daily:{q:dd.quadrant||'',rsr:dd.current?.rs_ratio||100,rsm:dd.current?.rs_momentum||100},
+      weekly:{q:ww.quadrant||'',rsr:ww.current?.rs_ratio||100,rsm:ww.current?.rs_momentum||100},
+      monthly:{q:mm.quadrant||'',rsr:mm.current?.rs_ratio||100,rsm:mm.current?.rs_momentum||100}};});
+}
+
+function computeSignal(item){
+  const{daily:d,weekly:w,monthly:m}=item;
+  const right=q=>q==='Leading'||q==='Improving';
+  let score=0;
+  if(right(m.q))score+=(m.rsr>=100&&m.rsm>=100)?2:1;
+  if(right(w.q))score+=(w.rsr>=100&&w.rsm>=100)?2:1;
+  if(right(d.q))score+=1;
+  score=Math.min(score,5);
+  let light;
+  if(right(m.q)&&right(w.q)&&right(d.q))light='GREEN';
+  else if(right(m.q)&&!right(w.q)&&right(d.q))light='YELLOW';
+  else if(!right(m.q)&&right(w.q)&&right(d.q))light='BLUE';
+  else light='RED';
+  const weeklyMomOk=w.rsm>=98&&w.rsm<=106;
+  const rsiOk=right(w.q)&&weeklyMomOk;
+  let sz=0;if(w.rsr>100)sz++;if(weeklyMomOk)sz++;
+  if(w.rsm>=98&&w.rsm<=103)sz++;if(right(w.q))sz++;if(score>=3)sz++;
+  let action;
+  if(score>=4&&rsiOk)action='AGGRESSIVE BUY';
+  else if(score>=3&&rsiOk)action='BUY ON DIP';
+  else if(light==='YELLOW')action='HOOK ENTRY';
+  else if(light==='BLUE')action='SCALP ONLY';
+  else if(score>=3)action='HOLD';
+  else action='AVOID';
+  return{score,light,rsiOk,action,sz};
+}
+
+function computeAllocation(assets){
+  // Step 1: Get signal-adjusted weights
+  const adjusted=[];
+  let totalRaw=0;
+
+  assets.forEach(a=>{
+    const meta=ASSET_CATEGORIES[a.name];
+    if(!meta)return;
+    const sig=computeSignal(a);
+    let multiplier=1;
+    if(sig.light==='GREEN'&&sig.score>=4)multiplier=1.6;
+    else if(sig.light==='GREEN'&&sig.score>=3)multiplier=1.3;
+    else if(sig.light==='GREEN')multiplier=1.1;
+    else if(sig.light==='BLUE')multiplier=1.0;
+    else if(sig.light==='YELLOW')multiplier=0.75;
+    else if(sig.light==='RED'&&sig.score>=3)multiplier=0.5;
+    else multiplier=0.25;
+
+    // RSM bonus
+    if(sig.rsiOk)multiplier*=1.1;
+
+    const raw=meta.base*multiplier;
+    totalRaw+=raw;
+    adjusted.push({...a,...meta,sig,rawWeight:raw});
+  });
+
+  // Step 2: Normalize to 100%
+  // Reserve some for cash if regime is bearish
+  const greenCount=adjusted.filter(a=>a.sig.light==='GREEN').length;
+  const redCount=adjusted.filter(a=>a.sig.light==='RED').length;
+  const total=adjusted.length||1;
+  
+  let regime,regimeColor,cashReserve;
+  if(greenCount/total>=0.5){regime='RISK-ON';regimeColor='#00ff88';cashReserve=5;}
+  else if(redCount/total>=0.5){regime='RISK-OFF';regimeColor='#ff3366';cashReserve=25;}
+  else{regime='BALANCED';regimeColor='#ffd000';cashReserve=12;}
+
+  const allocatable=100-cashReserve;
+  adjusted.forEach(a=>{
+    a.weight=Math.round((a.rawWeight/totalRaw)*allocatable*10)/10;
+    a.change=Math.round((a.weight-a.base)*10)/10;
+    a.stance=a.change>2?'OW':a.change<-2?'UW':'N';
+  });
+
+  // Step 3: Risk score (0-100, higher = more aggressive)
+  const avgScore=adjusted.reduce((s,a)=>s+a.sig.score,0)/total;
+  const riskScore=Math.round(avgScore*20);
+
+  // Step 4: Category rollup
+  const catWeights={};
+  adjusted.forEach(a=>{
+    if(!catWeights[a.cat])catWeights[a.cat]={weight:0,base:0,assets:[]};
+    catWeights[a.cat].weight+=a.weight;
+    catWeights[a.cat].base+=a.base;
+    catWeights[a.cat].assets.push(a);
+  });
+  catWeights['Cash']={weight:cashReserve,base:10,assets:[{name:'Cash Reserve',weight:cashReserve,base:10,sig:{light:'GREEN',score:5,action:'HOLD'},cat:'Cash',icon:'💵',change:cashReserve-10,stance:cashReserve>12?'OW':'N'}]};
+
+  return{adjusted,regime,regimeColor,cashReserve,riskScore,catWeights,greenCount,redCount,total};
+}
+
+function drawDonut(canvas,catWeights){
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const size=240;
+  canvas.width=size*dpr;canvas.height=size*dpr;
+  canvas.style.width=size+'px';canvas.style.height=size+'px';
+  ctx.scale(dpr,dpr);
+  
+  const cx=size/2,cy=size/2,r=90,inner=55;
+  const cats=Object.entries(catWeights).sort((a,b)=>b[1].weight-a[1].weight);
+  let angle=-Math.PI/2;
+  
+  cats.forEach(([cat,data])=>{
+    const sweep=(data.weight/100)*Math.PI*2;
+    const color=CAT_COLORS[cat]||'#666';
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,angle,angle+sweep);
+    ctx.arc(cx,cy,inner,angle+sweep,angle,true);
+    ctx.closePath();
+    ctx.fillStyle=color;
+    ctx.globalAlpha=0.8;
+    ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.strokeStyle=color;
+    ctx.lineWidth=1;
+    ctx.stroke();
+    
+    // Label
+    const mid=angle+sweep/2;
+    if(data.weight>=5){
+      const lx=cx+Math.cos(mid)*(r-18);
+      const ly=cy+Math.sin(mid)*(r-18);
+      ctx.font='700 9px JetBrains Mono';
+      ctx.fillStyle='#000';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(Math.round(data.weight)+'%',lx,ly);
+    }
+    angle+=sweep;
+  });
+  
+  // Center text
+  ctx.font='800 22px Outfit';
+  ctx.fillStyle='#fff';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  const totalAlloc=Object.values(catWeights).reduce((s,c)=>s+c.weight,0);
+  ctx.fillText(Math.round(totalAlloc)+'%',cx,cy-6);
+  ctx.font='500 9px JetBrains Mono';
+  ctx.fillStyle='rgba(255,255,255,.3)';
+  ctx.fillText('ALLOCATED',cx,cy+12);
+}
+
+function render(rrmData){
+  const benchmark='^NSEI';
+  const all=[
+    ...transformData(rrmData,benchmark,'market_segments'),
+    ...transformData(rrmData,benchmark,'asset_classes'),
+    ...transformData(rrmData,benchmark,'global_indices'),
+    ...transformData(rrmData,benchmark,'sectors')
+  ];
+  
+  const macroNames=Object.keys(ASSET_CATEGORIES);
+  const assets=macroNames.map(k=>all.find(a=>a.name?.includes(k))).filter(Boolean);
+  
+  if(!assets.length){
+    document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red);font-family:var(--mono)">No asset data found</div>';
+    return;
+  }
+  
+  const alloc=computeAllocation(assets);
+  const date=rrmData?.metadata?.date||'';
+  
+  const app=document.getElementById('app');
+  app.innerHTML=`
+    <!-- HEADER -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h1 style="font-family:var(--mono);font-size:18px;font-weight:800;letter-spacing:.12em;background:linear-gradient(90deg,var(--green),var(--cyan),#fff,var(--green));background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s ease-in-out infinite">ALLOCATION ENGINE</h1>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--t3);margin-top:3px">Dynamic Asset Allocation · Powered by MATRIX Signals · ${date}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="padding:6px 14px;border-radius:6px;background:${alloc.regimeColor}0a;border:1px solid ${alloc.regimeColor}25;font-family:var(--mono);font-size:11px;font-weight:700;color:${alloc.regimeColor}">${alloc.regime}</div>
+        <div style="padding:6px 14px;border-radius:6px;background:var(--s2);border:1px solid var(--bd);font-family:var(--mono);font-size:10px;color:var(--t2)">Risk: <span style="color:${alloc.riskScore>=60?'var(--green)':alloc.riskScore>=40?'var(--yellow)':'var(--red)'}; font-weight:700">${alloc.riskScore}/100</span></div>
+      </div>
+    </div>
+
+    <!-- TOP ROW: Donut + Category breakdown + Regime -->
+    <div style="display:grid;grid-template-columns:260px 1fr 280px;gap:14px;margin-bottom:16px" id="top-row">
+      
+      <!-- DONUT -->
+      <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;animation-delay:.1s">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">RECOMMENDED ALLOCATION</div>
+        <canvas id="donut" width="240" height="240"></canvas>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;justify-content:center">
+          ${Object.entries(alloc.catWeights).map(([cat,d])=>`<span style="font-family:var(--mono);font-size:8px;color:${CAT_COLORS[cat]||'#666'};display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:${CAT_COLORS[cat]||'#666'}"></span>${cat} ${Math.round(d.weight)}%</span>`).join('')}
+        </div>
+      </div>
+
+      <!-- CATEGORY BARS -->
+      <div class="card" style="animation-delay:.2s">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">CATEGORY WEIGHTS · BASE vs SIGNAL</div>
+        ${Object.entries(alloc.catWeights).sort((a,b)=>b[1].weight-a[1].weight).map(([cat,d])=>{
+          const c=CAT_COLORS[cat]||'#666';
+          const change=Math.round(d.weight-d.base);
+          const changeC=change>0?'var(--green)':change<0?'var(--red)':'var(--t3)';
+          return`<div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+              <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${c}">${cat}</span>
+              <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--t1)">${Math.round(d.weight)}% <span style="font-size:8px;color:${changeC}">(${change>0?'+':''}${change})</span></span>
+            </div>
+            <div style="position:relative;height:8px;background:var(--s2);border-radius:4px;overflow:hidden">
+              <div style="position:absolute;height:100%;width:${d.base}%;background:${c}20;border-radius:4px"></div>
+              <div style="position:absolute;height:100%;width:${d.weight}%;background:${c};border-radius:4px;box-shadow:0 0 8px ${c}30;transition:width .5s ease"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- REGIME + SIGNALS -->
+      <div class="card" style="animation-delay:.3s">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px;font-weight:700">REGIME ANALYSIS</div>
+        <div style="text-align:center;padding:12px;background:${alloc.regimeColor}06;border:1px solid ${alloc.regimeColor}15;border-radius:8px;margin-bottom:12px">
+          <div style="font-family:var(--mono);font-size:20px;font-weight:800;color:${alloc.regimeColor}">${alloc.regime}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--t2);margin-top:4px">${alloc.greenCount} green · ${alloc.redCount} red · ${alloc.total-alloc.greenCount-alloc.redCount} other</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <div style="flex:1;text-align:center;padding:8px;background:var(--s2);border-radius:6px">
+            <div style="font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.1em;margin-bottom:2px">RISK</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:${alloc.riskScore>=60?'var(--green)':alloc.riskScore>=40?'var(--yellow)':'var(--red)'}">${alloc.riskScore}</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:8px;background:var(--s2);border-radius:6px">
+            <div style="font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.1em;margin-bottom:2px">CASH</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--t1)">${alloc.cashReserve}%</div>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--t3);line-height:1.6;border-top:1px solid var(--bd);padding-top:8px">
+          ${alloc.regime==='RISK-ON'?'<span style="color:var(--green)">●</span> Markets showing broad strength. Overweight equities, reduce cash. Momentum favors risk assets.':''}
+          ${alloc.regime==='RISK-OFF'?'<span style="color:var(--red)">●</span> Structural weakness detected. Shift to gold + bonds + cash. Reduce equity exposure.':''}
+          ${alloc.regime==='BALANCED'?'<span style="color:var(--yellow)">●</span> Mixed signals. Maintain balanced allocation. Selective opportunities in high-score assets.':''}
+        </div>
+      </div>
+    </div>
+
+    <!-- ASSET TABLE -->
+    <div class="card" style="animation-delay:.4s;padding:0;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--bd)">
+        <span style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;font-weight:700">ASSET-LEVEL ALLOCATION</span>
+      </div>
+      <div style="display:grid;grid-template-columns:0.3fr 1.5fr 0.8fr 0.8fr 0.8fr 0.6fr 0.6fr 1fr;gap:4px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.03)">
+        ${['','ASSET','SIGNAL','BASE','ALLOC','CHANGE','STANCE','ACTION'].map(h=>`<span style="font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.1em;font-weight:700">${h}</span>`).join('')}
+      </div>
+      ${alloc.adjusted.sort((a,b)=>b.weight-a.weight).map(a=>{
+        const lc=LIGHT_MAP[a.sig.light];
+        const changeC=a.change>0?'var(--green)':a.change<0?'var(--red)':'var(--t3)';
+        const stanceC=a.stance==='OW'?'var(--green)':a.stance==='UW'?'var(--red)':'var(--t3)';
+        const stanceBg=a.stance==='OW'?'rgba(0,255,136,.06)':a.stance==='UW'?'rgba(255,51,102,.06)':'var(--s1)';
+        return`<div style="display:grid;grid-template-columns:0.3fr 1.5fr 0.8fr 0.8fr 0.8fr 0.6fr 0.6fr 1fr;gap:4px;padding:8px 16px;align-items:center;border-bottom:1px solid rgba(255,255,255,.02)">
+          <span style="font-size:14px">${a.icon}</span>
+          <div><div style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--t1)">${a.name}</div><div style="font-family:var(--mono);font-size:8px;color:var(--t3)">${a.cat}</div></div>
+          <span style="font-family:var(--mono);font-size:9px;font-weight:700;color:${lc}">${a.sig.light} · ${a.sig.score}</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--t3)">${a.base}%</span>
+          <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--t1)">${a.weight}%</span>
+          <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${changeC}">${a.change>0?'+':''}${a.change}</span>
+          <span style="font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:${stanceBg};color:${stanceC};text-align:center">${a.stance==='OW'?'OW ↑':a.stance==='UW'?'UW ↓':'N ='}</span>
+          <span style="font-family:var(--mono);font-size:8px;font-weight:700;color:${lc};padding:3px 6px;border-radius:3px;background:${lc}06;border:1px solid ${lc}12;text-align:center">${a.sig.action}</span>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- REBALANCING ACTIONS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+      <div class="card" style="animation-delay:.5s">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--green);letter-spacing:.12em;margin-bottom:10px;font-weight:700">▲ INCREASE (OVERWEIGHT)</div>
+        ${alloc.adjusted.filter(a=>a.stance==='OW').sort((a,b)=>b.change-a.change).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.02)">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--t2)">${a.icon} ${a.name}</span>
+          <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--green)">+${a.change}% → ${a.weight}%</span>
+        </div>`).join('')||'<div style="font-family:var(--mono);font-size:9px;color:var(--t3)">No overweight positions</div>'}
+      </div>
+      <div class="card" style="animation-delay:.6s">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--red);letter-spacing:.12em;margin-bottom:10px;font-weight:700">▼ DECREASE (UNDERWEIGHT)</div>
+        ${alloc.adjusted.filter(a=>a.stance==='UW').sort((a,b)=>a.change-b.change).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.02)">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--t2)">${a.icon} ${a.name}</span>
+          <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--red)">${a.change}% → ${a.weight}%</span>
+        </div>`).join('')||'<div style="font-family:var(--mono);font-size:9px;color:var(--t3)">No underweight positions</div>'}
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="text-align:center;padding:16px 0;margin-top:16px;border-top:1px solid var(--bd);font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.1em">
+      TRADEDGE ALLOCATION ENGINE · Signals from MATRIX v4.3 · ${date} · Educational purposes only
+    </div>
+  `;
+
+  // Draw donut chart
+  const donut=document.getElementById('donut');
+  if(donut)drawDonut(donut,alloc.catWeights);
+}
+
+// Responsive grid fix
+function fixGrid(){
+  const row=document.getElementById('top-row');
+  if(row&&window.innerWidth<900)row.style.gridTemplateColumns='1fr';
+}
+
+// Load data and render
+fetch(DATA_URL).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(data=>{render(data);fixGrid();window.addEventListener('resize',fixGrid)}).catch(err=>{document.getElementById('app').innerHTML=`<div style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">⚠</div><div style="font-family:var(--mono);font-size:12px;color:var(--red)">Failed to load: ${err.message}</div><div style="font-family:var(--mono);font-size:9px;color:var(--t3);margin-top:8px">Place this file alongside rrm-signals.html in your repo</div></div>`});
+</script>
+</body>
+</html>
