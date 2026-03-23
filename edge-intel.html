@@ -870,24 +870,89 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const partialValue = partialQty * currentPrice;
   const partialProfit = partialQty * (currentPrice - existingEntry);
 
+  // Auto-load existing position from Trade Log when stock changes
   useEffect(()=>{
-    if(stockData?.price){
-      // Check if we have an existing position for this stock
-      const existingTrade = loadExistingPosition();
+    const autoLoadPosition = async () => {
+      if(!symbol || !stockData?.price) return;
       
-      if (!existingTrade) {
-        // New position mode
-        setIsExistingPosition(false);
+      // Reset existing position state first
+      setIsExistingPosition(false);
+      setExistingEntry(0);
+      setExistingQty(0);
+      setExistingDate('');
+      setCurrentSL(0);
+      setCurrentTarget(0);
+      
+      // Check localStorage first
+      const localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+      let openTrade = localTrades.find(t => 
+        t.symbol?.toUpperCase() === symbol?.toUpperCase() && 
+        (t.status === 'Open' || t.status === 'Partial')
+      );
+      
+      // If not found locally, try Supabase
+      if(!openTrade) {
+        try {
+          const SB_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+          const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NDYwNzYsImV4cCI6MjA1ODEyMjA3Nn0.sHYFRy1U-oSVwVaLqPX1qSTBE5_sXCYCzPnC5Wrbdw';
+          
+          const res = await fetch(`${SB_URL}/rest/v1/tradedge_trades?select=trades_json&order=updated_at.desc&limit=1`, {
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+          });
+          
+          if (res.ok) {
+            const rows = await res.json();
+            if (rows.length > 0 && rows[0].trades_json) {
+              const cloudTrades = JSON.parse(rows[0].trades_json);
+              openTrade = cloudTrades.find(t => 
+                t.symbol?.toUpperCase() === symbol?.toUpperCase() && 
+                (t.status === 'Open' || t.status === 'Partial')
+              );
+              
+              // Sync cloud trades to local if found
+              if(openTrade) {
+                localStorage.setItem('te_trades', JSON.stringify(cloudTrades));
+              }
+            }
+          }
+        } catch(e) {
+          console.log('Supabase check failed:', e);
+        }
+      }
+      
+      // Apply found position
+      if(openTrade) {
+        const entryPrice = openTrade.avg_price || openTrade.entry_price || openTrade.price || 0;
+        const quantity = openTrade.qty || openTrade.quantity || 0;
+        
+        setIsExistingPosition(true);
+        setExistingEntry(entryPrice);
+        setExistingQty(quantity);
+        setExistingDate(openTrade.ts ? new Date(openTrade.ts).toLocaleDateString('en-IN') : '');
+        setCurrentSL(openTrade.sl || 0);
+        setCurrentTarget(openTrade.target || 0);
+        setEntry(entryPrice);
+        setQty(quantity);
+        setSL(openTrade.sl || 0);
+        setTarget(openTrade.target || 0);
+        
+        console.log('✓ Auto-loaded position:', symbol, 'Qty:', quantity, 'Entry:', entryPrice);
+        addToast(`📦 Loaded: ${symbol} × ${quantity} @ ₹${entryPrice}`, 'info', 3000);
+      } else {
+        // No position found - new trade mode
         setEntry(stockData.price);
-        setTarget(+(stockData.price*1.08).toFixed(2));
-        // Auto-suggest SL based on ATR (2× ATR is a good default)
-        const suggestedSL = stockData.atr ? +(stockData.price - (stockData.atr * 2)).toFixed(2) : +(stockData.price*0.97).toFixed(2);
+        setTarget(+(stockData.price * 1.08).toFixed(2));
+        const suggestedSL = stockData.atr 
+          ? +(stockData.price - (stockData.atr * 2)).toFixed(2) 
+          : +(stockData.price * 0.97).toFixed(2);
         setSL(suggestedSL);
         setSLATRMult(2);
         setSLMethod('atr');
       }
-    }
-  },[stockData?.price, symbol]);
+    };
+    
+    autoLoadPosition();
+  },[symbol, stockData?.price]);
 
   const risk=entry>0&&sl>0?Math.abs(entry-sl)*qty:0;
   const reward=entry>0&&target>0?Math.abs(target-entry)*qty:0;
@@ -1355,112 +1420,109 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
 
   return(
     <div className="fade-in">
-      {/* ═══ EXISTING POSITION SECTION ═══ */}
-      {isExistingPosition && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
+      {/* ═══ EXISTING POSITION PANEL (only when found in Trade Log) ═══ */}
+      {isExistingPosition && existingEntry > 0 && existingQty > 0 && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <span style={{fontSize:18}}>📦</span>
-            <span style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'#8844ff'}}>EXISTING POSITION</span>
-            {existingEntry > 0 && existingQty > 0 && <span style={{fontSize:9,padding:'3px 8px',background:unrealizedPnL>=0?'rgba(0,255,136,0.2)':'rgba(255,68,85,0.2)',borderRadius:4,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontWeight:700}}>
+            <span style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'#8844ff'}}>OPEN POSITION</span>
+            <span style={{fontSize:9,padding:'3px 8px',background:unrealizedPnL>=0?'rgba(0,255,136,0.2)':'rgba(255,68,85,0.2)',borderRadius:4,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontWeight:700}}>
               {unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)} ({unrealizedPnLPct.toFixed(1)}%)
-            </span>}
+            </span>
+            <span style={{fontSize:8,padding:'2px 6px',background:'rgba(0,200,255,0.1)',borderRadius:3,color:'var(--accent2)'}}>from Trade Log</span>
           </div>
           <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0);setExistingDate('')}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
             ✕ New Trade Mode
           </button>
         </div>
         
-        {/* Entry Form - always visible for editing */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
-          <div>
-            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>BUY PRICE ₹</label>
-            <input type="number" value={existingEntry||''} onChange={e=>{const v=+e.target.value;setExistingEntry(v);setEntry(v)}} placeholder="2350" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700,background:'var(--bg-secondary)'}}/>
+        {/* Position Overview */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:12}}>
+          <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+            <div style={{fontSize:8,color:'var(--text-muted)'}}>AVG ENTRY</div>
+            <div style={{fontSize:14,fontWeight:900,color:'#8844ff',fontFamily:'var(--font-mono)'}}>₹{existingEntry.toLocaleString()}</div>
           </div>
-          <div>
-            <label style={{fontSize:9,color:'#8844ff',display:'block',marginBottom:4}}>QUANTITY</label>
-            <input type="number" value={existingQty||''} onChange={e=>{const v=+e.target.value;setExistingQty(v);setQty(v)}} placeholder="50" style={{width:'100%',padding:'10px',fontSize:14,fontWeight:700,background:'var(--bg-secondary)'}}/>
+          <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+            <div style={{fontSize:8,color:'var(--text-muted)'}}>QTY</div>
+            <div style={{fontSize:14,fontWeight:900,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{existingQty}</div>
           </div>
-          <div>
-            <label style={{fontSize:9,color:'var(--text-muted)',display:'block',marginBottom:4}}>BUY DATE</label>
-            <input type="date" value={existingDate} onChange={e=>setExistingDate(e.target.value)} style={{width:'100%',padding:'10px',background:'var(--bg-secondary)'}}/>
+          <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+            <div style={{fontSize:8,color:'var(--text-muted)'}}>CMP <button onClick={refreshCMP} disabled={cmpLoading} style={{fontSize:7,padding:'1px 3px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:2,color:'var(--text-muted)',cursor:'pointer'}}>{cmpLoading?'⏳':'🔄'}</button></div>
+            <div style={{fontSize:14,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{currentPrice.toFixed(2)}</div>
+          </div>
+          <div style={{padding:'8px',background:unrealizedPnL>=0?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',borderRadius:6,textAlign:'center',border:`1px solid ${unrealizedPnL>=0?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
+            <div style={{fontSize:8,color:'var(--text-muted)'}}>P&L</div>
+            <div style={{fontSize:14,fontWeight:900,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontFamily:'var(--font-mono)'}}>{unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)}</div>
+          </div>
+          <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
+            <div style={{fontSize:8,color:'var(--text-muted)'}}>VALUE</div>
+            <div style={{fontSize:14,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{positionValue.toLocaleString()}</div>
           </div>
         </div>
         
-        {/* Position Overview - shows when values entered */}
-        {existingEntry > 0 && existingQty > 0 && <>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:12}}>
-            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
-              <div style={{fontSize:8,color:'var(--text-muted)'}}>ENTRY</div>
-              <div style={{fontSize:14,fontWeight:900,color:'#8844ff',fontFamily:'var(--font-mono)'}}>₹{existingEntry}</div>
-            </div>
-            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
-              <div style={{fontSize:8,color:'var(--text-muted)'}}>QTY</div>
-              <div style={{fontSize:14,fontWeight:900,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{existingQty}</div>
-            </div>
-            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
-              <div style={{fontSize:8,color:'var(--text-muted)'}}>CMP <button onClick={refreshCMP} disabled={cmpLoading} style={{fontSize:7,padding:'1px 3px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:2,color:'var(--text-muted)',cursor:'pointer'}}>{cmpLoading?'⏳':'🔄'}</button></div>
-              <div style={{fontSize:14,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{currentPrice.toFixed(2)}</div>
-            </div>
-            <div style={{padding:'8px',background:unrealizedPnL>=0?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)',borderRadius:6,textAlign:'center',border:`1px solid ${unrealizedPnL>=0?'rgba(0,255,136,0.3)':'rgba(255,68,85,0.3)'}`}}>
-              <div style={{fontSize:8,color:'var(--text-muted)'}}>UNREALIZED P&L</div>
-              <div style={{fontSize:14,fontWeight:900,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontFamily:'var(--font-mono)'}}>{unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)}</div>
-            </div>
-            <div style={{padding:'8px',background:'var(--bg-tertiary)',borderRadius:6,textAlign:'center'}}>
-              <div style={{fontSize:8,color:'var(--text-muted)'}}>VALUE</div>
-              <div style={{fontSize:14,fontWeight:900,color:'var(--text-primary)',fontFamily:'var(--font-mono)'}}>₹{positionValue.toFixed(0)}</div>
-            </div>
-          </div>
-          
-          {/* Action Buttons */}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
-            <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'10px',background:'rgba(255,170,0,0.1)',border:'1px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-              🛡️ Set GTT (SL+TGT)
-            </button>
-            <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(Math.floor(existingQty*partialExitPct/100))}} style={{padding:'10px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-              📤 Partial Exit ({partialExitPct}%)
-            </button>
-            <button onClick={()=>{setShowExecution(true);setTxnType('BUY');setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(0,255,136,0.1)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-              📈 Add (Pyramid)
-            </button>
-            <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(existingQty)}} style={{padding:'10px',background:'rgba(255,68,85,0.1)',border:'1px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-              🚪 Full Exit
-            </button>
-          </div>
-          
-          {/* Partial Exit Selector */}
-          <div style={{padding:10,background:'rgba(0,0,0,0.2)',borderRadius:8}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-              <span style={{fontSize:9,color:'var(--text-muted)'}}>Partial Exit Amount:</span>
-              <span style={{fontSize:10,fontWeight:700,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{partialExitPct}% = {Math.floor(existingQty*partialExitPct/100)} shares = ₹{(Math.floor(existingQty*partialExitPct/100)*currentPrice).toFixed(0)}</span>
-            </div>
-            <div style={{display:'flex',gap:4}}>
-              {[25,33,50,67,75,100].map(p=>(
-                <button key={p} onClick={()=>setPartialExitPct(p)} style={{flex:1,padding:'5px',fontSize:9,fontWeight:700,borderRadius:4,border:'none',cursor:'pointer',background:partialExitPct===p?'var(--accent2)':'var(--bg-tertiary)',color:partialExitPct===p?'#000':'var(--text-muted)'}}>{p}%</button>
-              ))}
-            </div>
-          </div>
-        </>}
-        
-        {/* Hint when values not entered */}
-        {(existingEntry <= 0 || existingQty <= 0) && <div style={{padding:10,background:'rgba(255,170,0,0.1)',borderRadius:6,fontSize:10,color:'#ffaa00',textAlign:'center'}}>
-          ⚠️ Enter Buy Price and Quantity above to see position details and action buttons
+        {/* Current SL/Target if set */}
+        {(currentSL > 0 || currentTarget > 0) && <div style={{display:'flex',gap:8,marginBottom:12}}>
+          {currentSL > 0 && <div style={{flex:1,padding:'6px 10px',background:'rgba(255,68,85,0.1)',borderRadius:6,border:'1px solid rgba(255,68,85,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:9,color:'var(--red)'}}>SL</span>
+            <span style={{fontSize:11,fontWeight:700,color:'var(--red)',fontFamily:'var(--font-mono)'}}>₹{currentSL} ({((existingEntry-currentSL)/existingEntry*100).toFixed(1)}%)</span>
+          </div>}
+          {currentTarget > 0 && <div style={{flex:1,padding:'6px 10px',background:'rgba(0,255,136,0.1)',borderRadius:6,border:'1px solid rgba(0,255,136,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:9,color:'var(--accent)'}}>Target</span>
+            <span style={{fontSize:11,fontWeight:700,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>₹{currentTarget} (+{((currentTarget-existingEntry)/existingEntry*100).toFixed(1)}%)</span>
+          </div>}
         </div>}
+        
+        {/* Action Buttons */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'10px',background:'rgba(255,170,0,0.1)',border:'1px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            🛡️ Set GTT
+          </button>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(Math.floor(existingQty*partialExitPct/100));setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            📤 Partial ({partialExitPct}%)
+          </button>
+          <button onClick={()=>{setShowExecution(true);setTxnType('BUY');setEntry(currentPrice);setQty(Math.floor(existingQty*0.5))}} style={{padding:'10px',background:'rgba(0,255,136,0.1)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            📈 Pyramid
+          </button>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(existingQty);setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(255,68,85,0.1)',border:'1px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+            🚪 Full Exit
+          </button>
+        </div>
+        
+        {/* Partial Exit Selector */}
+        <div style={{padding:10,background:'rgba(0,0,0,0.2)',borderRadius:8}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <span style={{fontSize:9,color:'var(--text-muted)'}}>Partial Exit:</span>
+            <span style={{fontSize:10,fontWeight:700,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>{partialExitPct}% = {Math.floor(existingQty*partialExitPct/100)} shares = ₹{(Math.floor(existingQty*partialExitPct/100)*currentPrice).toLocaleString()}</span>
+          </div>
+          <div style={{display:'flex',gap:4}}>
+            {[25,33,50,67,75,100].map(p=>(
+              <button key={p} onClick={()=>setPartialExitPct(p)} style={{flex:1,padding:'5px',fontSize:9,fontWeight:700,borderRadius:4,border:'none',cursor:'pointer',background:partialExitPct===p?'var(--accent2)':'var(--bg-tertiary)',color:partialExitPct===p?'#000':'var(--text-muted)'}}>{p}%</button>
+            ))}
+          </div>
+        </div>
       </div>}
       
-      {/* Load from Trade Log + Manual Entry Fallback */}
-      {!isExistingPosition && <div style={{marginBottom:16}}>
-        <div style={{display:'flex',gap:10,marginBottom:8}}>
-          <button onClick={loadExistingPosition} disabled={loadingPosition} style={{padding:'10px 16px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:6,color:'#8844ff',fontSize:11,fontWeight:700,cursor:loadingPosition?'wait':'pointer',fontFamily:'var(--font-mono)',flex:1,opacity:loadingPosition?0.7:1}}>
-            {loadingPosition ? '⏳ Checking...' : '📦 Load from Trade Log'}
-          </button>
-          <button onClick={()=>setIsExistingPosition(true)} style={{padding:'10px 16px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',flex:1}}>
-            ✏️ Enter Manually
-          </button>
-        </div>
-        <div style={{fontSize:9,color:'var(--text-muted)',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          <span>↑ Auto-load from Local + Cloud ☁️</span>
-          <span>↑ For positions not in trade log</span>
-        </div>
+      {/* No position in Trade Log - just show info */}
+      {!isExistingPosition && <div style={{marginBottom:16,padding:'10px 14px',background:'rgba(0,0,0,0.2)',borderRadius:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontSize:10,color:'var(--text-muted)'}}>No open position for <strong style={{color:'var(--accent2)'}}>{symbol}</strong> in Trade Log</span>
+        <button onClick={async()=>{
+          setLoadingPosition(true);
+          const localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+          const found = localTrades.find(t => t.symbol?.toUpperCase() === symbol?.toUpperCase() && (t.status === 'Open' || t.status === 'Partial'));
+          if(found) {
+            setIsExistingPosition(true);
+            setExistingEntry(found.avg_price || found.entry_price || found.price);
+            setExistingQty(found.qty || found.quantity);
+            setCurrentSL(found.sl || 0);
+            setCurrentTarget(found.target || 0);
+            addToast(`📦 Found: ${symbol} × ${found.qty || found.quantity} @ ₹${found.avg_price || found.entry_price}`, 'success', 3000);
+          } else {
+            addToast(`No open position for ${symbol}`, 'info', 2000);
+          }
+          setLoadingPosition(false);
+        }} disabled={loadingPosition} style={{padding:'6px 12px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:4,color:'#8844ff',fontSize:9,fontWeight:700,cursor:loadingPosition?'wait':'pointer'}}>
+          {loadingPosition ? '⏳' : '🔄 Re-check'}
+        </button>
       </div>}
       
       <div className="section-title">📐 {isExistingPosition && existingEntry > 0 && existingQty > 0 ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
