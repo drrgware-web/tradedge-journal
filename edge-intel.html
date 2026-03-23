@@ -1612,7 +1612,9 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             {/* Target Input */}
             <div>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-                <label style={{fontSize:9,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>TARGET ₹</label>
+                <label style={{fontSize:9,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>
+                  {showStaggeredExit ? 'FINAL TARGET (T4)' : 'TARGET ₹'}
+                </label>
                 <span style={{fontSize:9,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>
                   {currentTarget > 0 ? `${isShortPosition ? '-' : '+'}${Math.abs((currentTarget-existingEntry)/existingEntry*100).toFixed(1)}%` : '--'}
                 </span>
@@ -1621,8 +1623,8 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
                 type="number" 
                 value={currentTarget || ''} 
                 onChange={e=>setCurrentTarget(+e.target.value)} 
-                placeholder="Enter Target"
-                style={{width:'100%',padding:'8px 10px',background:'var(--bg-tertiary)',border:'1px solid rgba(0,255,136,0.3)',borderRadius:6,color:'var(--accent)',fontSize:12,fontFamily:'var(--font-mono)'}}
+                placeholder={showStaggeredExit ? "Optional - using tranches" : "Enter Target"}
+                style={{width:'100%',padding:'8px 10px',background:'var(--bg-tertiary)',border:'1px solid rgba(0,255,136,0.3)',borderRadius:6,color:'var(--accent)',fontSize:12,fontFamily:'var(--font-mono)',opacity:showStaggeredExit?0.6:1}}
               />
               {/* Quick Target suggestions based on R:R */}
               <div style={{display:'flex',gap:4,marginTop:6}}>
@@ -1795,14 +1797,120 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             
             {/* Place GTT Orders Button */}
             <button 
-              onClick={()=>{
-                // TODO: Place multiple GTT orders for each tranche
-                addToast('🎯 GTT orders for staggered exit coming soon!', 'info', 3000);
+              onClick={async ()=>{
+                // Validate tranches
+                const totalPct = staggeredTranches.reduce((s,t)=>s+t.pct,0);
+                if(totalPct !== 100) {
+                  addToast(`Total exit % must be 100% (currently ${totalPct}%)`, 'error', 3000);
+                  return;
+                }
+                
+                // Check if all targets are set
+                const missingTargets = staggeredTranches.filter(t => !t.target || t.target <= 0);
+                if(missingTargets.length > 0) {
+                  addToast('Please set all target prices', 'error', 3000);
+                  return;
+                }
+                
+                // Check SL is set
+                if(!currentSL || currentSL <= 0) {
+                  addToast('Please set Stop Loss first', 'error', 3000);
+                  return;
+                }
+                
+                // Get Zerodha auth
+                const kiteAuth = localStorage.getItem('kite_auth');
+                if(!kiteAuth) {
+                  addToast('Please login to Zerodha first (Matrix > Settings)', 'error', 4000);
+                  return;
+                }
+                
+                const wUrl = localStorage.getItem('zd_worker_url');
+                if(!wUrl) {
+                  addToast('Worker URL not set', 'error', 3000);
+                  return;
+                }
+                
+                const auth = JSON.parse(kiteAuth);
+                const results = [];
+                
+                // Place GTT for each tranche
+                for(let i = 0; i < staggeredTranches.length; i++) {
+                  const t = staggeredTranches[i];
+                  const trancheQty = Math.floor(existingQty * t.pct / 100);
+                  if(trancheQty <= 0) continue;
+                  
+                  addToast(`Placing GTT T${i+1}: ${trancheQty} @ ₹${t.target}...`, 'info', 2000);
+                  
+                  try {
+                    // GTT OCO: SL + Target
+                    const gttPayload = {
+                      trigger_type: 'two-leg',
+                      tradingsymbol: symbol,
+                      exchange: 'NSE',
+                      trigger_values: [currentSL, t.target], // SL trigger, Target trigger
+                      last_price: currentPrice,
+                      orders: [
+                        { // SL order
+                          transaction_type: isShortPosition ? 'BUY' : 'SELL',
+                          quantity: trancheQty,
+                          product: 'CNC',
+                          order_type: 'LIMIT',
+                          price: isShortPosition ? +(currentSL * 1.005).toFixed(2) : +(currentSL * 0.995).toFixed(2) // Slight buffer
+                        },
+                        { // Target order
+                          transaction_type: isShortPosition ? 'BUY' : 'SELL',
+                          quantity: trancheQty,
+                          product: 'CNC',
+                          order_type: 'LIMIT',
+                          price: t.target
+                        }
+                      ]
+                    };
+                    
+                    const res = await fetch(wUrl, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-Kite-Action': 'gtt-place',
+                        'X-Enctoken': auth.enctoken
+                      },
+                      body: JSON.stringify(gttPayload)
+                    });
+                    
+                    const data = await res.json();
+                    results.push({ tranche: i+1, qty: trancheQty, target: t.target, result: data });
+                    
+                    if(data.data?.trigger_id || data.trigger_id) {
+                      addToast(`✅ T${i+1} GTT placed: ${trancheQty} @ ₹${t.target}`, 'success', 3000);
+                    } else {
+                      addToast(`⚠️ T${i+1} GTT response: ${JSON.stringify(data).substring(0,100)}`, 'warning', 4000);
+                    }
+                    
+                    // Small delay between orders
+                    await new Promise(r => setTimeout(r, 500));
+                    
+                  } catch(e) {
+                    results.push({ tranche: i+1, error: e.message });
+                    addToast(`❌ T${i+1} failed: ${e.message}`, 'error', 4000);
+                  }
+                }
+                
+                // Summary
+                const successCount = results.filter(r => r.result?.data?.trigger_id || r.result?.trigger_id).length;
+                addToast(`🎯 GTT Summary: ${successCount}/${staggeredTranches.length} orders placed`, successCount === staggeredTranches.length ? 'success' : 'warning', 5000);
+                
+                console.log('GTT Staggered Exit Results:', results);
               }}
-              style={{width:'100%',marginTop:10,padding:'10px',background:'linear-gradient(135deg,rgba(0,255,136,0.2),rgba(0,200,255,0.2))',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}
+              style={{width:'100%',marginTop:10,padding:'12px',background:'linear-gradient(135deg,rgba(0,255,136,0.2),rgba(0,200,255,0.2))',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}
             >
-              🛡️ Place GTT Orders for All Tranches
+              🛡️ Place GTT Orders for All Tranches (SL: ₹{currentSL})
             </button>
+            
+            {/* Trail SL Info */}
+            {trailingAfterT1 && <div style={{marginTop:8,padding:'6px 10px',background:'rgba(255,170,0,0.1)',borderRadius:4,fontSize:9,color:'var(--amber)'}}>
+              ⚠️ After T1 hits, manually update SL to entry (₹{existingEntry}) in Zerodha GTT
+            </div>}
           </div>}
         </div>
         
@@ -1938,7 +2046,9 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </details>
       </div>}
       
-      <div className="section-title">📐 {isExistingPosition && existingEntry > 0 && existingQty > 0 ? 'MANAGE POSITION' : 'SMART TRADE SETUP BUILDER'}</div>
+      {/* Only show SMART TRADE SETUP BUILDER for NEW trades, not existing positions */}
+      {!isExistingPosition && <>
+      <div className="section-title">📐 SMART TRADE SETUP BUILDER</div>
       
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
         <div>
@@ -2562,6 +2672,10 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       </div>}
 
       {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
+      </>}
+      
+      {/* AI Analysis for existing positions */}
+      {isExistingPosition && analysis && <div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
     </div>
   );
 };
