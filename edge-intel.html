@@ -742,23 +742,81 @@ const SmartTradeSetup=({symbol,stockData})=>{
     setSL(newSL);
   };
   
-  // Load existing position from localStorage (te_trades)
-  const loadExistingPosition = () => {
-    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-    const openTrade = trades.find(t => t.symbol?.toUpperCase() === symbol?.toUpperCase() && (t.status === 'Open' || t.status === 'Partial'));
-    if (openTrade) {
+  // Load existing position from localStorage + Supabase cloud
+  const [loadingPosition, setLoadingPosition] = useState(false);
+  
+  const loadExistingPosition = async () => {
+    setLoadingPosition(true);
+    
+    // Helper to apply trade data
+    const applyTrade = (trade, source) => {
       setIsExistingPosition(true);
-      setExistingEntry(openTrade.entry_price || openTrade.price || 0);
-      setExistingQty(openTrade.qty || openTrade.quantity || 0);
-      setExistingDate(openTrade.ts ? new Date(openTrade.ts).toLocaleDateString() : '');
-      setCurrentSL(openTrade.sl || 0);
-      setCurrentTarget(openTrade.target || 0);
-      setEntry(openTrade.entry_price || openTrade.price || stockData?.price || 0);
-      setQty(openTrade.qty || openTrade.quantity || 1);
-      setSL(openTrade.sl || 0);
-      setTarget(openTrade.target || 0);
-      return openTrade;
+      setExistingEntry(trade.entry_price || trade.price || 0);
+      setExistingQty(trade.qty || trade.quantity || 0);
+      setExistingDate(trade.ts ? new Date(trade.ts).toLocaleDateString() : '');
+      setCurrentSL(trade.sl || 0);
+      setCurrentTarget(trade.target || 0);
+      setEntry(trade.entry_price || trade.price || stockData?.price || 0);
+      setQty(trade.qty || trade.quantity || 1);
+      setSL(trade.sl || 0);
+      setTarget(trade.target || 0);
+      addToast(`✓ Loaded from ${source}: ${symbol} × ${trade.qty || trade.quantity} @ ₹${trade.entry_price || trade.price}`, 'success', 3000);
+      return trade;
+    };
+    
+    // 1. Try localStorage first
+    const localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+    const localOpen = localTrades.find(t => t.symbol?.toUpperCase() === symbol?.toUpperCase() && (t.status === 'Open' || t.status === 'Partial'));
+    
+    if (localOpen) {
+      setLoadingPosition(false);
+      return applyTrade(localOpen, 'Local');
     }
+    
+    // 2. Try Supabase cloud
+    try {
+      const SB_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+      const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NDYwNzYsImV4cCI6MjA1ODEyMjA3Nn0.sHYFRy1U-oSVwVaLqPX1qSTBE5_sXCYCzPnC5Wrbdw';
+      
+      const res = await fetch(`${SB_URL}/rest/v1/tradedge_trades?select=trades_json&order=updated_at.desc&limit=1`, {
+        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+      });
+      
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows.length > 0 && rows[0].trades_json) {
+          const cloudTrades = JSON.parse(rows[0].trades_json);
+          const cloudOpen = cloudTrades.find(t => t.symbol?.toUpperCase() === symbol?.toUpperCase() && (t.status === 'Open' || t.status === 'Partial'));
+          
+          if (cloudOpen) {
+            // Also sync to localStorage
+            localStorage.setItem('te_trades', JSON.stringify(cloudTrades));
+            setLoadingPosition(false);
+            return applyTrade(cloudOpen, 'Cloud ☁️');
+          }
+          
+          // Check if there are any open positions in cloud
+          const allCloudOpen = cloudTrades.filter(t => t.status === 'Open' || t.status === 'Partial');
+          if (allCloudOpen.length > 0) {
+            addToast(`No position for ${symbol} in cloud. Found ${allCloudOpen.length} other open trades.`, 'info', 4000);
+            setLoadingPosition(false);
+            return null;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Supabase fetch error:', e);
+    }
+    
+    // 3. Nothing found
+    const allLocalOpen = localTrades.filter(t => t.status === 'Open' || t.status === 'Partial');
+    if (allLocalOpen.length > 0) {
+      addToast(`No position for ${symbol}. You have ${allLocalOpen.length} other open trades locally.`, 'info', 4000);
+    } else {
+      addToast(`No open positions found (local or cloud). Use manual entry.`, 'info', 4000);
+    }
+    
+    setLoadingPosition(false);
     return null;
   };
   
@@ -1228,13 +1286,19 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       </div>}
       
       {/* Manual Position Entry (if not auto-loaded) */}
-      {!isExistingPosition && <div style={{display:'flex',gap:10,marginBottom:16}}>
-        <button onClick={()=>setIsExistingPosition(true)} style={{padding:'8px 16px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:6,color:'#8844ff',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-          📦 I have an existing position
-        </button>
-        <button onClick={loadExistingPosition} style={{padding:'8px 16px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
-          🔄 Load from Trade Log
-        </button>
+      {!isExistingPosition && <div style={{marginBottom:16}}>
+        <div style={{display:'flex',gap:10,marginBottom:8}}>
+          <button onClick={()=>setIsExistingPosition(true)} style={{padding:'10px 16px',background:'rgba(136,68,255,0.1)',border:'1px solid #8844ff',borderRadius:6,color:'#8844ff',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',flex:1}}>
+            📦 I have an existing position
+          </button>
+          <button onClick={loadExistingPosition} disabled={loadingPosition} style={{padding:'10px 16px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',fontSize:11,fontWeight:700,cursor:loadingPosition?'wait':'pointer',fontFamily:'var(--font-mono)',flex:1,opacity:loadingPosition?0.7:1}}>
+            {loadingPosition ? '⏳ Checking...' : '🔄 Load from Trade Log'}
+          </button>
+        </div>
+        <div style={{fontSize:9,color:'var(--text-muted)',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <span>↑ Enter position manually (buy price, qty)</span>
+          <span>↑ Checks Local + Cloud ☁️ for {symbol}</span>
+        </div>
       </div>}
       
       {/* Manual Entry for Existing Position */}
