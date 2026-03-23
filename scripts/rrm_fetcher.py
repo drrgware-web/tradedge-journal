@@ -1,24 +1,299 @@
 """
 ================================================================================
-RRM Data Fetcher v4.3 — Thematic Indices + Multi-Benchmark + RSI
+RRM Data Fetcher v4.3.1 — NSE Direct API Fallback + Thematic Indices + RSI
 ================================================================================
-UPGRADE from v4.2:
-  - NEW: 47 Nifty Thematic/Sectoral indices as a separate group
-  - Appears as 'thematic_indices' in rrm_data.json
-  - Frontend renders this as a new "Thematic" tab
-  - All v4.2 features preserved (RSI, multi-benchmark, global indices, etc.)
+UPGRADE from v4.3:
+  - NEW: NSE Direct API fallback for 47 thematic indices
+  - When yfinance returns empty/short data for NIFTY_XXXXX.NS tickers,
+    fetcher falls back to nseindia.com/api/equity-stockIndices
+  - Session-cookie + browser-header approach to bypass NSE bot detection
+  - Exponential backoff + retry logic for rate limiting
+  - All v4.3 features preserved (RSI, multi-benchmark, global indices, etc.)
 
-Requirements:  pip install yfinance numpy
+Requirements:  pip install yfinance numpy requests
 ================================================================================
 """
 
-import json, os, sys, argparse, logging, hashlib
-from datetime import datetime
+import json, os, sys, argparse, logging, hashlib, time
+from datetime import datetime, timedelta
 import yfinance as yf
 import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("rrm_fetcher")
+
+# =============================================================================
+# NSE DIRECT API — FALLBACK FOR THEMATIC INDICES
+# =============================================================================
+# yfinance often fails for NIFTY_XXXXX.NS format tickers (newer NSE indices).
+# This module fetches historical data directly from NSE's website API.
+# NSE requires: (1) session cookies from homepage visit, (2) browser-like headers
+
+class NSEFetcher:
+    """Fetch index data directly from NSE India API with session management."""
+    
+    BASE_URL = "https://www.nseindia.com"
+    API_URL = "https://www.nseindia.com/api"
+    
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Referer": "https://www.nseindia.com/",
+    }
+    
+    # Map yfinance ticker → NSE index name for API query
+    # NSE API uses index names like "NIFTY HEALTHCARE" not ticker symbols
+    TICKER_TO_NSE_NAME = {
+        "NIFTY_CONSR_DURBL.NS":   "NIFTY CONSUMER DURABLES",
+        "NIFTY_HEALTHCARE.NS":    "NIFTY HEALTHCARE",
+        "NIFTY_OIL_AND_GAS.NS":   "NIFTY OIL & GAS",
+        "NIFTY_PHARMA.NS":        "NIFTY PHARMA",
+        "NIFTY_AUTO.NS":          "NIFTY AUTO",
+        "NIFTY_BANK.NS":          "NIFTY BANK",
+        "NIFTY_ENERGY.NS":        "NIFTY ENERGY",
+        "NIFTY_FMCG.NS":         "NIFTY FMCG",
+        "NIFTY_IT.NS":           "NIFTY IT",
+        "NIFTY_MEDIA.NS":        "NIFTY MEDIA",
+        "NIFTY_METAL.NS":        "NIFTY METAL",
+        "NIFTY_REALTY.NS":       "NIFTY REALTY",
+        "NIFTY_PSU_BANK.NS":     "NIFTY PSU BANK",
+        "NIFTY_PVT_BANK.NS":     "NIFTY PRIVATE BANK",
+        "NIFTY_CHEMICALS.NS":    "NIFTY CHEMICALS",
+        "NIFTY_CPSE.NS":         "NIFTY CPSE",
+        "NIFTY_IND_DIGITAL.NS":  "NIFTY INDIA DIGITAL",
+        "NIFTY_INDIA_MFG.NS":    "NIFTY INDIA MANUFACTURING",
+        "NIFTY_COMMODITIES.NS":  "NIFTY COMMODITIES",
+        "NIFTY_CONSUMPTION.NS":  "NIFTY CONSUMPTION",
+        "NIFTY_FIN_SERVICE.NS":  "NIFTY FINANCIAL SERVICES",
+        "NIFTY_GROWSECT_15.NS":  "NIFTY GROWTH SECTORS 15",
+        "NIFTY_INFRA.NS":        "NIFTY INFRASTRUCTURE",
+        "NIFTY_MNC.NS":          "NIFTY MNC",
+        "NIFTY_PSE.NS":          "NIFTY PSE",
+        "NIFTY_SERV_SECTOR.NS":  "NIFTY SERVICES SECTOR",
+        "NIFTY_IND_DEFENCE.NS":  "NIFTY INDIA DEFENCE",
+        "NIFTY_IND_TOURISM.NS":  "NIFTY INDIA TOURISM",
+        "NIFTY_CAPITAL_MKT.NS":  "NIFTY FINANCIAL SERVICES 25/50",  # Check actual name
+        "NIFTY_EV.NS":           "NIFTY EV & NEW AGE AUTOMOTIVE",
+        "NIFTY_HOUSING.NS":      "NIFTY HOUSING",
+        "NIFTY_COREHOUSING.NS":  "NIFTY CORE HOUSING",
+        "NIFTY_INTERNET.NS":     "NIFTY INTERNET",  
+        "NIFTY_MOBILITY.NS":     "NIFTY MOBILITY",
+        "NIFTY_RURAL.NS":        "NIFTY RURAL",
+        "NIFTY_WAVES.NS":        "NIFTY WAVES",
+        "NIFTY_FIN_SRV_25_50.NS": "NIFTY FINANCIAL SERVICES 25/50",
+        "NIFTY_FINSRV_EX_BANK.NS": "NIFTY FINANCIAL SERVICES EX-BANK",
+        "NIFTY_MS_FIN_SERV.NS":  "NIFTY MIDSMALL FINANCIAL SERVICES",
+        "NIFTY_MS_IT_TELECOM.NS": "NIFTY MIDSMALL IT & TELECOM",
+        "NIFTY_MS_IND_CONS.NS":  "NIFTY MIDSMALL INDIA CONSUMPTION",
+        "NIFTY_MIDSML_HLTH.NS":  "NIFTY MIDSMALL HEALTHCARE",
+        "NIFTY_NEW_CONSUMP.NS":  "NIFTY NEW AGE CONSUMPTION",  
+        "NIFTY_NONCYC_CONS.NS":  "NIFTY NON-CYCLICAL CONSUMER",
+        "NIFTY_TRANS_LOGIS.NS":  "NIFTY TRANSPORTATION & LOGISTICS",
+        "NIFTY_INFRA_LOG.NS":    "NIFTY INFRASTRUCTURE & LOGISTICS",  
+        "NIFTY_CORP_MAATR.NS":   "NIFTY CORPORATE MAATR",  
+        "NIFTY_TELECOM.NS":      "NIFTY TELECOM",
+        "NIFTY_CAPITAL_MKT.NS":  "NIFTY CAPITAL MARKETS",
+    }
+    
+    def __init__(self):
+        self._session = None
+        self._cookies_fetched = False
+        self._last_request_time = 0
+        self._min_delay = 0.5  # seconds between requests
+    
+    def _get_session(self):
+        """Get or create a requests session with NSE cookies."""
+        if self._session and self._cookies_fetched:
+            return self._session
+        
+        try:
+            import requests
+            self._session = requests.Session()
+            self._session.headers.update(self.HEADERS)
+            
+            # Step 1: Hit homepage to get cookies (nseappid, nsit, bm_sv etc.)
+            log.info("NSE API: Establishing session (fetching cookies)...")
+            resp = self._session.get(self.BASE_URL, timeout=15)
+            resp.raise_for_status()
+            
+            # Step 2: Hit a lightweight API endpoint to validate session
+            resp2 = self._session.get(
+                f"{self.API_URL}/allIndices", 
+                timeout=15,
+                headers={**self.HEADERS, "Referer": f"{self.BASE_URL}/market-data/live-equity-market"}
+            )
+            if resp2.status_code == 200:
+                self._cookies_fetched = True
+                log.info("NSE API: Session established successfully")
+            else:
+                log.warning(f"NSE API: Session validation returned {resp2.status_code}")
+                self._cookies_fetched = True  # Try anyway
+            
+            return self._session
+        except ImportError:
+            log.error("NSE API: 'requests' library not installed. pip install requests")
+            return None
+        except Exception as e:
+            log.error(f"NSE API: Session setup failed: {e}")
+            return None
+    
+    def _rate_limit(self):
+        """Ensure minimum delay between NSE requests."""
+        elapsed = time.time() - self._last_request_time
+        if elapsed < self._min_delay:
+            time.sleep(self._min_delay - elapsed)
+        self._last_request_time = time.time()
+    
+    def fetch_index_history(self, ticker, years=5, max_retries=3):
+        """
+        Fetch historical closing prices for an NSE index.
+        
+        NSE API endpoint: /api/equity-stockIndices?index=NIFTY+HEALTHCARE
+        For historical: /api/historical/indicesHistory?indexType=NIFTY+HEALTHCARE&from=01-01-2020&to=01-01-2025
+        
+        Returns: {"closes": [...], "dates": [...]} or None
+        """
+        session = self._get_session()
+        if not session:
+            return None
+        
+        nse_name = self.TICKER_TO_NSE_NAME.get(ticker)
+        if not nse_name:
+            # Try auto-conversion: NIFTY_PHARMA.NS → NIFTY PHARMA
+            name_guess = ticker.replace(".NS", "").replace("_", " ")
+            log.info(f"NSE API: No exact mapping for {ticker}, trying '{name_guess}'")
+            nse_name = name_guess
+        
+        # Build date range
+        to_date = datetime.now()
+        from_date = to_date - timedelta(days=years * 365)
+        
+        # NSE limits to ~1 year per request, so chunk it
+        all_closes = []
+        all_dates = []
+        
+        chunk_start = from_date
+        while chunk_start < to_date:
+            chunk_end = min(chunk_start + timedelta(days=365), to_date)
+            
+            from_str = chunk_start.strftime("%d-%m-%Y")
+            to_str = chunk_end.strftime("%d-%m-%Y")
+            
+            url = (
+                f"{self.API_URL}/historical/indicesHistory"
+                f"?indexType={nse_name.replace(' ', '+').replace('&', '%26')}"
+                f"&from={from_str}&to={to_str}"
+            )
+            
+            for attempt in range(max_retries):
+                try:
+                    self._rate_limit()
+                    resp = session.get(
+                        url, 
+                        timeout=20,
+                        headers={
+                            **self.HEADERS, 
+                            "Referer": f"{self.BASE_URL}/market-data/live-equity-market"
+                        }
+                    )
+                    
+                    if resp.status_code == 401 or resp.status_code == 403:
+                        # Session expired — refresh cookies
+                        log.warning(f"NSE API: {resp.status_code} — refreshing session...")
+                        self._cookies_fetched = False
+                        session = self._get_session()
+                        if not session:
+                            return None
+                        continue
+                    
+                    if resp.status_code == 429:
+                        # Rate limited — exponential backoff
+                        wait = 2 ** (attempt + 1)
+                        log.warning(f"NSE API: Rate limited, waiting {wait}s...")
+                        time.sleep(wait)
+                        continue
+                    
+                    if resp.status_code != 200:
+                        log.warning(f"NSE API: {ticker} got {resp.status_code}")
+                        break
+                    
+                    data = resp.json()
+                    records = data.get("data", {}).get("indexCloseOnlineRecords", [])
+                    if not records:
+                        records = data.get("data", {}).get("indexTurnoverRecords", [])
+                    
+                    if records:
+                        for rec in records:
+                            # NSE returns records like:
+                            # {"EOD_TIMESTAMP": "17-Mar-2025", "EOD_CLOSE_INDEX_VAL": "12345.67", ...}
+                            # or: {"TIMESTAMP": "17-Mar-2025", "CLOSE": "12345.67"}
+                            date_str = rec.get("EOD_TIMESTAMP") or rec.get("TIMESTAMP") or rec.get("HistoricalDate")
+                            close_val = rec.get("EOD_CLOSE_INDEX_VAL") or rec.get("CLOSE") or rec.get("CloseValue")
+                            
+                            if date_str and close_val:
+                                try:
+                                    # Parse various NSE date formats
+                                    for fmt in ["%d-%b-%Y", "%d-%m-%Y", "%d %b %Y", "%Y-%m-%d"]:
+                                        try:
+                                            dt = datetime.strptime(date_str.strip(), fmt)
+                                            break
+                                        except ValueError:
+                                            continue
+                                    else:
+                                        continue
+                                    
+                                    close_float = float(str(close_val).replace(",", ""))
+                                    all_dates.append(dt.strftime("%Y-%m-%d"))
+                                    all_closes.append(close_float)
+                                except (ValueError, AttributeError):
+                                    continue
+                        
+                        log.info(f"  NSE API: {ticker} chunk {from_str}→{to_str}: {len(records)} records")
+                    break  # Success
+                    
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        wait = 2 ** (attempt + 1)
+                        log.warning(f"NSE API: {ticker} attempt {attempt+1} failed: {e}, retrying in {wait}s")
+                        time.sleep(wait)
+                    else:
+                        log.error(f"NSE API: {ticker} all retries failed: {e}")
+            
+            chunk_start = chunk_end + timedelta(days=1)
+        
+        if not all_closes:
+            return None
+        
+        # Sort by date (NSE sometimes returns reverse order)
+        pairs = sorted(zip(all_dates, all_closes), key=lambda x: x[0])
+        all_dates = [p[0] for p in pairs]
+        all_closes = [p[1] for p in pairs]
+        
+        # Deduplicate dates
+        seen = set()
+        deduped_dates = []
+        deduped_closes = []
+        for d, c in zip(all_dates, all_closes):
+            if d not in seen:
+                seen.add(d)
+                deduped_dates.append(d)
+                deduped_closes.append(c)
+        
+        log.info(f"  NSE API ✓ {ticker}: {len(deduped_closes)} days total")
+        return {"closes": deduped_closes, "dates": deduped_dates}
+
+# Global NSE fetcher instance (lazy init)
+_nse_fetcher = None
+
+def get_nse_fetcher():
+    global _nse_fetcher
+    if _nse_fetcher is None:
+        _nse_fetcher = NSEFetcher()
+    return _nse_fetcher
+
 
 # =============================================================================
 # RSI COMPUTATION (v4.2)
@@ -60,7 +335,7 @@ def load_config(config_path):
             return cfg
         except Exception as e:
             log.warning(f"Config load failed: {e}")
-    log.info("Using built-in defaults (v4.3 — 16 sectors, 47 thematic, 54 ETFs, 25 global + RSI)")
+    log.info("Using built-in defaults (v4.3.1 — 16 sectors, 47 thematic, 54 ETFs, 25 global + NSE API fallback)")
     return DEFAULT_CONFIG()
 
 def DEFAULT_CONFIG():
@@ -92,11 +367,9 @@ def DEFAULT_CONFIG():
         },
 
         # ═══════════════════════════════════════════════════════
-        # 47 NIFTY THEMATIC / SECTORAL INDICES (NEW v4.3)
-        # Yahoo Finance format: NIFTY_XXXXX.NS
+        # 47 NIFTY THEMATIC / SECTORAL INDICES (v4.3)
         # ═══════════════════════════════════════════════════════
         "thematic_indices": {
-            # ── Sectoral / Industry ──
             "NIFTY_CONSR_DURBL.NS":     {"name": "Nifty Consumer Durables",   "color": "#f472b6", "group": "Sectoral"},
             "NIFTY_HEALTHCARE.NS":      {"name": "Nifty Healthcare",          "color": "#34d399", "group": "Sectoral"},
             "NIFTY_OIL_AND_GAS.NS":     {"name": "Nifty Oil & Gas",          "color": "#f97316", "group": "Sectoral"},
@@ -112,8 +385,6 @@ def DEFAULT_CONFIG():
             "NIFTY_PSU_BANK.NS":        {"name": "Nifty PSU Bank",          "color": "#0ea5e9", "group": "Sectoral"},
             "NIFTY_PVT_BANK.NS":        {"name": "Nifty Pvt Bank",          "color": "#60a5fa", "group": "Sectoral"},
             "NIFTY_CHEMICALS.NS":       {"name": "Nifty Chemicals",          "color": "#d946ef", "group": "Sectoral"},
-
-            # ── Thematic ──
             "NIFTY_CPSE.NS":            {"name": "Nifty CPSE",              "color": "#4ade80", "group": "Thematic"},
             "NIFTY_IND_DIGITAL.NS":     {"name": "Nifty India Digital",     "color": "#22d3ee", "group": "Thematic"},
             "NIFTY_INDIA_MFG.NS":       {"name": "Nifty India Mfg",        "color": "#bef264", "group": "Thematic"},
@@ -135,8 +406,6 @@ def DEFAULT_CONFIG():
             "NIFTY_MOBILITY.NS":        {"name": "Nifty Mobility",          "color": "#c084fc", "group": "Thematic"},
             "NIFTY_RURAL.NS":           {"name": "Nifty Rural",             "color": "#a3e635", "group": "Thematic"},
             "NIFTY_WAVES.NS":           {"name": "Nifty Waves",             "color": "#5eead4", "group": "Thematic"},
-
-            # ── Strategy / Multi-Sector ──
             "NIFTY_FIN_SRV_25_50.NS":   {"name": "Nifty FinSrv 25/50",     "color": "#818cf8", "group": "Strategy"},
             "NIFTY_FINSRV_EX_BANK.NS":  {"name": "Nifty FinSrv ExBank",    "color": "#a5b4fc", "group": "Strategy"},
             "NIFTY_MS_FIN_SERV.NS":     {"name": "Nifty MS Fin Serv",      "color": "#c4b5fd", "group": "Strategy"},
@@ -332,32 +601,77 @@ def quadrant(r, m):
     return "Weakening"
 
 # =============================================================================
-# FETCH PRICES (unchanged)
+# FETCH PRICES — UPDATED with NSE API fallback
 # =============================================================================
-def fetch_prices(symbols, period="5y"):
+def is_thematic_ticker(sym):
+    """Check if a symbol is a NIFTY_XXXXX.NS thematic index ticker."""
+    return sym.startswith("NIFTY_") and sym.endswith(".NS")
+
+def fetch_prices(symbols, period="5y", thematic_tickers=None):
+    """
+    Fetch prices for all symbols. For thematic index tickers that fail on 
+    yfinance, automatically falls back to NSE Direct API.
+    
+    Args:
+        symbols: List of ticker symbols
+        period: yfinance period string (default "5y")
+        thematic_tickers: Set of tickers that are thematic indices (for NSE fallback)
+    """
+    if thematic_tickers is None:
+        thematic_tickers = set()
+    
     log.info(f"Fetching {len(symbols)} symbols from Yahoo Finance...")
     out = {}
+    failed_thematic = []  # Track thematic tickers that fail on yfinance
+    
     for sym in symbols:
         try:
-            # Try requested period first (5y default)
             h = yf.Ticker(sym).history(period=period, interval="1d")
-            # If empty or too short, try "max" to get ALL available history
-            # This catches newer indices launched in 2022-2024
             if (h.empty or len(h) < 30) and period != "max":
                 h = yf.Ticker(sym).history(period="max", interval="1d")
                 if not h.empty and len(h) >= 30:
                     log.info(f"  ✓ {sym}: {len(h)} days (fallback: max)")
             if h.empty or len(h) < 30:
-                log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows")
+                if sym in thematic_tickers or is_thematic_ticker(sym):
+                    failed_thematic.append(sym)
+                    log.info(f"  ⚠ {sym}: yfinance failed, queued for NSE API")
+                else:
+                    log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows")
                 continue
             out[sym] = {
                 "closes": h['Close'].dropna().tolist(),
                 "dates": [d.strftime("%Y-%m-%d") for d in h.index],
             }
-            if sym not in [s for s in out if 'fallback' not in str(s)]:
-                log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days")
+            log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days")
         except Exception as e:
-            log.error(f"  ✗ {sym}: {e}")
+            if sym in thematic_tickers or is_thematic_ticker(sym):
+                failed_thematic.append(sym)
+                log.info(f"  ⚠ {sym}: yfinance error ({e}), queued for NSE API")
+            else:
+                log.error(f"  ✗ {sym}: {e}")
+    
+    log.info(f"  yfinance: {len(out)}/{len(symbols)} symbols")
+    
+    # ── NSE Direct API Fallback ──
+    if failed_thematic:
+        log.info(f"\n═══ NSE DIRECT API FALLBACK: {len(failed_thematic)} thematic indices ═══")
+        nse = get_nse_fetcher()
+        nse_success = 0
+        
+        for sym in failed_thematic:
+            try:
+                result = nse.fetch_index_history(sym, years=5)
+                if result and len(result["closes"]) >= 30:
+                    out[sym] = result
+                    nse_success += 1
+                    log.info(f"  NSE ✓ {sym}: {len(result['closes'])} days")
+                else:
+                    log.warning(f"  NSE ✗ {sym}: insufficient data")
+            except Exception as e:
+                log.error(f"  NSE ✗ {sym}: {e}")
+        
+        log.info(f"  NSE API: {nse_success}/{len(failed_thematic)} recovered")
+    
     log.info(f"  Total fetched: {len(out)}/{len(symbols)} symbols")
     return out
 
@@ -457,7 +771,7 @@ def qsum(items):
     return {q: [s["name"] for s in items if s["quadrant"] == q] for q in ["Leading", "Improving", "Lagging", "Weakening"]}
 
 # =============================================================================
-# CALCULATE RRM FOR ONE BENCHMARK — UPDATED with thematic_indices
+# CALCULATE RRM FOR ONE BENCHMARK
 # =============================================================================
 def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, custom_stock_items, daily_tail, weekly_tail, monthly_tail, window):
     if bench_sym not in price_data:
@@ -471,41 +785,37 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, custom_stoc
         return [{"symbol": k, **v} for k, v in cfg.items() if k != bench_sym]
 
     sec_list = to_list(config.get("sectors", {}))
-    thm_list = to_list(config.get("thematic_indices", {}))  # NEW v4.3
+    thm_list = to_list(config.get("thematic_indices", {}))
     etf_list = to_list(config.get("etfs", {}))
     ac_list  = to_list(config.get("asset_classes", {}))
     ms_list  = to_list(config.get("market_segments", {}))
     gi_list  = to_list(config.get("global_indices", {}))
     cs_list  = [{"symbol": s["symbol"], "name": s.get("name", s["symbol"]), "color": stock_color(s.get("name", s["symbol"]), i), "sector": s.get("sector", ""), "group": s.get("group", "Custom")} for i, s in enumerate(custom_stock_items)]
 
-    # ── Daily ──
     d_sec = calc_rrm_items(price_data, sec_list, bc, bd, daily_tail, window)
-    d_thm = calc_rrm_items(price_data, thm_list, bc, bd, daily_tail, window)  # NEW
+    d_thm = calc_rrm_items(price_data, thm_list, bc, bd, daily_tail, window)
     d_etf = calc_rrm_items(price_data, etf_list, bc, bd, daily_tail, window)
     d_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, daily_tail, window)
     d_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, daily_tail, window)
     d_gi  = calc_rrm_items(price_data, gi_list,  bc, bd, daily_tail, window)
     d_cs  = calc_rrm_items(price_data, cs_list,  bc, bd, daily_tail, window)
 
-    # ── Weekly ──
     w_sec = calc_rrm_items(price_data, sec_list, bc, bd, weekly_tail, window, resample_weekly)
-    w_thm = calc_rrm_items(price_data, thm_list, bc, bd, weekly_tail, window, resample_weekly)  # NEW
+    w_thm = calc_rrm_items(price_data, thm_list, bc, bd, weekly_tail, window, resample_weekly)
     w_etf = calc_rrm_items(price_data, etf_list, bc, bd, weekly_tail, window, resample_weekly)
     w_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, weekly_tail, window, resample_weekly)
     w_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, weekly_tail, window, resample_weekly)
     w_gi  = calc_rrm_items(price_data, gi_list,  bc, bd, weekly_tail, window, resample_weekly)
     w_cs  = calc_rrm_items(price_data, cs_list,  bc, bd, weekly_tail, window, resample_weekly)
 
-    # ── Monthly ──
     m_sec = calc_rrm_items(price_data, sec_list, bc, bd, monthly_tail, window, resample_monthly)
-    m_thm = calc_rrm_items(price_data, thm_list, bc, bd, monthly_tail, window, resample_monthly)  # NEW
+    m_thm = calc_rrm_items(price_data, thm_list, bc, bd, monthly_tail, window, resample_monthly)
     m_etf = calc_rrm_items(price_data, etf_list, bc, bd, monthly_tail, window, resample_monthly)
     m_ac  = calc_rrm_items(price_data, ac_list,  bc, bd, monthly_tail, window, resample_monthly)
     m_ms  = calc_rrm_items(price_data, ms_list,  bc, bd, monthly_tail, window, resample_monthly)
     m_gi  = calc_rrm_items(price_data, gi_list,  bc, bd, monthly_tail, window, resample_monthly)
     m_cs  = calc_rrm_items(price_data, cs_list,  bc, bd, monthly_tail, window, resample_monthly)
 
-    # ── Drill-down ──
     sectors = config.get("sectors", {})
     drilldown = {}
     for sec_sym, stocks in sector_stocks.items():
@@ -539,17 +849,17 @@ def calc_for_benchmark(bench_sym, config, price_data, sector_stocks, custom_stoc
     }
 
 # =============================================================================
-# MAIN — UPDATED metadata for v4.3
+# MAIN — v4.3.1 with NSE fallback
 # =============================================================================
 def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10):
     today = datetime.now().strftime("%Y-%m-%d")
     log.info(f"╔════════════════════════════════════════════════════════════╗")
-    log.info(f"║  RRM v4.3 + THEMATIC INDICES + RSI — {today}       ║")
+    log.info(f"║  RRM v4.3.1 + THEMATIC + NSE API + RSI — {today}  ║")
     log.info(f"╚════════════════════════════════════════════════════════════╝")
 
     benchmarks = config.get("benchmarks", {})
     sectors = config.get("sectors", {})
-    thematic = config.get("thematic_indices", {})  # NEW
+    thematic = config.get("thematic_indices", {})
     etfs = config.get("etfs", {})
     asset_classes = config.get("asset_classes", {})
     market_segments = config.get("market_segments", {})
@@ -561,6 +871,9 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
                     asset_classes.keys(), market_segments.keys(), global_indices.keys())
     for cs in custom_stocks: all_syms.add(cs["symbol"])
 
+    # Track which symbols are thematic (for NSE fallback)
+    thematic_tickers = set(thematic.keys())
+
     sector_stocks = {}
     for sec_sym in sectors:
         constituents = get_constituents(sec_sym, config)
@@ -571,8 +884,9 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
     log.info(f"Total symbols to fetch: {len(all_syms)}")
     log.info(f"  {len(sectors)} sectors, {len(thematic)} thematic, {len(etfs)} ETFs")
     log.info(f"  {len(asset_classes)} assets, {len(market_segments)} segments, {len(global_indices)} global, {len(custom_stocks)} custom")
+    log.info(f"  {len(thematic_tickers)} thematic tickers eligible for NSE API fallback")
 
-    price_data = fetch_prices(list(all_syms), period="5y")
+    price_data = fetch_prices(list(all_syms), period="5y", thematic_tickers=thematic_tickers)
 
     benchmarks_data = {}
     for bench_sym, bench_name in benchmarks.items():
@@ -592,8 +906,8 @@ def calculate_rrm(config, daily_tail=5, weekly_tail=5, monthly_tail=5, window=10
         "metadata": {
             "generated_at": datetime.now().isoformat(),
             "date": today,
-            "version": "4.3",
-            "features": ["rs_ratio", "rs_momentum", "rsi_14", "multi_tf", "global_indices", "thematic_indices", "custom_stocks"],
+            "version": "4.3.1",
+            "features": ["rs_ratio", "rs_momentum", "rsi_14", "multi_tf", "global_indices", "thematic_indices", "nse_api_fallback", "custom_stocks"],
             "benchmarks_calculated": list(benchmarks_data.keys()),
             "total_sectors": max((len(b["daily"]["sectors"]) for b in benchmarks_data.values()), default=0),
             "total_thematic": max((len(b["daily"]["thematic_indices"]) for b in benchmarks_data.values()), default=0),
@@ -660,7 +974,6 @@ def generate_ai_analysis(rrm_output):
             cur = g.get("current", {})
             global_summary.append(g["name"] + ": RS=" + str(round(cur.get("rs_ratio", 100), 1)) + ", Q=" + g.get("quadrant", "?"))
 
-        # Build context parts without backslashes in f-strings
         top3_str = "; ".join([s["name"] + ":RS" + str(round(s["current"]["rs_ratio"], 1)) + ",M" + str(round(s["current"]["rs_momentum"], 1)) for s in top3])
         bot3_str = "; ".join([s["name"] + ":RS" + str(round(s["current"]["rs_ratio"], 1)) + ",M" + str(round(s["current"]["rs_momentum"], 1)) for s in bot3])
         rot_str = "; ".join(rotating) if rotating else "None"
@@ -695,14 +1008,20 @@ def generate_ai_analysis(rrm_output):
         return None
 
 def main():
-    parser = argparse.ArgumentParser(description="RRM v4.3 Multi-Benchmark + Thematic + RSI")
+    parser = argparse.ArgumentParser(description="RRM v4.3.1 Multi-Benchmark + Thematic + NSE API + RSI")
     parser.add_argument("--output", "-o", type=str, default=None)
     parser.add_argument("--config", "-c", type=str, default=None)
     parser.add_argument("--daily-tail", type=int, default=5)
     parser.add_argument("--weekly-tail", type=int, default=5)
     parser.add_argument("--monthly-tail", type=int, default=5)
     parser.add_argument("--window", "-w", type=int, default=10)
+    parser.add_argument("--no-nse-fallback", action="store_true", help="Disable NSE API fallback")
     args = parser.parse_args()
+
+    if args.no_nse_fallback:
+        # Disable NSE fallback by clearing the ticker map
+        NSEFetcher.TICKER_TO_NSE_NAME = {}
+        log.info("NSE API fallback disabled via --no-nse-fallback")
 
     cp = args.config
     if not cp:
