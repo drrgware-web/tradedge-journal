@@ -2712,96 +2712,115 @@ const EarningsAnalyzer=({symbol,stockData})=>{
   // Fetch earnings from Screener.in (primary source for Indian stocks)
   const fetchFromScreener = async () => {
     const sym = symbol.replace('.NS', '').replace('.BO', '').toUpperCase();
-    const targetUrl = `https://www.screener.in/company/${sym}/consolidated/`;
     
-    for (const proxyFn of PROXIES) {
-      try {
-        const url = proxyFn(targetUrl);
-        const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-        if (!res.ok) continue;
-        
-        const html = await res.text();
-        
-        // Parse quarterly results table
-        const quarterlyMatch = html.match(/<section[^>]*id="quarters"[^>]*>([\s\S]*?)<\/section>/i);
-        if (!quarterlyMatch) continue;
-        
-        const tableMatch = quarterlyMatch[1].match(/<table[^>]*>([\s\S]*?)<\/table>/i);
-        if (!tableMatch) continue;
-        
-        const tableHtml = tableMatch[0];
-        
-        // Extract headers (quarter names)
-        const headerMatch = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i);
-        const headers = [];
-        if (headerMatch) {
-          const thMatches = headerMatch[1].match(/<th[^>]*>([\s\S]*?)<\/th>/gi) || [];
-          thMatches.forEach(th => {
-            const text = th.replace(/<[^>]+>/g, '').trim();
-            if (text.match(/\w{3}\s*\d{4}|Q[1-4]/i)) {
-              headers.push(text);
-            }
+    // Try both consolidated and standalone URLs
+    const urls = [
+      `https://www.screener.in/company/${sym}/consolidated/`,
+      `https://www.screener.in/company/${sym}/`
+    ];
+    
+    for (const targetUrl of urls) {
+      for (const proxyFn of PROXIES) {
+        try {
+          const url = proxyFn(targetUrl);
+          console.log('Trying Screener URL:', targetUrl);
+          const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+          if (!res.ok) continue;
+          
+          const html = await res.text();
+          
+          // Parse quarterly results table
+          const quarterlyMatch = html.match(/<section[^>]*id="quarters"[^>]*>([\s\S]*?)<\/section>/i);
+          if (!quarterlyMatch) {
+            console.log('No quarters section found');
+            continue;
+          }
+          
+          const tableMatch = quarterlyMatch[1].match(/<table[^>]*>([\s\S]*?)<\/table>/i);
+          if (!tableMatch) {
+            console.log('No table found in quarters section');
+            continue;
+          }
+          
+          const tableHtml = tableMatch[0];
+          
+          // Extract headers (quarter names)
+          const headerMatch = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i);
+          const headers = [];
+          if (headerMatch) {
+            const thMatches = headerMatch[1].match(/<th[^>]*>([\s\S]*?)<\/th>/gi) || [];
+            thMatches.forEach(th => {
+              const text = th.replace(/<[^>]+>/g, '').trim();
+              if (text.match(/\w{3}\s*\d{4}|Q[1-4]/i)) {
+                headers.push(text);
+              }
+            });
+          }
+          
+          console.log('Found headers:', headers);
+          
+          // Extract rows
+          const rowMatches = tableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+          const data = { sales: [], expenses: [], opm: [], profit: [], eps: [] };
+          
+          rowMatches.forEach(row => {
+            const rowText = row.replace(/<[^>]+>/g, ' ').toLowerCase();
+            const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+            const values = cells.map(c => {
+              const num = c.replace(/<[^>]+>/g, '').replace(/,/g, '').trim();
+              return parseFloat(num) || 0;
+            });
+            
+            if (rowText.includes('sales') && !rowText.includes('growth')) data.sales = values;
+            else if (rowText.includes('opm') || rowText.includes('operating profit margin')) data.opm = values;
+            else if (rowText.includes('net profit') && !rowText.includes('margin')) data.profit = values;
+            else if (rowText.includes('eps')) data.eps = values;
           });
+          
+          console.log('Parsed data:', { eps: data.eps.slice(0,4), sales: data.sales.slice(0,4) });
+          
+          // Build earnings array
+          const result = [];
+          const quarterCount = Math.min(headers.length, quarters);
+          
+          for (let i = 0; i < quarterCount && i < data.eps.length; i++) {
+            const qName = headers[i] || `Q${i+1}`;
+            const eps = data.eps[i] || 0;
+            const sales = data.sales[i] || 0;
+            const opm = data.opm[i] || 0;
+            const profit = data.profit[i] || 0;
+            
+            // Estimate previous quarter for comparison
+            const prevEps = data.eps[i+1] || eps * 0.95;
+            const prevSales = data.sales[i+1] || sales * 0.95;
+            
+            // Calculate YoY if we have data from 4 quarters ago
+            const yoyEps = data.eps[i+4] ? ((eps - data.eps[i+4]) / Math.abs(data.eps[i+4]) * 100).toFixed(1) : null;
+            const yoySales = data.sales[i+4] ? ((sales - data.sales[i+4]) / data.sales[i+4] * 100).toFixed(1) : null;
+            
+            result.push({
+              q: qName,
+              eps: eps,
+              est: +(prevEps * 1.05).toFixed(2), // Estimate: 5% growth expected
+              rev: sales,
+              revEst: +(prevSales * 1.05).toFixed(0),
+              opm: opm,
+              profit: profit,
+              yoyEps: yoyEps,
+              yoySales: yoySales,
+              reaction: null, // Will be filled by price fetch
+              status: eps > prevEps * 1.02 ? 'beat' : eps < prevEps * 0.98 ? 'miss' : 'inline'
+            });
+          }
+          
+          if (result.length > 0) {
+            console.log('Screener.in success! Found', result.length, 'quarters');
+            return result;
+          }
+        } catch (e) {
+          console.log('Screener proxy failed:', e.message);
+          continue;
         }
-        
-        // Extract rows
-        const rowMatches = tableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
-        const data = { sales: [], expenses: [], opm: [], profit: [], eps: [] };
-        
-        rowMatches.forEach(row => {
-          const rowText = row.replace(/<[^>]+>/g, ' ').toLowerCase();
-          const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-          const values = cells.map(c => {
-            const num = c.replace(/<[^>]+>/g, '').replace(/,/g, '').trim();
-            return parseFloat(num) || 0;
-          });
-          
-          if (rowText.includes('sales') && !rowText.includes('growth')) data.sales = values;
-          else if (rowText.includes('opm') || rowText.includes('operating profit margin')) data.opm = values;
-          else if (rowText.includes('net profit') && !rowText.includes('margin')) data.profit = values;
-          else if (rowText.includes('eps')) data.eps = values;
-        });
-        
-        // Build earnings array
-        const result = [];
-        const quarterCount = Math.min(headers.length, quarters);
-        
-        for (let i = 0; i < quarterCount && i < data.eps.length; i++) {
-          const qName = headers[i] || `Q${i+1}`;
-          const eps = data.eps[i] || 0;
-          const sales = data.sales[i] || 0;
-          const opm = data.opm[i] || 0;
-          const profit = data.profit[i] || 0;
-          
-          // Estimate previous quarter for comparison
-          const prevEps = data.eps[i+1] || eps * 0.95;
-          const prevSales = data.sales[i+1] || sales * 0.95;
-          
-          // Calculate YoY if we have data from 4 quarters ago
-          const yoyEps = data.eps[i+4] ? ((eps - data.eps[i+4]) / Math.abs(data.eps[i+4]) * 100).toFixed(1) : null;
-          const yoySales = data.sales[i+4] ? ((sales - data.sales[i+4]) / data.sales[i+4] * 100).toFixed(1) : null;
-          
-          result.push({
-            q: qName,
-            eps: eps,
-            est: +(prevEps * 1.05).toFixed(2), // Estimate: 5% growth expected
-            rev: sales,
-            revEst: +(prevSales * 1.05).toFixed(0),
-            opm: opm,
-            profit: profit,
-            yoyEps: yoyEps,
-            yoySales: yoySales,
-            reaction: null, // Will be filled by price fetch
-            status: eps > prevEps * 1.02 ? 'beat' : eps < prevEps * 0.98 ? 'miss' : 'inline'
-          });
-        }
-        
-        if (result.length > 0) {
-          return result;
-        }
-      } catch (e) {
-        console.log('Screener proxy failed:', e.message);
-        continue;
       }
     }
     return null;
@@ -2978,45 +2997,66 @@ const EarningsAnalyzer=({symbol,stockData})=>{
     setFetchError(null);
     
     try {
-      const searchPrompt = `You are a financial analyst. For ${symbol} (${stockData?.name || symbol}), provide the last ${quarters} quarters of actual earnings data.
+      // Add random seed to prevent caching
+      const randomSeed = Math.random().toString(36).substring(7);
+      const currentPrice = stockData?.price || 0;
+      const marketCap = stockData?.fundamentals?.market_cap_cr || 0;
+      const sector = stockData?.sector || 'Unknown';
+      
+      const searchPrompt = `[SEED:${randomSeed}] You are a financial analyst with access to NSE India earnings data.
 
-IMPORTANT: Use REAL data from your knowledge. Each quarter should have DIFFERENT values specific to ${symbol}.
+STOCK: ${symbol}
+COMPANY: ${stockData?.name || symbol}
+SECTOR: ${sector}
+CURRENT PRICE: ₹${currentPrice}
+MARKET CAP: ₹${marketCap} Cr
 
-Return ONLY a JSON array with this exact format:
+TASK: Provide the last ${quarters} quarters of ACTUAL earnings data for ${symbol} from NSE filings.
+
+CRITICAL REQUIREMENTS:
+1. Use REAL historical data specific to ${symbol} - NOT generic placeholder values
+2. EPS values should be realistic for this company's scale (Market Cap: ₹${marketCap} Cr)
+3. Revenue should match the company's typical quarterly revenue
+4. Each quarter MUST have DIFFERENT values
+5. Include some quarters with MISS or INLINE status (not all BEAT)
+6. Stock reactions should vary: some positive, some negative
+
+For a company with Market Cap ₹${marketCap} Cr:
+- If < 1000 Cr (Small Cap): EPS typically ₹1-10, Revenue ₹50-500 Cr
+- If 1000-10000 Cr (Mid Cap): EPS typically ₹5-30, Revenue ₹200-2000 Cr  
+- If > 10000 Cr (Large Cap): EPS typically ₹10-100, Revenue ₹1000-50000 Cr
+
+Return ONLY a JSON array:
 [
-  {"q": "Dec 2024", "eps": 15.2, "est": 14.5, "rev": 2850, "revEst": 2750, "reaction": 2.5, "status": "beat"},
-  {"q": "Sep 2024", "eps": 14.8, "est": 14.2, "rev": 2720, "revEst": 2680, "reaction": 1.2, "status": "beat"}
+  {"q": "Dec 2024", "eps": X.X, "est": X.X, "rev": XXX, "revEst": XXX, "reaction": X.X, "status": "beat/miss/inline"},
+  ...
 ]
 
-Fields:
-- q: Quarter end month and year (e.g., "Dec 2024", "Sep 2024")
-- eps: Actual EPS in INR
-- est: Analyst estimate EPS
-- rev: Actual revenue in Crores
-- revEst: Expected revenue in Crores
-- reaction: Stock price change % on/after earnings day
-- status: "beat", "miss", or "inline"
+NO explanation, NO markdown, ONLY the JSON array.`;
 
-Return ONLY valid JSON, no explanation.`;
-
-      const response = await callGroqAI(searchPrompt, "You are a financial data assistant. Return only valid JSON.");
+      const response = await callGroqAI(searchPrompt, `You are a financial data API. Return only valid JSON for ${symbol}. Seed: ${randomSeed}`);
       
       // Parse JSON from response
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.length > 0 && parsed[0].q !== parsed[1]?.q) { // Verify quarters are different
+        
+        // Validate data is unique (not all same EPS)
+        const epsValues = parsed.map(e => e.eps);
+        const uniqueEps = new Set(epsValues);
+        
+        if (parsed.length > 0 && uniqueEps.size >= Math.min(2, parsed.length)) {
           setEarnings(parsed);
           setEarningsSource('ai');
         } else {
-          throw new Error('AI returned duplicate data');
+          throw new Error('AI returned non-unique data. Try Screener.in instead.');
         }
       } else {
         throw new Error('Could not parse AI response');
       }
     } catch (e) {
       console.error('AI earnings error:', e);
-      setFetchError('AI generation failed: ' + e.message);
+      setFetchError('AI failed: ' + e.message + '. Try clicking Screener.in button.');
     }
     setFetchingEarnings(false);
   };
@@ -3125,9 +3165,10 @@ Format with 🟢 for beats, 🔴 for misses, 🟡 for inline.`;
           background: earningsSource === 'screener' ? 'rgba(0,255,136,0.2)' : earningsSource === 'yahoo' ? 'rgba(0,200,255,0.2)' : earningsSource === 'ai' ? 'rgba(255,136,255,0.2)' : 'rgba(255,170,0,0.2)',
           color: earningsSource === 'screener' ? '#00ff88' : earningsSource === 'yahoo' ? '#00c8ff' : earningsSource === 'ai' ? '#ff88ff' : '#ffaa00'
         }}>
-          {earningsSource === 'screener' ? '🟢 SCREENER.IN' : earningsSource === 'yahoo' ? '🔵 YAHOO FINANCE' : earningsSource === 'ai' ? '🟣 AI GENERATED' : '🟡 LOADING...'}
+          {earningsSource === 'screener' ? '🟢 SCREENER.IN' : earningsSource === 'yahoo' ? '🔵 YAHOO FINANCE' : earningsSource === 'ai' ? '⚠️ AI ESTIMATED' : '🟡 LOADING...'}
         </span>
         {earnings.length > 0 && <span style={{fontSize:9,color:'var(--text-muted)'}}>({earnings.length} quarters)</span>}
+        {earningsSource === 'ai' && <span style={{fontSize:8,color:'var(--amber)',fontStyle:'italic'}}>AI estimates may be inaccurate. Click Screener.in for real data.</span>}
         {fetchError && <span style={{fontSize:9,color:'var(--red)'}}>{fetchError}</span>}
       </div>
 
