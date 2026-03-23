@@ -585,6 +585,7 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[existingEntry,setExistingEntry]=useState(0);      // Original buy price
   const[existingQty,setExistingQty]=useState(0);          // Total quantity held
   const[existingDate,setExistingDate]=useState('');       // Buy date
+  const[isShortPosition,setIsShortPosition]=useState(false); // true if SELL/Short
   const[currentSL,setCurrentSL]=useState(0);              // Current SL if any
   const[currentTarget,setCurrentTarget]=useState(0);      // Current target if any
   const[partialExitPct,setPartialExitPct]=useState(50);   // % to exit
@@ -872,15 +873,26 @@ const SmartTradeSetup=({symbol,stockData})=>{
   
   // Calculate P&L for existing position (prioritize stockData.price, fallback to liveCMP)
   const currentPrice = stockData?.price || liveCMP || 0;
-  const unrealizedPnL = isExistingPosition && existingEntry > 0 ? (currentPrice - existingEntry) * existingQty : 0;
-  const unrealizedPnLPct = isExistingPosition && existingEntry > 0 ? ((currentPrice - existingEntry) / existingEntry * 100) : 0;
+  // For LONG: profit when price goes UP. For SHORT: profit when price goes DOWN
+  const unrealizedPnL = isExistingPosition && existingEntry > 0 
+    ? (isShortPosition 
+        ? (existingEntry - currentPrice) * existingQty  // SHORT: profit = entry - current
+        : (currentPrice - existingEntry) * existingQty) // LONG: profit = current - entry
+    : 0;
+  const unrealizedPnLPct = isExistingPosition && existingEntry > 0 
+    ? (isShortPosition
+        ? ((existingEntry - currentPrice) / existingEntry * 100)
+        : ((currentPrice - existingEntry) / existingEntry * 100))
+    : 0;
   const positionValue = isExistingPosition ? currentPrice * existingQty : 0;
   const investedValue = isExistingPosition ? existingEntry * existingQty : 0;
   
   // Calculate partial exit amounts
   const partialQty = Math.floor(existingQty * partialExitPct / 100);
   const partialValue = partialQty * currentPrice;
-  const partialProfit = partialQty * (currentPrice - existingEntry);
+  const partialProfit = isShortPosition 
+    ? partialQty * (existingEntry - currentPrice)  // SHORT
+    : partialQty * (currentPrice - existingEntry); // LONG
 
   // Auto-load existing position from Trade Log when stock changes
   useEffect(()=>{
@@ -899,7 +911,7 @@ const SmartTradeSetup=({symbol,stockData})=>{
       setCurrentSL(0);
       setCurrentTarget(0);
       
-      // Helper: Check if trade is an OPEN BUY position for this symbol
+      // Helper: Check if trade is an OPEN position for this symbol (Buy OR Sell)
       const isOpenPosition = (t) => {
         // Match symbol
         const sym = (t.symbol || t.stock || '').toUpperCase();
@@ -907,12 +919,7 @@ const SmartTradeSetup=({symbol,stockData})=>{
         
         // Must be Open or Partial status (NOT Closed)
         const status = (t.status || '').toLowerCase();
-        if(status === 'closed' || status === 'exited' || status === 'sold') return false;
         if(status !== 'open' && status !== 'partial') return false;
-        
-        // Must be a BUY side (we want long positions, not shorts)
-        const side = (t.side || t.action || t.txnType || '').toUpperCase();
-        if(side === 'SELL') return false; // Skip short positions for now
         
         return true;
       };
@@ -976,8 +983,10 @@ const SmartTradeSetup=({symbol,stockData})=>{
         const avgEntry = calcAvgEntry(openTrade);
         const openQty = calcOpenQty(openTrade);
         const lastEntry = openTrade.entries?.[openTrade.entries.length - 1];
+        const isShort = (openTrade.side || '').toLowerCase() === 'sell';
         
         setIsExistingPosition(true);
+        setIsShortPosition(isShort);
         setExistingEntry(+avgEntry.toFixed(2));
         setExistingQty(openQty);
         setExistingDate(lastEntry?.date || openTrade.ts || '');
@@ -988,11 +997,13 @@ const SmartTradeSetup=({symbol,stockData})=>{
         setSL(+(openTrade.sl || 0));
         setTarget(+(openTrade.target || openTrade.tgt || 0));
         
-        console.log('✓ Auto-loaded position:', symbol, 'Qty:', openQty, 'Avg Entry:', avgEntry.toFixed(2));
-        addToast(`📦 Loaded: ${symbol} × ${openQty} @ ₹${avgEntry.toFixed(2)}`, 'info', 3000);
+        const posType = isShort ? 'SHORT' : 'LONG';
+        console.log(`✓ Auto-loaded ${posType} position:`, symbol, 'Qty:', openQty, 'Avg Entry:', avgEntry.toFixed(2));
+        addToast(`📦 ${posType}: ${symbol} × ${openQty} @ ₹${avgEntry.toFixed(2)}`, 'info', 3000);
       } else {
         // No position found - new trade mode with defaults
         console.log('No open position for', symbol, '- setting defaults');
+        setIsShortPosition(false);
         if(currentStockPrice > 0) {
           setEntry(currentStockPrice);
           setTarget(+(currentStockPrice * 1.08).toFixed(2));
@@ -1480,14 +1491,14 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
       {isExistingPosition && existingEntry > 0 && existingQty > 0 && <div style={{background:'linear-gradient(135deg,rgba(136,68,255,0.1),rgba(0,200,255,0.05))',border:'1px solid rgba(136,68,255,0.3)',borderRadius:12,padding:16,marginBottom:20}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:18}}>📦</span>
-            <span style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:'#8844ff'}}>OPEN POSITION</span>
+            <span style={{fontSize:18}}>{isShortPosition ? '🔻' : '📦'}</span>
+            <span style={{fontSize:13,fontWeight:800,fontFamily:'var(--font-mono)',color:isShortPosition?'#ff4455':'#8844ff'}}>{isShortPosition ? 'SHORT POSITION' : 'LONG POSITION'}</span>
             <span style={{fontSize:9,padding:'3px 8px',background:unrealizedPnL>=0?'rgba(0,255,136,0.2)':'rgba(255,68,85,0.2)',borderRadius:4,color:unrealizedPnL>=0?'#00ff88':'#ff4455',fontWeight:700}}>
               {unrealizedPnL>=0?'+':''}₹{unrealizedPnL.toFixed(0)} ({unrealizedPnLPct.toFixed(1)}%)
             </span>
             <span style={{fontSize:8,padding:'2px 6px',background:'rgba(0,200,255,0.1)',borderRadius:3,color:'var(--accent2)'}}>from Trade Log</span>
           </div>
-          <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0);setExistingDate('')}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
+          <button onClick={()=>{setIsExistingPosition(false);setExistingEntry(0);setExistingQty(0);setExistingDate('');setIsShortPosition(false)}} style={{fontSize:9,padding:'4px 10px',background:'transparent',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--text-muted)',cursor:'pointer'}}>
             ✕ New Trade Mode
           </button>
         </div>
