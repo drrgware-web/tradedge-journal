@@ -1037,10 +1037,22 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const risk=entry>0&&sl>0?Math.abs(entry-sl)*qty:0;
   const reward=entry>0&&target>0?Math.abs(target-entry)*qty:0;
   const rr=risk>0?(reward/risk).toFixed(2):'—';
-  const positionSize=riskPct>0&&risk>0?Math.floor((capital*riskPct/100)/Math.abs(entry-sl)):0;
+  // Fixed: Don't depend on risk (which uses qty=1), calculate directly from entry-sl
+  const riskPerShare = entry > 0 && sl > 0 ? Math.abs(entry - sl) : 0;
+  const positionSize = riskPct > 0 && riskPerShare > 0 ? Math.floor((capital * riskPct / 100) / riskPerShare) : 0;
   const maxLoss=positionSize*Math.abs(entry-sl);
   const maxProfit=positionSize*Math.abs(target-entry);
   const winRate=rr>=2?'40-45%':rr>=1.5?'50-55%':rr>=1?'60%+':'70%+';
+  
+  // Auto-update qty when positionSize changes (for new trades only)
+  // Using a ref to prevent infinite loops
+  const lastCalcSize = useRef(0);
+  useEffect(() => {
+    if(!isExistingPosition && positionSize > 0 && positionSize !== lastCalcSize.current) {
+      lastCalcSize.current = positionSize;
+      setQty(positionSize);
+    }
+  }, [positionSize, isExistingPosition]);
 
   // Calculate trail value based on method
   const getTrailValue = () => {
