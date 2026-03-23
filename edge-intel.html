@@ -591,6 +591,16 @@ const SmartTradeSetup=({symbol,stockData})=>{
   const[partialExitPct,setPartialExitPct]=useState(50);   // % to exit
   const[addQty,setAddQty]=useState(0);                    // Qty to add (pyramid)
   
+  // Staggered Exit State
+  const[showStaggeredExit,setShowStaggeredExit]=useState(false);
+  const[staggeredTranches,setStaggeredTranches]=useState([
+    { pct: 25, target: 0, rMultiple: 1 },
+    { pct: 25, target: 0, rMultiple: 1.5 },
+    { pct: 25, target: 0, rMultiple: 2 },
+    { pct: 25, target: 0, rMultiple: 3 }
+  ]);
+  const[trailingAfterT1,setTrailingAfterT1]=useState(true); // Trail SL to entry after T1
+  
   // Smart SL Calculator State
   const[showSLCalculator,setShowSLCalculator]=useState(false);
   const[slMethod,setSLMethod]=useState('atr'); // 'atr', 'pct', 'ema', 'fixed', 'swing'
@@ -1643,6 +1653,156 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
             </span>
             <span style={{fontSize:9,color:'var(--red)'}}>Risk: ₹{(Math.abs(existingEntry - currentSL) * existingQty).toLocaleString()}</span>
             <span style={{fontSize:9,color:'var(--accent)'}}>Reward: ₹{(Math.abs(currentTarget - existingEntry) * existingQty).toLocaleString()}</span>
+          </div>}
+          
+          {/* Staggered Exit Toggle */}
+          {currentSL > 0 && <div style={{marginTop:10}}>
+            <button 
+              onClick={()=>{
+                setShowStaggeredExit(!showStaggeredExit);
+                // Auto-calculate targets based on R multiples
+                if(!showStaggeredExit && currentSL > 0) {
+                  const risk = Math.abs(existingEntry - currentSL);
+                  setStaggeredTranches(prev => prev.map(t => ({
+                    ...t,
+                    target: isShortPosition 
+                      ? +(existingEntry - (risk * t.rMultiple)).toFixed(2)
+                      : +(existingEntry + (risk * t.rMultiple)).toFixed(2)
+                  })));
+                }
+              }}
+              style={{width:'100%',padding:'8px',background:showStaggeredExit?'rgba(0,200,255,0.2)':'transparent',border:'1px solid var(--accent2)',borderRadius:6,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}
+            >
+              {showStaggeredExit ? '▼' : '▶'} 📊 STAGGERED EXIT PLANNER (Sell Into Strength)
+            </button>
+          </div>}
+          
+          {/* Staggered Exit Planner */}
+          {showStaggeredExit && currentSL > 0 && <div style={{marginTop:10,padding:12,background:'rgba(0,200,255,0.05)',borderRadius:8,border:'1px solid rgba(0,200,255,0.2)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <span style={{fontSize:10,fontWeight:700,color:'var(--accent2)'}}>🎯 EXIT TRANCHES</span>
+              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                <label style={{fontSize:8,color:'var(--text-muted)'}}>
+                  <input type="checkbox" checked={trailingAfterT1} onChange={e=>setTrailingAfterT1(e.target.checked)} style={{marginRight:4}}/>
+                  Trail SL to Entry after T1
+                </label>
+              </div>
+            </div>
+            
+            {/* Tranche Grid */}
+            <div style={{display:'grid',gridTemplateColumns:'60px 1fr 80px 80px 80px',gap:6,marginBottom:8,fontSize:8,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>
+              <span>EXIT %</span>
+              <span>TARGET</span>
+              <span>QTY</span>
+              <span>VALUE</span>
+              <span>GAIN</span>
+            </div>
+            
+            {staggeredTranches.map((tranche, idx) => {
+              const trancheQty = Math.floor(existingQty * tranche.pct / 100);
+              const trancheValue = trancheQty * tranche.target;
+              const trancheGain = isShortPosition 
+                ? trancheQty * (existingEntry - tranche.target)
+                : trancheQty * (tranche.target - existingEntry);
+              const risk = Math.abs(existingEntry - currentSL);
+              
+              return (
+                <div key={idx} style={{display:'grid',gridTemplateColumns:'60px 1fr 80px 80px 80px',gap:6,alignItems:'center',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                  {/* Percentage */}
+                  <div style={{display:'flex',gap:2}}>
+                    <input 
+                      type="number" 
+                      value={tranche.pct} 
+                      onChange={e=>{
+                        const newTranches = [...staggeredTranches];
+                        newTranches[idx].pct = +e.target.value;
+                        setStaggeredTranches(newTranches);
+                      }}
+                      style={{width:40,padding:'4px',background:'var(--bg-tertiary)',border:'1px solid var(--border-dim)',borderRadius:4,color:'var(--accent2)',fontSize:10,fontFamily:'var(--font-mono)',textAlign:'center'}}
+                    />
+                    <span style={{fontSize:10,color:'var(--text-muted)'}}>%</span>
+                  </div>
+                  
+                  {/* Target Price + R multiple selector */}
+                  <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                    <input 
+                      type="number" 
+                      value={tranche.target || ''} 
+                      onChange={e=>{
+                        const newTranches = [...staggeredTranches];
+                        newTranches[idx].target = +e.target.value;
+                        setStaggeredTranches(newTranches);
+                      }}
+                      placeholder={`T${idx+1}`}
+                      style={{flex:1,padding:'4px 6px',background:'var(--bg-tertiary)',border:'1px solid rgba(0,255,136,0.3)',borderRadius:4,color:'var(--accent)',fontSize:10,fontFamily:'var(--font-mono)'}}
+                    />
+                    {/* Quick R buttons */}
+                    {[1, 1.5, 2, 3, 4].map(r => (
+                      <button 
+                        key={r}
+                        onClick={()=>{
+                          const newTranches = [...staggeredTranches];
+                          newTranches[idx].rMultiple = r;
+                          newTranches[idx].target = isShortPosition 
+                            ? +(existingEntry - (risk * r)).toFixed(2)
+                            : +(existingEntry + (risk * r)).toFixed(2);
+                          setStaggeredTranches(newTranches);
+                        }}
+                        style={{padding:'3px 5px',fontSize:7,background:tranche.rMultiple===r?'rgba(0,255,136,0.3)':'var(--bg-tertiary)',border:'1px solid rgba(0,255,136,0.2)',borderRadius:3,color:'var(--accent)',cursor:'pointer'}}
+                      >
+                        {r}R
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Qty */}
+                  <span style={{fontSize:10,color:'var(--accent2)',fontFamily:'var(--font-mono)',textAlign:'center'}}>{trancheQty}</span>
+                  
+                  {/* Value */}
+                  <span style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)',textAlign:'center'}}>₹{trancheValue.toLocaleString()}</span>
+                  
+                  {/* Gain */}
+                  <span style={{fontSize:10,color:trancheGain>=0?'var(--accent)':'var(--red)',fontFamily:'var(--font-mono)',textAlign:'center',fontWeight:700}}>
+                    {trancheGain>=0?'+':''}₹{trancheGain.toLocaleString()}
+                  </span>
+                </div>
+              );
+            })}
+            
+            {/* Summary */}
+            <div style={{marginTop:10,padding:'8px 10px',background:'rgba(0,0,0,0.3)',borderRadius:6}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontSize:9,color:'var(--text-muted)'}}>Total Exit %:</span>
+                <span style={{fontSize:11,fontWeight:700,color:staggeredTranches.reduce((s,t)=>s+t.pct,0)===100?'var(--accent)':'var(--red)',fontFamily:'var(--font-mono)'}}>
+                  {staggeredTranches.reduce((s,t)=>s+t.pct,0)}%
+                </span>
+                
+                <span style={{fontSize:9,color:'var(--text-muted)'}}>Avg Exit:</span>
+                <span style={{fontSize:11,fontWeight:700,color:'var(--accent2)',fontFamily:'var(--font-mono)'}}>
+                  ₹{(staggeredTranches.reduce((s,t)=>s+(t.target*t.pct),0)/staggeredTranches.reduce((s,t)=>s+t.pct,0)||0).toFixed(2)}
+                </span>
+                
+                <span style={{fontSize:9,color:'var(--text-muted)'}}>Est. Total Gain:</span>
+                <span style={{fontSize:11,fontWeight:900,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>
+                  +₹{staggeredTranches.reduce((s,t)=>{
+                    const q = Math.floor(existingQty * t.pct / 100);
+                    const g = isShortPosition ? q*(existingEntry-t.target) : q*(t.target-existingEntry);
+                    return s + g;
+                  },0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+            
+            {/* Place GTT Orders Button */}
+            <button 
+              onClick={()=>{
+                // TODO: Place multiple GTT orders for each tranche
+                addToast('🎯 GTT orders for staggered exit coming soon!', 'info', 3000);
+              }}
+              style={{width:'100%',marginTop:10,padding:'10px',background:'linear-gradient(135deg,rgba(0,255,136,0.2),rgba(0,200,255,0.2))',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}
+            >
+              🛡️ Place GTT Orders for All Tranches
+            </button>
           </div>}
         </div>
         
