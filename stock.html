@@ -35,6 +35,9 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-
 @keyframes logoPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.85;transform:scale(1.03)}}
 .fade-in{animation:fadeIn .3s ease-out}
 canvas{image-rendering:pixelated}
+.live-indicator{display:inline-flex;align-items:center;gap:4px;font-size:9px;color:#00ff88;font-family:var(--font-mono)}
+.live-dot{width:6px;height:6px;background:#00ff88;border-radius:50%;animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
 </style>
 </head>
 <body>
@@ -51,118 +54,19 @@ const SYMBOL = (urlParams.get('s') || 'RELIANCE').toUpperCase();
 // MOCK DATA (Replace with fetch in production)
 // ═══════════════════════════════════════════════════════════════
 const MOCK = {
-  symbol: SYMBOL, name: "Religare Enterprises Ltd", sector: "Financial Services", industry: "Finance-Investment Mgmt",
-  price: 296.5, change_pct: 2.34, prev_close: 289.7,
-  circuit: { band: "20%", is_restricted: false },
-  earnings_alert: "📅 Q4 FY26 results in 12 days",
-
-  fundamentals: {
-    market_cap_cr: 7306.27, sales_cr: 8010.38, shares_float_cr: 24.63,
-    pe_ratio: 15.2, pb_ratio: 2.88, book_value: 103, eps: 19.5,
-    dividend_yield: null, roe: 4.0, roce: 5.2, debt_to_equity: null,
-    alpha: -0.03, beta: 1.1, revenue_growth: 17, profit_margin: 3,
-    ud_vol_ratio: 0.9, lt_debt_equity: null,
-  },
-  prev_fundamentals: {
-    market_cap_cr: 6850, sales_cr: 7200, shares_float_cr: 24.63,
-    pe_ratio: 16.8, pb_ratio: 2.65, book_value: 98, eps: 17.2,
-    dividend_yield: null, roe: 3.5, roce: 4.8, debt_to_equity: null,
-    alpha: -0.08, beta: 1.05, revenue_growth: 14, profit_margin: 2.5,
-    ud_vol_ratio: 0.85, lt_debt_equity: null,
-  },
-  yoy_fundamentals: {
-    market_cap_cr: 5200, sales_cr: 5800, shares_float_cr: 24.63,
-    pe_ratio: 22.5, pb_ratio: 2.1, book_value: 85, eps: 12.0,
-    dividend_yield: null, roe: 2.8, roce: 3.5, debt_to_equity: null,
-    alpha: -0.15, beta: 1.2, revenue_growth: 8, profit_margin: 1.8,
-    ud_vol_ratio: 0.7, lt_debt_equity: null,
-  },
-
-  fund_holdings: {
-    no_of_funds: 119, fund_shares_change_pct: -0.83,
-    shares_held_cr: 5.64, shares_held_change_pct: -5.74,
-  },
-
-  oneil: {
-    master_score: "C", eps_strength: 16, price_strength: 64,
-    buyer_demand: "C", buyer_demand_score: 45, group_rank: 77,
-    analysis_text: "Religare Enterprises has an operating revenue of Rs. 8,010.38 Cr. on a trailing 12-month basis. An annual revenue growth of 17% is outstanding, Pre-tax margin of 3% needs improvement, ROE of 4% is fair but needs improvement. The stock from a technical standpoint is trading below its key moving averages and stay above it to make any meaningful move.\n\nFrom an O'Neil Methodology perspective, the stock has an EPS Rank of 16 which is a POOR score indicating inconsistency in earnings, a RS Rating of 64 which is FAIR indicating the recent price performance, Buyer Demand at C which is evident from recent supply seen, Group Rank of 77 indicates it belongs to a poor industry group of Finance-Investment Mgmt and a Master Score of C.",
-  },
-
-  guru_ratings: [
-    { guru: "William J. O'Neil", strategy: "CANSLIM", score: "FAIR", score_pct: 57, criteria_met: 4, criteria_total: 7,
-      details: [{criterion:"Current EPS growth > 25%",passed:false,detail:"12%"},{criterion:"Annual revenue growth > 25%",passed:false,detail:"17%"},{criterion:"Within 15% of 52W high",passed:true,detail:"88%"},{criterion:"Shares outstanding < 50Cr",passed:true,detail:"24.6Cr"},{criterion:"RS Rating > 80",passed:false,detail:"64"},{criterion:"Institutional holding > 10%",passed:true,detail:"18%"},{criterion:"Above 200 DMA",passed:true,detail:"Yes"}]},
-    { guru: "Benjamin Graham", strategy: "Value Investing", score: "FAIR", score_pct: 57, criteria_met: 4, criteria_total: 7,
-      details: [{criterion:"P/E < 15",passed:false,detail:"15.2"},{criterion:"P/B < 1.5",passed:false,detail:"2.88"},{criterion:"P/E × P/B < 22.5",passed:false,detail:"43.8"},{criterion:"Debt/Equity < 100%",passed:true,detail:"N/A"},{criterion:"Dividend yield > 0%",passed:false,detail:"0%"},{criterion:"Positive EPS",passed:true,detail:"₹19.5"},{criterion:"Market cap > ₹500 Cr",passed:true,detail:"₹7306Cr"}]},
-    { guru: "Warren Buffett", strategy: "Quality + Moat", score: "FAIL", score_pct: 33, criteria_met: 2, criteria_total: 6,
-      details: [{criterion:"ROE > 15%",passed:false,detail:"4%"},{criterion:"Profit margin > 10%",passed:false,detail:"3%"},{criterion:"Low debt (D/E < 50%)",passed:true,detail:"N/A"},{criterion:"Revenue growth > 5%",passed:true,detail:"17%"},{criterion:"Earnings growth > 10%",passed:false,detail:"8%"},{criterion:"Reasonable P/E (< 25)",passed:false,detail:"15.2"}]},
-    { guru: "Peter Lynch", strategy: "Growth at Reasonable Price", score: "FAIL", score_pct: 33, criteria_met: 2, criteria_total: 6,
-      details: [{criterion:"PEG ratio < 1.0",passed:false,detail:"1.9"},{criterion:"P/E < 40",passed:true,detail:"15.2"},{criterion:"Earnings growth > 15%",passed:false,detail:"8%"},{criterion:"Revenue growth > 10%",passed:true,detail:"17%"},{criterion:"Debt/Equity < 80%",passed:false,detail:"N/A"},{criterion:"Institutional holding < 60%",passed:false,detail:"N/A"}]},
-    { guru: "James O'Shaughnessy", strategy: "What Works on Wall Street", score: "FAIR", score_pct: 50, criteria_met: 3, criteria_total: 6,
-      details: [{criterion:"Market cap > ₹1000 Cr",passed:true,detail:"₹7306Cr"},{criterion:"P/E < 20",passed:true,detail:"15.2"},{criterion:"P/S < 1.5",passed:true,detail:"0.91"},{criterion:"6-month return > 0%",passed:false,detail:"-8%"},{criterion:"Pays dividends",passed:false,detail:"No"},{criterion:"Revenue growth positive",passed:false,detail:"17%"}]},
-  ],
-
-  surveillance: {
-    flags: [
-      {name:"NSE Additional Surveillance Measure (ASM) list",flagged:false,detail:"Not on ASM list"},
-      {name:"NSE Graded Surveillance Measure (GSM) list",flagged:false,detail:"Not on GSM list"},
-      {name:"High Debt Company",flagged:false,detail:"Debt/Equity: N/A"},
-      {name:"No OR limited institutional holding",flagged:false,detail:"Institutional holding: 18%"},
-      {name:"Penny Stock",flagged:false,detail:"Price ₹296.5, MCap ₹7306 Cr"},
-      {name:"High Promoter Pledging",flagged:false,detail:"Promoter holding: 25.7%"},
-      {name:"Low liquidity",flagged:false,detail:"Avg 20-day volume: 2.1M"},
-      {name:"Decline in number of Institutional Sponsors",flagged:true,detail:"Change: -0.83%"},
-      {name:"Decline in shares held by Institutional Sponsors",flagged:true,detail:"Change: -5.74%"},
-    ],
-    red_flag_count: 2,
-    assessment: "2 Caution Flag(s)",
-    assessment_detail: "Some concerns detected. Review the flagged items carefully.",
-  },
-
-  ownership: {
-    promoter: [{qtr:"Dec-25",pct:26.27},{qtr:"Sep-25",pct:25.83},{qtr:"Jun-25",pct:25.83},{qtr:"Mar-25",pct:25.67}],
-    mutual_funds: [{qtr:"Dec-25",pct:6.29},{qtr:"Sep-25",pct:7.14},{qtr:"Jun-25",pct:8.18},{qtr:"Mar-25",pct:7.92}],
-    fii: [{qtr:"Dec-25",pct:8},{qtr:"Sep-25",pct:6},{qtr:"Jun-25",pct:5},{qtr:"Mar-25",pct:4}],
-    public: [{qtr:"Dec-25",pct:31},{qtr:"Sep-25",pct:30},{qtr:"Jun-25",pct:29},{qtr:"Mar-25",pct:28}],
-    dii: [{qtr:"Dec-25",pct:28},{qtr:"Sep-25",pct:31},{qtr:"Jun-25",pct:32},{qtr:"Mar-25",pct:34}],
-  },
-
-  quarterly_results: [
-    {fq:"Dec 2025",eps:5.0,yoy:"+162.0%",qoq:"+60.2%",sales:284,sales_yoy:"+289.0%",sales_qoq:"+37.9%",opm:"28.0%",pe:57.2,fund_score:90},
-    {fq:"Sep 2025",eps:3.1,yoy:"+93.8%",qoq:"+0.6%",sales:286,sales_yoy:"+119.1%",sales_qoq:"+16.4%",opm:"18.0%",pe:57.2,fund_score:85},
-    {fq:"Jun 2025",eps:3.1,yoy:"-28.1%",qoq:"+24.3%",sales:177,sales_yoy:"+190.2%",sales_qoq:"+63.9%",opm:"18.0%",pe:57.2,fund_score:80},
-    {fq:"Mar 2025",eps:2.5,yoy:"+19.0%",qoq:"+30.7%",sales:108,sales_yoy:"+176.9%",sales_qoq:"+47.9%",opm:"15.0%",pe:57.2,fund_score:75},
-    {fq:"Dec 2024",eps:1.9,yoy:"—",qoq:"+18.5%",sales:73,sales_yoy:"—",sales_qoq:"-22.3%",opm:"24.0%",pe:57.2,fund_score:70},
-  ],
-
-  major_shareholders: [
-    {name:"Puran Associates Private Limited",pct:9.87},
-    {name:"Vic Enterprises Private Limited",pct:7.74},
-    {name:"M B Finmart Private Limited",pct:5.65},
-    {name:"Motilal Oswal Focused Fund",pct:5.22},
-    {name:"Chandrakanta",pct:4.72},
-    {name:"Ashish Dhawan",pct:4.12},
-  ],
-
-  management: [
-    {name:"Mr. Malay Kumar Sinha",designation:"Chairperson (NonExe.&Ind...)"},
-    {name:"Mr. Ranjan Dwivedi",designation:"Ind. Non-Executive Director"},
-    {name:"Mr. Praveen Kumar Tripathi",designation:"Ind. Non-Executive Director"},
-    {name:"Ms. Preeti Madan",designation:"Ind. Non-Executive Director"},
-    {name:"Mr. Rajender Mohan Malla",designation:"Ind. Non-Executive Director"},
-  ],
-
-  // Price data for P&F and Renko charts
-  price_history: (() => {
-    const prices = [];
-    let p = 250;
-    for (let i = 0; i < 200; i++) {
-      p += (Math.random() - 0.48) * 8;
-      p = Math.max(180, Math.min(350, p));
-      prices.push({o:p-2+Math.random()*4, h:p+Math.random()*6, l:p-Math.random()*6, c:p, v:Math.random()*5e6});
-    }
-    return prices;
-  })(),
+  symbol: SYMBOL, name: "Loading...", sector: "Unknown", industry: "Unknown",
+  price: 0, change_pct: 0, prev_close: 0,
+  circuit: { band: "—", is_restricted: false },
+  fundamentals: {},
+  fund_holdings: {},
+  oneil: { master_score: "?", eps_strength: 0, price_strength: 0, buyer_demand: "?", buyer_demand_score: 0, group_rank: 0, analysis_text: "Loading..." },
+  guru_ratings: [],
+  surveillance: { flags: [], red_flag_count: 0, assessment: "Loading", assessment_detail: "" },
+  ownership: { promoter: [], mutual_funds: [], fii: [], public: [], dii: [] },
+  quarterly_results: [],
+  major_shareholders: [],
+  management: [],
+  price_history: [],
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -198,9 +102,7 @@ const ProgressBar = ({value, max=99, color="#00ff88", label}) => (
   </div>
 );
 
-// Trend Arrow — shows QoQ (Q) and YoY (Y) direction
 const TrendArrow = ({curr, prev, inverse}) => {
-  // inverse=true → lower is better (P/E, debt, beta)
   if (curr == null || prev == null) return null;
   const diff = curr - prev;
   if (Math.abs(diff) < 0.001) return <span style={{fontSize:7,color:"#556"}}>→</span>;
@@ -210,7 +112,7 @@ const TrendArrow = ({curr, prev, inverse}) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// TRADEDGE CUSTOM CHART — HLC Bars + 3 EMAs + Volume (No TV)
+// TRADEDGE CUSTOM CHART — HLC Bars + 3 EMAs + Volume
 // ═══════════════════════════════════════════════════════════════
 
 function calcEMA(closes, period) {
@@ -230,14 +132,9 @@ const TEChart = ({symbol, prices}) => {
   const [showEMA, setShowEMA] = useState({e20:true,e50:true,e200:true});
   const [hoverBar, setHoverBar] = useState(null);
 
-  const priceData = useMemo(() => {
-    if (!prices || !prices.length) return [];
-    return prices;
-  }, [prices]);
-
+  const priceData = useMemo(() => prices || [], [prices]);
   const start = viewStart ?? Math.max(0, priceData.length - viewCount);
   const visible = priceData.slice(start, start + viewCount);
-
   const closes = useMemo(() => priceData.map(d => d.c), [priceData]);
   const ema20 = useMemo(() => closes.length >= 20 ? calcEMA(closes, 20) : [], [closes]);
   const ema50 = useMemo(() => closes.length >= 50 ? calcEMA(closes, 50) : [], [closes]);
@@ -258,7 +155,6 @@ const TEChart = ({symbol, prices}) => {
     const volH = 72, chartH = H - padT - padB - volH - 8;
     const chartW = W - padL - padR, barW = chartW / viewCount;
 
-    // Price range with EMAs
     let allH = visible.map(d => d.h), allL = visible.map(d => d.l);
     for (let i = 0; i < visible.length; i++) {
       const gi = start + i;
@@ -273,10 +169,8 @@ const TEChart = ({symbol, prices}) => {
     const volTop = padT + chartH + 8;
     const toVolY = (v) => volTop + volH - (v / maxVol) * volH;
 
-    // Clear
     ctx.fillStyle = "#06080c"; ctx.fillRect(0, 0, W, H);
 
-    // Grid
     ctx.strokeStyle = "rgba(0,255,136,0.04)"; ctx.lineWidth = 0.5;
     for (let i = 0; i <= 6; i++) {
       const p = pMin + pRng * i / 6, y = toY(p);
@@ -285,26 +179,19 @@ const TEChart = ({symbol, prices}) => {
       ctx.fillText(p.toFixed(1), padL - 6, y + 3);
     }
 
-    // Date labels
     ctx.fillStyle = "#334"; ctx.font = "9px 'JetBrains Mono',monospace"; ctx.textAlign = "center";
     const dStep = Math.max(1, Math.floor(viewCount / 8));
     for (let i = 0; i < visible.length; i += dStep) {
       const x = toX(i), dt = visible[i].date || "";
       if (dt) { const p = dt.split("-"); ctx.fillText(p[2]+"/"+p[1], x, H - 4); }
-      ctx.strokeStyle = "rgba(0,255,136,0.02)";
-      ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
     }
 
-    // Volume
     for (let i = 0; i < visible.length; i++) {
       const b = visible[i], x = toX(i), bull = b.c >= b.o;
       ctx.fillStyle = bull ? "rgba(0,204,102,0.25)" : "rgba(238,51,68,0.25)";
       ctx.fillRect(x - barW * 0.35, toVolY(b.v), barW * 0.7, volTop + volH - toVolY(b.v));
     }
-    ctx.fillStyle = "#223"; ctx.font = "8px monospace"; ctx.textAlign = "right";
-    ctx.fillText(fmtVol(maxVol), padL - 6, volTop + 8);
 
-    // EMAs
     const drawEMA = (ed, col) => {
       ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath(); let s = false;
       for (let i = 0; i < visible.length; i++) {
@@ -317,19 +204,15 @@ const TEChart = ({symbol, prices}) => {
     if (showEMA.e50 && ema50.length) drawEMA(ema50, "#ffaa00");
     if (showEMA.e20 && ema20.length) drawEMA(ema20, "#00bbff");
 
-    // HLC Bars
     for (let i = 0; i < visible.length; i++) {
       const b = visible[i], x = toX(i), bull = b.c >= b.o;
       const col = bull ? "#00cc66" : "#ee3344";
-      // H-L line
       ctx.strokeStyle = col; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, toY(b.h)); ctx.lineTo(x, toY(b.l)); ctx.stroke();
-      // Close tick right
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(x, toY(b.c)); ctx.lineTo(x + barW * 0.35, toY(b.c)); ctx.stroke();
     }
 
-    // Crosshair
     if (crosshair) {
       const {x: mx, y: my} = crosshair;
       if (mx >= padL && mx <= W - padR) {
@@ -337,7 +220,6 @@ const TEChart = ({symbol, prices}) => {
         ctx.beginPath(); ctx.moveTo(mx, padT); ctx.lineTo(mx, H - padB); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(padL, my); ctx.lineTo(W - padR, my); ctx.stroke();
         ctx.setLineDash([]);
-        // Price label
         if (my >= padT && my <= padT + chartH) {
           const pr = pMax - ((my - padT) / chartH) * pRng;
           ctx.fillStyle = "#0a1520"; ctx.fillRect(0, my - 9, padL - 2, 18);
@@ -345,19 +227,9 @@ const TEChart = ({symbol, prices}) => {
           ctx.fillStyle = "#00ff88"; ctx.font = "bold 9px 'JetBrains Mono',monospace"; ctx.textAlign = "right";
           ctx.fillText(pr.toFixed(2), padL - 6, my + 3);
         }
-        // Date label
-        const bi = Math.round((mx - padL) / barW - 0.5);
-        if (bi >= 0 && bi < visible.length) {
-          const dx = toX(bi), ds = visible[bi].date || "";
-          ctx.fillStyle = "#0a1520"; ctx.fillRect(dx - 32, H - padB, 64, padB);
-          ctx.strokeStyle = "#00ff88"; ctx.strokeRect(dx - 32, H - padB, 64, padB);
-          ctx.fillStyle = "#00ff88"; ctx.font = "bold 8px 'JetBrains Mono',monospace"; ctx.textAlign = "center";
-          ctx.fillText(ds, dx, H - 8);
-        }
       }
     }
 
-    // Legend
     ctx.fillStyle = "#ddd"; ctx.font = "bold 13px 'Outfit',sans-serif"; ctx.textAlign = "left";
     ctx.fillText("NSE:" + symbol, padL + 4, padT + 16);
 
@@ -382,7 +254,6 @@ const TEChart = ({symbol, prices}) => {
     if (showEMA.e50 && ema50.length) { ctx.fillStyle = "#ffaa00"; ctx.fillText("EMA50: " + (ema50[start + visible.length - 1]?.toFixed(2)||"—"), padL + 140, ey); }
     if (showEMA.e200 && ema200.length) { ctx.fillStyle = "#ff6644"; ctx.fillText("EMA200: " + (ema200[start + visible.length - 1]?.toFixed(2)||"—"), padL + 280, ey); }
 
-    // Separator
     ctx.strokeStyle = "rgba(0,255,136,0.06)"; ctx.lineWidth = 0.5;
     ctx.beginPath(); ctx.moveTo(padL, volTop - 4); ctx.lineTo(W - padR, volTop - 4); ctx.stroke();
   }, [visible, viewCount, start, crosshair, showEMA, hoverBar, symbol, ema20, ema50, ema200, priceData]);
@@ -420,10 +291,6 @@ const TEChart = ({symbol, prices}) => {
             style={{padding:"6px 14px",borderRadius:4,fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(0,200,255,0.3)",background:"rgba(0,200,255,0.08)",color:"#00c8ff"}}>
             ⭐ Open in TradingView Pro
           </button>
-          <button onClick={() => window.open(`https://zone.definedge.com/chart/NSE/${symbol}/pf`, '_blank')}
-            style={{padding:"6px 14px",borderRadius:4,fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(136,68,255,0.3)",background:"rgba(136,68,255,0.08)",color:"#8844ff"}}>
-            🔷 Definedge P&F
-          </button>
         </div>
       </div>
     );
@@ -431,12 +298,9 @@ const TEChart = ({symbol, prices}) => {
 
   return (
     <div style={{background:"var(--bg-card)",borderRadius:10,border:"1px solid var(--border-low)",overflow:"hidden"}}>
-      {/* Toolbar */}
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:"var(--bg-secondary)",borderBottom:"1px solid var(--border-dim)",flexWrap:"wrap"}}>
         <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
         <span style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>HLC + Volume</span>
-
-        {/* EMA toggles */}
         {[{k:"e20",l:"EMA 20",c:"#00bbff"},{k:"e50",l:"EMA 50",c:"#ffaa00"},{k:"e200",l:"EMA 200",c:"#ff6644"}].map(em => (
           <button key={em.k} onClick={() => setShowEMA(p => ({...p,[em.k]:!p[em.k]}))}
             style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",
@@ -445,8 +309,6 @@ const TEChart = ({symbol, prices}) => {
             {em.l}
           </button>
         ))}
-
-        {/* External links */}
         <div style={{marginLeft:"auto",display:"flex",gap:4}}>
           <button onClick={() => window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${symbol}&interval=D`, 'tradedge_tv')}
             style={{padding:"2px 8px",borderRadius:3,fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",border:"1px solid rgba(0,200,255,0.2)",background:"transparent",color:"#00c8ff"}}>
@@ -462,8 +324,6 @@ const TEChart = ({symbol, prices}) => {
           </button>
         </div>
       </div>
-
-      {/* Canvas */}
       <div style={{cursor:isDrag?"grabbing":"crosshair"}}>
         <canvas ref={canvasRef}
           onMouseMove={handleMouseMove}
@@ -473,8 +333,6 @@ const TEChart = ({symbol, prices}) => {
           onWheel={handleWheel}
           style={{display:"block",width:"100%"}}/>
       </div>
-
-      {/* Bottom bar */}
       <div style={{display:"flex",justifyContent:"space-between",padding:"3px 12px",background:"var(--bg-secondary)",
         borderTop:"1px solid var(--border-dim)",fontSize:8,fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>
         <span>Bars: {viewCount} | Visible: {visible.length} | Total: {priceData.length} | Scroll: Zoom | Drag: Pan</span>
@@ -482,212 +340,6 @@ const TEChart = ({symbol, prices}) => {
       </div>
     </div>
   );
-};
-
-// ═══════════════════════════════════════════════════════════════
-// POINT & FIGURE CHART (Canvas)
-// ═══════════════════════════════════════════════════════════════
-
-const PnFChart = ({prices, boxPct=1}) => {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    if (!canvasRef.current || !prices.length) return;
-    const ctx = canvasRef.current.getContext("2d");
-    const W = canvasRef.current.width = canvasRef.current.parentElement.offsetWidth;
-    const H = canvasRef.current.height = 300;
-
-    // Build P&F columns
-    const columns = [];
-    let currentCol = {type:"X", boxes:[]};
-    let currentPrice = prices[0].c;
-    let reversal = 3; // 3-box reversal
-
-    for (const bar of prices) {
-      const boxSize = currentPrice * (boxPct / 100);
-      if (currentCol.type === "X") {
-        if (bar.h >= currentPrice + boxSize) {
-          while (currentPrice + boxSize <= bar.h) {
-            currentCol.boxes.push(currentPrice);
-            currentPrice += boxSize;
-          }
-        } else if (bar.l <= currentPrice - boxSize * reversal) {
-          columns.push({...currentCol});
-          currentCol = {type:"O", boxes:[]};
-          currentPrice -= boxSize;
-          while (currentPrice - boxSize >= bar.l) {
-            currentCol.boxes.push(currentPrice);
-            currentPrice -= boxSize;
-          }
-        }
-      } else {
-        if (bar.l <= currentPrice - boxSize) {
-          while (currentPrice - boxSize >= bar.l) {
-            currentCol.boxes.push(currentPrice);
-            currentPrice -= boxSize;
-          }
-        } else if (bar.h >= currentPrice + boxSize * reversal) {
-          columns.push({...currentCol});
-          currentCol = {type:"X", boxes:[]};
-          currentPrice += boxSize;
-          while (currentPrice + boxSize <= bar.h) {
-            currentCol.boxes.push(currentPrice);
-            currentPrice += boxSize;
-          }
-        }
-      }
-    }
-    if (currentCol.boxes.length) columns.push(currentCol);
-
-    // Find price range
-    let allPrices = columns.flatMap(c => c.boxes);
-    if (!allPrices.length) return;
-    const minP = Math.min(...allPrices);
-    const maxP = Math.max(...allPrices);
-    const boxSize = currentPrice * (boxPct / 100) || 1;
-    const rows = Math.ceil((maxP - minP) / boxSize) + 2;
-
-    // Draw
-    ctx.fillStyle = "#06080c";
-    ctx.fillRect(0, 0, W, H);
-
-    const pad = 40;
-    const colW = Math.min(14, (W - pad * 2) / Math.max(columns.length, 1));
-    const rowH = Math.min(12, (H - pad * 2) / Math.max(rows, 1));
-
-    // Price axis
-    ctx.fillStyle = "#334";
-    ctx.font = "9px 'JetBrains Mono'";
-    ctx.textAlign = "right";
-    for (let i = 0; i <= rows; i += Math.max(1, Math.floor(rows / 8))) {
-      const p = minP + i * boxSize;
-      const y = H - pad - i * rowH;
-      ctx.fillText(`₹${p.toFixed(0)}`, pad - 4, y + 3);
-      ctx.strokeStyle = "rgba(0,255,136,0.04)";
-      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - 10, y); ctx.stroke();
-    }
-
-    // Draw columns
-    columns.forEach((col, ci) => {
-      const x = pad + ci * colW + colW / 2;
-      col.boxes.forEach(p => {
-        const row = Math.round((p - minP) / boxSize);
-        const y = H - pad - row * rowH;
-
-        if (col.type === "X") {
-          ctx.strokeStyle = "#00ff88";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(x - colW * 0.3, y - rowH * 0.3);
-          ctx.lineTo(x + colW * 0.3, y + rowH * 0.3);
-          ctx.moveTo(x + colW * 0.3, y - rowH * 0.3);
-          ctx.lineTo(x - colW * 0.3, y + rowH * 0.3);
-          ctx.stroke();
-        } else {
-          ctx.strokeStyle = "#ff4455";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(x, y, Math.min(colW, rowH) * 0.3, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      });
-    });
-
-    // Title
-    ctx.fillStyle = "#556";
-    ctx.font = "10px 'JetBrains Mono'";
-    ctx.textAlign = "left";
-    ctx.fillText(`P&F ${boxPct}% box, 3-box reversal`, pad, 14);
-
-  }, [prices, boxPct]);
-
-  return <canvas ref={canvasRef} style={{width:"100%",height:300,borderRadius:6}}/>;
-};
-
-// ═══════════════════════════════════════════════════════════════
-// RENKO CHART (Canvas)
-// ═══════════════════════════════════════════════════════════════
-
-const RenkoChart = ({prices, boxPct=1}) => {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    if (!canvasRef.current || !prices.length) return;
-    const ctx = canvasRef.current.getContext("2d");
-    const W = canvasRef.current.width = canvasRef.current.parentElement.offsetWidth;
-    const H = canvasRef.current.height = 300;
-
-    // Build Renko bricks
-    const bricks = [];
-    let lastBrickPrice = prices[0].c;
-    const firstBoxSize = lastBrickPrice * (boxPct / 100);
-
-    for (const bar of prices) {
-      const boxSize = lastBrickPrice * (boxPct / 100) || 1;
-      while (bar.c >= lastBrickPrice + boxSize) {
-        bricks.push({price: lastBrickPrice, type: "up"});
-        lastBrickPrice += boxSize;
-      }
-      while (bar.c <= lastBrickPrice - boxSize) {
-        lastBrickPrice -= boxSize;
-        bricks.push({price: lastBrickPrice, type: "down"});
-      }
-    }
-
-    if (!bricks.length) return;
-
-    const allP = bricks.map(b => b.price);
-    const minP = Math.min(...allP);
-    const maxP = Math.max(...allP);
-    const range = maxP - minP || 1;
-
-    ctx.fillStyle = "#06080c";
-    ctx.fillRect(0, 0, W, H);
-
-    const pad = 40;
-    const brickW = Math.min(10, (W - pad * 2) / Math.max(bricks.length, 1));
-    const scaleY = (H - pad * 2) / range;
-
-    // Price axis
-    ctx.fillStyle = "#334";
-    ctx.font = "9px 'JetBrains Mono'";
-    ctx.textAlign = "right";
-    const steps = 8;
-    for (let i = 0; i <= steps; i++) {
-      const p = minP + (range * i / steps);
-      const y = H - pad - (p - minP) * scaleY;
-      ctx.fillText(`₹${p.toFixed(0)}`, pad - 4, y + 3);
-      ctx.strokeStyle = "rgba(0,255,136,0.04)";
-      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - 10, y); ctx.stroke();
-    }
-
-    // Draw bricks
-    bricks.forEach((brick, i) => {
-      const x = pad + i * brickW;
-      const boxSize = brick.price * (boxPct / 100) || 1;
-      const y = H - pad - (brick.price - minP + boxSize) * scaleY;
-      const h = boxSize * scaleY;
-
-      if (brick.type === "up") {
-        ctx.fillStyle = "rgba(0,255,136,0.7)";
-        ctx.strokeStyle = "#00ff88";
-      } else {
-        ctx.fillStyle = "rgba(255,68,85,0.7)";
-        ctx.strokeStyle = "#ff4455";
-      }
-      ctx.lineWidth = 0.5;
-      ctx.fillRect(x + 1, y, brickW - 2, h);
-      ctx.strokeRect(x + 1, y, brickW - 2, h);
-    });
-
-    ctx.fillStyle = "#556";
-    ctx.font = "10px 'JetBrains Mono'";
-    ctx.textAlign = "left";
-    ctx.fillText(`Renko ${boxPct}% box`, pad, 14);
-
-  }, [prices, boxPct]);
-
-  return <canvas ref={canvasRef} style={{width:"100%",height:300,borderRadius:6}}/>;
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -714,8 +366,7 @@ const OwnershipBar = ({ownership}) => {
       <div style={{display:"flex",height:32,borderRadius:4,overflow:"hidden",marginBottom:8}}>
         {segments.map((s,i) => s.pct > 0 && (
           <div key={i} style={{width:`${s.pct}%`,background:s.color,display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:9,fontWeight:700,color:"#000",fontFamily:"var(--font-mono)",
-            minWidth:s.pct>5?0:0}}>{s.pct > 5 ? `${s.pct}%` : ""}</div>
+            justifyContent:"center",fontSize:9,fontWeight:700,color:"#000",fontFamily:"var(--font-mono)"}}>{s.pct > 5 ? `${s.pct}%` : ""}</div>
         ))}
       </div>
       <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
@@ -738,17 +389,58 @@ const OwnershipBar = ({ownership}) => {
 const StockPage = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [chartBoxPct, setChartBoxPct] = useState(1);
-  const [chartType, setChartType] = useState("pnf");
+  const [livePrice, setLivePrice] = useState(null);
   const [screenerData, setScreenerData] = useState(null);
   const [screenerLoading, setScreenerLoading] = useState(true);
 
-  // ── Screener.in fetch (same as Journal page) ──
   const FUND_PROXIES = [
     u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
     u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
   ];
+
+  // ═══ LIVE PRICE FETCH (Intraday) ═══
+  const fetchLivePrice = async (symbol) => {
+    const wUrl = localStorage.getItem('zd_worker_url');
+    if (!wUrl) return null;
+    
+    try {
+      const res = await fetch(wUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+        body: JSON.stringify({ ticker: `${symbol}.NS`, range: '1d', interval: '1m' })
+      });
+      
+      if (!res.ok) return null;
+      
+      const data = await res.json();
+      const result = data?.chart?.result?.[0];
+      if (!result) return null;
+      
+      const meta = result.meta || {};
+      const quotes = result.indicators?.quote?.[0] || {};
+      const closes = quotes.close || [];
+      
+      // Priority: regularMarketPrice > latest 1m candle > previousClose
+      let price = meta.regularMarketPrice;
+      if (!price || price <= 0) {
+        for (let i = closes.length - 1; i >= 0; i--) {
+          if (closes[i] && closes[i] > 0) { price = closes[i]; break; }
+        }
+      }
+      if (!price || price <= 0) price = meta.previousClose;
+      
+      const prevClose = meta.chartPreviousClose || meta.previousClose || 0;
+      const change = prevClose > 0 ? ((price - prevClose) / prevClose * 100) : 0;
+      
+      console.log('[LIVE PRICE]', symbol, '₹' + price?.toFixed(2), change.toFixed(2) + '%');
+      
+      return { price, change_pct: +change.toFixed(2), prev_close: prevClose };
+    } catch (e) {
+      console.warn('[LIVE PRICE] Failed:', e.message);
+      return null;
+    }
+  };
 
   async function fundFetchScreener(symbol) {
     const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
@@ -769,7 +461,6 @@ const StockPage = () => {
     return null;
   }
 
-  // Fetch shareholding + No of Funds from screener.in HTML page
   async function fetchShareholding(symbol) {
     const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
     const targetUrl = `https://www.screener.in/company/${sym}/consolidated/`;
@@ -781,11 +472,7 @@ const StockPage = () => {
         if (!r.ok) continue;
         const html = await r.text();
         
-        // Parse shareholding from HTML
-        const result = { promoter: [], fii: [], dii: [], public: [], mutual_funds: [], no_of_funds: null, shares_held_cr: null };
-        
-        // Screener.in uses specific section with id or heading
-        // Find ALL tables and look for shareholding-related ones
+        const result = { promoter: [], fii: [], dii: [], public: [], mutual_funds: [], no_of_funds: null };
         const tables = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi) || [];
         
         for (const table of tables) {
@@ -794,8 +481,6 @@ const StockPage = () => {
           
           const rows = table.match(/<tr[\s\S]*?<\/tr>/gi) || [];
           const quarters = [];
-          
-          // Parse header for quarter labels
           const firstRow = rows[0] || "";
           const headers = firstRow.match(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi) || [];
           headers.forEach(th => {
@@ -805,118 +490,63 @@ const StockPage = () => {
           
           if (!quarters.length) continue;
           
-          // Parse data rows
           for (const row of rows.slice(1)) {
             const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
             const values = cells.map(td => td.replace(/<[^>]+>/g, '').trim());
             if (values.length < 2) continue;
             
             const label = values[0]?.toLowerCase() || "";
-            const nums = values.slice(1).map(v => {
-              const n = parseFloat(v.replace(/,/g, ''));
-              return isNaN(n) ? 0 : n;
-            });
-            
+            const nums = values.slice(1).map(v => parseFloat(v.replace(/,/g, '')) || 0);
             const buildQtrData = () => quarters.slice(0, nums.length).map((q, i) => ({ qtr: q, pct: nums[i] || 0 }));
             
-            if (label.includes("promoter") && !label.includes("pledge")) {
-              result.promoter = buildQtrData();
-            } else if (label.includes("fii") || label.includes("foreign inst")) {
-              result.fii = buildQtrData();
-            } else if (label.includes("dii") || label.includes("domestic inst") || label.includes("institutions") && !label.includes("foreign")) {
-              result.dii = buildQtrData();
-            } else if (label.includes("public") || label.includes("others")) {
-              result.public = buildQtrData();
-            } else if (label.includes("mutual fund")) {
-              result.mutual_funds = buildQtrData();
-            } else if (label.includes("no. of") || label.includes("number of")) {
-              // Some tables have "No. of shareholders" type rows
-              if (label.includes("mutual") || label.includes("fund")) {
-                result.no_of_funds = nums[0] || null;
-              }
-            }
+            if (label.includes("promoter") && !label.includes("pledge")) result.promoter = buildQtrData();
+            else if (label.includes("fii") || label.includes("foreign inst")) result.fii = buildQtrData();
+            else if (label.includes("dii") || label.includes("domestic inst")) result.dii = buildQtrData();
+            else if (label.includes("public") || label.includes("others")) result.public = buildQtrData();
+            else if (label.includes("mutual fund")) result.mutual_funds = buildQtrData();
           }
           
-          if (result.promoter.length > 0) break; // Found the right table
+          if (result.promoter.length > 0) break;
         }
         
-        // Extract MF count from various patterns in full HTML
-        const mfPatterns = [
-          /(\d{1,5})\s*(?:mutual funds?|MF schemes?)\s*(?:hold|holding|bought|increased)/i,
-          /Number of (?:Mutual Fund|MF)[\s:]*(\d{1,5})/i,
-          /(?:held by|held in)\s*(\d{1,5})\s*(?:mutual fund|MF|scheme)/i,
-          /No\.?\s*of\s*(?:Mutual Fund|MF)\s*(?:Scheme|Holder)s?\s*[\s:]*(\d{1,5})/i,
-          /MF\s*Holding[\s\S]{0,50}?(\d{2,5})\s*(?:scheme|fund)/i,
-        ];
-        for (const pat of mfPatterns) {
-          const m = html.match(pat);
-          if (m && !result.no_of_funds) {
-            result.no_of_funds = parseInt(m[1]);
-            break;
-          }
-        }
-        
-        if (result.promoter.length > 0 || result.no_of_funds) {
-          console.log("[SHAREHOLDING] Loaded for", sym, "promoter:", result.promoter[0]?.pct, "funds:", result.no_of_funds);
-          return result;
-        }
-      } catch(e) { 
-        console.warn('[SHAREHOLDING] Proxy failed:', e.message);
-        continue;
-      }
+        if (result.promoter.length > 0) return result;
+      } catch(e) { continue; }
     }
     return null;
   }
 
-  // Fetch MF holdings data via worker (Trendlyne)
-  async function fetchMFData(symbol) {
-    const sym = symbol.replace('.NS','').replace('.BO','').toUpperCase();
-    const workerUrl = localStorage.getItem('zd_worker_url') || '';
-    if (!workerUrl) return null;
-    
-    try {
-      const r = await fetch(workerUrl, {
-        method: 'GET',
-        headers: { 'X-Kite-Action': 'trendlyne-mf', 'X-Screener-Symbol': sym },
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!r.ok) return null;
-      const data = await r.json();
-      if (data.no_of_funds || data.mf_holding_pct) {
-        console.log("[TRENDLYNE MF]", sym, "funds:", data.no_of_funds, "holding:", data.mf_holding_pct + "%");
-        return data;
-      }
-    } catch(e) { console.warn('[TRENDLYNE MF] Failed:', e.message); }
-    return null;
-  }
-
+  // ═══ LOAD STOCK DATA ═══
   useEffect(() => {
     async function loadStock() {
       try {
-        // Try per-stock detail file first
         const res = await fetch(`./data/stock_details/${SYMBOL}.json?t=${Date.now()}`);
         if (res.ok) {
           const json = await res.json();
-          console.log("[STOCK] Loaded from stock_details/", SYMBOL, "keys:", Object.keys(json).join(","));
+          console.log("[STOCK] Loaded from stock_details/", SYMBOL);
           setData(json);
           setLoading(false);
+          
+          // Fetch live price
+          const live = await fetchLivePrice(SYMBOL);
+          if (live?.price > 0) {
+            setLivePrice(live);
+            setData(prev => ({ ...prev, price: live.price, change_pct: live.change_pct }));
+          }
           return;
         }
       } catch (e) { console.warn("[STOCK] stock_details fetch failed:", e.message); }
 
       try {
-        // Fallback: find stock in scanner_results.json
         const res = await fetch("./data/scanner_results.json?t=" + Date.now());
         if (res.ok) {
           const json = await res.json();
           const stock = (json.stocks || []).find(s => s.symbol === SYMBOL);
           if (stock) {
-            // Wrap in the expected detail format
             setData({
               ...stock,
-              oneil: stock.oneil || {master_score:"?",eps_strength:0,price_strength:0,buyer_demand:"?",buyer_demand_score:0,group_rank:0,analysis_text:"Run generate_data.py with --stock "+SYMBOL+" to get full analysis."},
+              oneil: stock.oneil || {master_score:"?",eps_strength:0,price_strength:0,buyer_demand:"?",buyer_demand_score:0,group_rank:0,analysis_text:""},
               guru_ratings: stock.guru_ratings || [],
-              surveillance: stock.surveillance || {flags:[],red_flag_count:0,assessment:"Data not available",assessment_detail:"Run full pipeline to generate."},
+              surveillance: stock.surveillance || {flags:[],red_flag_count:0,assessment:"",assessment_detail:""},
               ownership: stock.ownership || {promoter:[],mutual_funds:[],fii:[],public:[],dii:[]},
               quarterly_results: stock.quarterly_results || [],
               major_shareholders: stock.major_shareholders || [],
@@ -924,39 +554,43 @@ const StockPage = () => {
               price_history: stock.price_history || [],
             });
             setLoading(false);
+            
+            const live = await fetchLivePrice(SYMBOL);
+            if (live?.price > 0) {
+              setLivePrice(live);
+              setData(prev => ({ ...prev, price: live.price, change_pct: live.change_pct }));
+            }
             return;
           }
         }
       } catch (e) {}
 
-      // Ultimate fallback: use MOCK
       console.warn("Using mock data for", SYMBOL);
       setData(MOCK);
       setLoading(false);
+      
+      const live = await fetchLivePrice(SYMBOL);
+      if (live?.price > 0) {
+        setLivePrice(live);
+        setData(prev => ({ ...prev, price: live.price, change_pct: live.change_pct }));
+      }
     }
     loadStock();
   }, []);
 
-  // Fetch screener.in data (quarterly results, info)
+  // Fetch screener.in data
   useEffect(() => {
     if (!SYMBOL) return;
     setScreenerLoading(true);
     
-    // Fetch quarterly data from worker
     fundFetchScreener(SYMBOL).then(sData => {
       if (sData) {
-        console.log("[SCREENER] Loaded for", SYMBOL, sData.quarters?.length, "quarters", 
-          sData.shareholding ? "WITH shareholding" : "no shareholding");
         setScreenerData(sData);
-        
-        // If worker returned shareholding data, use it (more reliable than CORS proxy scrape)
         if (sData.shareholding) {
           const sh = sData.shareholding;
           setData(prev => {
             if (!prev) return prev;
             const updated = {...prev};
-            
-            // Build ownership from shareholding percentages
             if (sh.promoter?.length || sh.fii?.length) {
               const qtrs = sh.quarters || [];
               updated.ownership = {
@@ -967,17 +601,6 @@ const StockPage = () => {
                 mutual_funds: [],
               };
             }
-            
-            // MF count and shares
-            if (sh.mf_count || sh.mf_holding_pct) {
-              updated.fund_holdings = {
-                ...updated.fund_holdings,
-                no_of_funds: sh.mf_count || null,
-                mf_holding_pct: sh.mf_holding_pct || null,
-                shares_held_cr: sh.mf_shares_cr || null,
-              };
-            }
-            
             return updated;
           });
         }
@@ -985,63 +608,40 @@ const StockPage = () => {
       setScreenerLoading(false);
     }).catch(() => setScreenerLoading(false));
 
-    // Fetch shareholding from screener.in HTML
     fetchShareholding(SYMBOL).then(shData => {
-      if (shData) {
+      if (shData?.promoter?.length) {
         setData(prev => {
           if (!prev) return prev;
-          const updated = {...prev};
-          if (shData.promoter?.length) {
-            updated.ownership = {
-              promoter: shData.promoter,
-              mutual_funds: shData.mutual_funds || [],
-              fii: shData.fii || [],
-              public: shData.public || [],
-              dii: shData.dii || [],
-            };
-          }
-          if (shData.no_of_funds) {
-            updated.fund_holdings = {
-              ...updated.fund_holdings,
-              no_of_funds: shData.no_of_funds,
-            };
-          }
-          return updated;
+          return { ...prev, ownership: { ...shData } };
         });
       }
-    }).catch(e => console.warn("[SHAREHOLDING] Failed:", e.message));
+    }).catch(() => {});
+  }, []);
 
-    // Fetch MF data from Trendlyne (No of Funds + MF holding %)
-    fetchMFData(SYMBOL).then(mfData => {
-      if (mfData) {
-        setData(prev => {
-          if (!prev) return prev;
-          const updated = {...prev};
-          updated.fund_holdings = {
-            ...updated.fund_holdings,
-            no_of_funds: mfData.no_of_funds || updated.fund_holdings?.no_of_funds,
-            mf_holding_pct: mfData.mf_holding_pct || updated.fund_holdings?.mf_holding_pct,
-            mf_prev_pct: mfData.mf_prev_pct || null,
-          };
-          return updated;
-        });
+  // Auto-refresh live price every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const live = await fetchLivePrice(SYMBOL);
+      if (live?.price > 0) {
+        setLivePrice(live);
+        setData(prev => prev ? { ...prev, price: live.price, change_pct: live.change_pct } : prev);
       }
-    }).catch(e => console.warn("[TRENDLYNE] Failed:", e.message));
+    }, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {
     return (
       <div>
         <nav className="nav">
-          <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+          <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16}}/></a>
           <a href="scanner.html" className="nav-link">Scanner</a>
           <a href="sectors.html" className="nav-link">Sectors</a>
           <a href="rrg.html" className="nav-link">RRG</a>
           <a href="matrix.html" className="nav-link">Matrix</a>
           <a href="mps.html" className="nav-link">MPS</a>
           <a href="index.html" className="nav-link">Journal</a>
-        <a href="watchlist.html" className="nav-link">Watchlist</a>
-          <a href="scanner.html" className="nav-link" style={{marginLeft:"auto",color:"#00ff88"}}>← Back</a>
+          <a href="watchlist.html" className="nav-link">Watchlist</a>
         </nav>
         <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"60vh",flexDirection:"column",gap:12}}>
           <div style={{width:40,height:40,border:"3px solid var(--border-low)",borderTop:"3px solid var(--accent)",
@@ -1056,66 +656,20 @@ const StockPage = () => {
   if (!data) return <div style={{padding:40,textAlign:"center",color:"var(--text-muted)"}}>Stock not found</div>;
 
   const d = data;
-  // Merge screener.in info as fallback for fundamentals
   const si = screenerData?.info || {};
-  const f = {
-    ...d.fundamentals,
-    market_cap_cr: d.fundamentals?.market_cap_cr || si.mcapCr,
-    pe_ratio: d.fundamentals?.pe_ratio || si.pe,
-    roe: d.fundamentals?.roe || si.roe,
-    book_value: d.fundamentals?.book_value || si.bookValue,
-    dividend_yield: (() => {
-      const yf = d.fundamentals?.dividend_yield;
-      const sc = si.dividendYield;
-      // Prefer screener (already %) > yfinance (may be wrong)
-      if (sc != null && sc > 0 && sc < 30) return sc;
-      if (yf != null && yf > 0 && yf < 30) return yf;
-      return null;
-    })(),
-    roce: d.fundamentals?.roce || si.roce,
-    eps: d.fundamentals?.eps || (si.currentPrice && si.pe ? (si.currentPrice / si.pe).toFixed(2) : null),
-  };
-  
-  // Calculate U/D Volume Ratio from price_history (last 50 days)
-  if (!f.ud_vol_ratio && d.price_history?.length > 10) {
-    const ph = d.price_history.slice(-50);
-    let upVol = 0, downVol = 0;
-    for (let i = 1; i < ph.length; i++) {
-      const prev = ph[i-1], curr = ph[i];
-      const pc = curr.c ?? curr.close, pp = prev.c ?? prev.close, vol = curr.v ?? curr.volume ?? 0;
-      if (pc > pp) upVol += vol;
-      else if (pc < pp) downVol += vol;
-    }
-    if (downVol > 0) f.ud_vol_ratio = (upVol / downVol).toFixed(2);
-  }
-  if (!d.price && si.currentPrice) d.price = si.currentPrice;
-  if (!d.name && si.name) d.name = si.name;
-  const pq = d.prev_fundamentals || {};
-  const py = d.yoy_fundamentals || {};
-  const fh = d.fund_holdings || {};
+  const f = { ...d.fundamentals, market_cap_cr: d.fundamentals?.market_cap_cr || si.mcapCr, pe_ratio: d.fundamentals?.pe_ratio || si.pe, roe: d.fundamentals?.roe || si.roe };
   const o = d.oneil || {};
   
-  // Safe defaults for arrays (prevent .map() on undefined)
   if (!d.guru_ratings) d.guru_ratings = [];
-  if (!d.quarterly_results) d.quarterly_results = [];
-  if (!d.major_shareholders) d.major_shareholders = [];
-  if (!d.management) d.management = [];
-  if (!d.catalysts) d.catalysts = [];
-  if (!d.price_history) d.price_history = [];
-  if (!d.surveillance) d.surveillance = {flags:[], red_flag_count:0, assessment:"Data not available"};
+  if (!d.surveillance) d.surveillance = {flags:[], red_flag_count:0, assessment:""};
   if (!d.surveillance.flags) d.surveillance.flags = [];
   if (!d.ownership) d.ownership = {promoter:[],mutual_funds:[],fii:[],public:[],dii:[]};
-  if (!d.ownership.promoter) d.ownership.promoter = [];
-  if (!d.ownership.mutual_funds) d.ownership.mutual_funds = [];
-  if (!d.ownership.fii) d.ownership.fii = [];
-  if (!d.ownership.public) d.ownership.public = [];
-  if (!d.ownership.dii) d.ownership.dii = [];
+  if (!d.price_history) d.price_history = [];
 
   return (
     <div>
-      {/* Nav */}
       <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
+        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" alt="TradEdge" style={{height:100,marginRight:16}}/></a>
         <a href="scanner.html" className="nav-link">Scanner</a>
         <a href="sectors.html" className="nav-link">Sectors</a>
         <a href="rrg.html" className="nav-link">RRG</a>
@@ -1128,8 +682,7 @@ const StockPage = () => {
       </nav>
 
       <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 20px"}}>
-
-        {/* ── HEADER ── */}
+        {/* HEADER */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:12}} className="fade-in">
           <div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1137,171 +690,72 @@ const StockPage = () => {
               <span style={{fontSize:13,color:"var(--text-secondary)"}}>{d.name}</span>
             </div>
             <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
-              <span className="badge badge-fair">{d.sector}</span>
-              <span className="badge" style={{background:"rgba(136,68,255,0.1)",color:"#8844ff",border:"1px solid rgba(136,68,255,0.2)"}}>{d.industry}</span>
+              <span className="badge badge-fair">{d.sector || 'Unknown'}</span>
+              {d.industry && <span className="badge" style={{background:"rgba(136,68,255,0.1)",color:"#8844ff",border:"1px solid rgba(136,68,255,0.2)"}}>{d.industry}</span>}
               {d.circuit?.band && <span className={`badge ${d.circuit.is_restricted?"badge-fail":"badge-pass"}`}>Circuit: {d.circuit.band}</span>}
-              {d.earnings_alert && <span className="badge badge-warn">{d.earnings_alert}</span>}
             </div>
           </div>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:32,fontWeight:800,color:"#fff",fontFamily:"var(--font-mono)"}}>₹{d.price.toLocaleString()}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"flex-end"}}>
+              <span style={{fontSize:32,fontWeight:800,color:"#fff",fontFamily:"var(--font-mono)"}}>₹{(d.price || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+              {livePrice && <span className="live-indicator"><span className="live-dot"></span>LIVE</span>}
+            </div>
             <PctVal val={d.change_pct}/>
           </div>
         </div>
 
-        {/* ── TRADEDGE CHART (HLC + EMA + Volume) ── */}
+        {/* CHART */}
         <div style={{marginBottom:16}} className="fade-in">
           <TEChart symbol={d.symbol} prices={d.price_history || []}/>
         </div>
 
-        {/* ── FUNDAMENTAL OVERVIEW GRID ── */}
+        {/* FUNDAMENTALS */}
         <div className="card fade-in" style={{marginBottom:16}}>
-          <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>FUNDAMENTALS</span>
-            <div style={{display:"flex",gap:10,fontSize:8,fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>
-              <span><span style={{color:"#00ff88",fontSize:6}}>▲</span>Q = QoQ better</span>
-              <span><span style={{color:"#ff4455",fontSize:6}}>▼</span>Q = QoQ worse</span>
-              <span><span style={{color:"#00ff88",fontSize:6}}>▲</span>Y = YoY better</span>
-            </div>
-          </div>
+          <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>FUNDAMENTALS</div>
           <div style={{padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:1,background:"var(--border-dim)"}}>
-            {(() => {
-              // Helper to safely display values
-              const sv = (v, suffix="") => (v != null && v !== undefined && v !== "undefined") ? `${v}${suffix}` : "N/A";
-              
-              const items = [
-                ["Market Cap", f.market_cap_cr ? `INR ${f.market_cap_cr.toLocaleString()} Cr` : "N/A", f.market_cap_cr, pq.market_cap_cr, py.market_cap_cr, false],
-                ["Sales", f.sales_cr ? `INR ${f.sales_cr.toLocaleString()} Cr` : "N/A", f.sales_cr, pq.sales_cr, py.sales_cr, false],
-                ["Shares in Float", f.shares_float_cr ? `${f.shares_float_cr} Cr` : "N/A", null, null, null, false],
-                ["No of Funds", null, null, null, null, false],  // special render — DII holding
-                ["FII Holding", null, null, null, null, false],  // special render — FII holding
-                ["Yield", f.dividend_yield != null ? `${f.dividend_yield}%` : "N/A", null, null, null, false],
-                ["Book Value", f.book_value ? `${f.book_value}` : "N/A", null, null, null, false],
-                ["U/D Vol Ratio", sv(f.ud_vol_ratio), f.ud_vol_ratio, pq.ud_vol_ratio, py.ud_vol_ratio, false],
-                ["LTDebt/Equity", f.lt_debt_equity != null ? `${f.lt_debt_equity}` : "N.A", f.lt_debt_equity, pq.lt_debt_equity, py.lt_debt_equity, true],
-                ["Alpha", f.alpha != null ? `${f.alpha}` : "N/A", f.alpha, pq.alpha, py.alpha, false],
-                ["Beta", f.beta != null ? `${f.beta}` : "N/A", f.beta, pq.beta, py.beta, true],
-                ["P/E", f.pe_ratio != null ? `${f.pe_ratio}` : "N/A", f.pe_ratio, pq.pe_ratio, py.pe_ratio, true],
-                ["ROE", f.roe != null ? `${f.roe}%` : "N/A", f.roe, pq.roe, py.roe, false],
-                ["OPM", f.profit_margin != null ? `${f.profit_margin}%` : "N/A", f.profit_margin, pq.profit_margin, py.profit_margin, false],
-                ["Rev Growth", f.revenue_growth != null ? `${f.revenue_growth}%` : "N/A", f.revenue_growth, pq.revenue_growth, py.revenue_growth, false],
-              ];
-              return items.map(([label, display, curr, prevQv, prevYv, inv], i) => {
-                // Special: No of Funds
-                if (label === "No of Funds") {
-                  // Show DII Holding % (includes MF + Insurance + others)
-                  const sh = screenerData?.shareholding;
-                  const nf = fh.no_of_funds;
-                  const diiArr = sh?.dii || [];
-                  const diiCurr = diiArr[diiArr.length - 1];
-                  const diiPrev = diiArr.length >= 2 ? diiArr[diiArr.length - 2] : null;
-                  const diiChg = (diiCurr != null && diiPrev != null) ? (diiCurr - diiPrev).toFixed(2) : null;
-                  return (
-                    <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
-                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{nf ? "No of Funds" : "DII Holding"}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                        {nf != null ? (
-                          <span style={{fontSize:13,fontWeight:600,color:"var(--accent)",fontFamily:"var(--font-mono)"}}>{nf}</span>
-                        ) : diiCurr != null ? (
-                          <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{diiCurr}%</span>
-                        ) : (
-                          <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>—</span>
-                        )}
-                        {diiChg != null && <span style={{fontSize:9,color:parseFloat(diiChg)>=0?"#00cc66":"#ff4455",fontFamily:"var(--font-mono)",fontWeight:700}}>{parseFloat(diiChg)>=0?"+":""}{diiChg}%</span>}
-                      </div>
-                    </div>
-                  );
-                }
-                // Special: FII Holding
-                if (label === "FII Holding") {
-                  const sh = screenerData?.shareholding;
-                  const fiiArr = sh?.fii || [];
-                  const fiiCurr = fiiArr[fiiArr.length - 1];
-                  const fiiPrev = fiiArr.length >= 2 ? fiiArr[fiiArr.length - 2] : null;
-                  const fiiChg = (fiiCurr != null && fiiPrev != null) ? (fiiCurr - fiiPrev).toFixed(2) : null;
-                  return (
-                    <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
-                      <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>FII Holding</div>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <span style={{fontSize:13,fontWeight:600,color: fiiCurr ? "var(--text-primary)" : "var(--text-primary)",fontFamily:"var(--font-mono)"}}>{fiiCurr != null ? `${fiiCurr}%` : "—"}</span>
-                        {fiiChg != null && <span style={{fontSize:9,color:parseFloat(fiiChg)>=0?"#00cc66":"#ff4455",fontFamily:"var(--font-mono)",fontWeight:700}}>{parseFloat(fiiChg)>=0?"+":""}{fiiChg}%</span>}
-                      </div>
-                    </div>
-                  );
-                }
-                // Standard cell
-                const hasArrows = prevQv != null || prevYv != null;
-                return (
-                  <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
-                    <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{display}</span>
-                      {hasArrows && (
-                        <Fragment>
-                          {prevQv != null && <span style={{display:"flex",alignItems:"center",gap:1,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700}}>
-                            <TrendArrow curr={curr} prev={prevQv} inverse={inv}/><span style={{color:"#556"}}>Q</span>
-                          </span>}
-                          {prevYv != null && <span style={{display:"flex",alignItems:"center",gap:1,fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700}}>
-                            <TrendArrow curr={curr} prev={prevYv} inverse={inv}/><span style={{color:"#556"}}>Y</span>
-                          </span>}
-                        </Fragment>
-                      )}
-                    </div>
-                  </div>
-                );
-              });
-            })()}
+            {[
+              ["Market Cap", f.market_cap_cr ? `INR ${f.market_cap_cr.toLocaleString()} Cr` : "N/A"],
+              ["P/E", f.pe_ratio ?? "N/A"],
+              ["ROE", f.roe ? `${f.roe}%` : "N/A"],
+              ["Book Value", f.book_value ?? "N/A"],
+              ["EPS", f.eps ?? "N/A"],
+              ["Dividend Yield", f.dividend_yield ? `${f.dividend_yield}%` : "N/A"],
+              ["ROCE", f.roce ? `${f.roce}%` : "N/A"],
+              ["Debt/Equity", f.debt_to_equity ?? "N/A"],
+              ["Beta", f.beta ?? "N/A"],
+              ["Rev Growth", f.revenue_growth ? `${f.revenue_growth}%` : "N/A"],
+            ].map(([label, val], i) => (
+              <div key={i} style={{background:"var(--bg-card)",padding:"8px 12px"}}>
+                <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",marginBottom:2}}>{label}</div>
+                <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{val}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* ── O'NEIL MASTER SCORE + GURU RATINGS ── */}
+        {/* O'NEIL + GURU */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-
-          {/* Master Score */}
           <div className="card fade-in">
-            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
-              fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>O'NEIL MASTER SCORE</div>
+            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>O'NEIL MASTER SCORE</div>
             <div style={{padding:16}}>
               <div style={{display:"flex",gap:16,alignItems:"flex-start",marginBottom:16}}>
                 <ScoreGrade grade={o.master_score} size={52}/>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Master Score {o.master_score} :</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)",lineHeight:1.6}}>{o.analysis_text?.substring(0, 300)}...</div>
+                  <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Master Score {o.master_score}:</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)",lineHeight:1.6}}>{(o.analysis_text || '').substring(0, 300)}...</div>
                 </div>
               </div>
-
-              {/* Score bars */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,marginBottom:4,color:o.eps_strength<30?"#ff4455":o.eps_strength>70?"#00ff88":"#ffaa00"}}>
-                    {o.eps_strength<30?"POOR":o.eps_strength>70?"STRONG":"FAIR"} : {o.eps_strength}
-                  </div>
-                  <ProgressBar value={o.eps_strength} label="EPS Strength" color={o.eps_strength<30?"#ff4455":"#00ff88"}/>
-                </div>
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,marginBottom:4,color:o.price_strength<30?"#ff4455":o.price_strength>70?"#00ff88":"#ffaa00"}}>
-                    {o.price_strength<30?"POOR":o.price_strength>70?"STRONG":"FAIR"} : {o.price_strength}
-                  </div>
-                  <ProgressBar value={o.price_strength} label="Price Strength" color={o.price_strength<30?"#ff4455":"#00c8ff"}/>
-                </div>
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,marginBottom:4,color:"#00c8ff"}}>FAIR : {o.buyer_demand}</div>
-                  <ProgressBar value={o.buyer_demand_score} label="Buyer Demand" color="#00c8ff"/>
-                </div>
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,marginBottom:4,color:o.group_rank>70?"#ff4455":"#00ff88"}}>
-                    {o.group_rank>70?"POOR":"GOOD"} : {o.group_rank}
-                  </div>
-                  <ProgressBar value={o.group_rank} label="Group Rank" color={o.group_rank>70?"#ff4455":"#00ff88"}/>
-                </div>
+                <ProgressBar value={o.eps_strength || 0} label="EPS Strength" color={o.eps_strength<30?"#ff4455":"#00ff88"}/>
+                <ProgressBar value={o.price_strength || 0} label="Price Strength" color={o.price_strength<30?"#ff4455":"#00c8ff"}/>
+                <ProgressBar value={o.buyer_demand_score || 0} label="Buyer Demand" color="#00c8ff"/>
+                <ProgressBar value={o.group_rank || 0} label="Group Rank" color={o.group_rank>70?"#ff4455":"#00ff88"}/>
               </div>
             </div>
           </div>
 
-          {/* Guru Ratings */}
           <div className="card fade-in">
-            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
-              fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>GURU STRATEGY RATINGS</div>
+            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>GURU STRATEGY RATINGS</div>
             <div style={{padding:12}}>
               {d.guru_ratings.map((g,i) => (
                 <div key={i} style={{padding:"8px 0",borderBottom:i<d.guru_ratings.length-1?"1px solid var(--border-dim)":"none"}}>
@@ -1312,137 +766,80 @@ const StockPage = () => {
                     </span>
                   </div>
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                    {g.details.map((c,j) => (
+                    {(g.details || []).map((c,j) => (
                       <span key={j} style={{fontSize:8,padding:"1px 5px",borderRadius:2,fontFamily:"var(--font-mono)",
                         background:c.passed?"rgba(0,255,136,0.06)":"rgba(255,68,85,0.06)",
-                        color:c.passed?"#00ff88":"#ff4455",border:`1px solid ${c.passed?"rgba(0,255,136,0.15)":"rgba(255,68,85,0.15)"}`}}>
+                        color:c.passed?"#00ff88":"#ff4455"}}>
                         {c.passed?"✓":"✗"} {c.detail}
                       </span>
                     ))}
                   </div>
                 </div>
               ))}
+              {d.guru_ratings.length === 0 && <div style={{color:"var(--text-muted)",fontSize:11,textAlign:"center",padding:20}}>No guru ratings available</div>}
             </div>
           </div>
         </div>
 
-        {/* ── QUARTERLY RESULTS + OWNERSHIP ── */}
+        {/* QUARTERLY + OWNERSHIP */}
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16,marginBottom:16}}>
-
-          {/* Quarterly Results — powered by screener.in */}
           <div className="card fade-in">
-            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>📊 FUNDAMENTAL SCORECARDS</span>
-              {screenerData?.info && (
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <span style={{fontSize:10,fontFamily:"var(--font-mono)",color:"var(--text-muted)"}}>
-                    MCap: ₹{screenerData.info.mcapCr?.toLocaleString()} Cr | P/E: {screenerData.info.pe} | ROE: {screenerData.info.roe}%
-                  </span>
-                </div>
-              )}
-            </div>
+            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>📊 FUNDAMENTAL SCORECARDS</div>
             <div style={{overflowX:"auto"}}>
               {screenerLoading ? (
-                <div style={{padding:20,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>Loading quarterly data from screener.in...</div>
+                <div style={{padding:20,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>Loading quarterly data...</div>
               ) : screenerData?.quarters?.length ? (
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                   <thead>
                     <tr style={{background:"rgba(0,255,136,0.03)"}}>
                       {["FQ","EPS","YOY","QOQ","SALES","YOY","QOQ","OPM%","P/E"].map((h,i)=>(
-                        <th key={i} style={{padding:"6px 8px",textAlign:i===0?"left":"right",color:"var(--text-muted)",fontSize:9,
-                          fontFamily:"var(--font-mono)",fontWeight:700,borderBottom:"1px solid var(--border-dim)"}}>{h}</th>
+                        <th key={i} style={{padding:"6px 8px",textAlign:i===0?"left":"right",color:"var(--text-muted)",fontSize:9,fontFamily:"var(--font-mono)",fontWeight:700,borderBottom:"1px solid var(--border-dim)"}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {screenerData.quarters.slice(0,8).map((q,i) => {
-                      const fmtPct = (v) => {
-                        if (v == null) return "—";
-                        const s = (v > 0 ? "+" : "") + v.toFixed(1) + "%";
-                        return s;
-                      };
-                      return (
-                        <tr key={i} style={{borderBottom:"1px solid var(--border-dim)"}}>
-                          <td style={{padding:"6px 8px",fontWeight:600,fontSize:11,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{q.label}</td>
-                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--text-primary)"}}>{q.eps?.toFixed(1)}</td>
-                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.epsYoY != null ? fmtPct(q.epsYoY) : "—"}/></td>
-                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.epsQoQ != null ? fmtPct(q.epsQoQ) : "—"}/></td>
-                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--text-primary)"}}>{q.sales?.toLocaleString()}</td>
-                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.salesYoY != null ? fmtPct(q.salesYoY) : "—"}/></td>
-                          <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.salesQoQ != null ? fmtPct(q.salesQoQ) : "—"}/></td>
-                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:q.opm>=0?"var(--text-primary)":"#ff4455"}}>{q.opm != null ? q.opm + "%" : "—"}</td>
-                          <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--accent2)"}}>{screenerData.info?.pe || "—"}</td>
-                        </tr>
-                      );
-                    })}
+                    {screenerData.quarters.slice(0,8).map((q,i) => (
+                      <tr key={i} style={{borderBottom:"1px solid var(--border-dim)"}}>
+                        <td style={{padding:"6px 8px",fontWeight:600,fontSize:11,color:"var(--text-primary)",fontFamily:"var(--font-mono)"}}>{q.label}</td>
+                        <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{q.eps?.toFixed(1)}</td>
+                        <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.epsYoY != null ? (q.epsYoY > 0 ? "+" : "") + q.epsYoY.toFixed(1) + "%" : "—"}/></td>
+                        <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.epsQoQ != null ? (q.epsQoQ > 0 ? "+" : "") + q.epsQoQ.toFixed(1) + "%" : "—"}/></td>
+                        <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{q.sales?.toLocaleString()}</td>
+                        <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.salesYoY != null ? (q.salesYoY > 0 ? "+" : "") + q.salesYoY.toFixed(1) + "%" : "—"}/></td>
+                        <td style={{padding:"6px 8px",textAlign:"right"}}><PctVal str={q.salesQoQ != null ? (q.salesQoQ > 0 ? "+" : "") + q.salesQoQ.toFixed(1) + "%" : "—"}/></td>
+                        <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{q.opm != null ? q.opm + "%" : "—"}</td>
+                        <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"var(--font-mono)",color:"var(--accent2)"}}>{screenerData.info?.pe || "—"}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               ) : (
-                <div style={{padding:20,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>
-                  {screenerData === null ? "Set zd_worker_url in localStorage for quarterly data" : "No quarterly data available"}
-                </div>
+                <div style={{padding:20,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>No quarterly data available</div>
               )}
             </div>
           </div>
 
-          {/* Ownership + Shareholders — only show if data exists */}
-          <div style={{display:"flex",flexDirection:"column",gap:16}}>
-            {d.ownership.promoter.length > 0 ? (
-              <div className="card fade-in">
-                <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
-                  fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>OWNERSHIP PATTERN</div>
-                <div style={{padding:12}}>
-                  <OwnershipBar ownership={d.ownership}/>
-                  <div style={{marginTop:12}}>
-                    <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
-                      <thead><tr>{["","Dec-25","Sep-25","Jun-25","Mar-25"].map(h=><th key={h} style={{padding:"4px 6px",color:"var(--text-muted)",textAlign:"right",fontFamily:"var(--font-mono)"}}>{h}</th>)}</tr></thead>
-                      <tbody>
-                        {[["Promoters",d.ownership.promoter,"#8844ff"],["Mutual Funds",d.ownership.mutual_funds,"#ff8800"]].map(([label,data,color],i) => (
-                          <tr key={i} style={{borderTop:"1px solid var(--border-dim)"}}>
-                            <td style={{padding:"4px 6px",display:"flex",alignItems:"center",gap:4}}>
-                              <div style={{width:6,height:6,borderRadius:1,background:color}}/>{label}
-                            </td>
-                            {data.map((d,j)=><td key={j} style={{padding:"4px 6px",textAlign:"right",fontFamily:"var(--font-mono)"}}>{d.pct}%</td>)}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="card fade-in" style={{padding:16,textAlign:"center",color:"var(--text-muted)",fontSize:11}}>
-                Ownership data not available from current data sources
-              </div>
-            )}
-
-            {d.major_shareholders.length > 0 ? (
-              <div className="card fade-in">
-                <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
-                  fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>MAJOR SHAREHOLDERS</div>
-                <div style={{padding:8}}>
-                  {d.major_shareholders.map((s,i) => (
-                    <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",
-                      borderBottom:"1px solid var(--border-dim)",fontSize:11}}>
-                      <span style={{color:"var(--text-secondary)"}}>{s.name}</span>
-                      <span style={{fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-primary)"}}>{s.pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+          <div className="card fade-in">
+            <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>OWNERSHIP PATTERN</div>
+            <div style={{padding:12}}>
+              {d.ownership.promoter?.length > 0 ? (
+                <OwnershipBar ownership={d.ownership}/>
+              ) : (
+                <div style={{color:"var(--text-muted)",fontSize:11,textAlign:"center",padding:20}}>Ownership data not available</div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── SURVEILLANCE CHECKLIST ── */}
+        {/* SURVEILLANCE */}
         <div className="card fade-in" style={{marginBottom:16}}>
           <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between"}}>
             <span style={{fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>🛡 SURVEILLANCE CHECKLIST</span>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:13,fontWeight:700,color:d.surveillance.red_flag_count===0?"#00ff88":"#ffaa00"}}>
-                {d.surveillance.assessment}
+                {d.surveillance.red_flag_count === 0 ? "No Red Flags" : `${d.surveillance.red_flag_count} Caution Flag(s)`}
               </div>
-              <div style={{fontSize:9,color:"var(--text-muted)"}}>{d.surveillance.assessment_detail}</div>
+              <div style={{fontSize:9,color:"var(--text-muted)"}}>{d.surveillance.assessment_detail || "No obvious concerns with the stock. However, make sure you do the required fundamental & technical analysis before investing."}</div>
             </div>
           </div>
           <div style={{padding:12,display:"grid",gridTemplateColumns:"1fr",gap:2}}>
@@ -1453,66 +850,14 @@ const StockPage = () => {
                 <span style={{fontSize:16}}>{f.flagged?"🚩":"🟢"}</span>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* ── P&F + RENKO CHARTS ── */}
-        <div className="card fade-in" style={{marginBottom:16}}>
-          <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:11,fontWeight:700,fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>
-              {chartType==="pnf"?"POINT & FIGURE":"RENKO"} CHART
-            </span>
-            <div style={{display:"flex",gap:6,alignItems:"center"}}>
-              <div style={{display:"flex",gap:2,background:"var(--bg-secondary)",padding:2,borderRadius:4,border:"1px solid var(--border-dim)"}}>
-                {["pnf","renko"].map(t => (
-                  <button key={t} onClick={()=>setChartType(t)}
-                    style={{padding:"3px 10px",border:"none",borderRadius:3,fontSize:10,fontWeight:600,
-                      fontFamily:"var(--font-mono)",cursor:"pointer",
-                      background:chartType===t?"var(--accent-dim)":"transparent",
-                      color:chartType===t?"var(--accent)":"var(--text-muted)"}}>
-                    {t.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:2,background:"var(--bg-secondary)",padding:2,borderRadius:4,border:"1px solid var(--border-dim)"}}>
-                {[0.25, 0.5, 1, 3].map(pct => (
-                  <button key={pct} onClick={()=>setChartBoxPct(pct)}
-                    style={{padding:"3px 8px",border:"none",borderRadius:3,fontSize:10,fontWeight:600,
-                      fontFamily:"var(--font-mono)",cursor:"pointer",
-                      background:chartBoxPct===pct?"var(--accent-dim)":"transparent",
-                      color:chartBoxPct===pct?"var(--accent)":"var(--text-muted)"}}>
-                    {pct}%
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div style={{padding:12}}>
-            {chartType === "pnf"
-              ? <PnFChart prices={d.price_history} boxPct={chartBoxPct}/>
-              : <RenkoChart prices={d.price_history} boxPct={chartBoxPct}/>}
-          </div>
-        </div>
-
-        {/* ── MANAGEMENT TEAM ── */}
-        <div className="card fade-in" style={{marginBottom:16}}>
-          <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border-dim)",fontSize:11,fontWeight:700,
-            fontFamily:"var(--font-mono)",color:"var(--text-muted)",letterSpacing:1}}>MANAGEMENT TEAM</div>
-          <div style={{padding:8}}>
-            {d.management.map((m,i) => (
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"6px 10px",
-                borderBottom:"1px solid var(--border-dim)",fontSize:11}}>
-                <span style={{fontWeight:600,color:"var(--text-primary)"}}>{m.name}</span>
-                <span style={{color:"var(--text-muted)"}}>{m.designation}</span>
-              </div>
-            ))}
+            {d.surveillance.flags.length === 0 && <div style={{color:"var(--text-muted)",fontSize:11,textAlign:"center",padding:20}}>Surveillance data not available</div>}
           </div>
         </div>
 
         {/* Footer */}
         <div style={{padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",
           fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>
-          <span>TRADEDGE STOCK ANALYSIS • DATA VIA YFINANCE</span>
+          <span>TRADEDGE STOCK ANALYSIS • LIVE PRICE VIA YAHOO FINANCE</span>
           <a href="scanner.html" style={{color:"var(--accent)",textDecoration:"none"}}>← BACK TO SCANNER</a>
         </div>
       </div>
