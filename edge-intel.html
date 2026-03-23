@@ -2756,8 +2756,9 @@ const EdgeIntel=()=>{
             data.atr = atrData.atr;
             data.atr_pct = atrData.atr_pct;
             data.volatility = atrData.volatility;
-            data.swingLows = atrData.swingLows; // ← NEW: swing lows
-            if(!data.price) data.price = atrData.price;
+            data.swingLows = atrData.swingLows;
+            // ALWAYS use live price from Yahoo (overwrite stale JSON data)
+            if(atrData.price > 0) data.price = atrData.price;
             console.log('Live ATR + Swing Lows:', atrData);
           }
         }
