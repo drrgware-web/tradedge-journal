@@ -336,17 +336,29 @@ def quadrant(r, m):
 # =============================================================================
 def fetch_prices(symbols, period="5y"):
     log.info(f"Fetching {len(symbols)} symbols from Yahoo Finance...")
+    # Fallback periods: if 5y returns no data, try shorter periods
+    # This catches newer indices (e.g., Nifty EV launched 2022, Nifty Defence 2023)
+    FALLBACK_PERIODS = ["5y", "2y", "1y"]
     out = {}
     for sym in symbols:
-        try:
-            h = yf.Ticker(sym).history(period=period, interval="1d")
-            if h.empty or len(h) < 30:
-                log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows")
-                continue
-            out[sym] = {"closes": h['Close'].dropna().tolist(), "dates": [d.strftime("%Y-%m-%d") for d in h.index]}
-            log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days")
-        except Exception as e:
-            log.error(f"  ✗ {sym}: {e}")
+        fetched = False
+        for p in FALLBACK_PERIODS:
+            try:
+                h = yf.Ticker(sym).history(period=p, interval="1d")
+                if h.empty or len(h) < 30:
+                    if p == FALLBACK_PERIODS[-1]:
+                        log.warning(f"  ✗ {sym}: {len(h) if not h.empty else 0} rows (tried all periods)")
+                    continue
+                out[sym] = {"closes": h['Close'].dropna().tolist(), "dates": [d.strftime("%Y-%m-%d") for d in h.index]}
+                if p != "5y":
+                    log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days (fallback: {p})")
+                else:
+                    log.info(f"  ✓ {sym}: {len(out[sym]['closes'])} days")
+                fetched = True
+                break
+            except Exception as e:
+                if p == FALLBACK_PERIODS[-1]:
+                    log.error(f"  ✗ {sym}: {e}")
     log.info(f"  Total fetched: {len(out)}/{len(symbols)} symbols")
     return out
 
