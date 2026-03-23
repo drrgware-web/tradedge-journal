@@ -1530,17 +1530,121 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
           </div>
         </div>
         
-        {/* Current SL/Target if set */}
-        {(currentSL > 0 || currentTarget > 0) && <div style={{display:'flex',gap:8,marginBottom:12}}>
-          {currentSL > 0 && <div style={{flex:1,padding:'6px 10px',background:'rgba(255,68,85,0.1)',borderRadius:6,border:'1px solid rgba(255,68,85,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:9,color:'var(--red)'}}>SL</span>
-            <span style={{fontSize:11,fontWeight:700,color:'var(--red)',fontFamily:'var(--font-mono)'}}>₹{currentSL} ({((existingEntry-currentSL)/existingEntry*100).toFixed(1)}%)</span>
+        {/* Editable SL/Target for Position Management */}
+        <div style={{padding:12,background:'rgba(0,0,0,0.2)',borderRadius:8,marginBottom:12}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <span style={{fontSize:10,fontWeight:700,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>📊 POSITION SL & TARGET</span>
+            <button onClick={async()=>{
+              // Save SL/Target to Trade Log
+              const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+              const idx = trades.findIndex(t => (t.symbol||'').toUpperCase() === symbol.toUpperCase() && (t.status === 'Open' || t.status === 'Partial'));
+              if(idx >= 0) {
+                trades[idx].sl = currentSL;
+                trades[idx].target = currentTarget;
+                trades[idx].last_updated = new Date().toISOString();
+                localStorage.setItem('te_trades', JSON.stringify(trades));
+                
+                // Sync to Supabase
+                try {
+                  const SB_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+                  const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NDYwNzYsImV4cCI6MjA1ODEyMjA3Nn0.sHYFRy1U-oSVwVaLqPX1qSTBE5_sXCYCzPnC5Wrbdw';
+                  await fetch(`${SB_URL}/rest/v1/tradedge_trades`, {
+                    method: 'POST',
+                    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+                    body: JSON.stringify({ id: 'rahul_trades', trades_json: trades, updated_at: new Date().toISOString() })
+                  });
+                } catch(e) { console.log('Supabase sync failed:', e); }
+                
+                addToast(`✅ Saved SL: ₹${currentSL} | Target: ₹${currentTarget}`, 'success', 3000);
+              } else {
+                addToast('Position not found in Trade Log', 'error', 3000);
+              }
+            }} style={{padding:'4px 10px',fontSize:9,background:'rgba(0,255,136,0.2)',border:'1px solid var(--accent)',borderRadius:4,color:'var(--accent)',cursor:'pointer',fontWeight:700}}>
+              💾 Save
+            </button>
+          </div>
+          
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            {/* Stop Loss Input */}
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                <label style={{fontSize:9,color:'var(--red)',fontFamily:'var(--font-mono)'}}>STOP LOSS ₹</label>
+                <span style={{fontSize:9,color:'var(--red)',fontFamily:'var(--font-mono)'}}>
+                  {currentSL > 0 ? `${isShortPosition ? '+' : '-'}${Math.abs((existingEntry-currentSL)/existingEntry*100).toFixed(1)}%` : '--'}
+                </span>
+              </div>
+              <input 
+                type="number" 
+                value={currentSL || ''} 
+                onChange={e=>setCurrentSL(+e.target.value)} 
+                placeholder="Enter SL"
+                style={{width:'100%',padding:'8px 10px',background:'var(--bg-tertiary)',border:'1px solid rgba(255,68,85,0.3)',borderRadius:6,color:'var(--red)',fontSize:12,fontFamily:'var(--font-mono)'}}
+              />
+              {/* Quick SL suggestions based on ATR */}
+              <div style={{display:'flex',gap:4,marginTop:6}}>
+                {stockData?.atr && [1, 1.5, 2, 2.5].map(mult => {
+                  const slPrice = isShortPosition 
+                    ? +(existingEntry + (stockData.atr * mult)).toFixed(2)
+                    : +(existingEntry - (stockData.atr * mult)).toFixed(2);
+                  return (
+                    <button 
+                      key={mult}
+                      onClick={()=>setCurrentSL(slPrice)}
+                      style={{flex:1,padding:'3px',fontSize:8,background:currentSL===slPrice?'rgba(255,68,85,0.3)':'var(--bg-tertiary)',border:'1px solid rgba(255,68,85,0.2)',borderRadius:3,color:'var(--red)',cursor:'pointer'}}
+                    >
+                      {mult}×ATR
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Target Input */}
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                <label style={{fontSize:9,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>TARGET ₹</label>
+                <span style={{fontSize:9,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>
+                  {currentTarget > 0 ? `${isShortPosition ? '-' : '+'}${Math.abs((currentTarget-existingEntry)/existingEntry*100).toFixed(1)}%` : '--'}
+                </span>
+              </div>
+              <input 
+                type="number" 
+                value={currentTarget || ''} 
+                onChange={e=>setCurrentTarget(+e.target.value)} 
+                placeholder="Enter Target"
+                style={{width:'100%',padding:'8px 10px',background:'var(--bg-tertiary)',border:'1px solid rgba(0,255,136,0.3)',borderRadius:6,color:'var(--accent)',fontSize:12,fontFamily:'var(--font-mono)'}}
+              />
+              {/* Quick Target suggestions based on R:R */}
+              <div style={{display:'flex',gap:4,marginTop:6}}>
+                {currentSL > 0 && [1, 1.5, 2, 3].map(rr => {
+                  const risk = Math.abs(existingEntry - currentSL);
+                  const tgtPrice = isShortPosition
+                    ? +(existingEntry - (risk * rr)).toFixed(2)
+                    : +(existingEntry + (risk * rr)).toFixed(2);
+                  return (
+                    <button 
+                      key={rr}
+                      onClick={()=>setCurrentTarget(tgtPrice)}
+                      style={{flex:1,padding:'3px',fontSize:8,background:currentTarget===tgtPrice?'rgba(0,255,136,0.3)':'var(--bg-tertiary)',border:'1px solid rgba(0,255,136,0.2)',borderRadius:3,color:'var(--accent)',cursor:'pointer'}}
+                    >
+                      {rr}R
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          
+          {/* R:R Display */}
+          {currentSL > 0 && currentTarget > 0 && <div style={{marginTop:10,padding:'6px 10px',background:'rgba(136,68,255,0.1)',borderRadius:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:9,color:'var(--text-muted)'}}>Risk:Reward</span>
+            <span style={{fontSize:11,fontWeight:900,color:'#8844ff',fontFamily:'var(--font-mono)'}}>
+              1:{(Math.abs(currentTarget - existingEntry) / Math.abs(existingEntry - currentSL)).toFixed(2)}
+            </span>
+            <span style={{fontSize:9,color:'var(--red)'}}>Risk: ₹{(Math.abs(existingEntry - currentSL) * existingQty).toLocaleString()}</span>
+            <span style={{fontSize:9,color:'var(--accent)'}}>Reward: ₹{(Math.abs(currentTarget - existingEntry) * existingQty).toLocaleString()}</span>
           </div>}
-          {currentTarget > 0 && <div style={{flex:1,padding:'6px 10px',background:'rgba(0,255,136,0.1)',borderRadius:6,border:'1px solid rgba(0,255,136,0.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:9,color:'var(--accent)'}}>Target</span>
-            <span style={{fontSize:11,fontWeight:700,color:'var(--accent)',fontFamily:'var(--font-mono)'}}>₹{currentTarget} (+{((currentTarget-existingEntry)/existingEntry*100).toFixed(1)}%)</span>
-          </div>}
-        </div>}
+        </div>
         
         {/* Action Buttons */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
