@@ -30,19 +30,155 @@ log = logging.getLogger("rrm_fetcher")
 # NSE requires: (1) session cookies from homepage visit, (2) browser-like headers
 
 class NSEFetcher:
-    """Fetch index data directly from NSE India API with session management."""
+    """
+    Fetch NSE index data via TradEdge Cloudflare Worker proxy.
+    The worker handles NSE session cookies from Cloudflare's IP (not blocked).
+    """
     
-    BASE_URL = "https://www.nseindia.com"
-    API_URL = "https://www.nseindia.com/api"
+    # ── YOUR CLOUDFLARE WORKER URL ──
+    # Replace with your actual worker URL after deploying the nse-index-history action
+    WORKER_URL = os.environ.get(
+        "TRADEDGE_WORKER_URL",
+        "https://spring-fire-41a0.drrgware.workers.dev"
+    )
     
-    HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Referer": "https://www.nseindia.com/",
+    # Map yfinance ticker → NSE index name for API query
+    TICKER_TO_NSE_NAME = {
+        "NIFTY_CONSR_DURBL.NS":   "NIFTY CONSUMER DURABLES",
+        "NIFTY_HEALTHCARE.NS":    "NIFTY HEALTHCARE",
+        "NIFTY_OIL_AND_GAS.NS":   "NIFTY OIL & GAS",
+        "NIFTY_PHARMA.NS":        "NIFTY PHARMA",
+        "NIFTY_AUTO.NS":          "NIFTY AUTO",
+        "NIFTY_BANK.NS":          "NIFTY BANK",
+        "NIFTY_ENERGY.NS":        "NIFTY ENERGY",
+        "NIFTY_FMCG.NS":         "NIFTY FMCG",
+        "NIFTY_IT.NS":           "NIFTY IT",
+        "NIFTY_MEDIA.NS":        "NIFTY MEDIA",
+        "NIFTY_METAL.NS":        "NIFTY METAL",
+        "NIFTY_REALTY.NS":       "NIFTY REALTY",
+        "NIFTY_PSU_BANK.NS":     "NIFTY PSU BANK",
+        "NIFTY_PVT_BANK.NS":     "NIFTY PRIVATE BANK",
+        "NIFTY_CHEMICALS.NS":    "NIFTY CHEMICALS",
+        "NIFTY_CPSE.NS":         "NIFTY CPSE",
+        "NIFTY_IND_DIGITAL.NS":  "NIFTY INDIA DIGITAL",
+        "NIFTY_INDIA_MFG.NS":    "NIFTY INDIA MANUFACTURING",
+        "NIFTY_COMMODITIES.NS":  "NIFTY COMMODITIES",
+        "NIFTY_CONSUMPTION.NS":  "NIFTY CONSUMPTION",
+        "NIFTY_FIN_SERVICE.NS":  "NIFTY FINANCIAL SERVICES",
+        "NIFTY_GROWSECT_15.NS":  "NIFTY GROWTH SECTORS 15",
+        "NIFTY_INFRA.NS":        "NIFTY INFRASTRUCTURE",
+        "NIFTY_MNC.NS":          "NIFTY MNC",
+        "NIFTY_PSE.NS":          "NIFTY PSE",
+        "NIFTY_SERV_SECTOR.NS":  "NIFTY SERVICES SECTOR",
+        "NIFTY_IND_DEFENCE.NS":  "NIFTY INDIA DEFENCE",
+        "NIFTY_IND_TOURISM.NS":  "NIFTY INDIA TOURISM",
+        "NIFTY_CAPITAL_MKT.NS":  "NIFTY CAPITAL MARKETS",
+        "NIFTY_EV.NS":           "NIFTY EV & NEW AGE AUTOMOTIVE",
+        "NIFTY_HOUSING.NS":      "NIFTY HOUSING",
+        "NIFTY_COREHOUSING.NS":  "NIFTY CORE HOUSING",
+        "NIFTY_INTERNET.NS":     "NIFTY INTERNET",
+        "NIFTY_MOBILITY.NS":     "NIFTY MOBILITY",
+        "NIFTY_RURAL.NS":        "NIFTY RURAL",
+        "NIFTY_WAVES.NS":        "NIFTY WAVES",
+        "NIFTY_FIN_SRV_25_50.NS": "NIFTY FINANCIAL SERVICES 25/50",
+        "NIFTY_FINSRV_EX_BANK.NS": "NIFTY FINANCIAL SERVICES EX-BANK",
+        "NIFTY_MS_FIN_SERV.NS":  "NIFTY MIDSMALL FINANCIAL SERVICES",
+        "NIFTY_MS_IT_TELECOM.NS": "NIFTY MIDSMALL IT & TELECOM",
+        "NIFTY_MS_IND_CONS.NS":  "NIFTY MIDSMALL INDIA CONSUMPTION",
+        "NIFTY_MIDSML_HLTH.NS":  "NIFTY MIDSMALL HEALTHCARE",
+        "NIFTY_NEW_CONSUMP.NS":  "NIFTY NEW AGE CONSUMPTION",
+        "NIFTY_NONCYC_CONS.NS":  "NIFTY NON-CYCLICAL CONSUMER",
+        "NIFTY_TRANS_LOGIS.NS":  "NIFTY TRANSPORTATION & LOGISTICS",
+        "NIFTY_INFRA_LOG.NS":    "NIFTY INFRASTRUCTURE & LOGISTICS",
+        "NIFTY_CORP_MAATR.NS":   "NIFTY CORPORATE MAATR",
+        "NIFTY_TELECOM.NS":      "NIFTY TELECOM",
     }
+    
+    def __init__(self):
+        self._min_delay = 0.3
+        self._last_request_time = 0
+    
+    def _rate_limit(self):
+        elapsed = time.time() - self._last_request_time
+        if elapsed < self._min_delay:
+            time.sleep(self._min_delay - elapsed)
+        self._last_request_time = time.time()
+    
+    def fetch_index_history(self, ticker, years=5):
+        """Fetch historical data via Cloudflare Worker proxy."""
+        import urllib.request
+        
+        nse_name = self.TICKER_TO_NSE_NAME.get(ticker)
+        if not nse_name:
+            nse_name = ticker.replace(".NS", "").replace("_", " ")
+            log.info(f"NSE Proxy: No exact mapping for {ticker}, trying '{nse_name}'")
+        
+        to_date = datetime.now()
+        from_date = to_date - timedelta(days=years * 365)
+        
+        all_closes = []
+        all_dates = []
+        
+        # Chunk into 1-year requests (NSE API limitation)
+        chunk_start = from_date
+        while chunk_start < to_date:
+            chunk_end = min(chunk_start + timedelta(days=365), to_date)
+            
+            payload = json.dumps({
+                "index": nse_name,
+                "from": chunk_start.strftime("%d-%m-%Y"),
+                "to": chunk_end.strftime("%d-%m-%Y"),
+            }).encode("utf-8")
+            
+            try:
+                self._rate_limit()
+                req = urllib.request.Request(
+                    self.WORKER_URL,
+                    data=payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Kite-Action": "nse-index-history",
+                    },
+                    method="POST"
+                )
+                
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    result = json.loads(resp.read().decode("utf-8"))
+                
+                records = result.get("data", [])
+                for rec in records:
+                    date_str = rec.get("date", "")
+                    close_val = rec.get("close", 0)
+                    if date_str and close_val:
+                        # Parse NSE date formats
+                        for fmt in ["%d-%b-%Y", "%d-%m-%Y", "%d %b %Y", "%Y-%m-%d"]:
+                            try:
+                                dt = datetime.strptime(date_str.strip(), fmt)
+                                all_dates.append(dt.strftime("%Y-%m-%d"))
+                                all_closes.append(float(close_val))
+                                break
+                            except ValueError:
+                                continue
+                
+                if records:
+                    log.info(f"  Worker ✓ {ticker} chunk: {len(records)} records")
+                    
+            except Exception as e:
+                log.warning(f"  Worker ✗ {ticker} chunk failed: {e}")
+            
+            chunk_start = chunk_end + timedelta(days=1)
+        
+        if not all_closes:
+            return None
+        
+        # Sort + deduplicate
+        pairs = sorted(set(zip(all_dates, all_closes)), key=lambda x: x[0])
+        
+        log.info(f"  Worker ✓ {ticker}: {len(pairs)} days total")
+        return {
+            "closes": [p[1] for p in pairs],
+            "dates": [p[0] for p in pairs],
+        }
     
     # Map yfinance ticker → NSE index name for API query
     # NSE API uses index names like "NIFTY HEALTHCARE" not ticker symbols
@@ -75,215 +211,7 @@ class NSEFetcher:
         "NIFTY_SERV_SECTOR.NS":  "NIFTY SERVICES SECTOR",
         "NIFTY_IND_DEFENCE.NS":  "NIFTY INDIA DEFENCE",
         "NIFTY_IND_TOURISM.NS":  "NIFTY INDIA TOURISM",
-        "NIFTY_CAPITAL_MKT.NS":  "NIFTY FINANCIAL SERVICES 25/50",  # Check actual name
-        "NIFTY_EV.NS":           "NIFTY EV & NEW AGE AUTOMOTIVE",
-        "NIFTY_HOUSING.NS":      "NIFTY HOUSING",
-        "NIFTY_COREHOUSING.NS":  "NIFTY CORE HOUSING",
-        "NIFTY_INTERNET.NS":     "NIFTY INTERNET",  
-        "NIFTY_MOBILITY.NS":     "NIFTY MOBILITY",
-        "NIFTY_RURAL.NS":        "NIFTY RURAL",
-        "NIFTY_WAVES.NS":        "NIFTY WAVES",
-        "NIFTY_FIN_SRV_25_50.NS": "NIFTY FINANCIAL SERVICES 25/50",
-        "NIFTY_FINSRV_EX_BANK.NS": "NIFTY FINANCIAL SERVICES EX-BANK",
-        "NIFTY_MS_FIN_SERV.NS":  "NIFTY MIDSMALL FINANCIAL SERVICES",
-        "NIFTY_MS_IT_TELECOM.NS": "NIFTY MIDSMALL IT & TELECOM",
-        "NIFTY_MS_IND_CONS.NS":  "NIFTY MIDSMALL INDIA CONSUMPTION",
-        "NIFTY_MIDSML_HLTH.NS":  "NIFTY MIDSMALL HEALTHCARE",
-        "NIFTY_NEW_CONSUMP.NS":  "NIFTY NEW AGE CONSUMPTION",  
-        "NIFTY_NONCYC_CONS.NS":  "NIFTY NON-CYCLICAL CONSUMER",
-        "NIFTY_TRANS_LOGIS.NS":  "NIFTY TRANSPORTATION & LOGISTICS",
-        "NIFTY_INFRA_LOG.NS":    "NIFTY INFRASTRUCTURE & LOGISTICS",  
-        "NIFTY_CORP_MAATR.NS":   "NIFTY CORPORATE MAATR",  
-        "NIFTY_TELECOM.NS":      "NIFTY TELECOM",
-        "NIFTY_CAPITAL_MKT.NS":  "NIFTY CAPITAL MARKETS",
     }
-    
-    def __init__(self):
-        self._session = None
-        self._cookies_fetched = False
-        self._last_request_time = 0
-        self._min_delay = 0.5  # seconds between requests
-    
-    def _get_session(self):
-        """Get or create a requests session with NSE cookies."""
-        if self._session and self._cookies_fetched:
-            return self._session
-        
-        try:
-            import requests
-            self._session = requests.Session()
-            self._session.headers.update(self.HEADERS)
-            
-            # Step 1: Hit homepage to get cookies (nseappid, nsit, bm_sv etc.)
-            log.info("NSE API: Establishing session (fetching cookies)...")
-            resp = self._session.get(self.BASE_URL, timeout=15)
-            resp.raise_for_status()
-            
-            # Step 2: Hit a lightweight API endpoint to validate session
-            resp2 = self._session.get(
-                f"{self.API_URL}/allIndices", 
-                timeout=15,
-                headers={**self.HEADERS, "Referer": f"{self.BASE_URL}/market-data/live-equity-market"}
-            )
-            if resp2.status_code == 200:
-                self._cookies_fetched = True
-                log.info("NSE API: Session established successfully")
-            else:
-                log.warning(f"NSE API: Session validation returned {resp2.status_code}")
-                self._cookies_fetched = True  # Try anyway
-            
-            return self._session
-        except ImportError:
-            log.error("NSE API: 'requests' library not installed. pip install requests")
-            return None
-        except Exception as e:
-            log.error(f"NSE API: Session setup failed: {e}")
-            return None
-    
-    def _rate_limit(self):
-        """Ensure minimum delay between NSE requests."""
-        elapsed = time.time() - self._last_request_time
-        if elapsed < self._min_delay:
-            time.sleep(self._min_delay - elapsed)
-        self._last_request_time = time.time()
-    
-    def fetch_index_history(self, ticker, years=5, max_retries=3):
-        """
-        Fetch historical closing prices for an NSE index.
-        
-        NSE API endpoint: /api/equity-stockIndices?index=NIFTY+HEALTHCARE
-        For historical: /api/historical/indicesHistory?indexType=NIFTY+HEALTHCARE&from=01-01-2020&to=01-01-2025
-        
-        Returns: {"closes": [...], "dates": [...]} or None
-        """
-        session = self._get_session()
-        if not session:
-            return None
-        
-        nse_name = self.TICKER_TO_NSE_NAME.get(ticker)
-        if not nse_name:
-            # Try auto-conversion: NIFTY_PHARMA.NS → NIFTY PHARMA
-            name_guess = ticker.replace(".NS", "").replace("_", " ")
-            log.info(f"NSE API: No exact mapping for {ticker}, trying '{name_guess}'")
-            nse_name = name_guess
-        
-        # Build date range
-        to_date = datetime.now()
-        from_date = to_date - timedelta(days=years * 365)
-        
-        # NSE limits to ~1 year per request, so chunk it
-        all_closes = []
-        all_dates = []
-        
-        chunk_start = from_date
-        while chunk_start < to_date:
-            chunk_end = min(chunk_start + timedelta(days=365), to_date)
-            
-            from_str = chunk_start.strftime("%d-%m-%Y")
-            to_str = chunk_end.strftime("%d-%m-%Y")
-            
-            url = (
-                f"{self.API_URL}/historical/indicesHistory"
-                f"?indexType={nse_name.replace(' ', '+').replace('&', '%26')}"
-                f"&from={from_str}&to={to_str}"
-            )
-            
-            for attempt in range(max_retries):
-                try:
-                    self._rate_limit()
-                    resp = session.get(
-                        url, 
-                        timeout=20,
-                        headers={
-                            **self.HEADERS, 
-                            "Referer": f"{self.BASE_URL}/market-data/live-equity-market"
-                        }
-                    )
-                    
-                    if resp.status_code == 401 or resp.status_code == 403:
-                        # Session expired — refresh cookies
-                        log.warning(f"NSE API: {resp.status_code} — refreshing session...")
-                        self._cookies_fetched = False
-                        session = self._get_session()
-                        if not session:
-                            return None
-                        continue
-                    
-                    if resp.status_code == 429:
-                        # Rate limited — exponential backoff
-                        wait = 2 ** (attempt + 1)
-                        log.warning(f"NSE API: Rate limited, waiting {wait}s...")
-                        time.sleep(wait)
-                        continue
-                    
-                    if resp.status_code != 200:
-                        log.warning(f"NSE API: {ticker} got {resp.status_code}")
-                        break
-                    
-                    data = resp.json()
-                    records = data.get("data", {}).get("indexCloseOnlineRecords", [])
-                    if not records:
-                        records = data.get("data", {}).get("indexTurnoverRecords", [])
-                    
-                    if records:
-                        for rec in records:
-                            # NSE returns records like:
-                            # {"EOD_TIMESTAMP": "17-Mar-2025", "EOD_CLOSE_INDEX_VAL": "12345.67", ...}
-                            # or: {"TIMESTAMP": "17-Mar-2025", "CLOSE": "12345.67"}
-                            date_str = rec.get("EOD_TIMESTAMP") or rec.get("TIMESTAMP") or rec.get("HistoricalDate")
-                            close_val = rec.get("EOD_CLOSE_INDEX_VAL") or rec.get("CLOSE") or rec.get("CloseValue")
-                            
-                            if date_str and close_val:
-                                try:
-                                    # Parse various NSE date formats
-                                    for fmt in ["%d-%b-%Y", "%d-%m-%Y", "%d %b %Y", "%Y-%m-%d"]:
-                                        try:
-                                            dt = datetime.strptime(date_str.strip(), fmt)
-                                            break
-                                        except ValueError:
-                                            continue
-                                    else:
-                                        continue
-                                    
-                                    close_float = float(str(close_val).replace(",", ""))
-                                    all_dates.append(dt.strftime("%Y-%m-%d"))
-                                    all_closes.append(close_float)
-                                except (ValueError, AttributeError):
-                                    continue
-                        
-                        log.info(f"  NSE API: {ticker} chunk {from_str}→{to_str}: {len(records)} records")
-                    break  # Success
-                    
-                except Exception as e:
-                    if attempt < max_retries - 1:
-                        wait = 2 ** (attempt + 1)
-                        log.warning(f"NSE API: {ticker} attempt {attempt+1} failed: {e}, retrying in {wait}s")
-                        time.sleep(wait)
-                    else:
-                        log.error(f"NSE API: {ticker} all retries failed: {e}")
-            
-            chunk_start = chunk_end + timedelta(days=1)
-        
-        if not all_closes:
-            return None
-        
-        # Sort by date (NSE sometimes returns reverse order)
-        pairs = sorted(zip(all_dates, all_closes), key=lambda x: x[0])
-        all_dates = [p[0] for p in pairs]
-        all_closes = [p[1] for p in pairs]
-        
-        # Deduplicate dates
-        seen = set()
-        deduped_dates = []
-        deduped_closes = []
-        for d, c in zip(all_dates, all_closes):
-            if d not in seen:
-                seen.add(d)
-                deduped_dates.append(d)
-                deduped_closes.append(c)
-        
-        log.info(f"  NSE API ✓ {ticker}: {len(deduped_closes)} days total")
-        return {"closes": deduped_closes, "dates": deduped_dates}
 
 # Global NSE fetcher instance (lazy init)
 _nse_fetcher = None
