@@ -1,0 +1,67 @@
+# .github/workflows/shareholding-weekly.yml
+# Updates shareholding QoQ data from Screener.in weekly
+
+name: Weekly Shareholding Update
+
+on:
+  schedule:
+    # Run every Saturday at 6:00 AM IST (12:30 AM UTC)
+    - cron: '30 0 * * 6'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Number of stocks to update (0 for all)'
+        required: false
+        default: '100'
+
+jobs:
+  update-shareholding:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4
+      
+      - name: Run shareholding fetcher
+        run: |
+          LIMIT="${{ github.event.inputs.limit || '100' }}"
+          if [ "$LIMIT" = "0" ]; then
+            python scripts/shareholding_fetcher.py --all
+          else
+            python scripts/shareholding_fetcher.py --limit $LIMIT
+          fi
+      
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add all updated stock JSON files
+          git add data/stock_details/*.json
+          git add data/shareholding_cache.json || true
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "📊 Update shareholding QoQ data [$(date +'%Y-%m-%d')]"
+            git push
+          fi
+      
+      - name: Summary
+        run: |
+          echo "## Shareholding Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stocks processed**: Check logs for details" >> $GITHUB_STEP_SUMMARY

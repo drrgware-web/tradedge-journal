@@ -1,194 +1,69 @@
-# TradEdge Scanner Daily Workflow v2.0
-# Runs Mon-Fri at 5:30 PM IST (12:00 UTC)
-# Generates complete stock details: technicals + fundamentals + O'Neil + guru + surveillance
+# .github/workflows/scanner-daily.yml
+# Daily stock scanner workflow with shareholding updates
 
-name: Scanner Daily
+name: Daily Scanner
 
 on:
   schedule:
-    # 5:30 PM IST = 12:00 UTC
+    # Run Mon-Fri at 5:30 PM IST (12:00 PM UTC)
     - cron: '0 12 * * 1-5'
   workflow_dispatch:
-    inputs:
-      mode:
-        description: 'Run mode'
-        required: false
-        default: 'full'
-        type: choice
-        options:
-          - full           # All stocks (may take 3-4 hours)
-          - top500         # Top 500 by volume (~30 min)
-          - priority       # Priority stocks only (~10 min)
-          - test           # First 10 stocks (testing)
-      batch:
-        description: 'Batch number (for parallel runs)'
-        required: false
-        default: '0'
-        type: string
-      total_batches:
-        description: 'Total batches (for parallel runs)'
-        required: false
-        default: '1'
-        type: string
 
 jobs:
-  generate-stock-details:
+  run-scanner:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6 hour max
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
-          
-      - name: Setup Python
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
-          
+      
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install requests pandas numpy yfinance
-          
-      - name: Create data directories
+          pip install requests beautifulsoup4 yfinance pandas numpy
+      
+      - name: Run main scanner
         run: |
-          mkdir -p data/stock_details
-          mkdir -p logs
-          
-      - name: Determine run mode
-        id: mode
+          python scripts/scanner_runner.py
+      
+      - name: Update shareholding for scan results (top 50)
         run: |
-          MODE="${{ github.event.inputs.mode || 'top500' }}"
-          BATCH="${{ github.event.inputs.batch || '0' }}"
-          TOTAL="${{ github.event.inputs.total_batches || '1' }}"
-          
-          # For scheduled runs, default to top500
-          if [ "${{ github.event_name }}" == "schedule" ]; then
-            MODE="top500"
+          if [ -f "scripts/shareholding_fetcher.py" ]; then
+            python scripts/shareholding_fetcher.py --limit 50
+          else
+            echo "Shareholding fetcher not found, skipping..."
           fi
-          
-          echo "mode=$MODE" >> $GITHUB_OUTPUT
-          echo "batch=$BATCH" >> $GITHUB_OUTPUT
-          echo "total=$TOTAL" >> $GITHUB_OUTPUT
-          echo "Running in $MODE mode (batch $BATCH of $TOTAL)"
-          
-      # PHASE 1: Fetch Yahoo Finance technical data
-      - name: Phase 1 - Fetch Technical Data
-        run: |
-          echo "=== PHASE 1: Technical Data ==="
-          python scripts/scanner_fetcher.py --mode ${{ steps.mode.outputs.mode }}
-          
-      # PHASE 2: Generate complete stock details (fundamentals + scores)
-      - name: Phase 2 - Generate Stock Details
-        env:
-          SCREENER_DELAY: "0.5"
-        run: |
-          echo "=== PHASE 2: Stock Details ==="
-          MODE="${{ steps.mode.outputs.mode }}"
-          BATCH="${{ steps.mode.outputs.batch }}"
-          TOTAL="${{ steps.mode.outputs.total }}"
-          
-          ARGS=""
-          
-          case $MODE in
-            "full")
-              # Full run - all stocks
-              if [ "$BATCH" != "0" ] && [ "$TOTAL" != "1" ]; then
-                ARGS="--batch $BATCH --total $TOTAL"
-              fi
-              ;;
-            "top500")
-              ARGS="--top 500"
-              ;;
-            "priority")
-              ARGS="--top 100"
-              ;;
-            "test")
-              ARGS="--test"
-              ;;
-          esac
-          
-          python scripts/stock_detail_generator.py $ARGS 2>&1 | tee logs/detail_generator.log
-          
-      # PHASE 3: Generate scanner results summary
-      - name: Phase 3 - Generate Scanner Results
-        run: |
-          echo "=== PHASE 3: Scanner Results ==="
-          python scripts/generate_scanner_summary.py 2>&1 | tee logs/scanner_summary.log
-          
-      # PHASE 4: Generate scan preset results
-      - name: Phase 4 - Generate Scan Presets
-        run: |
-          echo "=== PHASE 4: Scan Presets ==="
-          python scripts/scan_presets.py 2>&1 | tee logs/scan_presets.log
-          
-      # PHASE 5: Run ChartInk-style scans
-      - name: Phase 5 - ChartInk Scans
-        run: |
-          echo "=== PHASE 5: ChartInk Scans ==="
-          python scripts/chartink_scanner.py 2>&1 | tee logs/chartink_scans.log
-          
-      - name: Commit and push data
+      
+      - name: Commit and push changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Add all generated data (only if files exist)
-          git add data/stock_details/*.json 2>/dev/null || true
-          git add data/scanner_results.json 2>/dev/null || true
-          git add data/scan_presets_results.json 2>/dev/null || true
-          git add data/chartink_results.json 2>/dev/null || true
-          git add logs/*.log 2>/dev/null || true
+          # Add all data files
+          git add data/*.json
+          git add data/stock_details/*.json || true
+          git add data/shareholding_cache.json || true
           
-          # Count updated files
-          UPDATED=$(git diff --cached --name-only | wc -l)
-          
-          if [ "$UPDATED" -gt 0 ]; then
-            TIMESTAMP=$(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M IST')
-            MODE="${{ steps.mode.outputs.mode }}"
-            git commit -m "📊 Scanner update ($MODE): $TIMESTAMP - $UPDATED files"
-            
-            # Pull latest changes and rebase, then push (handles concurrent updates)
-            git pull --rebase origin main || true
-            git push
-            echo "✅ Pushed $UPDATED files"
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
           else
-            echo "⚠️ No changes to commit"
+            git commit -m "📈 Daily scanner update [$(date +'%Y-%m-%d')]"
+            git push
           fi
-          
+      
       - name: Summary
         run: |
-          echo "=== SCANNER RUN COMPLETE ==="
-          echo "Mode: ${{ steps.mode.outputs.mode }}"
-          echo "Stock details generated: $(ls data/stock_details/*.json 2>/dev/null | wc -l)"
-          if [ -f data/scanner_results.json ]; then
-            echo "Scanner results generated successfully"
+          echo "## Daily Scanner Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          if [ -f "data/scanner_results.json" ]; then
+            TOTAL=$(jq '.all_stocks | length' data/scanner_results.json 2>/dev/null || echo "N/A")
+            echo "- **Total stocks scanned**: $TOTAL" >> $GITHUB_STEP_SUMMARY
           fi
-          if [ -f data/scan_presets_results.json ]; then
-            echo "Scan presets generated successfully"
-          fi
-          if [ -f data/chartink_results.json ]; then
-            echo "ChartInk scans generated successfully"
-          fi
-
-
-  # Optional: Parallel batch processing for full runs
-  # Uncomment to enable 5-way parallel processing
-  #
-  # batch-1:
-  #   uses: ./.github/workflows/scanner-daily.yml
-  #   with:
-  #     mode: full
-  #     batch: '1'
-  #     total_batches: '5'
-  #
-  # batch-2:
-  #   uses: ./.github/workflows/scanner-daily.yml
-  #   with:
-  #     mode: full
-  #     batch: '2'
-  #     total_batches: '5'
-  # ... etc
