@@ -655,62 +655,88 @@ class ScanEngine:
             "sector": stock.get("sector", ""),
         }
         
-        # Technical data
+        # Technical data - your structure has nested 'indicators' and 'returns'
         tech = stock.get("technical", {})
+        indicators = tech.get("indicators", {})
+        returns = tech.get("returns", {})
+        
+        # Also check root-level fields (your data has some at root level)
         flat.update({
-            "close": tech.get("close", 0),
+            "close": tech.get("close", 0) or stock.get("price", 0),
             "open": tech.get("open", 0),
             "high": tech.get("high", 0),
             "low": tech.get("low", 0),
             "prev_close": tech.get("prev_close", 0),
             "volume": tech.get("volume", 0),
-            "volume_ratio": tech.get("volume_ratio", 1),
-            "change_pct": tech.get("change_pct", 0),
-            "gap_pct": tech.get("gap_pct", 0),
-            "rsi": tech.get("rsi", 50),
-            "sma_10": tech.get("sma_10", 0),
-            "sma_20": tech.get("sma_20", 0),
-            "sma_50": tech.get("sma_50", 0),
-            "sma_200": tech.get("sma_200", 0),
-            "high_52w": tech.get("high_52w", 0),
-            "low_52w": tech.get("low_52w", 0),
-            "high_52w_proximity": tech.get("high_52w_proximity", 0),
-            "low_52w_proximity": tech.get("low_52w_proximity", 0),
-            "high_20d": tech.get("high_20d", 0),
-            "low_20d": tech.get("low_20d", 0),
-            "volatility_10d": tech.get("volatility_10d", 0),
-            "volatility_20d": tech.get("volatility_20d", 0),
-            "volatility_50d": tech.get("volatility_50d", 0),
-            "range_5d_pct": tech.get("range_5d_pct", 0),
-            "range_10d_pct": tech.get("range_10d_pct", 0),
-            "range_20d_pct": tech.get("range_20d_pct", 0),
-            "is_inside_bar": tech.get("is_inside_bar", False),
-            "is_nr7": tech.get("is_nr7", False),
+            "avg_volume": tech.get("avg_volume", 0),
+            "market_cap": tech.get("market_cap", 0),
+            "change_pct": tech.get("change_pct", 0) or stock.get("change_pct", 0),
+            
+            # SMAs from indicators
+            "sma_10": indicators.get("sma_10", 0),
+            "sma_20": indicators.get("sma_20", 0),
+            "sma_50": indicators.get("sma_50", 0),
+            "sma_200": indicators.get("sma_200", 0),
+            "rsi": indicators.get("rsi", 0) or stock.get("rsi", 50),
+            "volatility_30d": indicators.get("volatility_30d", 0),
+            "above_sma_20": indicators.get("above_sma_20", False),
+            "above_sma_50": indicators.get("above_sma_50", False),
+            "above_sma_200": indicators.get("above_sma_200", False),
+            
+            # 52W data
+            "high_52w": tech.get("high_52w", 0) or stock.get("breakout", {}).get("high_52w", 0),
+            "low_52w": tech.get("low_52w", 0) or stock.get("breakout", {}).get("low_52w", 0),
         })
         
-        # Returns
-        returns = tech.get("returns", {})
+        # Calculate proximity percentages
+        close = flat["close"] or 0
+        high_52w = flat["high_52w"] or 0
+        low_52w = flat["low_52w"] or 0
+        
+        if high_52w > 0 and close > 0:
+            flat["high_52w_proximity"] = (close / high_52w) * 100
+            flat["pct_from_high"] = ((close - high_52w) / high_52w) * 100
+        else:
+            flat["high_52w_proximity"] = 0
+            flat["pct_from_high"] = 0
+            
+        if low_52w > 0 and close > 0 and high_52w > low_52w:
+            flat["low_52w_proximity"] = ((close - low_52w) / (high_52w - low_52w)) * 100
+        else:
+            flat["low_52w_proximity"] = 0
+        
+        # Volume data from root level
+        vol_data = stock.get("volume", {})
+        if isinstance(vol_data, dict):
+            flat["volume_ratio"] = vol_data.get("ratio", 1)
+            flat["volume"] = vol_data.get("latest", 0) or flat.get("volume", 0)
+            flat["avg_volume"] = vol_data.get("avg_20d", 0) or flat.get("avg_volume", 0)
+        
+        # Returns - check both locations
+        root_returns = stock.get("returns", {})
         flat.update({
-            "return_1d": returns.get("1d", 0),
-            "return_1w": returns.get("1w", 0),
-            "return_1m": returns.get("1m", 0),
-            "return_3m": returns.get("3m", 0),
-            "return_6m": returns.get("6m", 0),
-            "return_1y": returns.get("1y", 0),
+            "return_1d": returns.get("1d", 0) or root_returns.get("1d", 0),
+            "return_1w": returns.get("1w", 0) or root_returns.get("1w", 0),
+            "return_1m": returns.get("1m", 0) or root_returns.get("1m", 0),
+            "return_3m": returns.get("3m", 0) or root_returns.get("3m", 0),
+            "return_6m": returns.get("6m", 0) or root_returns.get("6m", 0),
+            "return_1y": returns.get("1y", 0) or root_returns.get("1y", 0),
         })
         
-        # Fundamentals
+        # Fundamentals - check both locations
         fund = stock.get("fundamentals", {})
         flat.update({
-            "market_cap": fund.get("market_cap", 0),
-            "pe": fund.get("pe", 0),
-            "pb": fund.get("pb", 0),
-            "roe": fund.get("roe", 0),
-            "roce": fund.get("roce", 0),
-            "debt_equity": fund.get("debt_equity", 0),
+            "market_cap_cr": fund.get("market_cap_cr", 0),
+            "pe": fund.get("pe_ratio", 0) or fund.get("pe", 0),
+            "pb": fund.get("pb_ratio", 0) or fund.get("pb", 0),
+            "roe": fund.get("roe", 0) or 0,  # Can be null
+            "roce": fund.get("roce", 0) or 0,
+            "debt_equity": fund.get("debt_to_equity", 0) or fund.get("debt_equity", 0) or 0,
             "eps": fund.get("eps", 0),
             "book_value": fund.get("book_value", 0),
             "dividend_yield": fund.get("dividend_yield", 0),
+            "revenue_growth": fund.get("revenue_growth", 0),
+            "profit_margin": fund.get("profit_margin", 0),
         })
         
         # O'Neil scores
@@ -727,17 +753,36 @@ class ScanEngine:
         # Surveillance
         surv = stock.get("surveillance", {})
         flat.update({
-            "surveillance_status": surv.get("status", "-"),
-            "risk_score": surv.get("risk_score", 0),
+            "surveillance_status": "SAFE" if surv.get("red_flag_count", 0) == 0 else "CAUTION",
+            "red_flag_count": surv.get("red_flag_count", 0),
         })
         
-        # Ownership
-        own = stock.get("ownership", {})
+        # Ownership / Fund holdings
+        fund_hold = stock.get("fund_holdings", {})
         flat.update({
-            "promoter_holding": own.get("promoter", 0),
-            "fii_holding": own.get("fii", 0),
-            "dii_holding": own.get("dii", 0),
+            "promoter_holding": fund_hold.get("promoter_pct", 0),
+            "fii_holding": fund_hold.get("fii_pct", 0),
+            "dii_holding": fund_hold.get("dii_pct", 0),
+            "institutional_holding": fund_hold.get("institutional_pct", 0),
+            "mf_holding": fund_hold.get("mf_holding_pct", 0),
         })
+        
+        # EMA data from root level
+        ema_data = stock.get("ema", {})
+        if isinstance(ema_data, dict):
+            flat["ema_50"] = ema_data.get("ema50", 0)
+            flat["ema_200"] = ema_data.get("ema200", 0)
+        
+        # Breakout data
+        breakout = stock.get("breakout", {})
+        if isinstance(breakout, dict):
+            flat["breakout_signal"] = breakout.get("signal", "none")
+        
+        # MACD data
+        macd = stock.get("macd", {})
+        if isinstance(macd, dict):
+            flat["macd_crossover"] = macd.get("crossover", "")
+            flat["macd_histogram"] = macd.get("histogram", 0)
         
         return flat
     
