@@ -1,107 +1,172 @@
-name: "TradEdge Scanner - Daily Scan"
+# TradEdge Scanner Daily Workflow v2.0
+# Runs Mon-Fri at 5:30 PM IST (12:00 UTC)
+# Generates complete stock details: technicals + fundamentals + O'Neil + guru + surveillance
+
+name: Scanner Daily
 
 on:
   schedule:
-    - cron: "0 12 * * 1-5"  # 5:30 PM IST Mon-Fri
+    # 5:30 PM IST = 12:00 UTC
+    - cron: '0 12 * * 1-5'
   workflow_dispatch:
     inputs:
       mode:
-        description: "Run mode"
+        description: 'Run mode'
         required: false
+        default: 'full'
         type: choice
-        options: [full, quick, alerts-only, digest-only]
-        default: full
-      stock:
-        description: "Single stock to process (leave empty for all)"
+        options:
+          - full           # All stocks (may take 3-4 hours)
+          - top500         # Top 500 by volume (~30 min)
+          - priority       # Priority stocks only (~10 min)
+          - test           # First 10 stocks (testing)
+      batch:
+        description: 'Batch number (for parallel runs)'
         required: false
+        default: '0'
+        type: string
+      total_batches:
+        description: 'Total batches (for parallel runs)'
+        required: false
+        default: '1'
         type: string
 
-permissions:
-  contents: write
-
 jobs:
-  scan:
+  generate-stock-details:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360  # 6 hour max
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
       - name: Install dependencies
-        run: pip install yfinance pandas numpy requests
-
-      - name: Build symbol list (if missing)
         run: |
-          [ -f scripts/nse_symbols.json ] || python scripts/build_symbol_list.py
-
-      - name: Run Data Pipeline
-        if: inputs.mode != 'alerts-only' && inputs.mode != 'digest-only'
-        run: |
-          ARGS=""
-          [ "${{ inputs.mode }}" = "quick" ] && ARGS="--quick"
-          [ -n "${{ inputs.stock }}" ] && ARGS="$ARGS --stock ${{ inputs.stock }}"
-          python scripts/generate_data.py $ARGS
-        env:
-          PYTHONUNBUFFERED: "1"
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-
-      - name: Send Telegram Alerts
-        if: inputs.mode != 'digest-only'
-        run: python scripts/scanner_alerts.py
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
-      - name: Send Daily Digest Only
-        if: inputs.mode == 'digest-only'
-        run: python scripts/scanner_alerts.py --digest
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
-      - name: Debug - List generated files
-        run: |
-          echo "=== Files in data/ ==="
-          ls -la data/ 2>/dev/null || echo "data/ folder not found"
-          echo ""
-          echo "=== JSON files ==="
-          find data/ -name "*.json" -not -name ".gitkeep*" 2>/dev/null | head -20
-          echo ""
-          echo "=== Stock details count ==="
-          ls data/stock_details/*.json 2>/dev/null | wc -l || echo "0"
-          echo ""
-          echo "=== scanner_results.json size ==="
-          wc -c data/scanner_results.json 2>/dev/null || echo "File not found!"
-
-      - name: Commit and push
-        run: |
-          git config user.name "TradEdge Scanner Bot"
-          git config user.email "scanner@tradedge.bot"
+          pip install --upgrade pip
+          pip install requests pandas numpy yfinance
           
-          # Force add all data files (in case .gitignore blocks them)
-          git add -f data/scanner_results.json 2>/dev/null || true
-          git add -f data/scan_runs.json 2>/dev/null || true
-          git add -f data/sector_heatmap.json 2>/dev/null || true
-          git add -f data/sector_analysis.json 2>/dev/null || true
-          git add -f data/circuit_limits.json 2>/dev/null || true
-          git add -f data/earnings_calendar.json 2>/dev/null || true
-          git add -f data/alert_state.json 2>/dev/null || true
-          git add -f data/stock_details/ 2>/dev/null || true
-          git add -f scripts/nse_symbols.json 2>/dev/null || true
+      - name: Create data directories
+        run: |
+          mkdir -p data/stock_details
+          mkdir -p logs
           
-          # Show what's staged
-          echo "=== Staged changes ==="
-          git diff --staged --stat
-
-          # Run Fundamental Scanner
-            python scripts/funda_scanner.py || echo "Funda scanner failed, continuing..."
-          git add -f data/funda_scans.json 2>/dev/null || true
-          # Commit if there are changes
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "📊 Scanner update — $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
-            echo "✅ Pushed successfully"
+      - name: Determine run mode
+        id: mode
+        run: |
+          MODE="${{ github.event.inputs.mode || 'top500' }}"
+          BATCH="${{ github.event.inputs.batch || '0' }}"
+          TOTAL="${{ github.event.inputs.total_batches || '1' }}"
+          
+          # For scheduled runs, default to top500
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            MODE="top500"
           fi
+          
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+          echo "batch=$BATCH" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "Running in $MODE mode (batch $BATCH of $TOTAL)"
+          
+      # PHASE 1: Fetch Yahoo Finance technical data
+      - name: Phase 1 - Fetch Technical Data
+        run: |
+          echo "=== PHASE 1: Technical Data ==="
+          python scripts/scanner_fetcher.py --mode ${{ steps.mode.outputs.mode }}
+          
+      # PHASE 2: Generate complete stock details (fundamentals + scores)
+      - name: Phase 2 - Generate Stock Details
+        env:
+          SCREENER_DELAY: "0.5"
+        run: |
+          echo "=== PHASE 2: Stock Details ==="
+          MODE="${{ steps.mode.outputs.mode }}"
+          BATCH="${{ steps.mode.outputs.batch }}"
+          TOTAL="${{ steps.mode.outputs.total }}"
+          
+          ARGS=""
+          
+          case $MODE in
+            "full")
+              # Full run - all stocks
+              if [ "$BATCH" != "0" ] && [ "$TOTAL" != "1" ]; then
+                ARGS="--batch $BATCH --total $TOTAL"
+              fi
+              ;;
+            "top500")
+              ARGS="--top 500"
+              ;;
+            "priority")
+              ARGS="--top 100"
+              ;;
+            "test")
+              ARGS="--test"
+              ;;
+          esac
+          
+          python scripts/stock_detail_generator.py $ARGS 2>&1 | tee logs/detail_generator.log
+          
+      # PHASE 3: Generate scanner results summary
+      - name: Phase 3 - Generate Scanner Results
+        run: |
+          echo "=== PHASE 3: Scanner Results ==="
+          python scripts/generate_scanner_summary.py 2>&1 | tee logs/scanner_summary.log
+          
+      - name: Commit and push data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add all generated data
+          git add data/stock_details/*.json
+          git add data/scanner_results.json
+          git add data/generation_summary.json
+          git add logs/*.log
+          
+          # Count updated files
+          UPDATED=$(git diff --cached --name-only | wc -l)
+          
+          if [ "$UPDATED" -gt 0 ]; then
+            TIMESTAMP=$(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M IST')
+            MODE="${{ steps.mode.outputs.mode }}"
+            git commit -m "📊 Scanner update ($MODE): $TIMESTAMP - $UPDATED files"
+            git push
+            echo "✅ Pushed $UPDATED files"
+          else
+            echo "⚠️ No changes to commit"
+          fi
+          
+      - name: Summary
+        run: |
+          echo "=== SCANNER RUN COMPLETE ==="
+          echo "Mode: ${{ steps.mode.outputs.mode }}"
+          echo "Stock details generated: $(ls data/stock_details/*.json 2>/dev/null | wc -l)"
+          if [ -f data/generation_summary.json ]; then
+            cat data/generation_summary.json
+          fi
+
+
+  # Optional: Parallel batch processing for full runs
+  # Uncomment to enable 5-way parallel processing
+  #
+  # batch-1:
+  #   uses: ./.github/workflows/scanner-daily.yml
+  #   with:
+  #     mode: full
+  #     batch: '1'
+  #     total_batches: '5'
+  #
+  # batch-2:
+  #   uses: ./.github/workflows/scanner-daily.yml
+  #   with:
+  #     mode: full
+  #     batch: '2'
+  #     total_batches: '5'
+  # ... etc
