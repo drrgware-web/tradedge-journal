@@ -212,11 +212,17 @@ async function init(){
     $('symbol').style.color='var(--t4)';
     $('name').textContent='';
     $('sector').style.display='none';
-    $('loading').innerHTML=`<div style="font-size:48px;margin-bottom:16px">🔍</div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:8px">Search for a stock</div>
-      <div style="font-size:12px;color:var(--t4);margin-bottom:20px">Type symbol or company name in the search box above</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${['RELIANCE','TCS','HDFCBANK','INFY','BAJFINANCE'].map(s=>`<button onclick="goTo('${s}')" style="padding:6px 14px;background:var(--bg-hover);border:1px solid var(--border-low);border-radius:6px;color:var(--accent);font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer">${s}</button>`).join('')}</div>`;
-    setTimeout(()=>$('srchIn').focus(),100);
+    $('loading').innerHTML=`
+      <div style="font-size:48px;margin-bottom:20px">🔍</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:8px;color:var(--t1)">Search for a stock</div>
+      <div style="font-size:12px;color:var(--t4);margin-bottom:24px">Type symbol or company name</div>
+      <div style="position:relative;width:100%;max-width:400px;margin-bottom:24px">
+        <input type="text" id="mainSearch" placeholder="Search stock..." autocomplete="off" style="width:100%;padding:14px 20px;background:var(--bg-card);border:2px solid var(--accent);border-radius:10px;color:var(--t1);font-family:var(--font-mono);font-size:14px;outline:none;box-shadow:0 0 20px rgba(0,255,136,.15)">
+        <div id="mainSearchDD" style="position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg-card);border:1px solid var(--border-med);border-radius:8px;max-height:280px;overflow-y:auto;display:none;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:100"></div>
+      </div>
+      <div style="font-size:11px;color:var(--t4);margin-bottom:12px">Or select a popular stock:</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${['RELIANCE','TCS','HDFCBANK','INFY','BAJFINANCE','SBIN','ICICIBANK','WIPRO'].map(s=>`<button onclick="goTo('${s}')" style="padding:8px 16px;background:var(--bg-hover);border:1px solid var(--border-low);border-radius:6px;color:var(--accent);font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--border-low)';this.style.background='var(--bg-hover)'">${s}</button>`).join('')}</div>`;
+    setupMainSearch();
     document.title='Stock Drilldown | TradEdge';
     return;
   }
@@ -242,6 +248,28 @@ function setupSrch(){
 function updSel(its){its.forEach((it,i)=>it.classList.toggle('sel',i===selIdx))}
 function goTo(s){location.href=`stock.html?s=${s}`}
 function showErr(m){$('loading').innerHTML=`<div style="font-size:40px;margin-bottom:12px">⚠️</div><div>${m}</div><a href="scanner.html" style="margin-top:12px;color:var(--accent)">← Back to Scanner</a>`}
+
+function setupMainSearch(){
+  const inp=$('mainSearch'),dd=$('mainSearchDD');
+  if(!inp||!dd)return;
+  let selIdx2=-1;
+  inp.focus();
+  inp.addEventListener('input',()=>{
+    const q=inp.value.trim().toUpperCase();
+    if(q.length<1){dd.style.display='none';return}
+    const m=allS.filter(x=>x.s.includes(q)||x.n.toUpperCase().includes(q)).slice(0,10);
+    dd.innerHTML=m.length===0?'<div style="padding:12px;text-align:center;color:var(--t4);font-size:11px">No matches found</div>':m.map((x,i)=>`<div class="srch-it ${i===selIdx2?'sel':''}" data-s="${x.s}" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border-dim);transition:background .1s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><span style="font-family:var(--font-mono);font-weight:600;font-size:13px;color:var(--accent)">${x.s}</span><span style="font-size:11px;color:var(--t4);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.n}</span></div>`).join('');
+    dd.style.display='block';selIdx2=-1;
+  });
+  inp.addEventListener('keydown',e=>{
+    const its=dd.querySelectorAll('[data-s]');
+    if(e.key==='ArrowDown'){e.preventDefault();selIdx2=Math.min(selIdx2+1,its.length-1);its.forEach((it,i)=>{it.style.background=i===selIdx2?'var(--bg-hover)':'transparent'})}
+    else if(e.key==='ArrowUp'){e.preventDefault();selIdx2=Math.max(selIdx2-1,0);its.forEach((it,i)=>{it.style.background=i===selIdx2?'var(--bg-hover)':'transparent'})}
+    else if(e.key==='Enter'){e.preventDefault();if(selIdx2>=0&&its[selIdx2])goTo(its[selIdx2].dataset.s);else if(inp.value.trim())goTo(inp.value.trim().toUpperCase())}
+    else if(e.key==='Escape')dd.style.display='none';
+  });
+  dd.addEventListener('click',e=>{const it=e.target.closest('[data-s]');if(it)goTo(it.dataset.s)});
+}
 
 function render(){
   $('loading').style.display='none';
@@ -316,18 +344,21 @@ function renderFundScorecard(){
   const fmtPct=v=>v!=null?(v>=0?'+':'')+v.toFixed(1)+'%':'—';
   const fmtC=v=>v!=null?(v>=0?'#22c55e':'#f87171'):'var(--t4)';
 
-  const qRows=quarters.slice(0,5).map(q=>`
+  const qRows=quarters.slice(0,5).map(q=>{
+    const opmVal=q.opm??q.opProfit??0;
+    const opmColor=opmVal>=10?'#22c55e':opmVal>=5?'#eab308':'#f87171';
+    return`
     <tr>
       <td>${q.label||'—'}</td>
       <td style="color:var(--t1)">${q.eps?.toFixed(1)??'—'}</td>
       <td style="color:${fmtC(q.epsYoY)}">${fmtPct(q.epsYoY)}</td>
       <td style="color:${fmtC(q.epsQoQ)}">${fmtPct(q.epsQoQ)}</td>
-      <td style="color:var(--t1)">${q.sales?.toFixed(2)||q.revenueCr||'—'}</td>
+      <td style="color:var(--t1)">${typeof q.sales==='number'?q.sales.toFixed(2):q.revenueCr||'—'}</td>
       <td style="color:${fmtC(q.salesYoY)}">${fmtPct(q.salesYoY)}</td>
       <td style="color:${fmtC(q.salesQoQ)}">${fmtPct(q.salesQoQ)}</td>
-      <td style="color:${q.opm>=0?'#22c55e':'#f87171'}">${q.opm?.toFixed(1)||'—'}%</td>
+      <td style="color:${opmColor}">${typeof opmVal==='number'?opmVal.toFixed(1):'—'}%</td>
       <td style="color:${peColor}">${pe?pe.toFixed(1):'—'}</td>
-    </tr>`).join('');
+    </tr>`}).join('');
 
   container.style.borderLeftColor=scoreColor;
   container.innerHTML=`
@@ -493,7 +524,9 @@ function onKD(e){if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')re
 function rOneil(){const o=D.oneil||{},g=o.master_score||'-',eps=o.eps_strength||0,pr=o.price_strength||0,dem=o.buyer_demand_score||50,grp=o.group_rank||50;return`<div class="card"><div class="card-hd"><span class="card-tt">📊 O'NEIL RATING</span><span class="card-bg">Composite: ${o.composite_score||0}</span></div><div class="onl-w"><div class="m-gr ${g}"><span class="g">${g}</span><span class="lb">MASTER</span></div><div class="onl-mt">${metBar('EPS Strength',eps)}${metBar('Price Strength',pr)}${metBar('Buyer Demand',dem)}${metBar('Group Rank',grp)}</div></div></div>`}
 function metBar(lb,v){const c=v>=80?'grn':v>=60?'cyn':v>=40?'amb':'red';return`<div class="met-r"><span class="met-lb">${lb}</span><div class="met-bar"><div class="met-fl ${c}" style="width:${v}%"></div></div><span class="met-vl">${v}</span></div>`}
 function rGuru(){const rs=D.guru_ratings||[],ic={canslim:'📈',value:'💎',quality:'🏰',growth:'🌱','wall street':'📊'};return`<div class="card"><div class="card-hd"><span class="card-tt">🎓 GURU RATINGS</span></div><div class="guru-ls">${rs.map(g=>{const p=g.score_pct||0,b=p>=70?'pass':p>=50?'fair':'fail',i=Object.entries(ic).find(([k])=>g.strategy?.toLowerCase().includes(k))?.[1]||'📊';return`<div class="guru-r"><span class="guru-ic">${i}</span><div class="guru-nf"><div class="guru-nm">${g.guru||'Unknown'}</div><div class="guru-st">${g.strategy||'-'}</div></div><span class="guru-sc">${p}%</span><span class="guru-bd ${b}">${g.score||b.toUpperCase()}</span></div>`}).join('')}</div></div>`}
-function rSurv(){const s=D.surveillance||{},fs=s.flags||[],rc=s.red_flag_count||0,sc=rc===0?'safe':rc<=2?'caution':'danger',st=rc===0?'✓ No Red Flags':`⚠ ${rc} Flag${rc>1?'s':''} Raised`;return`<div class="card"><div class="card-hd"><span class="card-tt">🛡️ SURVEILLANCE CHECK</span></div><div class="surv-st ${sc}">${st}</div><div class="chk-ls">${fs.map(f=>`<div class="chk-r"><div class="chk-ic ${f.flagged?'fail':'pass'}">${f.flagged?'✗':'✓'}</div><div class="chk-tx"><div class="chk-nm">${f.name}</div><div class="chk-dt">${f.detail||f.description||''}</div></div></div>`).join('')}</div></div>`}
+function rSurv(){const s=D.surveillance||{},fs=s.flags||[],rc=s.red_flag_count||0,sc=rc===0?'safe':rc<=2?'caution':'danger',st=rc===0?'✓ No Red Flags':`⚠ ${rc} Flag${rc>1?'s':''} Raised`;
+  const validFlags=fs.filter(f=>f&&f.name);
+  return`<div class="card"><div class="card-hd"><span class="card-tt">🛡️ SURVEILLANCE CHECK</span></div><div class="surv-st ${sc}">${st}</div>${validFlags.length?`<div class="chk-ls">${validFlags.map(f=>`<div class="chk-r"><div class="chk-ic ${f.flagged?'fail':'pass'}">${f.flagged?'✗':'✓'}</div><div class="chk-tx"><div class="chk-nm">${f.name||'Check'}</div><div class="chk-dt">${f.detail||f.description||''}</div></div></div>`).join('')}</div>`:`<div style="font-size:11px;color:var(--t4);padding:8px 0">All surveillance checks passed</div>`}</div>`}
 function rFund(){const f=D.fundamentals||{},its=[{lb:'Market Cap',v:`₹${fmtCr(f.market_cap_cr)}Cr`},{lb:'P/E Ratio',v:fmt(f.pe_ratio,1)},{lb:'P/B Ratio',v:fmt(f.pb_ratio,2)},{lb:'ROE',v:f.roe?`${fmt(f.roe,1)}%`:'—'},{lb:'Debt/Equity',v:`${fmt(f.debt_to_equity,1)}%`},{lb:'Div Yield',v:f.dividend_yield?`${fmt(f.dividend_yield,2)}%`:'—'},{lb:'EPS',v:`₹${fmt(f.eps,2)}`},{lb:'Book Value',v:`₹${fmt(f.book_value,2)}`},{lb:'Rev Growth',v:f.revenue_growth?`${fmt(f.revenue_growth,1)}%`:'—'}];return`<div class="card"><div class="card-hd"><span class="card-tt">💰 FUNDAMENTALS</span><span class="card-bg">${f.mcap_category||'—'}</span></div><div class="fund-gr">${its.map(i=>`<div class="fund-it"><div class="fund-vl">${i.v}</div><div class="fund-lb">${i.lb}</div></div>`).join('')}</div></div>`}
 function rRet(){const t=D.technical||{},r=t.returns||D.returns||{},its=[{lb:'1D',v:r['1d']||0},{lb:'1W',v:r['1w']||0},{lb:'1M',v:r['1m']||0},{lb:'3M',v:r['3m']||0},{lb:'6M',v:r['6m']||0}];return`<div class="card"><div class="card-hd"><span class="card-tt">📈 RETURNS</span></div><div class="ret-r">${its.map(i=>`<div class="ret-it"><div class="ret-vl ${i.v>=0?'up':'dn'}">${i.v>=0?'+':''}${fmt(i.v,1)}%</div><div class="ret-lb">${i.lb}</div></div>`).join('')}</div></div>`}
 function rOwn(){const h=D.fund_holdings||{},pr=h.promoter_pct||0,ins=h.institutional_pct||0,pu=Math.max(0,100-pr-ins);return`<div class="card"><div class="card-hd"><span class="card-tt">👥 OWNERSHIP</span></div><div class="own-bs"><div class="own-r"><span class="own-lb">Promoter</span><div class="own-bar"><div class="own-fl prm" style="width:${pr}%">${fmt(pr,1)}%</div></div></div><div class="own-r"><span class="own-lb">Institutional</span><div class="own-bar"><div class="own-fl ins" style="width:${ins}%">${fmt(ins,1)}%</div></div></div><div class="own-r"><span class="own-lb">Public</span><div class="own-bar"><div class="own-fl pub" style="width:${pu}%">${fmt(pu,1)}%</div></div></div></div></div>`}
