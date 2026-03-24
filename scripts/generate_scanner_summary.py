@@ -10,9 +10,10 @@ import os
 from datetime import datetime
 from typing import Dict, List, Any
 
-# Paths
+# Paths - Use repo root data directory (scripts/ is one level deep)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "data")
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)  # Go up from scripts/ to repo root
+DATA_DIR = os.path.join(REPO_ROOT, "data")
 STOCK_DETAILS_DIR = os.path.join(DATA_DIR, "stock_details")
 OUTPUT_PATH = os.path.join(DATA_DIR, "scanner_results.json")
 
