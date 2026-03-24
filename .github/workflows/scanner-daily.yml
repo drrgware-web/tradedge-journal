@@ -1,5 +1,5 @@
 # .github/workflows/scanner-daily.yml
-# Daily stock scanner workflow with shareholding updates
+# Daily stock scanner workflow with Screener.in data updates
 
 name: Daily Scanner
 
@@ -32,12 +32,13 @@ jobs:
         run: |
           python scripts/scanner_runner.py
       
-      - name: Update shareholding for scan results (top 50)
+      - name: Update Screener.in data (top 50 stocks)
         run: |
-          if [ -f "scripts/shareholding_fetcher.py" ]; then
-            python scripts/shareholding_fetcher.py --limit 50
+          if [ -f "scripts/screener_fetcher.py" ]; then
+            echo "Fetching Screener.in data for top 50 stocks..."
+            python scripts/screener_fetcher.py --limit 50
           else
-            echo "Shareholding fetcher not found, skipping..."
+            echo "Screener fetcher not found, skipping..."
           fi
       
       - name: Commit and push changes
@@ -48,7 +49,7 @@ jobs:
           # Add all data files
           git add data/*.json
           git add data/stock_details/*.json || true
-          git add data/shareholding_cache.json || true
+          git add data/screener_cache.json || true
           
           # Check if there are changes to commit
           if git diff --staged --quiet; then
@@ -65,5 +66,5 @@ jobs:
           echo "- **Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
           if [ -f "data/scanner_results.json" ]; then
             TOTAL=$(jq '.all_stocks | length' data/scanner_results.json 2>/dev/null || echo "N/A")
-            echo "- **Total stocks scanned**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total stocks**: $TOTAL" >> $GITHUB_STEP_SUMMARY
           fi

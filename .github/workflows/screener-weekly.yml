@@ -1,0 +1,106 @@
+# .github/workflows/screener-weekly.yml
+# Weekly full Screener.in data update for ALL stocks
+
+name: Weekly Screener Update (Full)
+
+on:
+  schedule:
+    # Run Saturday and Sunday at 2:00 AM IST (8:30 PM UTC prev day)
+    - cron: '30 20 * * 5'  # Friday 8:30 PM UTC = Saturday 2:00 AM IST
+    - cron: '30 20 * * 6'  # Saturday 8:30 PM UTC = Sunday 2:00 AM IST
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: 'Batch number (1-6) - each batch covers ~500 stocks'
+        required: false
+        default: '0'
+      limit:
+        description: 'Override limit (0 for full batch)'
+        required: false
+        default: '0'
+
+jobs:
+  update-screener:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # 3 hours max
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4
+      
+      - name: Determine batch to process
+        id: batch
+        run: |
+          # If batch specified, use it. Otherwise, auto-determine based on day
+          INPUT_BATCH="${{ github.event.inputs.batch || '0' }}"
+          
+          if [ "$INPUT_BATCH" != "0" ]; then
+            echo "batch=$INPUT_BATCH" >> $GITHUB_OUTPUT
+          else
+            # Auto-determine: Saturday=batches 1-3, Sunday=batches 4-6
+            DAY=$(date +%u)  # 6=Saturday, 7=Sunday
+            HOUR=$(date +%H)
+            
+            if [ "$DAY" = "6" ]; then
+              # Saturday - process batches 1, 2, 3 in sequence
+              echo "batch=1,2,3" >> $GITHUB_OUTPUT
+            else
+              # Sunday - process batches 4, 5, 6 in sequence
+              echo "batch=4,5,6" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      - name: Run Screener fetcher (batched)
+        run: |
+          BATCHES="${{ steps.batch.outputs.batch }}"
+          LIMIT="${{ github.event.inputs.limit || '0' }}"
+          
+          # Split batches by comma and process each
+          IFS=',' read -ra BATCH_ARRAY <<< "$BATCHES"
+          
+          for BATCH in "${BATCH_ARRAY[@]}"; do
+            echo ""
+            echo "========================================"
+            echo "Processing Batch $BATCH"
+            echo "========================================"
+            
+            if [ "$LIMIT" != "0" ]; then
+              python scripts/screener_fetcher.py --batch $BATCH --limit $LIMIT
+            else
+              python scripts/screener_fetcher.py --batch $BATCH
+            fi
+            
+            # Commit after each batch to avoid losing progress
+            git add data/stock_details/*.json data/screener_cache.json || true
+            if ! git diff --staged --quiet; then
+              git config --local user.email "github-actions[bot]@users.noreply.github.com"
+              git config --local user.name "github-actions[bot]"
+              git commit -m "📊 Screener batch $BATCH update [$(date +'%Y-%m-%d')]"
+              git push
+            fi
+            
+            echo "Batch $BATCH complete. Sleeping 30s before next batch..."
+            sleep 30
+          done
+      
+      - name: Summary
+        run: |
+          echo "## Weekly Screener Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Batches processed**: ${{ steps.batch.outputs.batch }}" >> $GITHUB_STEP_SUMMARY
+          
+          # Count updated files
+          UPDATED=$(find data/stock_details -name "*.json" -mmin -180 | wc -l)
+          echo "- **Files updated**: $UPDATED" >> $GITHUB_STEP_SUMMARY
