@@ -1,674 +1,462 @@
 #!/usr/bin/env python3
 """
-TradEdge Stock Scanner v1.0
-===========================
-Fetches all NSE stocks via yfinance, computes technical & fundamental indicators,
-and outputs scan results as JSON for the TradEdge dashboard.
+Scanner Fetcher v2.0
+Fetches technical data from Yahoo Finance via Cloudflare Worker.
+Phase 1 of the daily scanner workflow.
 
-Scanners:
-  1. RSI (Overbought/Oversold)
-  2. MACD Crossover Signals
-  3. EMA Crossovers (9/21, 50/200)
-  4. 52-Week High/Low Breakout
-  5. Volume Spike (2x+ average)
-  6. Bollinger Band Squeeze/Breakout
-  7. P/E Ratio Filter
-  8. Market Cap Filter
-
-Data Source: yfinance
-Output: data/scanner_results.json
+Usage:
+    python scanner_fetcher.py                    # Default mode (top500)
+    python scanner_fetcher.py --mode full        # All stocks
+    python scanner_fetcher.py --mode top500      # Top 500 by volume
+    python scanner_fetcher.py --mode priority    # Priority 100 stocks
+    python scanner_fetcher.py --mode test        # First 10 stocks
+    python scanner_fetcher.py --symbol RELIANCE  # Single stock
 """
 
 import json
 import os
 import sys
 import time
-import traceback
+import argparse
 from datetime import datetime, timedelta
-from pathlib import Path
+from typing import Dict, List, Optional, Any
+import traceback
 
-import numpy as np
-import pandas as pd
-import yfinance as yf
+try:
+    import requests
+except ImportError:
+    print("requests not installed - run: pip install requests")
+    sys.exit(1)
 
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
+    print("yfinance not installed - using Worker API only")
 
-# ─── Configuration ───────────────────────────────────────────────────────────
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-DATA_DIR = SCRIPT_DIR.parent / "data"
-OUTPUT_FILE = DATA_DIR / "scanner_results.json"
-SYMBOL_LIST_FILE = SCRIPT_DIR / "nse_symbols.json"
+YAHOO_WORKER = "https://spring-fire-41a0.drrgware.workers.dev"
 
-# yfinance settings
-HISTORY_PERIOD = "1y"       # 1 year of daily data
-BATCH_SIZE = 50             # stocks per batch download (yfinance handles 50 well)
-BATCH_DELAY = 2.0           # seconds between batches (rate limit friendly)
-MAX_RETRIES = 2             # retries per failed batch
-SKIP_FUNDAMENTALS = os.environ.get("SKIP_FUNDAMENTALS", "").lower() == "true"
-# Set SKIP_FUNDAMENTALS=true to skip yfinance .info calls (much faster, ~3x speed)
-# Fundamentals (P/E, market cap) will be null but technicals will still work
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(SCRIPT_DIR, "data")
+STOCK_DETAILS_DIR = os.path.join(DATA_DIR, "stock_details")
+NSE_SYMBOLS_PATH = os.path.join(SCRIPT_DIR, "nse_symbols.json")
 
-# Technical indicator parameters
-RSI_PERIOD = 14
-MACD_FAST = 12
-MACD_SLOW = 26
-MACD_SIGNAL = 9
-BB_PERIOD = 20
-BB_STD = 2
-VOL_AVG_PERIOD = 20
-VOL_SPIKE_MULTIPLIER = 2.0
-EMA_SHORT_1 = 9
-EMA_LONG_1 = 21
-EMA_SHORT_2 = 50
-EMA_LONG_2 = 200
+YAHOO_DELAY = 0.15  # 150ms between requests
+MAX_RETRIES = 3
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "application/json",
+}
 
-# ─── NSE Symbol List ────────────────────────────────────────────────────────
+# ============================================================================
+# SYMBOL LOADING
+# ============================================================================
 
-def get_nse_symbols() -> list[dict]:
-    """
-    Load NSE symbols from the JSON config file.
-    The file should contain a list of dicts: [{"symbol": "RELIANCE", "name": "Reliance Industries", "sector": "Energy"}, ...]
-    If the file doesn't exist, generate a starter list from Nifty 500 + common stocks.
-    """
-    if SYMBOL_LIST_FILE.exists():
-        with open(SYMBOL_LIST_FILE) as f:
-            return json.load(f)
+def load_symbols() -> List[str]:
+    """Load NSE symbols list."""
+    symbols = []
     
-    print("⚠ nse_symbols.json not found. Using built-in Nifty 500 starter list.")
-    print("  Run 'python scripts/build_symbol_list.py' to generate the full list.")
+    if os.path.exists(NSE_SYMBOLS_PATH):
+        with open(NSE_SYMBOLS_PATH, "r") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                symbols = [s["symbol"] if isinstance(s, dict) else s for s in data]
+            elif isinstance(data, dict):
+                symbols = list(data.keys())
     
-    # Fallback: well-known NSE symbols (Nifty 50 + key mid/small caps)
-    # Full list should be generated separately via build_symbol_list.py
-    starter_symbols = [
-        # Nifty 50
-        {"symbol": "RELIANCE", "name": "Reliance Industries", "sector": "Energy"},
-        {"symbol": "HDFCBANK", "name": "HDFC Bank", "sector": "Banking"},
-        {"symbol": "BHARTIARTL", "name": "Bharti Airtel", "sector": "Telecom"},
-        {"symbol": "SBIN", "name": "State Bank of India", "sector": "Banking"},
-        {"symbol": "ICICIBANK", "name": "ICICI Bank", "sector": "Banking"},
-        {"symbol": "TCS", "name": "TCS", "sector": "IT"},
-        {"symbol": "BAJFINANCE", "name": "Bajaj Finance", "sector": "NBFC"},
-        {"symbol": "HINDUNILVR", "name": "Hindustan Unilever", "sector": "FMCG"},
-        {"symbol": "INFY", "name": "Infosys", "sector": "IT"},
-        {"symbol": "LICI", "name": "LIC of India", "sector": "Insurance"},
-        {"symbol": "LT", "name": "Larsen & Toubro", "sector": "Infrastructure"},
-        {"symbol": "SUNPHARMA", "name": "Sun Pharma", "sector": "Pharma"},
-        {"symbol": "MARUTI", "name": "Maruti Suzuki", "sector": "Auto"},
-        {"symbol": "ITC", "name": "ITC", "sector": "FMCG"},
-        {"symbol": "M&M", "name": "Mahindra & Mahindra", "sector": "Auto"},
-        {"symbol": "AXISBANK", "name": "Axis Bank", "sector": "Banking"},
-        {"symbol": "NTPC", "name": "NTPC", "sector": "Power"},
-        {"symbol": "KOTAKBANK", "name": "Kotak Mahindra Bank", "sector": "Banking"},
-        {"symbol": "TITAN", "name": "Titan Company", "sector": "Consumer"},
-        {"symbol": "TATAMOTORS", "name": "Tata Motors", "sector": "Auto"},
-        {"symbol": "TVSMOTOR", "name": "TVS Motor", "sector": "Auto"},
-        {"symbol": "GRASIM", "name": "Grasim Industries", "sector": "Cement"},
-        {"symbol": "INDIGO", "name": "InterGlobe Aviation", "sector": "Aviation"},
-        {"symbol": "DIVISLAB", "name": "Divi's Laboratories", "sector": "Pharma"},
-        {"symbol": "WIPRO", "name": "Wipro", "sector": "IT"},
-        {"symbol": "HCLTECH", "name": "HCL Technologies", "sector": "IT"},
-        {"symbol": "ADANIENT", "name": "Adani Enterprises", "sector": "Conglomerate"},
-        {"symbol": "ADANIPORTS", "name": "Adani Ports", "sector": "Infrastructure"},
-        {"symbol": "POWERGRID", "name": "Power Grid Corp", "sector": "Power"},
-        {"symbol": "ASIANPAINT", "name": "Asian Paints", "sector": "Paints"},
-        {"symbol": "BAJAJFINSV", "name": "Bajaj Finserv", "sector": "NBFC"},
-        {"symbol": "NESTLEIND", "name": "Nestle India", "sector": "FMCG"},
-        {"symbol": "ULTRACEMCO", "name": "UltraTech Cement", "sector": "Cement"},
-        {"symbol": "JSWSTEEL", "name": "JSW Steel", "sector": "Metals"},
-        {"symbol": "TATASTEEL", "name": "Tata Steel", "sector": "Metals"},
-        {"symbol": "ONGC", "name": "ONGC", "sector": "Energy"},
-        {"symbol": "COALINDIA", "name": "Coal India", "sector": "Mining"},
-        {"symbol": "TECHM", "name": "Tech Mahindra", "sector": "IT"},
-        {"symbol": "DRREDDY", "name": "Dr. Reddy's", "sector": "Pharma"},
-        {"symbol": "CIPLA", "name": "Cipla", "sector": "Pharma"},
-        {"symbol": "HEROMOTOCO", "name": "Hero MotoCorp", "sector": "Auto"},
-        {"symbol": "EICHERMOT", "name": "Eicher Motors", "sector": "Auto"},
-        {"symbol": "APOLLOHOSP", "name": "Apollo Hospitals", "sector": "Healthcare"},
-        {"symbol": "BPCL", "name": "BPCL", "sector": "Energy"},
-        {"symbol": "HINDALCO", "name": "Hindalco", "sector": "Metals"},
-        {"symbol": "SHRIRAMFIN", "name": "Shriram Finance", "sector": "NBFC"},
-        {"symbol": "BRITANNIA", "name": "Britannia", "sector": "FMCG"},
-        {"symbol": "SBILIFE", "name": "SBI Life Insurance", "sector": "Insurance"},
-        {"symbol": "HDFCLIFE", "name": "HDFC Life", "sector": "Insurance"},
-        {"symbol": "TRENT", "name": "Trent", "sector": "Retail"},
+    print(f"Loaded {len(symbols)} symbols")
+    return symbols
+
+def get_priority_symbols(all_symbols: List[str]) -> List[str]:
+    """Get priority symbols (NIFTY 100 + high volume)."""
+    # NIFTY 100 stocks (subset)
+    nifty_100 = [
+        "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR",
+        "SBIN", "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK",
+        "HCLTECH", "ASIANPAINT", "MARUTI", "SUNPHARMA", "TITAN", "WIPRO",
+        "ULTRACEMCO", "BAJFINANCE", "NESTLEIND", "TECHM", "DMART", "NTPC",
+        "TATAMOTORS", "POWERGRID", "ONGC", "TATASTEEL", "M&M", "JSWSTEEL",
+        "BAJAJFINSV", "ADANIENT", "ADANIPORTS", "COALINDIA", "HINDALCO",
+        "GRASIM", "CIPLA", "DRREDDY", "EICHERMOT", "BRITANNIA", "DIVISLAB",
+        "APOLLOHOSP", "SBILIFE", "BAJAJ-AUTO", "HDFCLIFE", "INDUSINDBK",
+        "HEROMOTOCO", "DABUR", "SHREECEM", "TATACONSUM", "ADANIGREEN"
     ]
-    return starter_symbols
-
-
-# ─── Technical Indicator Calculations ────────────────────────────────────────
-
-def calc_rsi(close: pd.Series, period: int = RSI_PERIOD) -> pd.Series:
-    """Wilder's RSI calculation."""
-    delta = close.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(alpha=1/period, min_periods=period).mean()
-    avg_loss = loss.ewm(alpha=1/period, min_periods=period).mean()
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
-
-
-def calc_macd(close: pd.Series) -> dict:
-    """MACD line, signal line, histogram."""
-    ema_fast = close.ewm(span=MACD_FAST, adjust=False).mean()
-    ema_slow = close.ewm(span=MACD_SLOW, adjust=False).mean()
-    macd_line = ema_fast - ema_slow
-    signal_line = macd_line.ewm(span=MACD_SIGNAL, adjust=False).mean()
-    histogram = macd_line - signal_line
-    return {
-        "macd_line": macd_line,
-        "signal_line": signal_line,
-        "histogram": histogram
-    }
-
-
-def calc_bollinger_bands(close: pd.Series) -> dict:
-    """Bollinger Bands with squeeze detection."""
-    sma = close.rolling(BB_PERIOD).mean()
-    std = close.rolling(BB_PERIOD).std()
-    upper = sma + (BB_STD * std)
-    lower = sma - (BB_STD * std)
-    bandwidth = (upper - lower) / sma * 100  # as percentage
-    return {
-        "upper": upper,
-        "lower": lower,
-        "sma": sma,
-        "bandwidth": bandwidth
-    }
-
-
-def calc_ema(close: pd.Series, period: int) -> pd.Series:
-    """Exponential Moving Average."""
-    return close.ewm(span=period, adjust=False).mean()
-
-
-# ─── Scanner Logic ───────────────────────────────────────────────────────────
-
-def scan_stock(symbol_info: dict, df: pd.DataFrame, info: dict) -> dict | None:
-    """
-    Run all 8 scanners on a single stock.
-    Returns a dict with all scan results, or None if data is insufficient.
-    """
-    if df is None or len(df) < 200:
-        return None
-
-    try:
-        close = df["Close"]
-        high = df["High"]
-        low = df["Low"]
-        volume = df["Volume"]
-
-        latest_close = float(close.iloc[-1])
-        prev_close = float(close.iloc[-2]) if len(close) > 1 else latest_close
-        change_pct = round((latest_close - prev_close) / prev_close * 100, 2) if prev_close else 0
-
-        # ── RSI ──
-        rsi_series = calc_rsi(close)
-        rsi_val = round(float(rsi_series.iloc[-1]), 2) if not rsi_series.empty else None
-        rsi_prev = round(float(rsi_series.iloc[-2]), 2) if len(rsi_series) > 1 else None
-
-        rsi_signal = "neutral"
-        if rsi_val is not None:
-            if rsi_val >= 70:
-                rsi_signal = "overbought"
-            elif rsi_val <= 30:
-                rsi_signal = "oversold"
-            elif rsi_val >= 60:
-                rsi_signal = "bullish"
-            elif rsi_val <= 40:
-                rsi_signal = "bearish"
-
-        # ── MACD ──
-        macd = calc_macd(close)
-        macd_val = round(float(macd["macd_line"].iloc[-1]), 2)
-        macd_signal_val = round(float(macd["signal_line"].iloc[-1]), 2)
-        macd_hist = round(float(macd["histogram"].iloc[-1]), 2)
-        macd_hist_prev = round(float(macd["histogram"].iloc[-2]), 2) if len(macd["histogram"]) > 1 else 0
-
-        macd_crossover = "none"
-        if macd_hist > 0 and macd_hist_prev <= 0:
-            macd_crossover = "bullish_crossover"
-        elif macd_hist < 0 and macd_hist_prev >= 0:
-            macd_crossover = "bearish_crossover"
-        elif macd_hist > 0:
-            macd_crossover = "bullish"
-        elif macd_hist < 0:
-            macd_crossover = "bearish"
-
-        # ── EMA Crossovers ──
-        ema9 = calc_ema(close, EMA_SHORT_1)
-        ema21 = calc_ema(close, EMA_LONG_1)
-        ema50 = calc_ema(close, EMA_SHORT_2)
-        ema200 = calc_ema(close, EMA_LONG_2)
-
-        ema9_val = round(float(ema9.iloc[-1]), 2)
-        ema21_val = round(float(ema21.iloc[-1]), 2)
-        ema50_val = round(float(ema50.iloc[-1]), 2)
-        ema200_val = round(float(ema200.iloc[-1]), 2)
-
-        # 9/21 crossover
-        ema_9_21_signal = "none"
-        if len(ema9) > 1 and len(ema21) > 1:
-            curr_diff = float(ema9.iloc[-1] - ema21.iloc[-1])
-            prev_diff = float(ema9.iloc[-2] - ema21.iloc[-2])
-            if curr_diff > 0 and prev_diff <= 0:
-                ema_9_21_signal = "golden_cross"
-            elif curr_diff < 0 and prev_diff >= 0:
-                ema_9_21_signal = "death_cross"
-            elif curr_diff > 0:
-                ema_9_21_signal = "bullish"
-            else:
-                ema_9_21_signal = "bearish"
-
-        # 50/200 crossover
-        ema_50_200_signal = "none"
-        if len(ema50) > 1 and len(ema200) > 1:
-            curr_diff = float(ema50.iloc[-1] - ema200.iloc[-1])
-            prev_diff = float(ema50.iloc[-2] - ema200.iloc[-2])
-            if curr_diff > 0 and prev_diff <= 0:
-                ema_50_200_signal = "golden_cross"
-            elif curr_diff < 0 and prev_diff >= 0:
-                ema_50_200_signal = "death_cross"
-            elif curr_diff > 0:
-                ema_50_200_signal = "bullish"
-            else:
-                ema_50_200_signal = "bearish"
-
-        # Price vs EMAs
-        above_ema50 = latest_close > ema50_val
-        above_ema200 = latest_close > ema200_val
-
-        # ── 52-Week High/Low ──
-        high_52w = float(high.tail(252).max()) if len(high) >= 252 else float(high.max())
-        low_52w = float(low.tail(252).min()) if len(low) >= 252 else float(low.min())
-        pct_from_52w_high = round((latest_close - high_52w) / high_52w * 100, 2)
-        pct_from_52w_low = round((latest_close - low_52w) / low_52w * 100, 2)
-
-        breakout_signal = "none"
-        if pct_from_52w_high >= -2:  # within 2% of 52w high
-            breakout_signal = "near_52w_high"
-        if pct_from_52w_high >= 0:
-            breakout_signal = "new_52w_high"
-        if pct_from_52w_low <= 2:  # within 2% of 52w low
-            breakout_signal = "near_52w_low"
-        if pct_from_52w_low <= 0:
-            breakout_signal = "new_52w_low"
-
-        # ── Volume Spike ──
-        vol_avg = float(volume.tail(VOL_AVG_PERIOD).mean())
-        vol_latest = float(volume.iloc[-1])
-        vol_ratio = round(vol_latest / vol_avg, 2) if vol_avg > 0 else 0
-
-        vol_signal = "normal"
-        if vol_ratio >= 3.0:
-            vol_signal = "extreme_spike"
-        elif vol_ratio >= VOL_SPIKE_MULTIPLIER:
-            vol_signal = "spike"
-        elif vol_ratio >= 1.5:
-            vol_signal = "above_avg"
-        elif vol_ratio <= 0.5:
-            vol_signal = "dry"
-
-        # ── Bollinger Bands ──
-        bb = calc_bollinger_bands(close)
-        bb_upper = round(float(bb["upper"].iloc[-1]), 2)
-        bb_lower = round(float(bb["lower"].iloc[-1]), 2)
-        bb_bandwidth = round(float(bb["bandwidth"].iloc[-1]), 2)
-        bb_bandwidth_prev = round(float(bb["bandwidth"].iloc[-6]), 2) if len(bb["bandwidth"]) > 5 else bb_bandwidth
-
-        bb_signal = "neutral"
-        if latest_close >= bb_upper:
-            bb_signal = "upper_breakout"
-        elif latest_close <= bb_lower:
-            bb_signal = "lower_breakout"
-        elif bb_bandwidth < bb_bandwidth_prev * 0.7:
-            bb_signal = "squeeze"
-
-        # ── Fundamentals (from yfinance info) ──
-        pe_ratio = info.get("trailingPE") or info.get("forwardPE")
-        market_cap = info.get("marketCap")
-        eps = info.get("trailingEps")
-        pb_ratio = info.get("priceToBook")
-        dividend_yield = info.get("dividendYield")
-        roe = info.get("returnOnEquity")
-        sector = info.get("sector") or symbol_info.get("sector", "Unknown")
-        industry = info.get("industry", "Unknown")
-
-        # Market cap category
-        mcap_cr = round(market_cap / 1e7, 2) if market_cap else None  # Convert to Crores
-        mcap_category = "unknown"
-        if mcap_cr:
-            if mcap_cr >= 100000:
-                mcap_category = "mega_cap"
-            elif mcap_cr >= 20000:
-                mcap_category = "large_cap"
-            elif mcap_cr >= 5000:
-                mcap_category = "mid_cap"
-            elif mcap_cr >= 1000:
-                mcap_category = "small_cap"
-            else:
-                mcap_category = "micro_cap"
-
-        # ── Composite Score ──
-        # Simple scoring: each bullish signal adds +1, bearish -1
-        score = 0
-        if rsi_signal in ["oversold", "bullish"]:
-            score += 1
-        elif rsi_signal in ["overbought", "bearish"]:
-            score -= 1
-        if macd_crossover in ["bullish_crossover", "bullish"]:
-            score += 1
-        elif macd_crossover in ["bearish_crossover", "bearish"]:
-            score -= 1
-        if ema_9_21_signal in ["golden_cross", "bullish"]:
-            score += 1
-        elif ema_9_21_signal in ["death_cross", "bearish"]:
-            score -= 1
-        if ema_50_200_signal in ["golden_cross", "bullish"]:
-            score += 1
-        elif ema_50_200_signal in ["death_cross", "bearish"]:
-            score -= 1
-        if breakout_signal in ["new_52w_high", "near_52w_high"]:
-            score += 1
-        elif breakout_signal in ["new_52w_low", "near_52w_low"]:
-            score -= 1
-        if vol_signal in ["spike", "extreme_spike"]:
-            score += 1
-        if bb_signal == "upper_breakout":
-            score += 1
-        elif bb_signal == "lower_breakout":
-            score -= 1
-
-        # ── Returns ──
-        ret_1d = change_pct
-        ret_1w = round((latest_close - float(close.iloc[-5])) / float(close.iloc[-5]) * 100, 2) if len(close) >= 5 else None
-        ret_1m = round((latest_close - float(close.iloc[-21])) / float(close.iloc[-21]) * 100, 2) if len(close) >= 21 else None
-        ret_3m = round((latest_close - float(close.iloc[-63])) / float(close.iloc[-63]) * 100, 2) if len(close) >= 63 else None
-
-        return {
-            "symbol": symbol_info["symbol"],
-            "name": symbol_info.get("name", symbol_info["symbol"]),
-            "sector": sector,
-            "industry": industry,
-            "price": round(latest_close, 2),
-            "change_pct": ret_1d,
-            "returns": {
-                "1d": ret_1d,
-                "1w": ret_1w,
-                "1m": ret_1m,
-                "3m": ret_3m,
-            },
-            # Technical
-            "rsi": {"value": rsi_val, "signal": rsi_signal},
-            "macd": {
-                "line": macd_val,
-                "signal": macd_signal_val,
-                "histogram": macd_hist,
-                "crossover": macd_crossover,
-            },
-            "ema": {
-                "ema9": ema9_val,
-                "ema21": ema21_val,
-                "ema50": ema50_val,
-                "ema200": ema200_val,
-                "cross_9_21": ema_9_21_signal,
-                "cross_50_200": ema_50_200_signal,
-                "above_ema50": above_ema50,
-                "above_ema200": above_ema200,
-            },
-            "breakout": {
-                "high_52w": round(high_52w, 2),
-                "low_52w": round(low_52w, 2),
-                "pct_from_high": pct_from_52w_high,
-                "pct_from_low": pct_from_52w_low,
-                "signal": breakout_signal,
-            },
-            "volume": {
-                "latest": int(vol_latest),
-                "avg_20d": int(vol_avg),
-                "ratio": vol_ratio,
-                "signal": vol_signal,
-            },
-            "bollinger": {
-                "upper": bb_upper,
-                "lower": bb_lower,
-                "bandwidth": bb_bandwidth,
-                "signal": bb_signal,
-            },
-            # Fundamental
-            "fundamentals": {
-                "pe_ratio": round(pe_ratio, 2) if pe_ratio else None,
-                "pb_ratio": round(pb_ratio, 2) if pb_ratio else None,
-                "eps": round(eps, 2) if eps else None,
-                "market_cap_cr": mcap_cr,
-                "mcap_category": mcap_category,
-                "dividend_yield": round(dividend_yield * 100, 2) if dividend_yield else None,
-                "roe": round(roe * 100, 2) if roe else None,
-            },
-            # Composite
-            "composite_score": score,
-        }
-    except Exception as e:
-        print(f"  ✗ Error scanning {symbol_info['symbol']}: {e}")
-        traceback.print_exc()
-        return None
-
-
-# ─── Main Fetcher ────────────────────────────────────────────────────────────
-
-def fetch_and_scan():
-    """Main entry point: fetch data for all NSE stocks and run scanners."""
-    print("=" * 60)
-    print("  TradEdge Scanner v1.0")
-    print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
-
-    symbols_list = get_nse_symbols()
-    total = len(symbols_list)
-    total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
-    est_minutes = total_batches * (BATCH_DELAY + 3) / 60  # rough estimate
     
-    print(f"\n📊 Scanning {total} NSE stocks...")
-    print(f"   Period: {HISTORY_PERIOD} | Batch size: {BATCH_SIZE}")
-    print(f"   Fundamentals: {'SKIP (fast mode)' if SKIP_FUNDAMENTALS else 'ENABLED (slower)'}")
-    print(f"   Estimated time: ~{est_minutes:.0f} minutes\n")
+    # Filter to existing symbols
+    priority = [s for s in nifty_100 if s in all_symbols]
+    
+    # Add remaining from all_symbols up to 100
+    remaining = [s for s in all_symbols if s not in priority][:100 - len(priority)]
+    
+    return priority + remaining
 
-    results = []
-    errors = []
-    skipped = []
-    scan_start = time.time()
+# ============================================================================
+# YAHOO FINANCE FETCHER
+# ============================================================================
 
-    # Process in batches
-    for batch_start in range(0, total, BATCH_SIZE):
-        batch_end = min(batch_start + BATCH_SIZE, total)
-        batch = symbols_list[batch_start:batch_end]
-        batch_num = batch_start // BATCH_SIZE + 1
+class YahooFetcher:
+    """Fetches stock data from Yahoo Finance."""
+    
+    def __init__(self, use_worker: bool = True):
+        self.use_worker = use_worker
+        self.session = requests.Session()
+        self.session.headers.update(HEADERS)
+        
+    def fetch_stock(self, symbol: str) -> Optional[Dict]:
+        """Fetch stock data for a single symbol."""
+        yahoo_symbol = f"{symbol}.NS"
+        
+        # Try Worker API first
+        if self.use_worker:
+            data = self._fetch_via_worker(yahoo_symbol)
+            if data:
+                return self._process_data(symbol, data)
+        
+        # Fallback to yfinance
+        if yf:
+            data = self._fetch_via_yfinance(yahoo_symbol)
+            if data:
+                return self._process_data(symbol, data)
+        
+        return None
+    
+    def _fetch_via_worker(self, yahoo_symbol: str) -> Optional[Dict]:
+        """Fetch via Cloudflare Worker."""
+        try:
+            response = self.session.get(
+                f"{YAHOO_WORKER}/quote/{yahoo_symbol}",
+                params={"range": "1y", "interval": "1d"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+        except Exception as e:
+            print(f"Worker error for {yahoo_symbol}: {e}")
+        
+        return None
+    
+    def _fetch_via_yfinance(self, yahoo_symbol: str) -> Optional[Dict]:
+        """Fetch via yfinance library."""
+        try:
+            ticker = yf.Ticker(yahoo_symbol)
+            hist = ticker.history(period="1y")
+            
+            if hist.empty:
+                return None
+            
+            info = ticker.info
+            
+            return {
+                "history": hist.to_dict(),
+                "info": info
+            }
+        except Exception as e:
+            print(f"yfinance error for {yahoo_symbol}: {e}")
+        
+        return None
+    
+    def _process_data(self, symbol: str, raw_data: Dict) -> Dict:
+        """Process raw Yahoo data into structured format."""
+        data = {
+            "symbol": symbol,
+            "technical": {},
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        try:
+            # Extract from Worker format
+            if "chart" in raw_data:
+                result = raw_data["chart"]["result"][0]
+                meta = result.get("meta", {})
+                indicators = result.get("indicators", {})
+                quotes = indicators.get("quote", [{}])[0]
+                timestamps = result.get("timestamp", [])
+                
+                closes = quotes.get("close", [])
+                volumes = quotes.get("volume", [])
+                highs = quotes.get("high", [])
+                lows = quotes.get("low", [])
+                
+                # Filter out None values
+                closes = [c for c in closes if c is not None]
+                volumes = [v for v in volumes if v is not None]
+                
+                if closes:
+                    current = closes[-1]
+                    prev_close = closes[-2] if len(closes) > 1 else current
+                    
+                    data["technical"] = {
+                        "close": round(current, 2),
+                        "prev_close": round(prev_close, 2),
+                        "change": round(current - prev_close, 2),
+                        "change_pct": round(((current - prev_close) / prev_close) * 100, 2) if prev_close else 0,
+                        "high_52w": round(max(closes[-252:]) if len(closes) >= 252 else max(closes), 2),
+                        "low_52w": round(min(closes[-252:]) if len(closes) >= 252 else min(closes), 2),
+                        "volume": volumes[-1] if volumes else 0,
+                        "avg_volume": int(sum(volumes[-20:]) / len(volumes[-20:])) if len(volumes) >= 20 else 0,
+                        "volume_ratio": round(volumes[-1] / (sum(volumes[-20:]) / 20), 2) if len(volumes) >= 20 and sum(volumes[-20:]) > 0 else 1,
+                    }
+                    
+                    # Calculate 52w high proximity
+                    high_52w = data["technical"]["high_52w"]
+                    low_52w = data["technical"]["low_52w"]
+                    if high_52w > low_52w:
+                        data["technical"]["high_52w_proximity"] = round(
+                            ((current - low_52w) / (high_52w - low_52w)) * 100, 1
+                        )
+                    
+                    # Calculate returns
+                    data["technical"]["returns"] = self._calculate_returns(closes)
+                    
+                    # Calculate basic indicators
+                    data["technical"]["indicators"] = self._calculate_indicators(closes, volumes)
+                    
+                    # Price history (last 30 days)
+                    data["technical"]["price_history"] = [round(c, 2) for c in closes[-30:]]
+                    
+            # Extract from yfinance format
+            elif "history" in raw_data:
+                hist = raw_data["history"]
+                info = raw_data.get("info", {})
+                
+                closes = list(hist.get("Close", {}).values())
+                volumes = list(hist.get("Volume", {}).values())
+                
+                if closes:
+                    current = closes[-1]
+                    prev_close = closes[-2] if len(closes) > 1 else current
+                    
+                    data["technical"] = {
+                        "close": round(current, 2),
+                        "prev_close": round(prev_close, 2),
+                        "change": round(current - prev_close, 2),
+                        "change_pct": round(((current - prev_close) / prev_close) * 100, 2) if prev_close else 0,
+                        "high_52w": round(info.get("fiftyTwoWeekHigh", max(closes)), 2),
+                        "low_52w": round(info.get("fiftyTwoWeekLow", min(closes)), 2),
+                        "volume": int(volumes[-1]) if volumes else 0,
+                        "avg_volume": int(info.get("averageVolume", 0)),
+                        "market_cap": info.get("marketCap", 0),
+                    }
+                    
+                    data["technical"]["returns"] = self._calculate_returns(closes)
+                    data["technical"]["indicators"] = self._calculate_indicators(closes, volumes)
+                    data["technical"]["price_history"] = [round(c, 2) for c in closes[-30:]]
+                    
+        except Exception as e:
+            print(f"Error processing data for {symbol}: {e}")
+            traceback.print_exc()
+        
+        return data
+    
+    def _calculate_returns(self, closes: List[float]) -> Dict[str, float]:
+        """Calculate returns for various periods."""
+        if not closes or len(closes) < 2:
+            return {}
+        
+        current = closes[-1]
+        returns = {}
+        
+        periods = [
+            ("1d", 1), ("1w", 5), ("1m", 21),
+            ("3m", 63), ("6m", 126), ("1y", 252)
+        ]
+        
+        for name, days in periods:
+            if len(closes) > days:
+                past = closes[-(days + 1)]
+                if past > 0:
+                    returns[name] = round(((current - past) / past) * 100, 2)
+        
+        return returns
+    
+    def _calculate_indicators(self, closes: List[float], volumes: List[float]) -> Dict:
+        """Calculate basic technical indicators."""
+        if not closes:
+            return {}
+        
+        indicators = {}
+        
+        try:
+            # Simple Moving Averages
+            if len(closes) >= 20:
+                indicators["sma_20"] = round(sum(closes[-20:]) / 20, 2)
+            if len(closes) >= 50:
+                indicators["sma_50"] = round(sum(closes[-50:]) / 50, 2)
+            if len(closes) >= 200:
+                indicators["sma_200"] = round(sum(closes[-200:]) / 200, 2)
+            
+            # RSI (14-period)
+            if len(closes) >= 15:
+                indicators["rsi"] = self._calculate_rsi(closes, 14)
+            
+            # Volatility (30-day)
+            if len(closes) >= 30:
+                returns = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes[-30:]))]
+                if returns:
+                    import math
+                    mean = sum(returns) / len(returns)
+                    variance = sum((r - mean) ** 2 for r in returns) / len(returns)
+                    indicators["volatility_30d"] = round(math.sqrt(variance) * math.sqrt(252) * 100, 2)
+            
+            # Price vs SMAs
+            current = closes[-1]
+            if "sma_20" in indicators:
+                indicators["above_sma_20"] = current > indicators["sma_20"]
+            if "sma_50" in indicators:
+                indicators["above_sma_50"] = current > indicators["sma_50"]
+            if "sma_200" in indicators:
+                indicators["above_sma_200"] = current > indicators["sma_200"]
+                
+        except Exception as e:
+            print(f"Error calculating indicators: {e}")
+        
+        return indicators
+    
+    def _calculate_rsi(self, closes: List[float], period: int = 14) -> float:
+        """Calculate RSI."""
+        if len(closes) < period + 1:
+            return 50
+        
+        gains = []
+        losses = []
+        
+        for i in range(1, len(closes)):
+            change = closes[i] - closes[i-1]
+            if change >= 0:
+                gains.append(change)
+                losses.append(0)
+            else:
+                gains.append(0)
+                losses.append(abs(change))
+        
+        avg_gain = sum(gains[-period:]) / period
+        avg_loss = sum(losses[-period:]) / period
+        
+        if avg_loss == 0:
+            return 100
+        
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        
+        return round(rsi, 2)
 
-        # Build yfinance tickers (append .NS for NSE)
-        yf_symbols = [f"{s['symbol']}.NS" for s in batch]
-        elapsed = time.time() - scan_start
-        pct = batch_start / total * 100
-        print(f"  [{pct:5.1f}%] Batch {batch_num}/{total_batches} ({len(results)} done, {elapsed:.0f}s): {', '.join(s['symbol'] for s in batch[:4])}{'...' if len(batch) > 4 else ''}")
 
-        # Retry logic for batch download
-        data = None
-        for attempt in range(MAX_RETRIES + 1):
-            try:
-                data = yf.download(
-                    yf_symbols,
-                    period=HISTORY_PERIOD,
-                    group_by="ticker",
-                    auto_adjust=True,
-                    threads=True,
-                    progress=False,
-                )
-                break
-            except Exception as e:
-                if attempt < MAX_RETRIES:
-                    print(f"    ⟳ Retry {attempt+1}/{MAX_RETRIES} after error: {e}")
-                    time.sleep(BATCH_DELAY * 2)
-                else:
-                    print(f"  ✗ Batch download failed after {MAX_RETRIES} retries: {e}")
-                    errors.extend([s["symbol"] for s in batch])
-                    data = None
+# ============================================================================
+# MAIN FETCHER
+# ============================================================================
 
-        if data is None:
-            continue
-
-        for sym_info in batch:
-            yf_sym = f"{sym_info['symbol']}.NS"
-            try:
-                # Extract individual stock data from batch result
-                if len(yf_symbols) == 1:
-                    stock_df = data.copy()
-                else:
-                    if yf_sym in data.columns.get_level_values(0):
-                        stock_df = data[yf_sym].dropna(how="all")
-                    else:
-                        skipped.append(sym_info["symbol"])
-                        continue
-
-                if stock_df.empty or len(stock_df) < 50:
-                    skipped.append(sym_info["symbol"])
-                    continue
-
-                # Fetch fundamental info (optional — slow for 2000+ stocks)
-                info = {}
-                if not SKIP_FUNDAMENTALS:
-                    try:
-                        ticker = yf.Ticker(yf_sym)
-                        info = ticker.info or {}
-                    except Exception:
-                        pass
-
-                result = scan_stock(sym_info, stock_df, info)
-                if result:
-                    results.append(result)
-                else:
-                    skipped.append(sym_info["symbol"])
-
-            except Exception as e:
-                errors.append(sym_info["symbol"])
-                print(f"    ✗ {sym_info['symbol']}: {e}")
-
-        # Rate limit delay between batches
-        if batch_end < total:
-            time.sleep(BATCH_DELAY)
-
-    # ── Sort by composite score (descending) ──
-    results.sort(key=lambda x: x["composite_score"], reverse=True)
-
-    # ── Build output ──
-    output = {
-        "meta": {
-            "generated_at": datetime.now().isoformat(),
-            "total_scanned": len(results),
-            "total_errors": len(errors),
-            "total_skipped": len(skipped),
-            "version": "1.0",
-            "scanners": [
-                "RSI", "MACD", "EMA Crossovers", "52W Breakout",
-                "Volume Spike", "Bollinger Bands", "PE Ratio", "Market Cap"
-            ],
-        },
-        "scanner_summary": build_summary(results),
-        "stocks": results,
+def fetch_all_stocks(
+    symbols: List[str],
+    mode: str = "top500"
+) -> Dict[str, Any]:
+    """Fetch technical data for all stocks."""
+    
+    # Filter based on mode
+    if mode == "test":
+        target_symbols = symbols[:10]
+    elif mode == "priority":
+        target_symbols = get_priority_symbols(symbols)[:100]
+    elif mode == "top500":
+        target_symbols = symbols[:500]
+    else:  # full
+        target_symbols = symbols
+    
+    print(f"Mode: {mode}, Processing: {len(target_symbols)} stocks")
+    
+    fetcher = YahooFetcher()
+    results = {
+        "processed": 0,
+        "success": 0,
+        "failed": 0,
+        "errors": []
     }
+    
+    os.makedirs(STOCK_DETAILS_DIR, exist_ok=True)
+    
+    for i, symbol in enumerate(target_symbols):
+        try:
+            print(f"[{i+1}/{len(target_symbols)}] Fetching {symbol}...", end=" ")
+            
+            data = fetcher.fetch_stock(symbol)
+            
+            if data and data.get("technical"):
+                # Load existing detail if available
+                detail_path = os.path.join(STOCK_DETAILS_DIR, f"{symbol}.json")
+                
+                if os.path.exists(detail_path):
+                    with open(detail_path, "r") as f:
+                        existing = json.load(f)
+                    # Merge technical data
+                    existing["technical"] = data["technical"]
+                    existing["updated_at"] = data["updated_at"]
+                    data = existing
+                else:
+                    data["name"] = symbol
+                    data["fundamentals"] = {}
+                    data["oneil"] = {}
+                    data["guru_ratings"] = []
+                    data["surveillance"] = {}
+                    data["ownership"] = {}
+                    data["quarterly_results"] = []
+                
+                # Save
+                with open(detail_path, "w") as f:
+                    json.dump(data, f, indent=2, default=str)
+                
+                results["success"] += 1
+                print("✓")
+            else:
+                results["failed"] += 1
+                results["errors"].append({"symbol": symbol, "error": "No data"})
+                print("✗")
+                
+            time.sleep(YAHOO_DELAY)
+            
+        except Exception as e:
+            results["failed"] += 1
+            results["errors"].append({"symbol": symbol, "error": str(e)})
+            print(f"✗ {e}")
+        
+        results["processed"] += 1
+        
+        # Progress update
+        if (i + 1) % 100 == 0:
+            print(f"\nProgress: {i+1}/{len(target_symbols)} ({results['success']} success)")
+    
+    print(f"\n=== Complete: {results['success']} success, {results['failed']} failed ===")
+    return results
 
-    # ── Write JSON ──
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w") as f:
-        json.dump(output, f, indent=2, default=str)
 
-    print(f"\n{'=' * 60}")
-    print(f"  ✅ Done! {len(results)} stocks scanned successfully")
-    print(f"  ⚠  {len(errors)} errors, {len(skipped)} skipped")
-    print(f"  📁 Output: {OUTPUT_FILE}")
-    print(f"{'=' * 60}")
-
-    return output
-
-
-def build_summary(results: list[dict]) -> dict:
-    """Build scanner summary counts for the dashboard."""
-    summary = {
-        "rsi_overbought": [],
-        "rsi_oversold": [],
-        "macd_bullish_crossover": [],
-        "macd_bearish_crossover": [],
-        "ema_golden_cross_9_21": [],
-        "ema_death_cross_9_21": [],
-        "ema_golden_cross_50_200": [],
-        "ema_death_cross_50_200": [],
-        "new_52w_high": [],
-        "near_52w_high": [],
-        "new_52w_low": [],
-        "near_52w_low": [],
-        "volume_spike": [],
-        "volume_extreme_spike": [],
-        "bb_upper_breakout": [],
-        "bb_lower_breakout": [],
-        "bb_squeeze": [],
-        "bullish_composite": [],  # score >= 3
-        "bearish_composite": [],  # score <= -3
-    }
-
-    for stock in results:
-        sym = stock["symbol"]
-
-        if stock["rsi"]["signal"] == "overbought":
-            summary["rsi_overbought"].append(sym)
-        elif stock["rsi"]["signal"] == "oversold":
-            summary["rsi_oversold"].append(sym)
-
-        if stock["macd"]["crossover"] == "bullish_crossover":
-            summary["macd_bullish_crossover"].append(sym)
-        elif stock["macd"]["crossover"] == "bearish_crossover":
-            summary["macd_bearish_crossover"].append(sym)
-
-        if stock["ema"]["cross_9_21"] == "golden_cross":
-            summary["ema_golden_cross_9_21"].append(sym)
-        elif stock["ema"]["cross_9_21"] == "death_cross":
-            summary["ema_death_cross_9_21"].append(sym)
-
-        if stock["ema"]["cross_50_200"] == "golden_cross":
-            summary["ema_golden_cross_50_200"].append(sym)
-        elif stock["ema"]["cross_50_200"] == "death_cross":
-            summary["ema_death_cross_50_200"].append(sym)
-
-        bs = stock["breakout"]["signal"]
-        if bs == "new_52w_high":
-            summary["new_52w_high"].append(sym)
-        elif bs == "near_52w_high":
-            summary["near_52w_high"].append(sym)
-        elif bs == "new_52w_low":
-            summary["new_52w_low"].append(sym)
-        elif bs == "near_52w_low":
-            summary["near_52w_low"].append(sym)
-
-        vs = stock["volume"]["signal"]
-        if vs == "spike":
-            summary["volume_spike"].append(sym)
-        elif vs == "extreme_spike":
-            summary["volume_extreme_spike"].append(sym)
-
-        bbs = stock["bollinger"]["signal"]
-        if bbs == "upper_breakout":
-            summary["bb_upper_breakout"].append(sym)
-        elif bbs == "lower_breakout":
-            summary["bb_lower_breakout"].append(sym)
-        elif bbs == "squeeze":
-            summary["bb_squeeze"].append(sym)
-
-        if stock["composite_score"] >= 3:
-            summary["bullish_composite"].append(sym)
-        elif stock["composite_score"] <= -3:
-            summary["bearish_composite"].append(sym)
-
-    # Convert to counts + symbols for dashboard
-    return {k: {"count": len(v), "symbols": v} for k, v in summary.items()}
+def main():
+    parser = argparse.ArgumentParser(description="Scanner Fetcher - Yahoo Finance Data")
+    parser.add_argument("--mode", type=str, default="top500",
+                       choices=["full", "top500", "priority", "test"],
+                       help="Run mode")
+    parser.add_argument("--symbol", type=str, help="Fetch single symbol")
+    
+    args = parser.parse_args()
+    
+    symbols = load_symbols()
+    
+    if args.symbol:
+        # Single symbol mode
+        fetcher = YahooFetcher()
+        data = fetcher.fetch_stock(args.symbol)
+        if data:
+            print(json.dumps(data, indent=2, default=str))
+        else:
+            print(f"Failed to fetch {args.symbol}")
+    else:
+        # Batch mode
+        results = fetch_all_stocks(symbols, args.mode)
+        print(json.dumps(results, indent=2))
 
 
 if __name__ == "__main__":
-    fetch_and_scan()
+    main()
