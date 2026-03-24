@@ -11,6 +11,17 @@ Fetches:
 
 Usage:
     python screener_fetcher.py [--symbols SYMBOL1,SYMBOL2] [--all] [--limit N]
+    python screener_fetcher.py --batch 1  # Process batch 1 (~500 stocks)
+    python screener_fetcher.py --batch 1 --limit 100  # Process 100 from batch 1
+
+Batches:
+    With ~2800 stocks, batches are:
+    Batch 1: stocks 0-499
+    Batch 2: stocks 500-999
+    Batch 3: stocks 1000-1499
+    Batch 4: stocks 1500-1999
+    Batch 5: stocks 2000-2499
+    Batch 6: stocks 2500+
 
 Author: TradEdge Scanner
 """
@@ -40,12 +51,16 @@ except ImportError:
 # Configuration
 STOCK_DETAILS_DIR = "data/stock_details"
 SCANNER_RESULTS = "data/scanner_results.json"
+NSE_SYMBOLS_FILE = "data/nse_symbols.json"
 CACHE_FILE = "data/screener_cache.json"
 SCREENER_BASE = "https://www.screener.in/company"
 
+# Batch configuration
+BATCH_SIZE = 500  # Stocks per batch
+
 # Rate limiting
-MIN_DELAY = 1.5
-MAX_DELAY = 3.0
+MIN_DELAY = 1.0  # Reduced for faster processing
+MAX_DELAY = 2.0
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -480,58 +495,123 @@ def update_stock_json(symbol, screener_data):
         return False
 
 
+def get_all_symbols():
+    """Get all symbols from various sources."""
+    symbols = set()
+    
+    # 1. Load from nse_symbols.json (main universe)
+    if os.path.exists(NSE_SYMBOLS_FILE):
+        try:
+            with open(NSE_SYMBOLS_FILE, 'r') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, str):
+                            symbols.add(item)
+                        elif isinstance(item, dict) and 'symbol' in item:
+                            symbols.add(item['symbol'])
+                elif isinstance(data, dict):
+                    # Could be {symbol: data} format
+                    symbols.update(data.keys())
+        except Exception as e:
+            print(f"Warning: Could not load {NSE_SYMBOLS_FILE}: {e}")
+    
+    # 2. Load from scanner results
+    if os.path.exists(SCANNER_RESULTS):
+        try:
+            with open(SCANNER_RESULTS, 'r') as f:
+                data = json.load(f)
+                all_stocks = data.get('all_stocks', [])
+                for s in all_stocks:
+                    if isinstance(s, dict) and 'symbol' in s:
+                        symbols.add(s['symbol'])
+                    elif isinstance(s, str):
+                        symbols.add(s)
+        except:
+            pass
+    
+    # 3. Load from existing stock_details
+    if os.path.exists(STOCK_DETAILS_DIR):
+        for f in os.listdir(STOCK_DETAILS_DIR):
+            if f.endswith('.json'):
+                symbols.add(f[:-5])
+    
+    return sorted(list(symbols))
+
+
 def get_symbols_to_update(args):
     """Get list of symbols to update based on arguments."""
-    symbols = []
     
     if args.symbols:
-        symbols = [s.strip().upper() for s in args.symbols.split(',')]
-    elif args.all or args.limit:
-        # Load from scanner results
-        if os.path.exists(SCANNER_RESULTS):
-            try:
-                with open(SCANNER_RESULTS, 'r') as f:
-                    data = json.load(f)
-                    all_stocks = data.get('all_stocks', [])
-                    symbols = [s['symbol'] for s in all_stocks if 'symbol' in s]
-            except:
-                pass
+        # Specific symbols provided
+        return [s.strip().upper() for s in args.symbols.split(',')]
+    
+    # Get all symbols
+    all_symbols = get_all_symbols()
+    
+    if not all_symbols:
+        print("No symbols found. Please ensure nse_symbols.json or scanner_results.json exists.")
+        return []
+    
+    print(f"Total universe: {len(all_symbols)} symbols")
+    
+    # Batch processing
+    if args.batch:
+        batch_num = int(args.batch)
+        start_idx = (batch_num - 1) * BATCH_SIZE
+        end_idx = start_idx + BATCH_SIZE
+        batch_symbols = all_symbols[start_idx:end_idx]
         
-        # Also check stock_details directory
-        if os.path.exists(STOCK_DETAILS_DIR):
-            for f in os.listdir(STOCK_DETAILS_DIR):
-                if f.endswith('.json'):
-                    sym = f[:-5]
-                    if sym not in symbols:
-                        symbols.append(sym)
+        print(f"Batch {batch_num}: symbols {start_idx+1} to {min(end_idx, len(all_symbols))}")
         
         if args.limit:
-            # Prioritize stocks without Screener data
-            without_data = []
-            with_data = []
-            
-            for sym in symbols:
-                json_path = os.path.join(STOCK_DETAILS_DIR, f"{sym}.json")
-                if os.path.exists(json_path):
-                    try:
-                        with open(json_path, 'r') as f:
-                            data = json.load(f)
-                            # Check if we have recent Screener data
-                            updated = data.get('screener_updated', '')
-                            if not updated or updated < datetime.now().strftime('%Y-%m-%d'):
-                                without_data.append(sym)
-                            else:
-                                with_data.append(sym)
-                    except:
-                        without_data.append(sym)
-                else:
-                    without_data.append(sym)
-            
-            symbols = without_data[:args.limit]
-            if len(symbols) < args.limit:
-                symbols.extend(with_data[:args.limit - len(symbols)])
+            batch_symbols = batch_symbols[:args.limit]
+        
+        return batch_symbols
     
-    return symbols
+    # All symbols
+    if args.all:
+        if args.limit:
+            return all_symbols[:args.limit]
+        return all_symbols
+    
+    # Limit only (prioritize stocks without recent data)
+    if args.limit:
+        today = datetime.now().strftime('%Y-%m-%d')
+        without_data = []
+        with_old_data = []
+        with_recent_data = []
+        
+        for sym in all_symbols:
+            json_path = os.path.join(STOCK_DETAILS_DIR, f"{sym}.json")
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r') as f:
+                        data = json.load(f)
+                        updated = data.get('screener_updated', '')[:10]
+                        if not updated:
+                            without_data.append(sym)
+                        elif updated < today:
+                            with_old_data.append(sym)
+                        else:
+                            with_recent_data.append(sym)
+                except:
+                    without_data.append(sym)
+            else:
+                without_data.append(sym)
+        
+        # Priority: without data > old data > recent data
+        result = []
+        result.extend(without_data[:args.limit])
+        if len(result) < args.limit:
+            result.extend(with_old_data[:args.limit - len(result)])
+        if len(result) < args.limit:
+            result.extend(with_recent_data[:args.limit - len(result)])
+        
+        return result
+    
+    print("Please specify --symbols, --all, --batch, or --limit")
+    return []
 
 
 def main():
@@ -539,6 +619,7 @@ def main():
     parser.add_argument('--symbols', type=str, help='Comma-separated list of symbols')
     parser.add_argument('--all', action='store_true', help='Update all stocks')
     parser.add_argument('--limit', type=int, help='Limit number of stocks')
+    parser.add_argument('--batch', type=int, help='Batch number (1-6, each ~500 stocks)')
     parser.add_argument('--no-cache', action='store_true', help='Ignore cache')
     args = parser.parse_args()
     
@@ -546,11 +627,13 @@ def main():
     print("📊 TradEdge Screener Fetcher")
     print("=" * 60)
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if args.batch:
+        print(f"Mode: Batch {args.batch} (stocks {(args.batch-1)*BATCH_SIZE + 1} to {args.batch*BATCH_SIZE})")
     print()
     
     symbols = get_symbols_to_update(args)
     if not symbols:
-        print("No symbols to update. Use --symbols, --all, or --limit")
+        print("No symbols to update. Use --symbols, --all, --batch, or --limit")
         return
     
     print(f"Symbols to update: {len(symbols)}")
@@ -597,7 +680,7 @@ def main():
                     chg_str = f"({chg:+.2f}%)" if chg else ""
                     info_parts.append(f"Promo:{shp['promoter_pct']:.1f}%{chg_str}")
                 
-                print(f"✓ {' | '.join(info_parts)}")
+                print(f"✓ {' | '.join(info_parts) if info_parts else 'OK'}")
                 success += 1
                 
                 # Update cache
@@ -613,6 +696,11 @@ def main():
         # Rate limiting
         if i < len(symbols):
             time.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
+        
+        # Save cache periodically (every 50 stocks)
+        if i % 50 == 0:
+            save_cache(cache)
+            print(f"  [Cache saved at {i} stocks]")
     
     # Save cache
     save_cache(cache)
@@ -622,6 +710,7 @@ def main():
     print(f"✓ Success: {success}")
     print(f"📦 Cached: {cached}")
     print(f"✗ Failed: {failed}")
+    print(f"Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 
 
