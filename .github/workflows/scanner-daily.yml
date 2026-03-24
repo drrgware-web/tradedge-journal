@@ -124,11 +124,10 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Add all generated data
-          git add data/stock_details/*.json
-          git add data/scanner_results.json
-          git add data/generation_summary.json
-          git add logs/*.log
+          # Add all generated data (only if files exist)
+          git add data/stock_details/*.json 2>/dev/null || true
+          git add data/scanner_results.json 2>/dev/null || true
+          git add logs/*.log 2>/dev/null || true
           
           # Count updated files
           UPDATED=$(git diff --cached --name-only | wc -l)
@@ -148,8 +147,8 @@ jobs:
           echo "=== SCANNER RUN COMPLETE ==="
           echo "Mode: ${{ steps.mode.outputs.mode }}"
           echo "Stock details generated: $(ls data/stock_details/*.json 2>/dev/null | wc -l)"
-          if [ -f data/generation_summary.json ]; then
-            cat data/generation_summary.json
+          if [ -f data/scanner_results.json ]; then
+            echo "Scanner results generated successfully"
           fi
 
 
