@@ -149,7 +149,7 @@ body {
 }
 .scanner-icon.fundamental { background: linear-gradient(135deg, var(--purple), #6366f1); }
 .scanner-icon.technical { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
-.scanner-icon.combined { background: linear-gradient(135deg, var(--amber), var(--red)); }
+.scanner-icon.combined { background: linear-gradient(135deg, var(--amber), #f97316); }
 .scanner-name {
   font-weight: 600;
   font-size: 14px;
@@ -560,6 +560,16 @@ body {
         <div class="scanners-grid" id="technicalScanners"></div>
       </div>
     </div>
+
+    <!-- Combined Scanners -->
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">🎯 Combined Scanners (Fundamental + Technical)</span>
+      </div>
+      <div class="card-b">
+        <div class="scanners-grid" id="combinedScanners"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Tab Content: AI Query -->
@@ -779,6 +789,77 @@ const FUNDAMENTAL_SCANNERS = [
     desc: "William O'Neil's growth investing criteria",
     tags: ['growth', 'momentum'],
     query: 'EPS Growth Quarterly > 25 AND Sales Growth Quarterly > 25 AND ROE > 15 AND Shares Outstanding < 50 AND Institutional Holding > 10 AND Close > SMA(Close, 200)'
+  },
+  // NEW SCANNERS FOR SWING/POSITIONAL TRADERS
+  {
+    id: 'turnaround_plays',
+    name: 'Turnaround Plays',
+    desc: 'Companies turning profitable after losses - early stage recovery',
+    tags: ['turnaround', 'value'],
+    query: 'Net Profit Quarterly > 0 AND Net Profit 1Qtr Back < 0 AND Market Cap > 300 AND DE < 1.5 AND Sales Growth Quarterly YoY > 0'
+  },
+  {
+    id: 'hidden_gems',
+    name: 'Hidden Gems (Low Coverage)',
+    desc: 'Quality small/mid caps with low institutional & retail attention',
+    tags: ['value', 'smallcap'],
+    query: 'Market Cap > 200 AND Market Cap < 5000 AND ROCE > 15 AND ROE > 12 AND DE < 0.5 AND Institutional Holding < 15 AND Promoter Holding > 50'
+  },
+  {
+    id: 'dividend_growth',
+    name: 'Dividend Growth Champions',
+    desc: 'Consistent dividend payers with growing payouts and strong fundamentals',
+    tags: ['dividend', 'income'],
+    query: 'Dividend Yield > 1.5 AND Dividend Yield < 8 AND ROCE > 12 AND DE < 1 AND Market Cap > 500 AND EPS Growth Quarterly > 0'
+  },
+  {
+    id: 'cash_rich',
+    name: 'Cash Rich Companies',
+    desc: 'Companies with strong cash position and low debt',
+    tags: ['quality', 'value'],
+    query: 'DE < 0.3 AND Market Cap > 500 AND ROCE > 12 AND Free Cash Flow per share > 0 AND OPM Yearly > 12'
+  },
+  {
+    id: 'margin_expansion',
+    name: 'Margin Expansion',
+    desc: 'Companies with improving operating margins QoQ',
+    tags: ['growth', 'efficiency'],
+    query: 'OPM Quarterly > OPM 1Qtr Back AND OPM Quarterly > 10 AND Market Cap > 300 AND Sales Growth Quarterly YoY > 5'
+  },
+  {
+    id: 'sector_leaders',
+    name: 'Sector Leaders',
+    desc: 'Large caps with dominant market position and consistent growth',
+    tags: ['quality', 'largecap'],
+    query: 'Market Cap > 20000 AND ROCE > 15 AND ROE > 15 AND DE < 1 AND Sales 3yr CAGR > 10 AND Promoter Holding > 40'
+  },
+  {
+    id: 'mid_cap_rockets',
+    name: 'Mid Cap Rockets',
+    desc: 'Fast growing mid caps with strong fundamentals near breakout',
+    tags: ['growth', 'midcap'],
+    query: 'Market Cap > 5000 AND Market Cap < 30000 AND EPS Growth Quarterly > 20 AND Sales Growth Quarterly YoY > 15 AND ROCE > 12 AND Price Within Fifty Two Week High < 15'
+  },
+  {
+    id: 'small_cap_gems',
+    name: 'Small Cap Gems',
+    desc: 'High growth small caps with clean balance sheet',
+    tags: ['growth', 'smallcap'],
+    query: 'Market Cap > 500 AND Market Cap < 5000 AND EPS Growth Quarterly > 25 AND Sales Growth Quarterly YoY > 20 AND DE < 0.5 AND Promoter Holding > 50 AND ROCE > 15'
+  },
+  {
+    id: 'piotroski_high',
+    name: 'Piotroski High Score',
+    desc: 'Fundamentally strong stocks with Piotroski score 7+',
+    tags: ['quality', 'value'],
+    query: 'Piotroski Score >= 7 AND Market Cap > 500 AND DE < 1 AND ROE > 10'
+  },
+  {
+    id: 'low_pe_growth',
+    name: 'Low P/E Growth',
+    desc: 'Growth stocks trading at reasonable valuations',
+    tags: ['value', 'growth'],
+    query: 'PE < 20 AND PE > 0 AND EPS Growth Quarterly > 15 AND Sales Growth Quarterly YoY > 10 AND Market Cap > 500 AND ROCE > 10'
   }
 ];
 
@@ -809,12 +890,12 @@ const TECHNICAL_SCANNERS = [
     name: 'Volume Breakout',
     desc: '2x+ volume spike with price breakout',
     tags: ['volume', 'breakout'],
-    query: 'preset_volume_2x_spike AND Close > High 1Day Back'
+    query: 'Volume Ratio > 2 AND Change Pct > 2'
   },
   {
     id: 'ema_crossover',
-    name: 'EMA Crossover',
-    desc: '9 EMA crossing above 21 EMA',
+    name: 'EMA Crossover (9/21)',
+    desc: '9 EMA crossing above 21 EMA - bullish momentum',
     tags: ['trend', 'momentum'],
     query: 'EMA(Close, 9) > EMA(Close, 21) AND EMA(Close, 9) 1Day Back < EMA(Close, 21) 1Day Back'
   },
@@ -823,12 +904,12 @@ const TECHNICAL_SCANNERS = [
     name: 'RSI Oversold Bounce',
     desc: 'RSI < 30 with bullish reversal candle',
     tags: ['reversal', 'momentum'],
-    query: 'RSI(14) < 30 AND Close > Open AND Close > High 1Day Back'
+    query: 'RSI < 35 AND Change Pct > 0'
   },
   {
     id: 'above_all_emas',
     name: 'Above All EMAs',
-    desc: 'Price above 20, 50, 200 EMA - strong trend',
+    desc: 'Price above 20, 50, 200 EMA - strong uptrend',
     tags: ['trend'],
     query: 'Close > EMA(Close, 20) AND Close > EMA(Close, 50) AND Close > EMA(Close, 200)'
   },
@@ -837,7 +918,194 @@ const TECHNICAL_SCANNERS = [
     name: '52 Week High Breakout',
     desc: 'Breaking above 52 week high on volume',
     tags: ['breakout'],
-    query: 'Close > High 52Week AND Volume > Volume 20Day SMA * 1.5'
+    query: 'Price Within Fifty Two Week High < 3 AND Volume Ratio > 1.5'
+  },
+  // NEW TECHNICAL SCANNERS FOR SWING/POSITIONAL
+  {
+    id: 'pullback_to_ema20',
+    name: 'Pullback to 20 EMA',
+    desc: 'Uptrending stocks pulling back to 20 EMA support',
+    tags: ['pullback', 'trend'],
+    query: 'Close > EMA(Close, 50) AND Close > EMA(Close, 200) AND Close <= EMA(Close, 20) * 1.02 AND Close >= EMA(Close, 20) * 0.98'
+  },
+  {
+    id: 'pullback_to_ema50',
+    name: 'Pullback to 50 EMA',
+    desc: 'Strong stocks pulling back to 50 EMA support zone',
+    tags: ['pullback', 'trend'],
+    query: 'Close > EMA(Close, 200) AND Close <= EMA(Close, 50) * 1.03 AND Close >= EMA(Close, 50) * 0.97 AND RSI < 50'
+  },
+  {
+    id: 'golden_cross',
+    name: 'Golden Cross',
+    desc: '50 EMA crossing above 200 EMA - major bullish signal',
+    tags: ['trend', 'crossover'],
+    query: 'EMA(Close, 50) > EMA(Close, 200) AND Close > EMA(Close, 50)'
+  },
+  {
+    id: 'stage2_uptrend',
+    name: 'Stage 2 Uptrend (Weinstein)',
+    desc: 'Stock in confirmed Stage 2 uptrend with rising moving averages',
+    tags: ['trend', 'weinstein'],
+    query: 'Close > EMA(Close, 50) AND EMA(Close, 50) > EMA(Close, 200) AND Volume Ratio > 1 AND Price Within Fifty Two Week High < 25'
+  },
+  {
+    id: 'breakout_consolidation',
+    name: 'Breakout from Consolidation',
+    desc: 'Breaking out of tight range with volume expansion',
+    tags: ['breakout', 'volume'],
+    query: 'Volume Ratio > 1.8 AND Change Pct > 3 AND Price Within Fifty Two Week High < 10'
+  },
+  {
+    id: 'inside_day_setup',
+    name: 'Inside Day Setup',
+    desc: 'Narrow range day indicating pending breakout',
+    tags: ['pattern', 'consolidation'],
+    query: 'preset_inside_day'
+  },
+  {
+    id: 'power_of_3',
+    name: 'Power of 3 (RS + Volume + Price)',
+    desc: 'Strong relative strength + volume + price action combo',
+    tags: ['momentum', 'strength'],
+    query: 'Volume Ratio > 1.5 AND Change Pct > 2 AND Price Within Fifty Two Week High < 15 AND RSI > 50'
+  },
+  {
+    id: 'bollinger_squeeze',
+    name: 'Bollinger Squeeze',
+    desc: 'Bollinger Bands contracting - volatility expansion coming',
+    tags: ['volatility', 'breakout'],
+    query: 'preset_bollinger_squeeze'
+  },
+  {
+    id: 'macd_bullish_cross',
+    name: 'MACD Bullish Crossover',
+    desc: 'MACD crossing above signal line - momentum shift',
+    tags: ['momentum', 'crossover'],
+    query: 'MACD Crossover = bullish AND Close > EMA(Close, 50)'
+  },
+  {
+    id: 'new_high_volume',
+    name: 'New High on High Volume',
+    desc: 'Making 52W high with 2x+ average volume',
+    tags: ['breakout', 'volume'],
+    query: 'Price Within Fifty Two Week High < 1 AND Volume Ratio > 2'
+  },
+  {
+    id: 'gap_up_hold',
+    name: 'Gap Up & Hold',
+    desc: 'Gapped up and holding gains - institutional buying',
+    tags: ['gap', 'momentum'],
+    query: 'Change Pct > 3 AND Volume Ratio > 1.5 AND Close > Open'
+  },
+  {
+    id: 'oversold_quality',
+    name: 'Oversold Quality Stocks',
+    desc: 'Quality stocks with RSI < 30 - potential bounce',
+    tags: ['reversal', 'value'],
+    query: 'RSI < 30 AND ROCE > 12 AND DE < 1 AND Market Cap > 1000'
+  },
+  {
+    id: 'relative_strength_leaders',
+    name: 'Relative Strength Leaders',
+    desc: 'Stocks outperforming market in uptrend',
+    tags: ['momentum', 'strength'],
+    query: 'Change Pct 3M > 15 AND Close > EMA(Close, 50) AND Close > EMA(Close, 200) AND Volume Ratio > 1'
+  },
+  {
+    id: 'accumulation_day',
+    name: 'Accumulation Day',
+    desc: 'Price up on above-average volume - institutional buying',
+    tags: ['volume', 'accumulation'],
+    query: 'Change Pct > 1 AND Volume Ratio > 1.25 AND Close > Open'
+  },
+  {
+    id: 'support_bounce',
+    name: 'Bounce from 200 EMA',
+    desc: 'Stock bouncing off 200 EMA support',
+    tags: ['support', 'reversal'],
+    query: 'Close >= EMA(Close, 200) * 0.98 AND Close <= EMA(Close, 200) * 1.05 AND Change Pct > 0 AND RSI < 45'
+  },
+  {
+    id: 'momentum_surge',
+    name: 'Momentum Surge',
+    desc: 'Strong momentum with RSI > 60 and volume spike',
+    tags: ['momentum', 'strength'],
+    query: 'RSI > 60 AND Volume Ratio > 1.5 AND Change Pct > 2 AND Close > EMA(Close, 20)'
+  }
+];
+
+// COMBINED SCANNERS (Fundamental + Technical)
+const COMBINED_SCANNERS = [
+  {
+    id: 'perfect_setup',
+    name: 'Perfect Setup',
+    desc: 'Strong fundamentals + technical breakout + volume',
+    tags: ['combined', 'quality'],
+    query: 'Market Cap > 500 AND ROCE > 12 AND DE < 1 AND EPS Growth Quarterly > 15 AND Volume Ratio > 1.5 AND Price Within Fifty Two Week High < 10'
+  },
+  {
+    id: 'growth_breakout',
+    name: 'Growth Stock Breakout',
+    desc: 'High growth stocks breaking out on volume',
+    tags: ['growth', 'breakout'],
+    query: 'EPS Growth Quarterly > 20 AND Sales Growth Quarterly YoY > 15 AND Market Cap > 500 AND Volume Ratio > 1.5 AND Change Pct > 2'
+  },
+  {
+    id: 'value_momentum',
+    name: 'Value + Momentum',
+    desc: 'Undervalued stocks gaining momentum',
+    tags: ['value', 'momentum'],
+    query: 'PE < 20 AND PB < 3 AND ROCE > 12 AND RSI > 50 AND RSI < 70 AND Close > EMA(Close, 50)'
+  },
+  {
+    id: 'institutional_breakout',
+    name: 'Institutional Favorite Breakout',
+    desc: 'High institutional holding stocks near 52W high',
+    tags: ['institutional', 'breakout'],
+    query: 'Institutional Holding > 20 AND Market Cap > 1000 AND Price Within Fifty Two Week High < 10 AND Volume Ratio > 1.3'
+  },
+  {
+    id: 'earnings_momentum',
+    name: 'Post-Earnings Momentum',
+    desc: 'Strong earnings + price momentum combo',
+    tags: ['earnings', 'momentum'],
+    query: 'EPS Growth Quarterly > 25 AND Change Pct > 0 AND Volume Ratio > 1.2 AND RSI > 50'
+  },
+  {
+    id: 'quality_pullback',
+    name: 'Quality Stock Pullback',
+    desc: 'High quality stocks in temporary pullback - buying opportunity',
+    tags: ['quality', 'pullback'],
+    query: 'ROCE > 15 AND ROE > 12 AND DE < 0.5 AND RSI < 40 AND Close > EMA(Close, 200)'
+  },
+  {
+    id: 'minervini_template',
+    name: 'Minervini Trend Template',
+    desc: "Mark Minervini's stock selection criteria",
+    tags: ['minervini', 'trend'],
+    query: 'Close > EMA(Close, 50) AND Close > EMA(Close, 200) AND EMA(Close, 50) > EMA(Close, 200) AND Price Within Fifty Two Week High < 25 AND Price Within Fifty Two Week Low > 30 AND EPS Growth Quarterly > 15'
+  },
+  {
+    id: 'swing_candidate',
+    name: 'Swing Trade Candidate',
+    desc: 'Ideal setup for 2-4 week swing trades',
+    tags: ['swing', 'setup'],
+    query: 'Market Cap > 500 AND Volume Ratio > 1.2 AND RSI > 40 AND RSI < 65 AND Close > EMA(Close, 20) AND Price Within Fifty Two Week High < 20'
+  },
+  {
+    id: 'positional_buy',
+    name: 'Positional Buy (2-6 months)',
+    desc: 'Strong stocks for medium-term holding',
+    tags: ['positional', 'quality'],
+    query: 'Market Cap > 1000 AND ROCE > 12 AND DE < 1 AND EPS Growth Quarterly > 10 AND Close > EMA(Close, 50) AND Close > EMA(Close, 200) AND Promoter Holding > 40'
+  },
+  {
+    id: 'high_conviction',
+    name: 'High Conviction Buy',
+    desc: 'All factors aligned - fundamentals, technicals, ownership',
+    tags: ['quality', 'conviction'],
+    query: 'Market Cap > 500 AND ROCE > 15 AND DE < 0.5 AND EPS Growth Quarterly > 20 AND Promoter Holding > 50 AND Close > EMA(Close, 50) AND Volume Ratio > 1 AND Price Within Fifty Two Week High < 15'
   }
 ];
 
@@ -857,6 +1125,7 @@ let myScanners = JSON.parse(localStorage.getItem('te_scanners') || '[]');
 function init() {
   renderFundamentalScanners();
   renderTechnicalScanners();
+  renderCombinedScanners();
   renderMyScanners();
   setupTabs();
   setupOperators();
@@ -889,8 +1158,9 @@ function setupOperators() {
 
 function renderScannerCard(scanner, type) {
   const isSelected = selectedScanners.find(s => s.id === scanner.id);
+  const icon = type === 'fundamental' ? '📊' : type === 'technical' ? '📈' : '🎯';
   return '<div class="scanner-card ' + (isSelected ? 'selected' : '') + '" data-id="' + scanner.id + '" data-type="' + type + '" onclick="toggleScanner(\'' + scanner.id + '\', \'' + type + '\')">' +
-    '<div class="scanner-icon ' + type + '">' + (type === 'fundamental' ? '📊' : '📈') + '</div>' +
+    '<div class="scanner-icon ' + type + '">' + icon + '</div>' +
     '<div class="scanner-name">' + scanner.name + '</div>' +
     '<div class="scanner-desc">' + scanner.desc + '</div>' +
     '<div class="scanner-tags">' + scanner.tags.map(t => '<span class="scanner-tag ' + t + '">' + t + '</span>').join('') + '</div>' +
@@ -907,12 +1177,21 @@ function renderTechnicalScanners() {
     TECHNICAL_SCANNERS.map(s => renderScannerCard(s, 'technical')).join('');
 }
 
+function renderCombinedScanners() {
+  document.getElementById('combinedScanners').innerHTML = 
+    COMBINED_SCANNERS.map(s => renderScannerCard(s, 'combined')).join('');
+}
+
 // ============================================================
 // SCANNER SELECTION
 // ============================================================
 
 function toggleScanner(id, type) {
-  const scanners = type === 'fundamental' ? FUNDAMENTAL_SCANNERS : TECHNICAL_SCANNERS;
+  let scanners;
+  if (type === 'fundamental') scanners = FUNDAMENTAL_SCANNERS;
+  else if (type === 'technical') scanners = TECHNICAL_SCANNERS;
+  else scanners = COMBINED_SCANNERS;
+  
   const scanner = scanners.find(s => s.id === id);
   
   const idx = selectedScanners.findIndex(s => s.id === id);
@@ -925,6 +1204,7 @@ function toggleScanner(id, type) {
   updateSelectedUI();
   renderFundamentalScanners();
   renderTechnicalScanners();
+  renderCombinedScanners();
 }
 
 function updateSelectedUI() {
@@ -951,6 +1231,7 @@ function removeSelected(id) {
   updateSelectedUI();
   renderFundamentalScanners();
   renderTechnicalScanners();
+  renderCombinedScanners();
 }
 
 function clearSelected() {
@@ -958,6 +1239,7 @@ function clearSelected() {
   updateSelectedUI();
   renderFundamentalScanners();
   renderTechnicalScanners();
+  renderCombinedScanners();
 }
 
 // ============================================================
