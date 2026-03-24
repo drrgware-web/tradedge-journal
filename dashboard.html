@@ -33,14 +33,6 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .hero-clock{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px}
 .market-dot{width:8px;height:8px;border-radius:50%;display:inline-block;animation:dotPulse 2s ease-in-out infinite}
 
-.macro-strip{display:flex;gap:8px;overflow-x:auto;padding:0 20px 20px;scrollbar-width:none}
-.macro-strip::-webkit-scrollbar{display:none}
-.macro-item{flex-shrink:0;padding:8px 14px;background:var(--s1);border:1px solid var(--bd);border-radius:8px;min-width:100px;animation:fadeIn .4s ease-out both;transition:all .2s}
-.macro-item:hover{border-color:var(--bd2);transform:translateY(-1px)}
-.macro-name{font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.08em;margin-bottom:4px;white-space:nowrap}
-.macro-val{font-family:var(--mono);font-size:16px;font-weight:800;line-height:1}
-.macro-label{font-family:var(--mono);font-size:7px;margin-top:3px}
-
 .section{padding:0 20px;margin-bottom:28px;max-width:1200px;margin-left:auto;margin-right:auto}
 .section-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.25em;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--bd2),transparent)}
@@ -75,8 +67,6 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
     <span id="market-status"></span>
   </div>
 </div>
-
-<div class="macro-strip" id="macro-strip"></div>
 
 <!-- INTELLIGENCE -->
 <div class="section">
@@ -272,27 +262,7 @@ function updateClock(){
 }
 updateClock();setInterval(updateClock,1000);
 
-// ═══ MACRO PULSE ═══
-fetch('./data/rrm_data.json').then(r=>r.ok?r.json():null).then(data=>{
-  if(!data)return;
-  const bm=data.benchmarks_data?.['^NSEI'];if(!bm)return;
-  const all=[...(bm.daily?.asset_classes||[]),...(bm.daily?.global_indices||[]),...(bm.daily?.market_segments||[])];
-  const names=['Gold','Silver','Crude Oil','USD/INR','Bitcoin','US 10Y Yield','Dow Jones','S&P 500','NASDAQ','Nifty 50'];
-  const strip=document.getElementById('macro-strip');
-  const qc={Leading:'#00ff88',Improving:'#00c8ff',Weakening:'#ffd000',Lagging:'#ff3366'};
-  names.forEach((name,i)=>{
-    const item=all.find(a=>a.name?.includes(name));if(!item)return;
-    const w=data.benchmarks_data?.['^NSEI']?.weekly;
-    const wItem=w?[...(w.asset_classes||[]),...(w.global_indices||[]),...(w.market_segments||[])].find(a=>a.name?.includes(name)):null;
-    const q=wItem?.quadrant||item.quadrant||'';
-    const rsr=wItem?.current?.rs_ratio||item.current?.rs_ratio||100;
-    const rsm=wItem?.current?.rs_momentum||item.current?.rs_momentum||100;
-    const c=qc[q]||'#666';
-    const el=document.createElement('div');el.className='macro-item';el.style.animationDelay=(i*0.05)+'s';
-    el.innerHTML=`<div class="macro-name">${name}</div><div class="macro-val" style="color:${c}">${rsr.toFixed(0)}<span style="font-size:11px;margin-left:3px;color:${rsm>=100?'#00ff88':'#ff3366'}">${rsm>=100?'↑':'↓'}</span></div><div class="macro-label" style="color:${c}80">${q}</div>`;
-    strip.appendChild(el);
-  });
-}).catch(()=>{});
+// ═══ MACRO PULSE REMOVED ═══
 </script>
 </body>
 </html>
