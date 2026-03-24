@@ -81,8 +81,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--t1);min-height:100
 .kl-box.res{border-left-color:var(--red)}
 .kl-box.sup{border-left-color:var(--green)}
 .kl-title{font-size:9px;color:var(--t4);margin-bottom:4px}
-.kl-val{font-size:13px;font-weight:600;font-family:var(--mono)}
-.kl-desc{font-size:9px;color:var(--t4);margin-top:2px}
+.kl-val{font-size:14px;font-weight:700;font-family:var(--mono)}
+.kl-desc{font-size:9px;color:var(--t3);margin-top:2px}
 
 /* Risk */
 .risk-box{padding:12px;background:var(--bg2);border-radius:8px;margin-top:12px}
@@ -429,9 +429,9 @@ function renderQuality() {
           return '<div class="qs-row"><div class="qs-label">' + b.l + '</div><div class="qs-bar"><div class="qs-fill" style="width:' + (b.v/b.m*100) + '%;background:' + b.c + '"></div></div><div class="qs-val">' + b.v + '/' + b.m + '</div></div>';
         }).join('') + '</div>' +
         '<div class="kl-grid">' +
-          '<div class="kl-box"><div class="kl-title">🎯 Current</div><div class="kl-val">₹' + fmt(price) + '</div></div>' +
-          '<div class="kl-box res"><div class="kl-title">🔺 Resistance</div><div class="kl-val">₹' + fmt(h52) + '</div></div>' +
-          '<div class="kl-box sup"><div class="kl-title">🔻 Support</div><div class="kl-val">₹' + fmt(ema50) + '</div></div>' +
+          '<div class="kl-box"><div class="kl-title">🎯 Current Price</div><div class="kl-val">₹' + fmt(price) + '</div></div>' +
+          '<div class="kl-box res"><div class="kl-title">▲ Resistance</div><div class="kl-val">₹' + fmt(h52) + '</div><div class="kl-desc">52W High</div></div>' +
+          '<div class="kl-box sup"><div class="kl-title">▼ Support</div><div class="kl-val">₹' + fmt(ema50) + '</div><div class="kl-desc">EMA 50</div></div>' +
         '</div>' +
         '<div class="risk-box">' +
           '<div class="risk-row"><span class="risk-icon">⚠️</span><span class="risk-label">Risk</span><span class="risk-val">' + (chgPct > 15 ? 'Extended move' : 'Normal range') + '</span></div>' +
@@ -475,12 +475,18 @@ function renderSHP() {
   const inst = h.institutional_pct || 0;
   const pub = h.public_pct || Math.max(0, 100 - promo - (fii || inst) - dii);
   
+  // QoQ changes (will be updated from Screener data)
+  const promoChg = h.promoter_chg || 0;
+  const fiiChg = h.fii_chg || 0;
+  const diiChg = h.dii_chg || 0;
+  const pubChg = h.public_chg || 0;
+  
   const holders = [];
-  if (promo > 0) holders.push({n: 'Promoters', p: promo, c: 0, col: COL.promo});
-  if (fii > 0) holders.push({n: 'FII/FPI', p: fii, c: 0, col: COL.fii});
+  if (promo > 0) holders.push({n: 'Promoters', p: promo, c: promoChg, col: COL.promo});
+  if (fii > 0) holders.push({n: 'FII/FPI', p: fii, c: fiiChg, col: COL.fii});
   else if (inst > 0) holders.push({n: 'Institutional', p: inst, c: 0, col: COL.fii});
-  if (dii > 0) holders.push({n: 'DII', p: dii, c: 0, col: COL.dii});
-  if (pub > 0) holders.push({n: 'Public', p: pub, c: 0, col: COL.pub});
+  if (dii > 0) holders.push({n: 'DII', p: dii, c: diiChg, col: COL.dii});
+  if (pub > 0) holders.push({n: 'Public', p: pub, c: pubChg, col: COL.pub});
   
   if (holders.length === 0) {
     holders.push({n: 'Promoters', p: 50, c: 0, col: COL.promo});
@@ -488,13 +494,19 @@ function renderSHP() {
     holders.push({n: 'Public', p: 20, c: 0, col: COL.pub});
   }
   
+  function chgBadge(c) {
+    if (c > 0) return '<div class="shp-chg up">▲' + c.toFixed(2) + '%</div>';
+    if (c < 0) return '<div class="shp-chg dn">▼' + Math.abs(c).toFixed(2) + '%</div>';
+    return '<div class="shp-chg flat">—</div>';
+  }
+  
   return '<div class="sec-t">Shareholding Pattern</div>' +
     '<div class="card">' +
       '<div class="card-h"><span class="card-t">📊 SHAREHOLDING</span><span style="font-size:9px;color:var(--t4)">Latest Qtr</span></div>' +
-      '<div class="card-b"><div class="shp-wrap">' +
+      '<div class="card-b" id="shpBody"><div class="shp-wrap">' +
         '<div class="shp-donut"><canvas id="shpC" width="160" height="160"></canvas><div class="shp-center">👥</div></div>' +
         '<div class="shp-list">' + holders.map(function(x) {
-          return '<div class="shp-row"><div class="shp-dot" style="background:' + x.col + '"></div><div class="shp-name">' + x.n + '</div><div class="shp-pct">' + x.p.toFixed(1) + '%</div><div class="shp-chg flat">—</div></div>';
+          return '<div class="shp-row"><div class="shp-dot" style="background:' + x.col + '"></div><div class="shp-name">' + x.n + '</div><div class="shp-pct">' + x.p.toFixed(1) + '%</div>' + chgBadge(x.c) + '</div>';
         }).join('') + '</div>' +
       '</div></div>' +
     '</div>';
@@ -536,26 +548,41 @@ function drawDonut() {
 }
 
 function renderMF() {
-  const mfPct = sv(D, 'fund_holdings.mf_pct', 15);
-  const list = [
-    {n: 'SBI MF', p: 4.2, c: 0.3},
-    {n: 'HDFC MF', p: 3.8, c: -0.1},
-    {n: 'ICICI Pru', p: 3.1, c: 0.2},
-    {n: 'Axis MF', p: 2.7, c: 0.5},
-    {n: 'Others', p: Math.max(0, mfPct - 13.8), c: 0}
-  ];
+  const h = D.fund_holdings || {};
+  const mfPct = h.mf_pct || 15;
+  
+  // Use actual MF data if available, otherwise placeholder
+  const mfHoldings = D.mf_holdings || [];
+  
+  let list;
+  if (mfHoldings.length > 0) {
+    list = mfHoldings.slice(0, 5);
+  } else {
+    // Placeholder based on typical distribution
+    const basePct = mfPct / 5;
+    list = [
+      {n: 'SBI MF', p: basePct * 1.4, c: 0.3},
+      {n: 'HDFC MF', p: basePct * 1.2, c: -0.1},
+      {n: 'ICICI Pru', p: basePct * 1.0, c: 0.2},
+      {n: 'Axis MF', p: basePct * 0.9, c: 0.5},
+      {n: 'Others', p: basePct * 0.5, c: 0}
+    ];
+  }
   
   const cols = ['#8b5cf6', '#22c55e', '#f59e0b', '#3b82f6', '#64748b'];
   
   return '<div class="sec-t">Mutual Fund Holdings</div>' +
     '<div class="card">' +
       '<div class="card-h"><span class="card-t">🏦 MF HOLDINGS</span><span style="font-size:9px;color:var(--t4)">' + mfPct.toFixed(1) + '% Total</span></div>' +
-      '<div class="card-b">' + list.map(function(m, i) {
+      '<div class="card-b" id="mfBody">' + list.map(function(m, i) {
+        const pct = m.p || m.pct || 0;
+        const chg = m.c || m.chg || 0;
+        const name = m.n || m.name || 'Fund ' + (i+1);
         return '<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
           '<div style="width:8px;height:8px;border-radius:50%;background:' + cols[i] + ';margin-right:10px"></div>' +
-          '<div style="flex:1;font-size:11px;color:var(--t2)">' + m.n + '</div>' +
-          '<div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-right:8px">' + m.p.toFixed(1) + '%</div>' +
-          '<div style="font-size:10px;font-weight:600;color:' + (m.c >= 0 ? 'var(--green)' : 'var(--red)') + '">' + (m.c >= 0 ? '+' : '') + m.c.toFixed(1) + '%</div>' +
+          '<div style="flex:1;font-size:11px;color:var(--t2)">' + name + '</div>' +
+          '<div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-right:8px">' + pct.toFixed(1) + '%</div>' +
+          '<div style="font-size:10px;font-weight:600;color:' + (chg >= 0 ? 'var(--green)' : 'var(--red)') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(1) + '%</div>' +
         '</div>';
       }).join('') + '</div>' +
     '</div>';
@@ -598,27 +625,39 @@ function renderInsider() {
 
 function renderSurv() {
   const s = D.surveillance || {};
-  const flags = s.flags || [];
+  const dataFlags = s.flags || [];
+  
+  // Default checks with proper names matching data
   const checks = [
-    {n: 'NSE ASM List', f: false},
-    {n: 'NSE GSM List', f: false},
-    {n: 'High Debt', f: false},
-    {n: 'Low Inst. Holding', f: false},
-    {n: 'Penny Stock', f: false},
-    {n: 'High Pledging', f: false},
-    {n: 'Low Liquidity', f: false},
-    {n: 'Inst. Decline', f: false}
+    {n: 'NSE ASM List', key: 'asm', f: false},
+    {n: 'NSE GSM List', key: 'gsm', f: false},
+    {n: 'High Debt', key: 'high_debt', f: false},
+    {n: 'Low Inst. Holding', key: 'low_inst', f: false},
+    {n: 'Penny Stock', key: 'penny', f: false},
+    {n: 'High Pledging', key: 'high_pledge', f: false},
+    {n: 'Low Liquidity', key: 'low_liq', f: false},
+    {n: 'Inst. Decline', key: 'inst_decline', f: false}
   ];
   
-  // Merge with actual flags
-  if (flags.length > 0) {
-    flags.forEach(function(flag) {
-      const idx = checks.findIndex(function(c) { return c.n === (flag.name || flag.n); });
-      if (idx >= 0) checks[idx].f = flag.flagged || flag.f || false;
+  // Merge with actual flags from data
+  if (dataFlags.length > 0) {
+    dataFlags.forEach(function(flag) {
+      if (!flag) return;
+      const flagName = flag.name || flag.n || '';
+      const isFlagged = flag.flagged === true || flag.f === true;
+      // Find matching check
+      for (let i = 0; i < checks.length; i++) {
+        if (flagName.toLowerCase().includes(checks[i].key) || 
+            flagName.toLowerCase().includes(checks[i].n.toLowerCase().split(' ')[0])) {
+          checks[i].f = isFlagged;
+          break;
+        }
+      }
     });
   }
   
-  const rc = s.red_flag_count || checks.filter(function(c) { return c.f; }).length;
+  // Count actual red flags
+  const rc = checks.filter(function(c) { return c.f === true; }).length;
   const st = rc === 0 ? 'safe' : rc <= 2 ? 'caution' : 'danger';
   
   return '<div class="sec-t">Surveillance</div>' +
@@ -973,10 +1012,77 @@ async function fetchFund(s) {
     if (!r.ok) throw new Error('Fetch failed');
     const d = await r.json();
     if (!d.quarters || d.quarters.length === 0) throw new Error('No data');
-    F = {info: d.info || {}, quarters: d.quarters || []};
+    F = {info: d.info || {}, quarters: d.quarters || [], shareholding: d.shareholding || null};
+    
+    // Update shareholding with real QoQ data if available
+    if (d.shareholding) {
+      updateShareholding(d.shareholding);
+    }
+    
+    // Update key metrics with real data
+    if (d.info) {
+      updateKeyMetrics(d.info);
+    }
+    
     renderFundTable();
   } catch (e) {
+    console.log('Screener fetch error:', e);
     if (c) c.innerHTML = '<div class="card-h"><span class="card-t">📊 QUARTERLY FINANCIALS</span></div><div class="card-b" style="text-align:center;padding:24px;color:var(--t4)">Data unavailable</div>';
+  }
+}
+
+function updateShareholding(shp) {
+  // Update D.fund_holdings with Screener data
+  if (shp.promoter_pct != null) D.fund_holdings.promoter_pct = shp.promoter_pct;
+  if (shp.promoter_chg != null) D.fund_holdings.promoter_chg = shp.promoter_chg;
+  if (shp.fii_pct != null) D.fund_holdings.fii_pct = shp.fii_pct;
+  if (shp.fii_chg != null) D.fund_holdings.fii_chg = shp.fii_chg;
+  if (shp.dii_pct != null) D.fund_holdings.dii_pct = shp.dii_pct;
+  if (shp.dii_chg != null) D.fund_holdings.dii_chg = shp.dii_chg;
+  if (shp.public_pct != null) D.fund_holdings.public_pct = shp.public_pct;
+  if (shp.public_chg != null) D.fund_holdings.public_chg = shp.public_chg;
+  
+  // Re-render shareholding section
+  const shpBody = $('shpBody');
+  if (shpBody) {
+    const h = D.fund_holdings;
+    const holders = [];
+    if (h.promoter_pct > 0) holders.push({n: 'Promoters', p: h.promoter_pct, c: h.promoter_chg || 0, col: COL.promo});
+    if (h.fii_pct > 0) holders.push({n: 'FII/FPI', p: h.fii_pct, c: h.fii_chg || 0, col: COL.fii});
+    else if (h.institutional_pct > 0) holders.push({n: 'Institutional', p: h.institutional_pct, c: 0, col: COL.fii});
+    if (h.dii_pct > 0) holders.push({n: 'DII', p: h.dii_pct, c: h.dii_chg || 0, col: COL.dii});
+    const pub = h.public_pct || Math.max(0, 100 - (h.promoter_pct || 0) - (h.fii_pct || h.institutional_pct || 0) - (h.dii_pct || 0));
+    if (pub > 0) holders.push({n: 'Public', p: pub, c: h.public_chg || 0, col: COL.pub});
+    
+    function chgBadge(c) {
+      if (c > 0) return '<div class="shp-chg up">▲' + c.toFixed(2) + '%</div>';
+      if (c < 0) return '<div class="shp-chg dn">▼' + Math.abs(c).toFixed(2) + '%</div>';
+      return '<div class="shp-chg flat">—</div>';
+    }
+    
+    shpBody.innerHTML = '<div class="shp-wrap">' +
+      '<div class="shp-donut"><canvas id="shpC" width="160" height="160"></canvas><div class="shp-center">👥</div></div>' +
+      '<div class="shp-list">' + holders.map(function(x) {
+        return '<div class="shp-row"><div class="shp-dot" style="background:' + x.col + '"></div><div class="shp-name">' + x.n + '</div><div class="shp-pct">' + x.p.toFixed(1) + '%</div>' + chgBadge(x.c) + '</div>';
+      }).join('') + '</div>' +
+    '</div>';
+    
+    drawDonut();
+  }
+}
+
+function updateKeyMetrics(info) {
+  // Update D.fundamentals with Screener data
+  if (info.mcapCr != null) D.fundamentals.market_cap_cr = info.mcapCr;
+  if (info.pe != null) D.fundamentals.pe_ratio = info.pe;
+  if (info.roe != null) D.fundamentals.roe = info.roe;
+  if (info.roce != null) D.fundamentals.roce = info.roce;
+  if (info.bookValue != null) D.fundamentals.book_value = info.bookValue;
+  if (info.dividendYield != null) D.fundamentals.dividend_yield = info.dividendYield;
+  if (info.debtToEquity != null) D.fundamentals.debt_to_equity = info.debtToEquity;
+  if (info.currentPrice != null) {
+    D.technical = D.technical || {};
+    D.technical.close = info.currentPrice;
   }
 }
 
