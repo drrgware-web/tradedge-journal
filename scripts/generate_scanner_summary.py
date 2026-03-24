@@ -46,30 +46,30 @@ def create_scan_categories(details: List[Dict]) -> Dict[str, List[Dict]]:
         "oneil_ab": [],     # A and B grade
         
         # Guru Strategies
-        "canslim_high": [],     # CANSLIM score >= 70
-        "graham_value": [],     # Graham score >= 70
-        "buffett_quality": [],  # Buffett score >= 70
-        "lynch_growth": [],     # Lynch score >= 70
+        "canslim_high": [],     # CANSLIM score >= 60
+        "graham_value": [],     # Graham score >= 60
+        "buffett_quality": [],  # Buffett score >= 60
+        "lynch_growth": [],     # Lynch score >= 60
         
         # Surveillance
-        "safe_stocks": [],      # Surveillance status = SAFE
-        "caution_stocks": [],   # Surveillance status = CAUTION
+        "safe_stocks": [],      # No red flags
+        "caution_stocks": [],   # Has red flags
         
         # Momentum
         "high_momentum": [],    # RS >= 80
         "breakout": [],         # Near 52w high
         
         # Fundamentals
-        "high_roe": [],         # ROE >= 20
-        "low_debt": [],         # D/E <= 0.5
-        "high_growth": [],      # EPS growth >= 25%
+        "high_roe": [],         # ROE >= 15
+        "low_debt": [],         # D/E <= 50 (your data uses percentage)
+        "high_growth": [],      # Revenue growth >= 15%
         
         # Volume
         "high_volume": [],      # Above avg volume
         "accumulation": [],     # Buyer demand A or B
         
         # Ownership
-        "fii_buying": [],       # FII holding increasing
+        "fii_buying": [],       # Institutional holding > 20%
         "high_promoter": [],    # Promoter >= 50%
     }
     
@@ -91,57 +91,61 @@ def create_scan_categories(details: List[Dict]) -> Dict[str, List[Dict]]:
         elif master_score == "B":
             categories["oneil_ab"].append(entry)
             
-        # Guru categories
+        # Guru categories - check score_pct field
         guru_ratings = detail.get("guru_ratings", [])
         for rating in guru_ratings:
             strategy = rating.get("strategy", "").lower()
-            score = rating.get("score", 0)
+            score_pct = rating.get("score_pct", 0) or 0
             
-            if strategy == "canslim" and score >= 70:
+            if "canslim" in strategy and score_pct >= 60:
                 categories["canslim_high"].append(entry)
-            elif strategy == "graham" and score >= 70:
+            elif "value" in strategy and score_pct >= 60:
                 categories["graham_value"].append(entry)
-            elif strategy == "buffett" and score >= 70:
-                categories["buffett_quality"].append(entry)
-            elif strategy == "lynch" and score >= 70:
-                categories["lynch_growth"].append(entry)
+            elif "quality" in strategy or "buffett" in strategy.lower():
+                if score_pct >= 60:
+                    categories["buffett_quality"].append(entry)
+            elif "lynch" in strategy.lower() or "growth" in strategy.lower():
+                if score_pct >= 60:
+                    categories["lynch_growth"].append(entry)
                 
-        # Surveillance
+        # Surveillance - check red_flag_count
         surveillance = detail.get("surveillance", {})
-        status = surveillance.get("status", "")
+        red_flags = surveillance.get("red_flag_count", 0) or 0
         
-        if status == "SAFE":
+        if red_flags == 0:
             categories["safe_stocks"].append(entry)
-        elif status == "CAUTION":
+        else:
             categories["caution_stocks"].append(entry)
             
-        # Momentum
-        price_strength = oneil.get("price_strength", 0)
+        # Momentum - from oneil.price_strength
+        price_strength = oneil.get("price_strength", 0) or 0
         if price_strength >= 80:
             categories["high_momentum"].append(entry)
-            
-        tech = detail.get("technical", {})
-        high_proximity = tech.get("high_52w_proximity", 0)
-        if high_proximity >= 95:
+        
+        # Breakout - calculate from breakout dict
+        breakout = detail.get("breakout", {})
+        pct_from_high = breakout.get("pct_from_high", -100) or -100
+        if pct_from_high >= -5:  # Within 5% of 52W high
             categories["breakout"].append(entry)
             
-        # Fundamentals
+        # Fundamentals - from fundamentals dict
         fund = detail.get("fundamentals", {})
         
-        roe = fund.get("roe", 0)
-        if roe >= 20:
+        roe = fund.get("roe")
+        if roe is not None and roe >= 15:
             categories["high_roe"].append(entry)
             
-        de = fund.get("debt_equity", 999)
-        if de <= 0.5:
+        de = fund.get("debt_to_equity") or fund.get("debt_equity")
+        if de is not None and de <= 50:  # Your data uses percentage (35.65 = 35.65%)
             categories["low_debt"].append(entry)
             
-        eps_growth = fund.get("eps_growth", 0) or detail.get("oneil", {}).get("breakdown", {}).get("eps_strength", 0)
-        if eps_growth >= 25:
+        revenue_growth = fund.get("revenue_growth", 0) or 0
+        if revenue_growth >= 15:
             categories["high_growth"].append(entry)
             
-        # Volume
-        volume_ratio = tech.get("volume_ratio", 1)
+        # Volume - from volume dict
+        vol_data = detail.get("volume", {})
+        volume_ratio = vol_data.get("ratio", 1) if isinstance(vol_data, dict) else 1
         if volume_ratio >= 1.5:
             categories["high_volume"].append(entry)
             
@@ -149,13 +153,13 @@ def create_scan_categories(details: List[Dict]) -> Dict[str, List[Dict]]:
         if buyer_demand in ["A", "B"]:
             categories["accumulation"].append(entry)
             
-        # Ownership
-        own = detail.get("ownership", {})
-        fii_change = own.get("fii_change_qoq", 0)
-        if fii_change > 0:
+        # Ownership - from fund_holdings dict
+        fund_hold = detail.get("fund_holdings", {})
+        institutional = fund_hold.get("institutional_pct", 0) or 0
+        if institutional >= 20:
             categories["fii_buying"].append(entry)
             
-        promoter = own.get("promoter", 0)
+        promoter = fund_hold.get("promoter_pct", 0) or 0
         if promoter >= 50:
             categories["high_promoter"].append(entry)
     
@@ -163,7 +167,7 @@ def create_scan_categories(details: List[Dict]) -> Dict[str, List[Dict]]:
     for cat_name, stocks in categories.items():
         categories[cat_name] = sorted(
             stocks, 
-            key=lambda x: x.get("composite_score", 0), 
+            key=lambda x: x.get("composite_score", 0) or 0, 
             reverse=True
         )[:100]  # Top 100 per category
     
@@ -174,12 +178,37 @@ def create_summary_entry(detail: Dict) -> Dict:
     symbol = detail.get("symbol", "")
     fund = detail.get("fundamentals", {})
     tech = detail.get("technical", {})
+    indicators = tech.get("indicators", {})
+    returns = tech.get("returns", {})
+    root_returns = detail.get("returns", {})
     oneil = detail.get("oneil", {})
     surveillance = detail.get("surveillance", {})
+    vol_data = detail.get("volume", {})
+    fund_hold = detail.get("fund_holdings", {})
+    breakout = detail.get("breakout", {})
     
     # Get best guru rating
     guru_ratings = detail.get("guru_ratings", [])
-    best_guru = max(guru_ratings, key=lambda x: x.get("score", 0)) if guru_ratings else {}
+    best_guru = max(guru_ratings, key=lambda x: x.get("score_pct", 0) or 0) if guru_ratings else {}
+    
+    # Get price - check multiple locations
+    close_price = tech.get("close", 0) or detail.get("price", 0)
+    
+    # Get returns - check both locations
+    return_1m = returns.get("1m", 0) or root_returns.get("1m", 0)
+    return_3m = returns.get("3m", 0) or root_returns.get("3m", 0)
+    return_6m = returns.get("6m", 0) or root_returns.get("6m", 0)
+    return_1y = returns.get("1y", 0) or root_returns.get("1y", 0)
+    
+    # Get volume ratio from volume dict
+    volume_ratio = vol_data.get("ratio", 1) if isinstance(vol_data, dict) else 1
+    
+    # Get change_pct
+    change_pct = tech.get("change_pct", 0) or detail.get("change_pct", 0)
+    
+    # Get surveillance status from red_flag_count
+    red_flags = surveillance.get("red_flag_count", 0) or 0
+    surv_status = "SAFE" if red_flags == 0 else "CAUTION"
     
     return {
         "symbol": symbol,
@@ -187,19 +216,32 @@ def create_summary_entry(detail: Dict) -> Dict:
         "sector": detail.get("sector", ""),
         
         # Price & Returns
-        "cmp": tech.get("close", 0),
-        "change_pct": tech.get("change_pct", 0),
-        "return_1m": tech.get("returns", {}).get("1m", 0),
-        "return_3m": tech.get("returns", {}).get("3m", 0),
-        "return_6m": tech.get("returns", {}).get("6m", 0),
-        "return_1y": tech.get("returns", {}).get("1y", 0),
+        "close": close_price,
+        "cmp": close_price,
+        "change_pct": change_pct,
+        "return_1w": returns.get("1w", 0) or root_returns.get("1w", 0),
+        "return_1m": return_1m,
+        "return_3m": return_3m,
+        "return_6m": return_6m,
+        "return_1y": return_1y,
+        
+        # Technicals
+        "rsi": indicators.get("rsi", 0) or detail.get("rsi", 50),
+        "sma_20": indicators.get("sma_20", 0),
+        "sma_50": indicators.get("sma_50", 0),
+        "sma_200": indicators.get("sma_200", 0),
+        "high_52w": tech.get("high_52w", 0) or breakout.get("high_52w", 0),
+        "low_52w": tech.get("low_52w", 0) or breakout.get("low_52w", 0),
         
         # Fundamentals
-        "market_cap": fund.get("market_cap", 0),
-        "pe": fund.get("pe", 0),
-        "roe": fund.get("roe", 0),
-        "roce": fund.get("roce", 0),
-        "debt_equity": fund.get("debt_equity", 0),
+        "market_cap_cr": fund.get("market_cap_cr", 0),
+        "pe": fund.get("pe_ratio", 0) or fund.get("pe", 0),
+        "pb": fund.get("pb_ratio", 0) or fund.get("pb", 0),
+        "roe": fund.get("roe") or 0,
+        "roce": fund.get("roce") or 0,
+        "debt_equity": fund.get("debt_to_equity", 0) or fund.get("debt_equity", 0),
+        "revenue_growth": fund.get("revenue_growth", 0),
+        "profit_margin": fund.get("profit_margin", 0),
         
         # O'Neil
         "oneil_grade": oneil.get("master_score", "-"),
@@ -210,15 +252,18 @@ def create_summary_entry(detail: Dict) -> Dict:
         
         # Best Guru
         "best_guru": best_guru.get("strategy", "-"),
-        "best_guru_score": best_guru.get("score", 0),
+        "best_guru_score": best_guru.get("score_pct", 0),
         
         # Surveillance
-        "surveillance_status": surveillance.get("status", "-"),
-        "risk_score": surveillance.get("risk_score", 0),
-        "surveillance_flags": surveillance.get("flags", [])[:3],  # Top 3 flags
+        "surveillance_status": surv_status,
+        "red_flag_count": red_flags,
         
         # Volume
-        "volume_ratio": tech.get("volume_ratio", 1),
+        "volume_ratio": volume_ratio,
+        
+        # Ownership
+        "promoter_holding": fund_hold.get("promoter_pct", 0),
+        "institutional_holding": fund_hold.get("institutional_pct", 0),
         
         # Update time
         "updated_at": detail.get("updated_at", "")
