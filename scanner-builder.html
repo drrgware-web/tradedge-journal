@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge Scanner Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg1: #06080c;
+  --bg2: #0a0e14;
+  --bg3: #0d1117;
+  --card: #0d1117;
+  --border: #1e2a3a;
+  --accent: #00ff88;
+  --accent2: #00c8ff;
+  --purple: #8b5cf6;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --green: #22c55e;
+  --t1: #ffffff;
+  --t2: #e2e8f0;
+  --t3: #94a3b8;
+  --t4: #64748b;
+  --sans: 'Outfit', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  font-family: var(--sans); 
+  background: var(--bg1); 
+  color: var(--t2); 
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* Header */
+.header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-back {
+  color: var(--t3);
+  text-decoration: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.header-back:hover { color: var(--accent); }
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Layout */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+.tab {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--t3);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.tab:hover { border-color: var(--accent2); color: var(--t2); }
+.tab.active { 
+  background: var(--accent); 
+  border-color: var(--accent); 
+  color: #000; 
+}
+
+/* Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.card-h {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-t { font-weight: 600; font-size: 14px; }
+.card-b { padding: 20px; }
+
+/* Pre-built Scanners Grid */
+.scanners-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.scanner-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.scanner-card:hover {
+  border-color: var(--accent2);
+  transform: translateY(-2px);
+}
+.scanner-card.selected {
+  border-color: var(--accent);
+  background: rgba(0, 255, 136, 0.05);
+}
+.scanner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.scanner-icon.fundamental { background: linear-gradient(135deg, var(--purple), #6366f1); }
+.scanner-icon.technical { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+.scanner-icon.combined { background: linear-gradient(135deg, var(--amber), var(--red)); }
+.scanner-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: var(--t1);
+}
+.scanner-desc {
+  font-size: 11px;
+  color: var(--t4);
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+.scanner-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.scanner-tag {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg3);
+  color: var(--t3);
+}
+.scanner-tag.growth { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+.scanner-tag.value { background: rgba(139, 92, 246, 0.2); color: var(--purple); }
+.scanner-tag.momentum { background: rgba(0, 200, 255, 0.2); color: var(--accent2); }
+
+/* AI Query Box */
+.ai-box {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(0, 200, 255, 0.1));
+  border: 1px solid var(--purple);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.ai-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--purple);
+  margin-bottom: 12px;
+}
+.ai-input {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: var(--t2);
+  font-family: var(--sans);
+  font-size: 14px;
+  resize: none;
+  min-height: 80px;
+}
+.ai-input:focus { outline: none; border-color: var(--purple); }
+.ai-input::placeholder { color: var(--t4); }
+.ai-examples {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ai-example {
+  font-size: 11px;
+  padding: 6px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--t3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ai-example:hover { border-color: var(--purple); color: var(--t2); }
+
+/* ChartInk Import */
+.chartink-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.chartink-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: var(--t2);
+  font-family: var(--mono);
+  font-size: 12px;
+  resize: vertical;
+  min-height: 120px;
+}
+.chartink-input:focus { outline: none; border-color: var(--accent2); }
+
+/* Selected Scanners */
+.selected-scanners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.selected-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.selected-chip .remove {
+  cursor: pointer;
+  color: var(--t4);
+  font-size: 14px;
+}
+.selected-chip .remove:hover { color: var(--red); }
+
+/* Operator Buttons */
+.operators {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.op-btn {
+  padding: 8px 16px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--t3);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+.op-btn:hover { border-color: var(--accent2); color: var(--t2); }
+.op-btn.active { background: var(--accent2); color: #000; border-color: var(--accent2); }
+
+/* Query Preview */
+.query-preview {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--t3);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+.btn-primary:hover { background: #00e077; }
+.btn-secondary {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--t2);
+}
+.btn-secondary:hover { border-color: var(--accent2); }
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* My Scanners List */
+.my-scanners {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.my-scanner-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.my-scanner-info { flex: 1; }
+.my-scanner-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.my-scanner-query {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--t4);
+  max-width: 500px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.my-scanner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Results */
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.results-count {
+  font-size: 13px;
+  color: var(--t3);
+}
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.results-table th,
+.results-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.results-table th {
+  color: var(--t4);
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.results-table tr:hover td {
+  background: var(--bg2);
+}
+.stock-link {
+  color: var(--accent2);
+  text-decoration: none;
+  font-weight: 600;
+}
+.stock-link:hover { text-decoration: underline; }
+.up { color: var(--green); }
+.dn { color: var(--red); }
+
+/* Loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  color: var(--t4);
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s;
+}
+.modal-overlay.active { opacity: 1; visibility: visible; }
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+.modal-h {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-title { font-weight: 600; font-size: 16px; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--t4);
+  cursor: pointer;
+  font-size: 20px;
+}
+.modal-b { padding: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-size: 12px;
+  color: var(--t3);
+  margin-bottom: 6px;
+}
+.form-input {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--t2);
+  font-family: var(--sans);
+  font-size: 14px;
+}
+.form-input:focus { outline: none; border-color: var(--accent); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .scanners-grid { grid-template-columns: 1fr; }
+  .tabs { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <a href="scans.html" class="header-back">← Scanner</a>
+  <div class="header-title">🔧 Scanner Builder</div>
+</header>
+
+<div class="container">
+  
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="prebuilt">📦 Pre-built Scanners</button>
+    <button class="tab" data-tab="ai">🤖 AI Query</button>
+    <button class="tab" data-tab="chartink">📋 ChartInk Import</button>
+    <button class="tab" data-tab="custom">⚙️ Custom Builder</button>
+    <button class="tab" data-tab="saved">💾 My Scanners</button>
+  </div>
+
+  <!-- Tab Content: Pre-built Scanners -->
+  <div id="tab-prebuilt" class="tab-content">
+    
+    <!-- Selected Scanners -->
+    <div class="card" id="selectedCard" style="display:none">
+      <div class="card-h">
+        <span class="card-t">🎯 Selected Scanners</span>
+        <button class="btn btn-secondary" style="padding:8px 16px;font-size:12px" onclick="clearSelected()">Clear All</button>
+      </div>
+      <div class="card-b">
+        <div class="selected-scanners" id="selectedList"></div>
+        <div class="operators">
+          <span style="font-size:12px;color:var(--t4);margin-right:8px">Combine with:</span>
+          <button class="op-btn active" data-op="AND">AND</button>
+          <button class="op-btn" data-op="OR">OR</button>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="runSelectedScanners()">▶ Run Combined Scan</button>
+          <button class="btn btn-secondary" onclick="showSaveModal()">💾 Save as Scanner</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fundamental Scanners -->
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">📊 Fundamental Scanners</span>
+      </div>
+      <div class="card-b">
+        <div class="scanners-grid" id="fundamentalScanners"></div>
+      </div>
+    </div>
+
+    <!-- Technical Scanners -->
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">📈 Technical Scanners</span>
+      </div>
+      <div class="card-b">
+        <div class="scanners-grid" id="technicalScanners"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: AI Query -->
+  <div id="tab-ai" class="tab-content" style="display:none">
+    <div class="ai-box">
+      <div class="ai-label">
+        <span>🤖</span>
+        <span>Describe your scan in plain English</span>
+      </div>
+      <textarea class="ai-input" id="aiQuery" placeholder="Example: Find mid-cap stocks with strong earnings growth, low debt, and near their 52-week high..."></textarea>
+      <div class="ai-examples">
+        <span style="font-size:10px;color:var(--t4);margin-right:8px">Try:</span>
+        <button class="ai-example" onclick="setAiExample(this)">Stocks with blockbuster earnings near 52W high</button>
+        <button class="ai-example" onclick="setAiExample(this)">FII + DII accumulation with retail selling</button>
+        <button class="ai-example" onclick="setAiExample(this)">Undervalued growth stocks with low debt</button>
+        <button class="ai-example" onclick="setAiExample(this)">Heavy capex companies expanding capacity</button>
+        <button class="ai-example" onclick="setAiExample(this)">CANSLIM stocks breaking out on volume</button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">Generated Query</span>
+      </div>
+      <div class="card-b">
+        <div class="query-preview" id="aiGeneratedQuery">Your query will appear here...</div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="generateAiQuery()">🤖 Generate Query</button>
+          <button class="btn btn-secondary" onclick="runAiQuery()">▶ Run Scan</button>
+          <button class="btn btn-secondary" onclick="showSaveModal()">💾 Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: ChartInk Import -->
+  <div id="tab-chartink" class="tab-content" style="display:none">
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">📋 Import ChartInk Scanner Query</span>
+      </div>
+      <div class="card-b">
+        <p style="font-size:12px;color:var(--t4);margin-bottom:16px">
+          Paste your ChartInk scanner query below. We'll convert it to TradEdge format.
+        </p>
+        <textarea class="chartink-input" id="chartinkQuery" placeholder="Example:
+Market Cap > 500 AND 
+Sales Growth Quarterly YoY > 8 AND 
+ROCE > 10 AND 
+Close > EMA(Close, 50)"></textarea>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="parseChartInk()">🔄 Convert Query</button>
+          <button class="btn btn-secondary" onclick="runChartInkQuery()">▶ Run Scan</button>
+          <button class="btn btn-secondary" onclick="showSaveModal()">💾 Save as Scanner</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">Converted Query</span>
+      </div>
+      <div class="card-b">
+        <div class="query-preview" id="chartinkConverted">Converted query will appear here...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: Custom Builder -->
+  <div id="tab-custom" class="tab-content" style="display:none">
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">⚙️ Custom Query Builder</span>
+      </div>
+      <div class="card-b">
+        <p style="font-size:12px;color:var(--t4);margin-bottom:16px">Coming soon - visual drag-and-drop query builder</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: My Scanners -->
+  <div id="tab-saved" class="tab-content" style="display:none">
+    <div class="card">
+      <div class="card-h">
+        <span class="card-t">💾 My Saved Scanners</span>
+        <button class="btn btn-secondary" style="padding:8px 16px;font-size:12px" onclick="exportScanners()">📤 Export</button>
+      </div>
+      <div class="card-b">
+        <div class="my-scanners" id="myScannersList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Section -->
+  <div class="card" id="resultsCard" style="display:none">
+    <div class="card-h">
+      <span class="card-t">📊 Scan Results</span>
+      <span class="results-count" id="resultsCount">0 stocks found</span>
+    </div>
+    <div class="card-b">
+      <div id="resultsBody">
+        <div class="loading">
+          <div class="spinner"></div>
+          <div>Running scan...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Save Modal -->
+<div class="modal-overlay" id="saveModal">
+  <div class="modal">
+    <div class="modal-h">
+      <span class="modal-title">💾 Save Scanner</span>
+      <button class="modal-close" onclick="closeSaveModal()">&times;</button>
+    </div>
+    <div class="modal-b">
+      <div class="form-group">
+        <label class="form-label">Scanner Name</label>
+        <input type="text" class="form-input" id="scannerName" placeholder="My Custom Scanner">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-input" id="scannerCategory">
+          <option value="fundamental">Fundamental</option>
+          <option value="technical">Technical</option>
+          <option value="combined">Combined</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Query</label>
+        <textarea class="form-input" id="scannerQuerySave" style="min-height:100px;font-family:var(--mono);font-size:11px" readonly></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveScanner()">💾 Save Scanner</button>
+        <button class="btn btn-secondary" onclick="closeSaveModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// PRE-BUILT SCANNERS DATABASE
+// ============================================================
+
+const FUNDAMENTAL_SCANNERS = [
+  {
+    id: 'accelerating_growth',
+    name: 'Accelerating Growth',
+    desc: 'Sales & profit growth accelerating QoQ and YoY with strong ROCE',
+    tags: ['growth', 'momentum'],
+    query: 'Market Cap > 400 AND Sales Growth Quarterly YoY > 8 AND Sales Growth Quarterly QoQ > 8 AND Operating Profit Growth Quarterly YoY > 8 AND Operating Profit Growth Quarterly QoQ > 8 AND ROCE > 8'
+  },
+  {
+    id: 'smart_money_accumulation',
+    name: 'Smart Money Accumulation',
+    desc: 'FII & DII increasing holdings while retail is selling',
+    tags: ['institutional', 'momentum'],
+    query: 'FII Holding > FII Holding 1Qtr Back AND FII Holding > 1 AND Market Cap > 500 AND DII Holding > DII Holding 1Qtr Back AND DII Holding > 1 AND Retail Holding < Retail Holding 1Qtr Back'
+  },
+  {
+    id: 'quality_at_highs',
+    name: 'Quality Near Highs',
+    desc: 'Low debt, low retail, near 52W/ATH with quarterly highs in sales & profit',
+    tags: ['quality', 'momentum'],
+    query: 'Market Cap > 250 AND DE < 0.6 AND Retail Holding < 25 AND ( Price Within Fifty Two Week High < 25 OR Price Within All Time High < 25 ) AND Quarterly Sales All Time High AND Quarterly Profit All Time High'
+  },
+  {
+    id: 'emerging_winners',
+    name: 'Emerging Winners @ 52WH/ATH',
+    desc: 'Strong sales & EPS growth OR institutional accumulation near highs',
+    tags: ['growth', 'breakout'],
+    query: '( ( Sales Quarterly > Sales 1Qtr Back * 1.15 AND Sales Quarterly > Sales 4Qtr Back * 1.15 AND EPS Quarterly > EPS 1Qtr Back * 1.15 AND EPS Quarterly > EPS 4Qtr Back * 1.15 ) OR ( ( FII Holding + DII Holding > FII Holding 4Qtr Back + DII Holding 4Qtr Back ) OR Promoter Holding > Promoter Holding 4Qtr Back ) AND Retail Holding < 0.9 * Retail Holding 4Qtr Back ) OR ( ( Net Profit Quarterly > 0 AND Net Profit 1Qtr Back < 0 ) OR ( Net Profit Quarterly > 0 AND Net Profit 4Qtr Back < 0 ) ) ) AND Market Cap > 400 AND DE < 0.8 AND PEG < 1.6 AND ( Price Within Fifty Two Week High < 25 OR Price Within All Time High < 25 )'
+  },
+  {
+    id: 'heavy_capex',
+    name: 'Heavy CapEx @ Near Highs',
+    desc: 'Companies expanding capacity with growing gross & net block',
+    tags: ['growth', 'expansion'],
+    query: 'Gross Block > Gross Block 1Yr Back * 1.25 AND Gross Block > Gross Block 3Yr Back AND Net Block > Net Block 1Yr Back * 1.25 AND Net Block > Net Block 3Yr Back AND ( Price Within Fifty Two Week High < 25 OR Price Within All Time High < 25 )'
+  },
+  {
+    id: 'strong_fundamentals',
+    name: 'Strong Fundamentals',
+    desc: 'High ROCE, ROE, low debt, strong CAGR, good cash conversion',
+    tags: ['quality', 'value'],
+    query: 'ROCE > 10 AND ROE > 10 AND DE < 1 AND Sales 3yr CAGR > 10 AND Net Profit 3yr CAGR > 10 AND Cash Conversion Cycle Yearly > Cash Conversion Cycle 5Yr Avg AND FCF Yield > 0 AND OPM Yearly > 10 AND NPM Yearly > 6'
+  },
+  {
+    id: 'blockbuster_earnings',
+    name: 'Blockbuster Quarterly Earnings',
+    desc: 'Mid-cap stocks with >25% EPS & Sales growth, positive FCF',
+    tags: ['growth', 'earnings'],
+    query: 'Market Cap > 500 AND Market Cap < 20000 AND EPS Quarterly / EPS 1Qtr Back > 1.25 AND DE < 1 AND Free Cash Flow per share > 0 AND Sales Quarterly / Sales 1Qtr Back > 1.25 AND OPM Quarterly > OPM 1Qtr Back'
+  },
+  {
+    id: 'oshaughnessy',
+    name: "O'Shaughnessy Scanner",
+    desc: 'PEG < 1, P/S < 2, low debt, positive FCF, growing earnings',
+    tags: ['value', 'growth'],
+    query: 'Market Cap > 300 AND Market Cap < 25000 AND PEG < 1 AND PS < 2 AND DE < 1 AND Free Cash Flow per share > 1 AND Sales Quarterly > 15 AND EPS Quarterly > EPS 1Yr Back AND EPS Yearly > EPS 1Yr Back'
+  },
+  {
+    id: 'graham_value',
+    name: 'Graham Value',
+    desc: 'Classic value: P/E < 15, P/B < 1.5, low debt, pays dividend',
+    tags: ['value'],
+    query: 'PE < 15 AND PB < 1.5 AND PE * PB < 22.5 AND DE < 100 AND Dividend Yield > 0 AND EPS > 0 AND Market Cap > 500'
+  },
+  {
+    id: 'canslim',
+    name: 'CANSLIM',
+    desc: "William O'Neil's growth investing criteria",
+    tags: ['growth', 'momentum'],
+    query: 'EPS Growth Quarterly > 25 AND Sales Growth Quarterly > 25 AND ROE > 15 AND Shares Outstanding < 50 AND Institutional Holding > 10 AND Close > SMA(Close, 200)'
+  }
+];
+
+const TECHNICAL_SCANNERS = [
+  {
+    id: 'vcp_setup',
+    name: 'VCP Setup',
+    desc: 'Volatility Contraction Pattern - tight consolidation near highs',
+    tags: ['breakout', 'minervini'],
+    query: 'preset_vcp'
+  },
+  {
+    id: 'flag_pattern',
+    name: 'Bull Flag',
+    desc: 'Pullback consolidation after strong up-move',
+    tags: ['breakout', 'pattern'],
+    query: 'preset_bull_flag'
+  },
+  {
+    id: 'tight_setup',
+    name: 'Tight Setup',
+    desc: 'Low volatility consolidation, ready to break',
+    tags: ['consolidation'],
+    query: 'preset_tight_setup'
+  },
+  {
+    id: 'volume_spike',
+    name: 'Volume Breakout',
+    desc: '2x+ volume spike with price breakout',
+    tags: ['volume', 'breakout'],
+    query: 'preset_volume_2x_spike AND Close > High 1Day Back'
+  },
+  {
+    id: 'ema_crossover',
+    name: 'EMA Crossover',
+    desc: '9 EMA crossing above 21 EMA',
+    tags: ['trend', 'momentum'],
+    query: 'EMA(Close, 9) > EMA(Close, 21) AND EMA(Close, 9) 1Day Back < EMA(Close, 21) 1Day Back'
+  },
+  {
+    id: 'rsi_oversold',
+    name: 'RSI Oversold Bounce',
+    desc: 'RSI < 30 with bullish reversal candle',
+    tags: ['reversal', 'momentum'],
+    query: 'RSI(14) < 30 AND Close > Open AND Close > High 1Day Back'
+  },
+  {
+    id: 'above_all_emas',
+    name: 'Above All EMAs',
+    desc: 'Price above 20, 50, 200 EMA - strong trend',
+    tags: ['trend'],
+    query: 'Close > EMA(Close, 20) AND Close > EMA(Close, 50) AND Close > EMA(Close, 200)'
+  },
+  {
+    id: '52w_high_breakout',
+    name: '52 Week High Breakout',
+    desc: 'Breaking above 52 week high on volume',
+    tags: ['breakout'],
+    query: 'Close > High 52Week AND Volume > Volume 20Day SMA * 1.5'
+  }
+];
+
+// ============================================================
+// STATE
+// ============================================================
+
+let selectedScanners = [];
+let currentOperator = 'AND';
+let currentQuery = '';
+let myScanners = JSON.parse(localStorage.getItem('te_scanners') || '[]');
+
+// ============================================================
+// INIT
+// ============================================================
+
+function init() {
+  renderFundamentalScanners();
+  renderTechnicalScanners();
+  renderMyScanners();
+  setupTabs();
+  setupOperators();
+}
+
+function setupTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).style.display = 'block';
+    });
+  });
+}
+
+function setupOperators() {
+  document.querySelectorAll('.op-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentOperator = btn.dataset.op;
+    });
+  });
+}
+
+// ============================================================
+// RENDER SCANNERS
+// ============================================================
+
+function renderScannerCard(scanner, type) {
+  const isSelected = selectedScanners.find(s => s.id === scanner.id);
+  return '<div class="scanner-card ' + (isSelected ? 'selected' : '') + '" data-id="' + scanner.id + '" data-type="' + type + '" onclick="toggleScanner(\'' + scanner.id + '\', \'' + type + '\')">' +
+    '<div class="scanner-icon ' + type + '">' + (type === 'fundamental' ? '📊' : '📈') + '</div>' +
+    '<div class="scanner-name">' + scanner.name + '</div>' +
+    '<div class="scanner-desc">' + scanner.desc + '</div>' +
+    '<div class="scanner-tags">' + scanner.tags.map(t => '<span class="scanner-tag ' + t + '">' + t + '</span>').join('') + '</div>' +
+  '</div>';
+}
+
+function renderFundamentalScanners() {
+  document.getElementById('fundamentalScanners').innerHTML = 
+    FUNDAMENTAL_SCANNERS.map(s => renderScannerCard(s, 'fundamental')).join('');
+}
+
+function renderTechnicalScanners() {
+  document.getElementById('technicalScanners').innerHTML = 
+    TECHNICAL_SCANNERS.map(s => renderScannerCard(s, 'technical')).join('');
+}
+
+// ============================================================
+// SCANNER SELECTION
+// ============================================================
+
+function toggleScanner(id, type) {
+  const scanners = type === 'fundamental' ? FUNDAMENTAL_SCANNERS : TECHNICAL_SCANNERS;
+  const scanner = scanners.find(s => s.id === id);
+  
+  const idx = selectedScanners.findIndex(s => s.id === id);
+  if (idx >= 0) {
+    selectedScanners.splice(idx, 1);
+  } else {
+    selectedScanners.push({ ...scanner, type });
+  }
+  
+  updateSelectedUI();
+  renderFundamentalScanners();
+  renderTechnicalScanners();
+}
+
+function updateSelectedUI() {
+  const card = document.getElementById('selectedCard');
+  const list = document.getElementById('selectedList');
+  
+  if (selectedScanners.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+  
+  card.style.display = 'block';
+  list.innerHTML = selectedScanners.map(s => 
+    '<div class="selected-chip">' +
+      '<span>' + (s.type === 'fundamental' ? '📊' : '📈') + '</span>' +
+      '<span>' + s.name + '</span>' +
+      '<span class="remove" onclick="event.stopPropagation(); removeSelected(\'' + s.id + '\')">&times;</span>' +
+    '</div>'
+  ).join('');
+}
+
+function removeSelected(id) {
+  selectedScanners = selectedScanners.filter(s => s.id !== id);
+  updateSelectedUI();
+  renderFundamentalScanners();
+  renderTechnicalScanners();
+}
+
+function clearSelected() {
+  selectedScanners = [];
+  updateSelectedUI();
+  renderFundamentalScanners();
+  renderTechnicalScanners();
+}
+
+// ============================================================
+// RUN SCANNERS
+// ============================================================
+
+function runSelectedScanners() {
+  if (selectedScanners.length === 0) {
+    alert('Please select at least one scanner');
+    return;
+  }
+  
+  const queries = selectedScanners.map(s => '(' + s.query + ')');
+  currentQuery = queries.join(' ' + currentOperator + ' ');
+  
+  runScan(currentQuery);
+}
+
+function runScan(query) {
+  console.log('Running scan:', query);
+  
+  const resultsCard = document.getElementById('resultsCard');
+  const resultsBody = document.getElementById('resultsBody');
+  
+  resultsCard.style.display = 'block';
+  resultsBody.innerHTML = '<div class="loading"><div class="spinner"></div><div>Running scan...</div></div>';
+  
+  // Scroll to results
+  resultsCard.scrollIntoView({ behavior: 'smooth' });
+  
+  // TODO: Implement actual scan logic
+  // For now, show demo results after a delay
+  setTimeout(() => {
+    showDemoResults();
+  }, 1500);
+}
+
+function showDemoResults() {
+  const stocks = [
+    { symbol: 'HINDCOPPER', name: 'Hindustan Copper', price: 463.55, chg: 3.21, mcap: 43450, pe: 65.6, roce: 15.2 },
+    { symbol: 'GUJALKALI', name: 'Gujarat Alkalies', price: 615.10, chg: 0.0, mcap: 4519, pe: 7.1, roce: 0.88 },
+    { symbol: 'RELIANCE', name: 'Reliance Industries', price: 1285.50, chg: 1.25, mcap: 1735000, pe: 24.5, roce: 12.1 },
+    { symbol: 'TCS', name: 'Tata Consultancy', price: 3650.00, chg: -0.45, mcap: 1320000, pe: 28.2, roce: 58.4 },
+    { symbol: 'INFY', name: 'Infosys', price: 1520.00, chg: 0.82, mcap: 632000, pe: 22.1, roce: 35.2 }
+  ];
+  
+  document.getElementById('resultsCount').textContent = stocks.length + ' stocks found';
+  
+  let html = '<table class="results-table">';
+  html += '<thead><tr><th>Symbol</th><th>Name</th><th>Price</th><th>Change</th><th>MCap (Cr)</th><th>P/E</th><th>ROCE</th><th></th></tr></thead>';
+  html += '<tbody>';
+  
+  stocks.forEach(s => {
+    html += '<tr>';
+    html += '<td><a href="stock.html?s=' + s.symbol + '" class="stock-link">' + s.symbol + '</a></td>';
+    html += '<td>' + s.name + '</td>';
+    html += '<td>₹' + s.price.toFixed(2) + '</td>';
+    html += '<td class="' + (s.chg >= 0 ? 'up' : 'dn') + '">' + (s.chg >= 0 ? '+' : '') + s.chg.toFixed(2) + '%</td>';
+    html += '<td>' + (s.mcap > 1000 ? (s.mcap/1000).toFixed(1) + 'K' : s.mcap) + '</td>';
+    html += '<td>' + s.pe.toFixed(1) + '</td>';
+    html += '<td>' + s.roce.toFixed(1) + '%</td>';
+    html += '<td><a href="stock.html?s=' + s.symbol + '" style="color:var(--accent2);font-size:11px">View →</a></td>';
+    html += '</tr>';
+  });
+  
+  html += '</tbody></table>';
+  
+  document.getElementById('resultsBody').innerHTML = html;
+}
+
+// ============================================================
+// AI QUERY
+// ============================================================
+
+function setAiExample(btn) {
+  document.getElementById('aiQuery').value = btn.textContent;
+}
+
+async function generateAiQuery() {
+  const input = document.getElementById('aiQuery').value.trim();
+  if (!input) {
+    alert('Please enter a query description');
+    return;
+  }
+  
+  const output = document.getElementById('aiGeneratedQuery');
+  output.textContent = 'Generating query...';
+  
+  // Check for Groq API key
+  const groqKey = localStorage.getItem('groq_api_key') || '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';
+  
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + groqKey
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a stock scanner query generator. Convert natural language to ChartInk-style scanner queries.
+
+Available fields:
+- Market Cap, PE, PB, PS, PEG, DE (Debt/Equity), ROCE, ROE, ROA
+- EPS, EPS Quarterly, EPS 1Qtr Back, EPS 4Qtr Back, EPS Yearly, EPS 1Yr Back
+- Sales Quarterly, Sales 1Qtr Back, Sales 4Qtr Back, Sales Growth Quarterly YoY/QoQ
+- Net Profit Quarterly, Net Profit 1Qtr Back, Operating Profit Growth
+- OPM Quarterly, OPM Yearly, NPM Yearly
+- FII Holding, DII Holding, Retail Holding, Promoter Holding (and 1Qtr Back, 4Qtr Back variants)
+- FCF Yield, Free Cash Flow per share
+- Gross Block, Net Block (and 1Yr Back, 3Yr Back variants)
+- Close, Open, High, Low, Volume
+- EMA(Close, 20/50/200), SMA(Close, 20/50/200), RSI(14)
+- High 52Week, Low 52Week, Price Within Fifty Two Week High, Price Within All Time High
+
+Output ONLY the query, no explanation. Use AND/OR operators.`
+          },
+          {
+            role: 'user',
+            content: input
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      })
+    });
+    
+    const data = await response.json();
+    const query = data.choices[0].message.content.trim();
+    output.textContent = query;
+    currentQuery = query;
+    
+  } catch (e) {
+    console.error('AI query error:', e);
+    output.textContent = 'Error generating query. Please try again.';
+  }
+}
+
+function runAiQuery() {
+  const query = document.getElementById('aiGeneratedQuery').textContent;
+  if (!query || query.includes('...') || query.includes('Error')) {
+    alert('Please generate a valid query first');
+    return;
+  }
+  runScan(query);
+}
+
+// ============================================================
+// CHARTINK IMPORT
+// ============================================================
+
+function parseChartInk() {
+  const input = document.getElementById('chartinkQuery').value.trim();
+  if (!input) {
+    alert('Please paste a ChartInk query');
+    return;
+  }
+  
+  // For now, just clean up and display
+  // TODO: Implement full ChartInk to TradEdge conversion
+  let converted = input
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  document.getElementById('chartinkConverted').textContent = converted;
+  currentQuery = converted;
+}
+
+function runChartInkQuery() {
+  const query = document.getElementById('chartinkConverted').textContent;
+  if (!query || query.includes('...')) {
+    alert('Please convert a query first');
+    return;
+  }
+  runScan(query);
+}
+
+// ============================================================
+// SAVE/LOAD SCANNERS
+// ============================================================
+
+function showSaveModal() {
+  if (!currentQuery && selectedScanners.length === 0) {
+    alert('Please create or select a scanner first');
+    return;
+  }
+  
+  // Build query from selected scanners if needed
+  if (!currentQuery && selectedScanners.length > 0) {
+    const queries = selectedScanners.map(s => '(' + s.query + ')');
+    currentQuery = queries.join(' ' + currentOperator + ' ');
+  }
+  
+  document.getElementById('scannerQuerySave').value = currentQuery;
+  document.getElementById('saveModal').classList.add('active');
+}
+
+function closeSaveModal() {
+  document.getElementById('saveModal').classList.remove('active');
+}
+
+function saveScanner() {
+  const name = document.getElementById('scannerName').value.trim();
+  const category = document.getElementById('scannerCategory').value;
+  const query = document.getElementById('scannerQuerySave').value;
+  
+  if (!name) {
+    alert('Please enter a scanner name');
+    return;
+  }
+  
+  const scanner = {
+    id: 'custom_' + Date.now(),
+    name: name,
+    category: category,
+    query: query,
+    created: new Date().toISOString()
+  };
+  
+  myScanners.push(scanner);
+  localStorage.setItem('te_scanners', JSON.stringify(myScanners));
+  
+  closeSaveModal();
+  renderMyScanners();
+  
+  // Switch to saved tab
+  document.querySelector('[data-tab="saved"]').click();
+}
+
+function renderMyScanners() {
+  const list = document.getElementById('myScannersList');
+  
+  if (myScanners.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t4)">No saved scanners yet. Create one from the Pre-built or AI tab!</div>';
+    return;
+  }
+  
+  list.innerHTML = myScanners.map((s, i) => 
+    '<div class="my-scanner-item">' +
+      '<div class="my-scanner-info">' +
+        '<div class="my-scanner-name">' + s.name + '</div>' +
+        '<div class="my-scanner-query">' + s.query + '</div>' +
+      '</div>' +
+      '<div class="my-scanner-actions">' +
+        '<button class="btn btn-primary" style="padding:8px 16px;font-size:11px" onclick="runSavedScanner(' + i + ')">▶ Run</button>' +
+        '<button class="btn btn-secondary" style="padding:8px 16px;font-size:11px" onclick="editScanner(' + i + ')">✏️</button>' +
+        '<button class="btn btn-secondary" style="padding:8px 16px;font-size:11px" onclick="deleteScanner(' + i + ')">🗑️</button>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function runSavedScanner(idx) {
+  const scanner = myScanners[idx];
+  currentQuery = scanner.query;
+  runScan(scanner.query);
+}
+
+function editScanner(idx) {
+  const scanner = myScanners[idx];
+  document.getElementById('scannerName').value = scanner.name;
+  document.getElementById('scannerCategory').value = scanner.category;
+  document.getElementById('scannerQuerySave').value = scanner.query;
+  
+  // Remove old scanner
+  myScanners.splice(idx, 1);
+  
+  document.getElementById('saveModal').classList.add('active');
+}
+
+function deleteScanner(idx) {
+  if (confirm('Delete this scanner?')) {
+    myScanners.splice(idx, 1);
+    localStorage.setItem('te_scanners', JSON.stringify(myScanners));
+    renderMyScanners();
+  }
+}
+
+function exportScanners() {
+  const data = JSON.stringify(myScanners, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tradedge_scanners.json';
+  a.click();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+init();
+</script>
+
+</body>
+</html>
