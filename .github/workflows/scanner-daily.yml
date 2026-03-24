@@ -136,6 +136,9 @@ jobs:
             TIMESTAMP=$(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M IST')
             MODE="${{ steps.mode.outputs.mode }}"
             git commit -m "📊 Scanner update ($MODE): $TIMESTAMP - $UPDATED files"
+            
+            # Pull latest changes and rebase, then push (handles concurrent updates)
+            git pull --rebase origin main || true
             git push
             echo "✅ Pushed $UPDATED files"
           else
