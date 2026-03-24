@@ -988,42 +988,355 @@ function runScan(query) {
   // Scroll to results
   resultsCard.scrollIntoView({ behavior: 'smooth' });
   
-  // TODO: Implement actual scan logic
-  // For now, show demo results after a delay
-  setTimeout(() => {
-    showDemoResults();
-  }, 1500);
+  // Load stock data and run scan client-side
+  loadAndScan(query);
 }
 
-function showDemoResults() {
-  const stocks = [
-    { symbol: 'HINDCOPPER', name: 'Hindustan Copper', price: 463.55, chg: 3.21, mcap: 43450, pe: 65.6, roce: 15.2 },
-    { symbol: 'GUJALKALI', name: 'Gujarat Alkalies', price: 615.10, chg: 0.0, mcap: 4519, pe: 7.1, roce: 0.88 },
-    { symbol: 'RELIANCE', name: 'Reliance Industries', price: 1285.50, chg: 1.25, mcap: 1735000, pe: 24.5, roce: 12.1 },
-    { symbol: 'TCS', name: 'Tata Consultancy', price: 3650.00, chg: -0.45, mcap: 1320000, pe: 28.2, roce: 58.4 },
-    { symbol: 'INFY', name: 'Infosys', price: 1520.00, chg: 0.82, mcap: 632000, pe: 22.1, roce: 35.2 }
-  ];
+async function loadAndScan(query) {
+  try {
+    // Try to load scanner_results.json which has all stock data
+    const response = await fetch('data/scanner_results.json');
+    if (!response.ok) throw new Error('Could not load stock data');
+    
+    const data = await response.json();
+    const stocks = data.all_stocks || [];
+    
+    console.log(`Loaded ${stocks.length} stocks`);
+    
+    // Parse and evaluate query
+    const matches = evaluateQuery(stocks, query);
+    
+    console.log(`Found ${matches.length} matches`);
+    
+    showResults(matches);
+    
+  } catch (e) {
+    console.error('Scan error:', e);
+    document.getElementById('resultsBody').innerHTML = 
+      '<div style="text-align:center;padding:40px;color:var(--t4)">' +
+      '<p>⚠️ Could not load stock data</p>' +
+      '<p style="font-size:11px;margin-top:8px">Make sure data/scanner_results.json exists</p>' +
+      '</div>';
+  }
+}
+
+// ============================================================
+// QUERY EVALUATOR (Client-side)
+// ============================================================
+
+const FIELD_MAP = {
+  // Market Cap
+  'market cap': 'fundamentals.market_cap_cr',
+  'mcap': 'fundamentals.market_cap_cr',
   
-  document.getElementById('resultsCount').textContent = stocks.length + ' stocks found';
+  // Valuation
+  'pe': 'fundamentals.pe_ratio',
+  'p/e': 'fundamentals.pe_ratio',
+  'pb': 'fundamentals.pb_ratio',
+  'p/b': 'fundamentals.pb_ratio',
+  'ps': 'fundamentals.ps_ratio',
+  'peg': 'fundamentals.peg_ratio',
+  
+  // Profitability
+  'roe': 'fundamentals.roe',
+  'roce': 'fundamentals.roce',
+  'opm': 'fundamentals.opm',
+  'npm': 'fundamentals.npm',
+  'opm yearly': 'fundamentals.opm',
+  'npm yearly': 'fundamentals.npm',
+  
+  // Debt
+  'de': 'fundamentals.debt_to_equity',
+  'd/e': 'fundamentals.debt_to_equity',
+  'debt to equity': 'fundamentals.debt_to_equity',
+  
+  // Earnings
+  'eps': 'fundamentals.eps',
+  'eps quarterly': 'fundamentals.eps',
+  'eps growth quarterly': 'fundamentals.eps_growth',
+  
+  // Sales
+  'sales growth quarterly yoy': 'fundamentals.revenue_growth',
+  'sales growth quarterly qoq': 'fundamentals.revenue_growth',
+  'sales 3yr cagr': 'fundamentals.sales_cagr_3yr',
+  
+  // Operating Profit
+  'operating profit growth quarterly yoy': 'fundamentals.op_growth',
+  'operating profit growth quarterly qoq': 'fundamentals.op_growth',
+  
+  // Holdings
+  'fii holding': 'fund_holdings.fii_pct',
+  'dii holding': 'fund_holdings.dii_pct',
+  'retail holding': 'fund_holdings.public_pct',
+  'promoter holding': 'fund_holdings.promoter_pct',
+  'institutional holding': 'fund_holdings.institutional_pct',
+  
+  // Price
+  'close': 'price',
+  'price': 'price',
+  'volume': 'volume.latest',
+  'volume ratio': 'volume.ratio',
+  
+  // Technical
+  'rsi': 'rsi',
+  'change': 'change_pct',
+  'change pct': 'change_pct',
+  
+  // Price position
+  'price within fifty two week high': 'breakout.pct_from_high',
+  'price within all time high': 'breakout.pct_from_high',
+  
+  // FCF
+  'fcf yield': 'fundamentals.fcf_yield',
+  'free cash flow per share': 'fundamentals.fcf_per_share',
+  
+  // Piotroski
+  'piotroski score': 'fundamentals.piotroski_score',
+  'altman z score': 'fundamentals.altman_z_score',
+};
+
+function getNestedValue(obj, path) {
+  if (!obj || !path) return null;
+  
+  const keys = path.split('.');
+  let val = obj;
+  
+  for (const key of keys) {
+    if (val && typeof val === 'object') {
+      val = val[key];
+    } else {
+      return null;
+    }
+  }
+  
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    const num = parseFloat(val.replace(/[,%]/g, ''));
+    return isNaN(num) ? null : num;
+  }
+  
+  return null;
+}
+
+function normalizeField(field) {
+  const lower = field.toLowerCase().trim();
+  if (FIELD_MAP[lower]) return FIELD_MAP[lower];
+  
+  // Try with underscores
+  const withUnder = lower.replace(/\s+/g, '_');
+  for (const [k, v] of Object.entries(FIELD_MAP)) {
+    if (k.replace(/\s+/g, '_') === withUnder) return v;
+  }
+  
+  return lower;
+}
+
+function getStockValue(stock, field) {
+  const path = normalizeField(field);
+  
+  // Try the mapped path
+  let val = getNestedValue(stock, path);
+  if (val !== null) return val;
+  
+  // Try direct field
+  val = stock[field.toLowerCase().replace(/\s+/g, '_')];
+  if (typeof val === 'number') return val;
+  
+  // Try fundamentals
+  val = getNestedValue(stock, 'fundamentals.' + field.toLowerCase().replace(/\s+/g, '_'));
+  if (val !== null) return val;
+  
+  // Try fund_holdings
+  val = getNestedValue(stock, 'fund_holdings.' + field.toLowerCase().replace(/\s+/g, '_'));
+  if (val !== null) return val;
+  
+  return null;
+}
+
+function parseCondition(condition) {
+  const ops = ['>=', '<=', '!=', '>', '<', '='];
+  
+  for (const op of ops) {
+    const idx = condition.indexOf(op);
+    if (idx > 0) {
+      const field = condition.substring(0, idx).trim();
+      const value = condition.substring(idx + op.length).trim();
+      
+      // Handle multiplication
+      if (value.includes('*')) {
+        const parts = value.split('*');
+        return { field, op, valueField: parts[0].trim(), multiplier: parseFloat(parts[1]) };
+      }
+      
+      const numVal = parseFloat(value.replace(/[,%]/g, ''));
+      if (!isNaN(numVal)) {
+        return { field, op, value: numVal };
+      }
+      
+      // Value is another field
+      return { field, op, valueField: value };
+    }
+  }
+  
+  return null;
+}
+
+function evaluateCondition(stock, cond) {
+  const stockVal = getStockValue(stock, cond.field);
+  if (stockVal === null) return false;
+  
+  let compareVal;
+  if (cond.valueField) {
+    compareVal = getStockValue(stock, cond.valueField);
+    if (compareVal === null) return false;
+    if (cond.multiplier) compareVal *= cond.multiplier;
+  } else {
+    compareVal = cond.value;
+  }
+  
+  switch (cond.op) {
+    case '>': return stockVal > compareVal;
+    case '<': return stockVal < compareVal;
+    case '>=': return stockVal >= compareVal;
+    case '<=': return stockVal <= compareVal;
+    case '=': return Math.abs(stockVal - compareVal) < 0.001;
+    case '!=': return stockVal !== compareVal;
+    default: return false;
+  }
+}
+
+function evaluateQuery(stocks, query) {
+  // Normalize query
+  query = query.replace(/\s+/g, ' ').trim();
+  
+  return stocks.filter(stock => {
+    try {
+      return evaluateStock(stock, query);
+    } catch (e) {
+      return false;
+    }
+  });
+}
+
+function evaluateStock(stock, query) {
+  // Simple tokenizer - split by AND/OR while respecting parentheses
+  const tokens = [];
+  let current = '';
+  let depth = 0;
+  
+  const words = query.split(/\s+/);
+  
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    
+    // Count parentheses
+    depth += (word.match(/\(/g) || []).length;
+    depth -= (word.match(/\)/g) || []).length;
+    
+    if ((word.toUpperCase() === 'AND' || word.toUpperCase() === 'OR') && depth === 0) {
+      if (current.trim()) {
+        tokens.push({ type: 'condition', value: current.trim() });
+      }
+      tokens.push({ type: 'operator', value: word.toUpperCase() });
+      current = '';
+    } else {
+      current += (current ? ' ' : '') + word;
+    }
+  }
+  
+  if (current.trim()) {
+    tokens.push({ type: 'condition', value: current.trim() });
+  }
+  
+  // Evaluate tokens
+  let result = null;
+  let currentOp = 'AND';
+  
+  for (const token of tokens) {
+    if (token.type === 'operator') {
+      currentOp = token.value;
+    } else {
+      // Remove outer parentheses
+      let condStr = token.value;
+      if (condStr.startsWith('(') && condStr.endsWith(')')) {
+        condStr = condStr.slice(1, -1);
+      }
+      
+      // Check if it's a nested expression
+      if (condStr.includes(' AND ') || condStr.includes(' OR ')) {
+        const innerResult = evaluateStock(stock, condStr);
+        if (result === null) {
+          result = innerResult;
+        } else if (currentOp === 'AND') {
+          result = result && innerResult;
+        } else {
+          result = result || innerResult;
+        }
+      } else {
+        // Single condition
+        const cond = parseCondition(condStr);
+        if (cond) {
+          const condResult = evaluateCondition(stock, cond);
+          if (result === null) {
+            result = condResult;
+          } else if (currentOp === 'AND') {
+            result = result && condResult;
+          } else {
+            result = result || condResult;
+          }
+        }
+      }
+    }
+  }
+  
+  return result !== null ? result : true;
+}
+
+function showResults(matches) {
+  document.getElementById('resultsCount').textContent = matches.length + ' stocks found';
+  
+  if (matches.length === 0) {
+    document.getElementById('resultsBody').innerHTML = 
+      '<div style="text-align:center;padding:40px;color:var(--t4)">No stocks match your criteria</div>';
+    return;
+  }
+  
+  // Sort by market cap
+  matches.sort((a, b) => {
+    const mcapA = getNestedValue(a, 'fundamentals.market_cap_cr') || 0;
+    const mcapB = getNestedValue(b, 'fundamentals.market_cap_cr') || 0;
+    return mcapB - mcapA;
+  });
   
   let html = '<table class="results-table">';
-  html += '<thead><tr><th>Symbol</th><th>Name</th><th>Price</th><th>Change</th><th>MCap (Cr)</th><th>P/E</th><th>ROCE</th><th></th></tr></thead>';
+  html += '<thead><tr><th>Symbol</th><th>Name</th><th>Sector</th><th>Price</th><th>Change</th><th>MCap (Cr)</th><th>P/E</th><th>ROCE</th><th></th></tr></thead>';
   html += '<tbody>';
   
-  stocks.forEach(s => {
+  matches.slice(0, 100).forEach(s => {
+    const price = s.price || getNestedValue(s, 'technical.close') || 0;
+    const chg = s.change_pct || getNestedValue(s, 'technical.change_pct') || 0;
+    const mcap = getNestedValue(s, 'fundamentals.market_cap_cr') || 0;
+    const pe = getNestedValue(s, 'fundamentals.pe_ratio');
+    const roce = getNestedValue(s, 'fundamentals.roce');
+    
     html += '<tr>';
     html += '<td><a href="stock.html?s=' + s.symbol + '" class="stock-link">' + s.symbol + '</a></td>';
-    html += '<td>' + s.name + '</td>';
-    html += '<td>₹' + s.price.toFixed(2) + '</td>';
-    html += '<td class="' + (s.chg >= 0 ? 'up' : 'dn') + '">' + (s.chg >= 0 ? '+' : '') + s.chg.toFixed(2) + '%</td>';
-    html += '<td>' + (s.mcap > 1000 ? (s.mcap/1000).toFixed(1) + 'K' : s.mcap) + '</td>';
-    html += '<td>' + s.pe.toFixed(1) + '</td>';
-    html += '<td>' + s.roce.toFixed(1) + '%</td>';
+    html += '<td>' + (s.name || s.symbol) + '</td>';
+    html += '<td style="font-size:10px;color:var(--t4)">' + (s.sector || '—') + '</td>';
+    html += '<td>₹' + price.toFixed(2) + '</td>';
+    html += '<td class="' + (chg >= 0 ? 'up' : 'dn') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%</td>';
+    html += '<td>' + (mcap > 1000 ? (mcap/1000).toFixed(1) + 'K' : mcap.toFixed(0)) + '</td>';
+    html += '<td>' + (pe ? pe.toFixed(1) : '—') + '</td>';
+    html += '<td>' + (roce ? roce.toFixed(1) + '%' : '—') + '</td>';
     html += '<td><a href="stock.html?s=' + s.symbol + '" style="color:var(--accent2);font-size:11px">View →</a></td>';
     html += '</tr>';
   });
   
   html += '</tbody></table>';
+  
+  if (matches.length > 100) {
+    html += '<div style="text-align:center;padding:16px;color:var(--t4);font-size:12px">Showing top 100 of ' + matches.length + ' results</div>';
+  }
   
   document.getElementById('resultsBody').innerHTML = html;
 }
