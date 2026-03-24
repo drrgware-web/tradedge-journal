@@ -1,0 +1,92 @@
+{
+  "version": "1.0",
+  "scans": [
+    {
+      "id": "preset_rsi_oversold",
+      "name": "RSI Oversold (< 30)",
+      "clause": "( cash ( latest rsi( 14 ) < 30 ) )",
+      "type": "preset",
+      "tags": [
+        "momentum",
+        "reversal"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "preset_rsi_overbought",
+      "name": "RSI Overbought (> 70)",
+      "clause": "( cash ( latest rsi( 14 ) > 70 ) )",
+      "type": "preset",
+      "tags": [
+        "momentum",
+        "reversal"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "preset_golden_cross",
+      "name": "Golden Cross (50/200 EMA)",
+      "clause": "( cash ( latest ema( close, 50 ) > latest ema( close, 200 ) and 1 day ago ema( close, 50 ) <= 1 day ago ema( close, 200 ) ) )",
+      "type": "preset",
+      "tags": [
+        "trend",
+        "crossover"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "preset_macd_bullish",
+      "name": "MACD Bullish Crossover",
+      "clause": "( cash ( latest macd( 12, 26, 9 ) > latest macd signal( 12, 26, 9 ) and 1 day ago macd( 12, 26, 9 ) <= 1 day ago macd signal( 12, 26, 9 ) ) )",
+      "type": "preset",
+      "tags": [
+        "momentum",
+        "crossover"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "preset_volume_spike",
+      "name": "Volume 3x Spike",
+      "clause": "( cash ( latest volume >= 1 day ago sma( volume, 20 ) * 3 ) )",
+      "type": "preset",
+      "tags": [
+        "volume",
+        "breakout"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "preset_minervini",
+      "name": "Minervini Trend Template",
+      "clause": "( cash ( latest close > 30 and latest ema( close, 200 ) > 1 month ago ema( close, 200 ) and latest close > latest ema( close, 200 ) and latest close > latest ema( close, 150 ) and latest close > latest ema( close, 50 ) and latest ema( close, 50 ) > latest ema( close, 150 ) and latest ema( close, 150 ) > latest ema( close, 200 ) ) )",
+      "type": "preset",
+      "tags": [
+        "trend",
+        "minervini"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "preset_52w_high",
+      "name": "Near 52W High",
+      "clause": "( cash ( latest close >= latest max( 252, latest high ) * 0.98 ) )",
+      "type": "preset",
+      "tags": [
+        "breakout",
+        "momentum"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "preset_supertrend_pos",
+      "name": "SuperTrend Positive",
+      "clause": "( cash ( latest close > latest supertrend( 7, 3 ) ) )",
+      "type": "preset",
+      "tags": [
+        "trend"
+      ],
+      "enabled": true
+    }
+  ]
+}
