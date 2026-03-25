@@ -59,7 +59,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* ═══ HEADER ═══ */
 .header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;border-bottom:1px solid var(--border-dim);margin-bottom:24px;}
 .header-left{display:flex;align-items:center;gap:16px;}
-.logo-mark{width:44px;height:44px;background:linear-gradient(135deg,var(--cyan) 0%,#06b6d4 100%);border-radius:10px;display:grid;place-items:center;font-weight:900;font-size:18px;color:#050810;letter-spacing:-0.5px;box-shadow:0 0 20px rgba(34,211,238,0.15);}
+.logo-mark{width:44px;height:44px;border-radius:10px;overflow:hidden;box-shadow:0 0 20px rgba(34,211,238,0.15);flex-shrink:0;}.logo-mark img{width:100%;height:100%;object-fit:cover;}
 .header-title{font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text-secondary);}
 .header-title span{color:var(--cyan);}
 .header-nav{display:flex;gap:6px;}
@@ -440,7 +440,7 @@ function render() {
   document.getElementById('app').innerHTML = `
     <div class="header">
       <div class="header-left">
-        <div class="logo-mark">TE</div>
+        <div class="logo-mark"><img src="assets/tradedge-logo.png" alt="TradEdge" onerror="this.onerror=null;this.parentElement.style.background='linear-gradient(135deg,#22d3ee,#06b6d4)';this.parentElement.style.display='grid';this.parentElement.style.placeItems='center';this.style.display='none';this.parentElement.innerHTML='<span style=font-weight:900;font-size:18px;color:#050810>TE</span>'"></div>
         <div class="header-title">Trad<span>Edge</span></div>
       </div>
       <div class="header-nav">${CONFIG.navLinks.map(l=>`<a href="${l.href}" class="${l.active?'active':''}">${l.name}</a>`).join('')}</div>
