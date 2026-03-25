@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradEdge AUTOPILOT v2.0</title>
+<title>TradEdge EDGE PILOT</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -72,7 +72,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--green),var(--amber),var(--red));opacity:0.6;}
 .hero-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;}
 .hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:28px;font-weight:900;letter-spacing:2px;color:var(--text-primary);}
-.hero-badge .diamond{width:32px;height:32px;background:linear-gradient(135deg,var(--cyan),var(--green));clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);flex-shrink:0;}
+.ep-logo{width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#4a5e78 0%,#1e2a3a 50%,#0f1923 100%);border:3px solid #3a4f66;box-shadow:0 0 12px rgba(34,211,238,0.15),inset 0 1px 2px rgba(255,255,255,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;}.ep-logo::before{content:'';position:absolute;top:2px;left:50%;transform:translateX(-50%);width:60%;height:30%;border-radius:0 0 50% 50%/0 0 100% 100%;border:1.5px solid rgba(255,255,255,0.25);border-top:none;}.ep-logo-txt{font-size:5.5px;font-weight:900;letter-spacing:0.8px;color:rgba(255,255,255,0.85);line-height:1;margin-top:6px;text-align:center;}.ep-logo-dot{display:flex;gap:6px;margin-top:2px;}.ep-logo-dot span{width:4px;height:4px;border-radius:50%;}.ep-logo-dot .on{background:#10b981;box-shadow:0 0 4px #10b981;}.ep-logo-dot .off{background:#6b7280;}
 .hero-subtitle{font-size:11.5px;font-weight:500;letter-spacing:2.5px;color:var(--text-dim);text-transform:uppercase;margin-top:6px;}
 .hero-actions{display:flex;gap:8px;flex-shrink:0;}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.2s;letter-spacing:0.3px;}
@@ -296,7 +296,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div class="app" id="app"></div>
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// TRADEDGE AUTOPILOT v2.0 — CHAMPIONSHIP TOP-DOWN ENGINE
+// TRADEDGE EDGE PILOT v2.0 — CHAMPIONSHIP TOP-DOWN ENGINE
 // 6-Stage Gated Pipeline:
 //   1. Dynamic Asset Allocation (Where to deploy capital?)
 //   2. Equity Regime (Is market safe? MPS + Breadth)
@@ -329,7 +329,7 @@ const CONFIG = {
     { name: 'MPS', href: 'mps.html' },
     { name: 'Journal', href: 'journal.html' },
     { name: 'Watchlist', href: 'watchlist.html' },
-    { name: 'Autopilot', href: 'autopilot.html', active: true },
+    { name: 'Edge Pilot', href: 'autopilot.html', active: true },
   ]
 };
 
@@ -449,7 +449,7 @@ function render() {
     <div class="hero">
       <div class="hero-top">
         <div>
-          <div class="hero-badge"><div class="diamond"></div>AUTOPILOT</div>
+          <div class="hero-badge"><div class="ep-logo"><div class="ep-logo-txt">AUTO<br>PILOT</div><div class="ep-logo-dot"><span class="on"></span><span class="off"></span></div></div>EDGE PILOT</div>
           <div class="hero-subtitle">Asset Alloc → Equity Regime → Sector → HELIX → Edge Intel → Execute</div>
         </div>
         <div class="hero-actions">
@@ -552,7 +552,7 @@ function render() {
       <div class="pipeline-stats">PIPELINE: <span class="hl-cyan">${state.pipeline.universe}</span> stocks → <span class="hl-amber">${state.pipeline.hotSectors}</span> hot sectors → <span class="hl-green">${state.pipeline.screened}</span> screened → <span class="${state.pipeline.topPicks>0?'hl-green':'hl-red'}">${state.pipeline.topPicks} top picks</span></div>
       <div class="pipeline-meta">MPS: <strong>${prof}</strong> (${g.mpsScore}) · Market: <strong style="color:${g.mpsSignal==='RISK-ON'?'var(--green)':g.mpsSignal==='CAUTION'?'var(--amber)':'var(--red)'}">${g.mpsSignal}</strong> · Leading: <strong>${state.sectors.leading.length}</strong> · ${ts}</div>
     </div>
-    <div class="disclaimer">TradEdge Autopilot v2.0 · Minervini · O'Neil · Definedge Methodology · Not Financial Advice</div>
+    <div class="disclaimer">TradEdge Edge Pilot v2.0 · Minervini · O'Neil · Definedge Methodology · Not Financial Advice</div>
   `;
 }
 
@@ -686,7 +686,7 @@ function addWL(s) {
 }
 function saveTopPicks() {
   const p=state.topPicks.map(x=>x.symbol);
-  localStorage.setItem('te_autopilot_picks',JSON.stringify({date:new Date().toISOString(),picks:p}));
+  localStorage.setItem('te_edgepilot_picks',JSON.stringify({date:new Date().toISOString(),picks:p}));
   alert(`Saved ${p.length} picks: ${p.join(', ')}`);
 }
 function rescan() { state.loading=true; render(); loadData(); }
