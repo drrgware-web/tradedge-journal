@@ -368,16 +368,8 @@ function renderChart(){
 }
 function initChart(){
   const wrap=$('tvChartWrap');if(!wrap)return;
-  const s=document.createElement('script');
-  s.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-  s.async=true;
-  s.textContent=JSON.stringify({symbol:'NSE:'+D.symbol,width:'100%',height:450,interval:'D',timezone:'Asia/Kolkata',theme:'dark',style:'1',locale:'en',backgroundColor:'rgba(6,8,12,1)',gridColor:'rgba(0,255,136,0.04)',hide_top_toolbar:false,hide_legend:false,allow_symbol_change:false,save_image:false,calendar:false,studies:['MAExp@tv-basicstudies|20','MAExp@tv-basicstudies|50','MAExp@tv-basicstudies|200','RSI@tv-basicstudies'],support_host:'https://www.tradingview.com'});
-  const div=document.createElement('div');
-  div.className='tradingview-widget-container';
-  div.innerHTML='<div class="tradingview-widget-container__widget"></div>';
-  div.appendChild(s);
-  wrap.innerHTML='';
-  wrap.appendChild(div);
+  // Use iframe to TradingView chart page — works for all NSE symbols
+  wrap.innerHTML='<iframe src="https://in.tradingview.com/widgetembed/?hideideas=1&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en&symbol=NSE%3A'+D.symbol+'&interval=D&theme=dark&style=1&timezone=Asia%2FKolkata&studies=%5B%22MAExp%4040tv-basicstudies%7C20%22%2C%22MAExp%4040tv-basicstudies%7C50%22%2C%22MAExp%4040tv-basicstudies%7C200%22%2C%22RSI%4040tv-basicstudies%22%5D&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=0&save_image=0&calendar=0&utm_source=tradedge" style="width:100%;height:450px;border:none"></iframe>';
 }
 
 // AI
