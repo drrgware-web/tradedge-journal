@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RRM Scanner | TradEdge</title>
+<title>HELIX | TradEdge</title>
 <link rel="icon" type="image/jpeg" href="assets/logo.jpeg">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -54,19 +54,36 @@ tr.row-green{border-left:3px solid #22c55e}tr.row-yellow{border-left:3px solid #
 .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;color:var(--t4)}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Toggle switch */
+.toggle-wrap{display:flex;align-items:center;gap:6px;cursor:pointer}.toggle-lbl{font-size:10px;font-weight:700;font-family:var(--mono);color:var(--t3)}
+.toggle-wrap input{display:none}
+.toggle-slider{width:34px;height:18px;background:var(--bg4);border:1px solid var(--border);border-radius:9px;position:relative;transition:all .2s}
+.toggle-slider::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;background:var(--t4);border-radius:50%;transition:all .2s}
+.toggle-wrap input:checked+.toggle-slider{background:rgba(0,255,136,.15);border-color:var(--accent)}
+.toggle-wrap input:checked+.toggle-slider::after{left:18px;background:var(--accent)}
+/* RSI column visibility */
+.rsi-col{transition:opacity .2s}
+.hide-rsi .rsi-col{display:none}
 @media(max-width:768px){.stats{gap:6px}.stat-card{min-width:70px;padding:8px 10px}.stat-val{font-size:16px}.srch{width:140px}}
 </style>
 </head>
 <body>
 <header class="hdr">
   <div>
-    <div class="logo">RRM SCANNER</div>
-    <div class="logo-sub">Relative Rotation Matrix · Daily / Weekly / Monthly</div>
+    <div class="logo">HELIX</div>
+    <div class="logo-sub">Multi-Timeframe Rotation Scanner · Daily / Weekly / Monthly</div>
   </div>
-  <div class="nav-links">
-    <a href="matrix.html" class="nav-link">MATRIX</a>
-    <a href="scanner-builder.html" class="nav-link">Scanner</a>
-    <a href="watchlist.html" class="nav-link">Watchlist</a>
+  <div style="display:flex;align-items:center;gap:12px">
+    <label class="toggle-wrap" title="Toggle RSI columns">
+      <span class="toggle-lbl">RSI</span>
+      <input type="checkbox" id="rsiToggle" checked>
+      <span class="toggle-slider"></span>
+    </label>
+    <div class="nav-links">
+      <a href="matrix.html" class="nav-link">MATRIX</a>
+      <a href="scanner-builder.html" class="nav-link">Scanner</a>
+      <a href="watchlist.html" class="nav-link">Watchlist</a>
+    </div>
   </div>
 </header>
 
@@ -76,8 +93,8 @@ tr.row-green{border-left:3px solid #22c55e}tr.row-yellow{border-left:3px solid #
 
 <script>
 const DATA_URL='data/rrm_scanner.json';
-let allStocks=[],filtered=[],sortCol='score',sortDir=-1;
-let filterSignal=null,filterQuad=null,searchQ='';
+let allStocks=[],filtered=[],sortCol='sweet',sortDir=-1;
+let filterSignal=null,filterQuad=null,filterSweet=null,searchQ='';
 
 async function init(){
   try{
@@ -91,7 +108,7 @@ async function init(){
 
 function render(meta){
   const c=document.getElementById('content');
-  const sd=meta?.signal_distribution||{};const qd=meta?.quadrant_distribution||{};
+  const sd=meta?.signal_distribution||{};const qd=meta?.quadrant_distribution||{};const sw=meta?.sweet_distribution||{};
   c.innerHTML=`
     <div class="stats">
       <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${allStocks.length}</div><div class="stat-lbl">Stocks</div></div>
@@ -99,9 +116,9 @@ function render(meta){
       <div class="stat-card"><div class="stat-val" style="color:#f59e0b">${sd.YELLOW||0}</div><div class="stat-lbl">🟡 Yellow</div></div>
       <div class="stat-card"><div class="stat-val" style="color:#00c8ff">${sd.BLUE||0}</div><div class="stat-lbl">🔵 Blue</div></div>
       <div class="stat-card"><div class="stat-val" style="color:#ef4444">${sd.RED||0}</div><div class="stat-lbl">🔴 Red</div></div>
-      <div class="stat-card"><div class="stat-val">${qd.Leading||0}</div><div class="stat-lbl">Leading</div></div>
-      <div class="stat-card"><div class="stat-val">${qd.Improving||0}</div><div class="stat-lbl">Improving</div></div>
-      <div style="margin-left:auto;font-size:9px;color:var(--t4);font-family:var(--mono);text-align:right"><div>Updated: ${meta?.generated_at?new Date(meta.generated_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}):'—'}</div><div>Benchmark: ${meta?.benchmark||'—'}</div></div>
+      <div style="width:1px;height:32px;background:var(--border)"></div>
+      <div class="stat-card" style="border-color:rgba(0,255,136,.2)"><div class="stat-val" style="color:#00ff88">${(sw.PERFECT||0)+(sw.SWEET||0)}</div><div class="stat-lbl">🎯 Sweet Spot</div></div>
+      <div style="margin-left:auto;font-size:9px;color:var(--t4);font-family:var(--mono);text-align:right"><div>Updated: ${meta?.generated_at?new Date(meta.generated_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}):'—'}</div><div>Benchmark: ${meta?.benchmark||'—'} · v${meta?.version||'?'}</div></div>
     </div>
 
     <div class="filters">
@@ -119,6 +136,12 @@ function render(meta){
         <button class="fbtn" data-quad="Weakening">Weakening</button>
         <button class="fbtn" data-quad="Lagging">Lagging</button>
       </div>
+      <div class="filter-grp">
+        <button class="fbtn on" data-sweet="ALL">ALL</button>
+        <button class="fbtn green" data-sweet="PERFECT">🎯 PERFECT</button>
+        <button class="fbtn green" data-sweet="SWEET">✨ SWEET</button>
+        <button class="fbtn" data-sweet="OK">OK</button>
+      </div>
       <input type="text" class="srch" id="srch" placeholder="Search symbol..." autocomplete="off">
       <div style="margin-left:auto;font-size:10px;color:var(--t4);font-family:var(--mono)" id="countLbl"></div>
     </div>
@@ -126,13 +149,15 @@ function render(meta){
     <div class="legend">
       <div class="leg-item"><span class="signal-dot GREEN"></span>GREEN — M+W+D right side</div>
       <div class="leg-item"><span class="signal-dot YELLOW"></span>YELLOW — M strong, W dip, D ↑</div>
-      <div class="leg-item"><span class="signal-dot BLUE"></span>BLUE — W+D strong, no M backing</div>
-      <div class="leg-item"><span class="signal-dot RED"></span>RED — Structural weakness</div>
-      <div class="leg-item" style="margin-left:auto;color:var(--t4)">Score 4-5 = High conviction · Click header to sort</div>
+      <div class="leg-item"><span class="signal-dot BLUE"></span>BLUE — W+D strong, no M</div>
+      <div class="leg-item"><span class="signal-dot RED"></span>RED — Weakness</div>
+      <div style="width:1px;height:14px;background:var(--border)"></div>
+      <div class="leg-item">🎯 PERFECT = M-RSI 55-75, W-RSI 45-65, D-RSI 35-55 + GREEN/YELLOW</div>
+      <div class="leg-item" style="margin-left:auto;color:var(--t4)">Click header to sort</div>
     </div>
 
     <div class="tbl-wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
-    <div class="meta-bar"><span id="showCount"></span><span>◈ TradEdge RRM Scanner v1.0</span></div>
+    <div class="meta-bar"><span id="showCount"></span><span>◈ HELIX v2.0 — Sweet Spot Edition</span></div>
   `;
 
   // Wire filters
@@ -146,30 +171,45 @@ function render(meta){
     b.closest('.filter-grp').querySelectorAll('.fbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');
     applyFilters();
   }});
+  document.querySelectorAll('[data-sweet]').forEach(b=>{b.onclick=()=>{
+    filterSweet=b.dataset.sweet==='ALL'?null:b.dataset.sweet;
+    b.closest('.filter-grp').querySelectorAll('.fbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    applyFilters();
+  }});
   document.getElementById('srch').oninput=e=>{searchQ=e.target.value.trim().toUpperCase();applyFilters()};
+
+  // RSI toggle
+  const rsiTog=document.getElementById('rsiToggle');
+  if(rsiTog){rsiTog.onchange=()=>{
+    showRSI=rsiTog.checked;
+    document.querySelector('.tbl-wrap').classList.toggle('hide-rsi',!showRSI);
+  };}
 
   renderHead();applyFilters();
 }
 
 const COLS=[
+  {k:'sweet',l:'🎯 SWEET',w:'70px',align:'center'},
   {k:'signal',l:'SIG',w:'50px',align:'center'},
-  {k:'score',l:'SCORE',w:'60px',align:'center'},
-  {k:'symbol',l:'STOCK',w:'140px'},
-  {k:'sector',l:'SECTOR',w:'100px'},
-  {k:'cmp',l:'CMP',w:'80px',align:'right'},
-  {k:'change_pct',l:'CHG%',w:'65px',align:'right'},
-  {k:'m_quad',l:'MONTHLY',w:'85px',align:'center'},
-  {k:'w_quad',l:'WEEKLY',w:'85px',align:'center'},
-  {k:'d_quad',l:'DAILY',w:'85px',align:'center'},
-  {k:'composite_score',l:'O\'NEIL',w:'55px',align:'center'},
-  {k:'oneil_grade',l:'GRD',w:'40px',align:'center'},
-  {k:'rsi',l:'RSI',w:'45px',align:'right'},
-  {k:'volume_ratio',l:'VOLR',w:'50px',align:'right'},
+  {k:'score',l:'SCORE',w:'55px',align:'center'},
+  {k:'symbol',l:'STOCK',w:'130px'},
+  {k:'sector',l:'SECTOR',w:'95px'},
+  {k:'cmp',l:'CMP',w:'75px',align:'right'},
+  {k:'change_pct',l:'CHG%',w:'58px',align:'right'},
+  {k:'m_quad',l:'M-QUAD',w:'80px',align:'center'},
+  {k:'m_rsi',l:'M-RSI',w:'50px',align:'center',rsi:true},
+  {k:'w_quad',l:'W-QUAD',w:'80px',align:'center'},
+  {k:'w_rsi',l:'W-RSI',w:'50px',align:'center',rsi:true},
+  {k:'d_quad',l:'D-QUAD',w:'80px',align:'center'},
+  {k:'d_rsi',l:'D-RSI',w:'50px',align:'center',rsi:true},
+  {k:'composite_score',l:'O\'NEIL',w:'50px',align:'center'},
+  {k:'oneil_grade',l:'GRD',w:'35px',align:'center'},
 ];
+let showRSI=true;
 
 function renderHead(){
   const thead=document.getElementById('thead');
-  thead.innerHTML='<tr>'+COLS.map(c=>'<th style="width:'+c.w+';text-align:'+(c.align||'left')+'" data-col="'+c.k+'" class="'+(sortCol===c.k?'sorted':'')+'">'+c.l+'<span class="sort-arrow">'+(sortCol===c.k?(sortDir>0?'▲':'▼'):'⇅')+'</span></th>').join('')+'</tr>';
+  thead.innerHTML='<tr>'+COLS.map(c=>'<th style="width:'+c.w+';text-align:'+(c.align||'left')+'" data-col="'+c.k+'" class="'+(sortCol===c.k?'sorted ':'')+( c.rsi?'rsi-col':'')+'">'+c.l+'<span class="sort-arrow">'+(sortCol===c.k?(sortDir>0?'▲':'▼'):'⇅')+'</span></th>').join('')+'</tr>';
   thead.querySelectorAll('th').forEach(th=>{th.onclick=()=>{
     const col=th.dataset.col;if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=-1;}
     renderHead();renderRows();
@@ -180,19 +220,24 @@ function applyFilters(){
   filtered=allStocks.filter(s=>{
     if(filterSignal&&s.signal!==filterSignal)return false;
     if(filterQuad){if(s.d_quad!==filterQuad&&s.w_quad!==filterQuad&&s.m_quad!==filterQuad)return false;}
+    if(filterSweet&&s.sweet_label!==filterSweet)return false;
     if(searchQ&&!s.symbol?.toUpperCase().includes(searchQ)&&!s.name?.toUpperCase().includes(searchQ)&&!s.sector?.toUpperCase().includes(searchQ))return false;
     return true;
   });
   renderRows();
 }
 
+function rsiCol(v){if(v==null)return'var(--t4)';if(v>75)return'var(--red)';if(v>65)return'var(--amber)';if(v>=45)return'var(--green)';if(v>=35)return'var(--accent2)';return'var(--t3)';}
+function rsiZone(v){if(v==null)return'';if(v>75)return' ⚠';if(v>=35&&v<=55)return' ✦';return'';}
+
 function renderRows(){
-  // Sort
   const quadOrder={Leading:0,Improving:1,Weakening:2,Lagging:3,Unknown:4};
   const sigOrder={GREEN:0,YELLOW:1,BLUE:2,RED:3};
+  const sweetOrder={PERFECT:0,SWEET:1,OK:2,WAIT:3,AVOID:4};
   filtered.sort((a,b)=>{
     let va=a[sortCol],vb=b[sortCol];
     if(sortCol==='signal'){va=sigOrder[va]??9;vb=sigOrder[vb]??9;}
+    else if(sortCol==='sweet_label'){va=sweetOrder[va]??9;vb=sweetOrder[vb]??9;}
     else if(sortCol.includes('quad')){va=quadOrder[va]??9;vb=quadOrder[vb]??9;}
     else if(sortCol==='oneil_grade'){const go={A:0,B:1,C:2,D:3,F:4,'':5};va=go[va]??9;vb=go[vb]??9;}
     else{va=va??-999;vb=vb??-999;}
@@ -204,7 +249,11 @@ function renderRows(){
   tbody.innerHTML=show.map(s=>{
     const chgCls=(s.change_pct||0)>=0?'up':'dn';
     const scorePips=Array.from({length:5},(_,i)=>'<div class="score-pip'+(i<(s.score||0)?' lit':'')+'"></div>').join('');
+    const sw=s.sweet||0;const swl=s.sweet_label||'AVOID';
+    const swCol=swl==='PERFECT'?'#00ff88':swl==='SWEET'?'#22c55e':swl==='OK'?'var(--amber)':swl==='WAIT'?'var(--t4)':'var(--red)';
+    const swBg=swl==='PERFECT'?'rgba(0,255,136,.12)':swl==='SWEET'?'rgba(34,197,94,.1)':swl==='OK'?'rgba(245,158,11,.08)':'transparent';
     return'<tr class="row-'+s.signal+'" onclick="go(\''+s.symbol+'\')">'+
+      '<td style="text-align:center"><div style="background:'+swBg+';border-radius:4px;padding:2px 4px"><div style="font-size:14px;font-weight:900;font-family:var(--mono);color:'+swCol+'">'+sw+'</div><div style="font-size:7px;font-weight:700;color:'+swCol+';letter-spacing:.5px">'+swl+'</div></div></td>'+
       '<td style="text-align:center"><span class="signal-dot '+s.signal+'"></span> <span class="signal-tag '+s.signal+'">'+s.signal+'</span></td>'+
       '<td style="text-align:center"><div class="score-bar" title="Score: '+(s.score||0)+'/5">'+scorePips+'</div></td>'+
       '<td><div class="sym-cell">'+s.symbol+'</div><div class="nm-cell">'+(s.name||'')+'</div></td>'+
@@ -212,12 +261,13 @@ function renderRows(){
       '<td class="num">₹'+(s.cmp?s.cmp.toLocaleString('en-IN',{maximumFractionDigits:1}):'—')+'</td>'+
       '<td class="num '+chgCls+'">'+(s.change_pct!=null?(s.change_pct>=0?'+':'')+s.change_pct.toFixed(1)+'%':'—')+'</td>'+
       '<td style="text-align:center"><span class="quad-pill '+(s.m_quad||'Unknown')+'">'+(s.m_quad||'—')+'</span></td>'+
+      '<td class="num rsi-col" style="text-align:center;color:'+rsiCol(s.m_rsi)+'">'+(s.m_rsi!=null?s.m_rsi.toFixed(0)+rsiZone(s.m_rsi):'—')+'</td>'+
       '<td style="text-align:center"><span class="quad-pill '+(s.w_quad||'Unknown')+'">'+(s.w_quad||'—')+'</span></td>'+
+      '<td class="num rsi-col" style="text-align:center;color:'+rsiCol(s.w_rsi)+'">'+(s.w_rsi!=null?s.w_rsi.toFixed(0)+rsiZone(s.w_rsi):'—')+'</td>'+
       '<td style="text-align:center"><span class="quad-pill '+(s.d_quad||'Unknown')+'">'+(s.d_quad||'—')+'</span></td>'+
+      '<td class="num rsi-col" style="text-align:center;color:'+rsiCol(s.d_rsi)+'">'+(s.d_rsi!=null?s.d_rsi.toFixed(0)+rsiZone(s.d_rsi):'—')+'</td>'+
       '<td class="num" style="text-align:center">'+(s.composite_score||'—')+'</td>'+
       '<td style="text-align:center">'+(s.oneil_grade?'<span class="grade '+s.oneil_grade+'">'+s.oneil_grade+'</span>':'—')+'</td>'+
-      '<td class="num" style="color:'+(s.rsi>70?'var(--red)':s.rsi<30?'var(--green)':'var(--t2)')+'">'+(s.rsi?s.rsi.toFixed(0):'—')+'</td>'+
-      '<td class="num" style="color:'+(s.volume_ratio>=1.5?'var(--green)':'var(--t3)')+'">'+(s.volume_ratio?s.volume_ratio.toFixed(1)+'x':'—')+'</td>'+
     '</tr>';
   }).join('');
 
