@@ -3,770 +3,696 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradEdge Autopilot — Top-Down Workflow</title>
+<title>TradEdge AUTOPILOT v2.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-:root{--bg:#06080c;--bg2:#0c1018;--bg3:#121820;--bgc:#0f1520;--bgh:#141d2a;--bd0:rgba(0,255,136,0.06);--bd1:rgba(0,255,136,0.1);--bd2:rgba(0,255,136,0.2);--g:#00ff88;--gd:rgba(0,255,136,0.15);--b:#00c8ff;--p:#8844ff;--r:#ff4455;--a:#ffaa00;--t1:#e8e8e8;--t2:#8899aa;--t3:#556677;--fd:'Outfit',sans-serif;--fm:'JetBrains Mono',monospace}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--t1);font-family:var(--fd);min-height:100vh;-webkit-font-smoothing:antialiased}
-body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.008) 2px,rgba(0,255,136,.008) 4px);pointer-events:none;z-index:9999}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.015) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
-#root{position:relative;z-index:1}
-::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.15);border-radius:3px}
-.nav{display:flex;align-items:center;gap:4px;padding:4px 20px;background:var(--bg2);border-bottom:1px solid var(--bd0);position:sticky;top:0;z-index:100}
-.nav-link{padding:5px 12px;font-size:11px;font-weight:600;color:var(--t3);text-decoration:none;border-radius:4px;font-family:var(--fm)}.nav-link:hover{color:var(--t1);background:var(--bgh)}.nav-link.active{color:var(--g);background:var(--gd)}
-.card{background:var(--bgc);border:1px solid var(--bd1);border-radius:8px;overflow:hidden}
-.card:hover{border-color:var(--bd2)}
-@keyframes logoPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.85;transform:scale(1.03)}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-@keyframes glow{0%,100%{box-shadow:0 0 8px rgba(0,255,136,0.15)}50%{box-shadow:0 0 20px rgba(0,255,136,0.3)}}
+:root {
+  --bg-void: #050810;
+  --bg-base: #080c16;
+  --bg-card: #0c1120;
+  --bg-card-alt: #0e1426;
+  --bg-elevated: #111830;
+  --bg-inset: #070a12;
 
-/* Stage pipeline */
-.stage{border-radius:8px;padding:16px;margin-bottom:12px;animation:fadeUp .4s ease-out both;border:1px solid var(--bd1);background:var(--bgc)}
-.stage-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.stage-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;font-family:var(--fm);flex-shrink:0}
-.stage-title{font-size:15px;font-weight:800;letter-spacing:1px}
-.stage-verdict{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:800;font-family:var(--fm);letter-spacing:1px}
-.pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700;font-family:var(--fm);letter-spacing:0.5px}
-.pill-g{background:rgba(0,255,136,0.12);color:var(--g);border:1px solid rgba(0,255,136,0.3)}
-.pill-r{background:rgba(255,68,85,0.12);color:var(--r);border:1px solid rgba(255,68,85,0.3)}
-.pill-a{background:rgba(255,170,0,0.12);color:var(--a);border:1px solid rgba(255,170,0,0.3)}
-.pill-b{background:rgba(0,200,255,0.12);color:var(--b);border:1px solid rgba(0,200,255,0.3)}
-.pill-p{background:rgba(136,68,255,0.12);color:var(--p);border:1px solid rgba(136,68,255,0.3)}
+  --border-dim: rgba(56,189,248,0.04);
+  --border-subtle: rgba(56,189,248,0.08);
+  --border-accent: rgba(56,189,248,0.18);
+  --border-glow: rgba(34,211,238,0.3);
+  --border-pass: rgba(16,185,129,0.25);
+  --border-fail: rgba(239,68,68,0.2);
 
-/* Stock card */
-.scard{background:var(--bg3);border:1px solid var(--bd1);border-radius:6px;padding:10px 12px;cursor:pointer;transition:all .15s}
-.scard:hover{border-color:var(--g);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,255,136,0.08)}
+  --text-primary: #e2e8f0;
+  --text-secondary: #8492a6;
+  --text-dim: #4a5568;
+  --text-muted: #2d3748;
+
+  --cyan: #22d3ee;
+  --cyan-soft: #67e8f9;
+  --cyan-dim: rgba(34,211,238,0.1);
+  --green: #10b981;
+  --green-bright: #34d399;
+  --green-dim: rgba(16,185,129,0.1);
+  --red: #ef4444;
+  --red-bright: #f87171;
+  --red-dim: rgba(239,68,68,0.1);
+  --amber: #f59e0b;
+  --amber-bright: #fbbf24;
+  --amber-dim: rgba(245,158,11,0.1);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --gold: #fbbf24;
+  --gold-dim: rgba(251,191,36,0.08);
+
+  --font: 'Outfit', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg-void);color:var(--text-primary);min-height:100vh;line-height:1.5;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg-void);}
+::-webkit-scrollbar-thumb{background:rgba(34,211,238,0.15);border-radius:3px;}
+
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 800px 600px at 15% 10%,rgba(34,211,238,0.03) 0%,transparent 60%),radial-gradient(ellipse 600px 500px at 85% 80%,rgba(16,185,129,0.025) 0%,transparent 60%);pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 24px 60px;}
+
+/* ═══ HEADER ═══ */
+.header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;border-bottom:1px solid var(--border-dim);margin-bottom:24px;}
+.header-left{display:flex;align-items:center;gap:16px;}
+.logo-mark{width:44px;height:44px;background:linear-gradient(135deg,var(--cyan) 0%,#06b6d4 100%);border-radius:10px;display:grid;place-items:center;font-weight:900;font-size:18px;color:#050810;letter-spacing:-0.5px;box-shadow:0 0 20px rgba(34,211,238,0.15);}
+.header-title{font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text-secondary);}
+.header-title span{color:var(--cyan);}
+.header-nav{display:flex;gap:6px;}
+.header-nav a{font-size:12px;font-weight:500;color:var(--text-dim);text-decoration:none;padding:6px 12px;border-radius:6px;transition:all 0.2s;letter-spacing:0.5px;}
+.header-nav a:hover{color:var(--text-secondary);background:var(--bg-card);}
+.header-nav a.active{color:var(--cyan);background:var(--cyan-dim);}
+
+/* ═══ HERO ═══ */
+.hero{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:16px;padding:28px 32px;margin-bottom:8px;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--green),var(--amber),var(--red));opacity:0.6;}
+.hero-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:28px;font-weight:900;letter-spacing:2px;color:var(--text-primary);}
+.hero-badge .diamond{width:32px;height:32px;background:linear-gradient(135deg,var(--cyan),var(--green));clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);flex-shrink:0;}
+.hero-subtitle{font-size:11.5px;font-weight:500;letter-spacing:2.5px;color:var(--text-dim);text-transform:uppercase;margin-top:6px;}
+.hero-actions{display:flex;gap:8px;flex-shrink:0;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.2s;letter-spacing:0.3px;}
+.btn-primary{background:linear-gradient(135deg,rgba(34,211,238,0.15),rgba(16,185,129,0.1));border-color:var(--border-accent);color:var(--cyan);}
+.btn-primary:hover{background:linear-gradient(135deg,rgba(34,211,238,0.25),rgba(16,185,129,0.15));border-color:var(--border-glow);box-shadow:0 0 16px rgba(34,211,238,0.1);}
+.btn-ghost{background:var(--bg-elevated);border-color:var(--border-subtle);color:var(--text-secondary);}
+.btn-ghost:hover{border-color:var(--border-accent);color:var(--text-primary);}
+
+/* ═══ MONEY PROFILE ═══ */
+.money-profile{display:grid;grid-template-columns:1fr auto auto auto;gap:32px;align-items:center;padding:16px 20px;background:var(--bg-inset);border-radius:10px;border:1px solid var(--border-dim);}
+.money-label{display:flex;align-items:center;gap:12px;}
+.money-dot{width:36px;height:36px;border-radius:50%;border:3px solid var(--cyan);position:relative;display:flex;align-items:center;justify-content:center;}
+.money-dot-inner{width:18px;height:18px;border-radius:50%;}
+.money-name{font-size:16px;font-weight:700;color:var(--text-primary);letter-spacing:1px;}
+.money-mode{font-size:11px;color:var(--text-dim);font-weight:500;}
+.money-stat{text-align:center;}
+.money-stat-val{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text-primary);}
+.money-stat-label{font-size:9.5px;font-weight:600;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase;}
+.money-rules{padding:10px 16px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.12);border-radius:8px;max-width:320px;}
+.money-rules-title{font-size:11px;font-weight:700;color:var(--green);letter-spacing:0.5px;margin-bottom:3px;}
+.money-rules-text{font-size:10.5px;color:var(--text-secondary);line-height:1.5;}
+
+/* ═══ PIPELINE TRACKER ═══ */
+.pipeline{display:flex;align-items:center;gap:0;padding:16px 24px;margin:8px 0 20px;}
+.pipe-stage{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;z-index:1;}
+.pipe-num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:12px;font-weight:700;border:2px solid var(--border-subtle);background:var(--bg-card);color:var(--text-dim);transition:all 0.4s;}
+.pipe-num.pass{border-color:var(--green);background:var(--green-dim);color:var(--green);box-shadow:0 0 12px rgba(16,185,129,0.15);}
+.pipe-num.fail{border-color:var(--red);background:var(--red-dim);color:var(--red);}
+.pipe-num.active{border-color:var(--cyan);background:var(--cyan-dim);color:var(--cyan);box-shadow:0 0 12px rgba(34,211,238,0.2);}
+.pipe-num.locked{opacity:0.35;}
+.pipe-label{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);text-align:center;white-space:nowrap;}
+.pipe-label.pass{color:var(--green);}
+.pipe-label.fail{color:var(--red);}
+.pipe-label.active{color:var(--cyan);}
+.pipe-connector{flex:0 0 auto;width:40px;height:2px;position:relative;z-index:1;}
+.pipe-connector .line{position:absolute;top:0;left:0;right:0;height:2px;background:var(--border-subtle);border-radius:1px;}
+.pipe-connector .line.pass{background:var(--green);box-shadow:0 0 6px rgba(16,185,129,0.2);}
+.pipe-connector .line.fail{background:linear-gradient(90deg,var(--red),rgba(239,68,68,0.3));}
+
+/* ═══ STAGE CARDS ═══ */
+.stage{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:14px;margin-bottom:16px;overflow:hidden;transition:all 0.3s;animation:stageIn 0.5s ease-out both;}
+.stage:hover{border-color:var(--border-accent);}
+.stage.locked{opacity:0.4;pointer-events:none;filter:grayscale(0.3);}
+.stage.locked .stage-body{display:none;}
+.stage.pass{border-color:var(--border-pass);}
+.stage.fail{border-color:var(--border-fail);}
+@keyframes stageIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.stage:nth-child(1){animation-delay:0.05s;}.stage:nth-child(2){animation-delay:0.1s;}.stage:nth-child(3){animation-delay:0.15s;}.stage:nth-child(4){animation-delay:0.2s;}.stage:nth-child(5){animation-delay:0.25s;}.stage:nth-child(6){animation-delay:0.3s;}
+
+.stage-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;cursor:pointer;user-select:none;}
+.stage-header-left{display:flex;align-items:center;gap:14px;}
+.stage-num{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:700;flex-shrink:0;}
+.stage-num.n1{background:var(--cyan-dim);color:var(--cyan);border:1.5px solid rgba(34,211,238,0.25);}
+.stage-num.n2{background:var(--green-dim);color:var(--green);border:1.5px solid rgba(16,185,129,0.25);}
+.stage-num.n3{background:var(--amber-dim);color:var(--amber);border:1.5px solid rgba(245,158,11,0.2);}
+.stage-num.n4{background:var(--purple-dim);color:var(--purple);border:1.5px solid rgba(167,139,250,0.2);}
+.stage-num.n5{background:var(--gold-dim);color:var(--gold);border:1.5px solid rgba(251,191,36,0.2);}
+.stage-num.n6{background:rgba(34,211,238,0.08);color:var(--cyan-soft);border:1.5px solid rgba(34,211,238,0.15);}
+.stage-title-group{}
+.stage-title{font-size:15px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;}
+.stage-question{font-size:11.5px;color:var(--text-dim);font-weight:400;margin-top:2px;}
+.stage-verdict{display:flex;align-items:center;gap:10px;}
+.verdict-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:1px;}
+.verdict-badge.risk-on{background:var(--green-dim);color:var(--green-bright);border:1px solid rgba(16,185,129,0.2);}
+.verdict-badge.risk-off{background:var(--red-dim);color:var(--red-bright);border:1px solid rgba(239,68,68,0.2);}
+.verdict-badge.caution{background:var(--amber-dim);color:var(--amber-bright);border:1px solid rgba(245,158,11,0.2);}
+.verdict-badge .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.verdict-badge.risk-on .dot{background:var(--green);box-shadow:0 0 6px var(--green);}
+.verdict-badge.risk-off .dot{background:var(--red);box-shadow:0 0 6px var(--red);animation:pulse-dot 2s infinite;}
+.verdict-badge.caution .dot{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+@keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.stage-body{padding:0 24px 22px;}
+
+/* ═══ STAGE 1: ASSET ALLOC ═══ */
+.asset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.asset-card{background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:10px;padding:14px 16px;transition:all 0.2s;position:relative;overflow:hidden;}
+.asset-card:hover{border-color:var(--border-accent);}
+.asset-card.recommended{border-color:var(--border-pass);background:linear-gradient(135deg,var(--bg-inset),rgba(16,185,129,0.04));}
+.asset-card.recommended::before{content:'★';position:absolute;top:8px;right:10px;font-size:10px;color:var(--green);}
+.asset-name{font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:0.5px;margin-bottom:6px;}
+.asset-alloc{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--text-primary);}
+.asset-alloc span{font-size:13px;color:var(--text-dim);}
+.asset-signal{font-size:10px;font-weight:600;margin-top:6px;letter-spacing:0.5px;}
+.asset-signal.overweight{color:var(--green);}
+.asset-signal.neutral{color:var(--text-dim);}
+.asset-signal.underweight{color:var(--red);}
+.alloc-reasoning{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;background:var(--bg-inset);border-radius:8px;border-left:3px solid var(--cyan);}
+.alloc-reasoning-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.alloc-reasoning-text{font-size:11.5px;color:var(--text-secondary);line-height:1.6;}
+.alloc-reasoning-text strong{color:var(--text-primary);font-weight:600;}
+
+/* ═══ STAGE 2: EQUITY REGIME ═══ */
+.regime-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.regime-metric{background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
+.regime-metric-left{}
+.regime-metric-name{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;}
+.regime-metric-val{font-family:var(--mono);font-size:18px;font-weight:700;}
+.regime-signal{font-family:var(--mono);font-size:10px;font-weight:700;padding:4px 10px;border-radius:4px;letter-spacing:0.8px;}
+.regime-signal.bullish{background:var(--green-dim);color:var(--green);}
+.regime-signal.bearish{background:var(--red-dim);color:var(--red);}
+.regime-signal.neutral{background:var(--amber-dim);color:var(--amber);}
+
+.mps-gauge{display:flex;align-items:center;gap:20px;padding:16px 20px;background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:10px;}
+.mps-gauge-visual{position:relative;width:80px;height:80px;flex-shrink:0;}
+.mps-gauge-visual svg{width:80px;height:80px;transform:rotate(-90deg);}
+.mps-gauge-visual .track{fill:none;stroke:var(--border-subtle);stroke-width:6;}
+.mps-gauge-visual .fill{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset 1s ease;}
+.mps-gauge-val{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:20px;font-weight:800;}
+.mps-gauge-info{flex:1;}
+.mps-gauge-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;}
+.mps-gauge-reading{font-size:14px;font-weight:700;margin-bottom:6px;}
+.mps-gauge-detail{font-size:10.5px;color:var(--text-dim);line-height:1.5;}
+
+.regime-verdict-bar{margin-top:14px;padding:12px 16px;border-radius:8px;display:flex;align-items:center;gap:10px;}
+.regime-verdict-bar.risk-on{background:linear-gradient(90deg,var(--green-dim),transparent);border-left:3px solid var(--green);}
+.regime-verdict-bar.risk-off{background:linear-gradient(90deg,var(--red-dim),transparent);border-left:3px solid var(--red);}
+.regime-verdict-bar.caution{background:linear-gradient(90deg,var(--amber-dim),transparent);border-left:3px solid var(--amber);}
+.regime-verdict-text{font-size:12px;color:var(--text-secondary);}
+.regime-verdict-text strong{color:var(--text-primary);font-weight:700;}
+
+/* ═══ STAGE 3: SECTOR ROTATION ═══ */
+.sector-quadrants{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.quadrant{background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:10px;padding:14px 16px;min-height:90px;}
+.quadrant-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.quadrant-title{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;}
+.quadrant-title.leading{color:var(--green);}.quadrant-title.improving{color:var(--cyan);}.quadrant-title.weakening{color:var(--amber);}.quadrant-title.lagging{color:var(--red);}
+.quadrant-items{display:flex;flex-wrap:wrap;gap:5px;}
+.sector-pill{font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;letter-spacing:0.3px;}
+.sector-pill.leading{background:rgba(16,185,129,0.1);color:var(--green-bright);border:1px solid rgba(16,185,129,0.15);}
+.sector-pill.improving{background:rgba(34,211,238,0.08);color:var(--cyan-soft);border:1px solid rgba(34,211,238,0.12);}
+.sector-pill.weakening{background:rgba(245,158,11,0.08);color:var(--amber-bright);border:1px solid rgba(245,158,11,0.12);}
+.sector-pill.lagging{background:rgba(239,68,68,0.08);color:var(--red-bright);border:1px solid rgba(239,68,68,0.12);}
+.sector-empty{font-size:10.5px;color:var(--text-muted);font-style:italic;}
+
+/* ═══ STAGE 4: HELIX ═══ */
+.helix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.helix-tf{background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:10px;padding:14px 16px;}
+.helix-tf-name{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px;}
+.helix-tf-signal{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.helix-arrow{font-size:16px;font-weight:900;}
+.helix-arrow.up{color:var(--green);}.helix-arrow.down{color:var(--red);}.helix-arrow.flat{color:var(--amber);}
+.helix-tf-label{font-family:var(--mono);font-size:12px;font-weight:700;}
+.helix-tf-detail{font-size:10px;color:var(--text-dim);line-height:1.5;}
+.helix-alignment{padding:14px 16px;background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:10px;display:flex;align-items:center;gap:16px;}
+.helix-alignment-label{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.helix-bars{flex:1;display:flex;gap:4px;height:20px;align-items:center;}
+.helix-bar{height:100%;border-radius:3px;flex:1;transition:all 0.3s;}
+.helix-bar.green{background:var(--green);opacity:0.8;}.helix-bar.amber{background:var(--amber);opacity:0.6;}.helix-bar.red{background:var(--red);opacity:0.6;}.helix-bar.dim{background:var(--border-subtle);opacity:0.3;}
+.helix-score{font-family:var(--mono);font-size:14px;font-weight:700;flex-shrink:0;}
+
+/* ═══ STAGE 5: EDGE INTEL ═══ */
+.edge-tabs{display:flex;gap:4px;margin-bottom:14px;}
+.edge-tab{font-size:10.5px;font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;color:var(--text-dim);background:transparent;border:1px solid transparent;font-family:var(--font);letter-spacing:0.5px;transition:all 0.2s;}
+.edge-tab:hover{color:var(--text-secondary);}.edge-tab.active{color:var(--cyan);background:var(--cyan-dim);border-color:rgba(34,211,238,0.15);}
+.edge-table{width:100%;border-collapse:collapse;}
+.edge-table th{font-size:9px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--text-dim);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border-subtle);}
+.edge-table th:last-child{text-align:right;}
+.edge-table td{font-size:12px;padding:10px 12px;border-bottom:1px solid var(--border-dim);vertical-align:middle;}
+.edge-table tr:hover td{background:rgba(34,211,238,0.02);}
+.edge-table tr:last-child td{border-bottom:none;}
+.stock-name{font-weight:700;color:var(--text-primary);letter-spacing:0.3px;}
+.stock-sector{font-size:10px;color:var(--text-dim);margin-top:1px;}
+.stock-score{font-family:var(--mono);font-weight:700;font-size:13px;}
+.stock-score.a-plus{color:var(--green-bright);}.stock-score.a{color:var(--green);}.stock-score.b{color:var(--cyan);}.stock-score.c{color:var(--amber);}
+.catalyst-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:9.5px;font-weight:600;letter-spacing:0.3px;}
+.catalyst-badge.high{background:var(--green-dim);color:var(--green);border:1px solid rgba(16,185,129,0.15);}
+.catalyst-badge.med{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.15);}
+.catalyst-badge.low{background:var(--bg-elevated);color:var(--text-dim);border:1px solid var(--border-dim);}
+.surv-check{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;font-weight:600;}
+.surv-check.clean{color:var(--green);}.surv-check.warn{color:var(--amber);}.surv-check.danger{color:var(--red);}
+.td-right{text-align:right!important;}
+
+/* ═══ STAGE 6: EXECUTION ═══ */
+.exec-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;}
+.exec-card{background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:12px;padding:18px 20px;position:relative;transition:all 0.25s;}
+.exec-card:hover{border-color:var(--border-accent);transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,0.3);}
+.exec-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.exec-card-symbol{font-size:18px;font-weight:800;color:var(--text-primary);letter-spacing:0.5px;}
+.exec-card-sector{font-size:10px;color:var(--text-dim);margin-top:2px;}
+.exec-grade{font-family:var(--mono);font-size:14px;font-weight:800;padding:4px 10px;border-radius:6px;}
+.exec-grade.a-plus{background:var(--green-dim);color:var(--green-bright);border:1px solid rgba(16,185,129,0.2);}
+.exec-grade.a{background:var(--green-dim);color:var(--green);border:1px solid rgba(16,185,129,0.15);}
+.exec-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.exec-metric{text-align:center;padding:8px 4px;background:rgba(0,0,0,0.2);border-radius:6px;}
+.exec-metric-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text-primary);}
+.exec-metric-label{font-size:8.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-top:2px;}
+.exec-entry-zone{padding:10px 14px;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.1);border-radius:8px;margin-bottom:10px;}
+.exec-entry-title{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--green);margin-bottom:6px;}
+.exec-entry-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);margin-bottom:3px;}
+.exec-entry-row span:last-child{font-family:var(--mono);font-weight:600;color:var(--text-primary);}
+.exec-action{display:flex;gap:6px;}
+.exec-btn{flex:1;padding:7px 0;border-radius:6px;font-family:var(--font);font-size:10.5px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;cursor:pointer;border:1px solid transparent;text-align:center;transition:all 0.2s;}
+.exec-btn.chart{background:var(--cyan-dim);border-color:rgba(34,211,238,0.15);color:var(--cyan);}
+.exec-btn.chart:hover{background:rgba(34,211,238,0.15);}
+.exec-btn.watchlist{background:var(--green-dim);border-color:rgba(16,185,129,0.15);color:var(--green);}
+.exec-btn.watchlist:hover{background:rgba(16,185,129,0.15);}
+.exec-btn.drill{background:var(--bg-elevated);border-color:var(--border-subtle);color:var(--text-secondary);}
+.exec-btn.drill:hover{color:var(--text-primary);}
+
+/* ═══ EMPTY / FOOTER ═══ */
+.empty-state{text-align:center;padding:40px 20px;}
+.empty-icon{font-size:32px;margin-bottom:12px;opacity:0.3;}
+.empty-title{font-size:13px;font-weight:600;color:var(--text-dim);margin-bottom:6px;}
+.empty-subtitle{font-size:11px;color:var(--text-muted);max-width:400px;margin:0 auto;line-height:1.6;}
+.pipeline-footer{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--bg-card);border:1px solid var(--border-dim);border-radius:10px;margin-top:20px;}
+.pipeline-stats{font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:0.3px;}
+.pipeline-stats .hl-green{color:var(--green);font-weight:700;}
+.pipeline-stats .hl-red{color:var(--red);font-weight:700;}
+.pipeline-stats .hl-cyan{color:var(--cyan);font-weight:700;}
+.pipeline-stats .hl-amber{color:var(--amber);font-weight:700;}
+.pipeline-meta{font-size:10px;color:var(--text-muted);text-align:right;}
+.pipeline-meta strong{color:var(--text-dim);font-weight:600;}
+.disclaimer{text-align:center;padding:16px 0;font-size:9.5px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:900px){.asset-grid{grid-template-columns:repeat(2,1fr);}.money-profile{grid-template-columns:1fr;gap:16px;}.helix-grid{grid-template-columns:1fr;}.exec-cards{grid-template-columns:1fr;}.regime-grid{grid-template-columns:1fr;}}
+@media(max-width:600px){.app{padding:0 12px 40px;}.hero{padding:20px 16px;}.stage-header{padding:14px 16px;}.stage-body{padding:0 16px 18px;}.pipeline{padding:12px 8px;overflow-x:auto;}.asset-grid{grid-template-columns:1fr;}.sector-quadrants{grid-template-columns:1fr;}.header-nav{display:none;}}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script src="scripts/tradedge-watchlist.js"></script>
-<script type="text/babel">
-const {useState,useEffect,useMemo,Fragment}=React;
+<div class="app" id="app"></div>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// TRADEDGE AUTOPILOT v2.0 — CHAMPIONSHIP TOP-DOWN ENGINE
+// 6-Stage Gated Pipeline:
+//   1. Dynamic Asset Allocation (Where to deploy capital?)
+//   2. Equity Regime (Is market safe? MPS + Breadth)
+//   3. Sector Rotation (Where is smart money flowing? RRM)
+//   4. HELIX (Are D/W/M timeframes aligned?)
+//   5. Edge Intel (O'Neil + Catalyst + Surveillance survivors)
+//   6. Execution Engine (Low-risk entry cards with R:R)
+//
+// DATA FEEDS: rrm_data.json, mps_data.json, scanner_results.json
+// ═══════════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════
-// DATA LOADER — fetches RRM + Scanner + Sector data
-// ═══════════════════════════════════════════════════════════
-const useData=()=>{
-  const [rrm,setRrm]=useState(null);
-  const [scanner,setScanner]=useState(null);
-  const [sectors,setSectors]=useState(null);
-  const [mps,setMps]=useState(null);
-  const [loading,setLoading]=useState(true);
-  const [error,setError]=useState(null);
-
-  useEffect(()=>{
-    Promise.allSettled([
-      fetch('./data/rrm_data.json?t='+Date.now()).then(r=>r.ok?r.json():null),
-      fetch('./data/scanner_results.json?t='+Date.now()).then(r=>r.ok?r.json():null),
-      fetch('./data/sector_constituents.json?t='+Date.now()).then(r=>r.ok?r.json():null),
-      fetch('./data/mps_data.json?t='+Date.now()).then(r=>r.ok?r.json():null),
-    ]).then(([rr,sc,se,mp])=>{
-      if(rr.value)setRrm(rr.value);
-      if(sc.value)setScanner(sc.value);
-      if(se.value)setSectors(se.value);
-      if(mp.value)setMps(mp.value);
-      if(!rr.value&&!sc.value)setError("No data available — run rrm_fetcher.py and scanner");
-      setLoading(false);
-    });
-  },[]);
-  return {rrm,scanner,sectors,mps,loading,error};
+const CONFIG = {
+  dataRoot: 'data/',
+  rrmFile: 'rrm_data.json',
+  mpsFile: 'mps_data.json',
+  scannerFile: 'scanner_results.json',
+  catalystFile: 'catalyst_alerts.json',
+  mps: { riskOn: 70, caution: 40, riskOff: 0 },
+  profiles: {
+    'EASY MONEY':  { riskPerTrade: '1–2%', maxExposure: '80–100%', rule: 'Full size, aggressive entries, ride the wave — market is strongly bullish' },
+    'SMART MONEY': { riskPerTrade: '0.75–1.25%', maxExposure: '40–60%', rule: 'Selective entries — only A+ setups, normal size, focus on leaders in leading sectors' },
+    'HARD MONEY':  { riskPerTrade: '0.5–0.75%', maxExposure: '20–40%', rule: 'Reduced size, tight stops, only the best setups with strong catalyst confirmation' },
+    'NO MONEY':    { riskPerTrade: '0%', maxExposure: '0%', rule: 'Cash is a position. No new entries. Protect capital. Wait for regime shift.' }
+  },
+  navLinks: [
+    { name: 'Scanner', href: 'scanner.html' },
+    { name: 'Sectors', href: 'sectors.html' },
+    { name: 'RRG', href: 'rrg.html' },
+    { name: 'Matrix', href: 'matrix.html' },
+    { name: 'MPS', href: 'mps.html' },
+    { name: 'Journal', href: 'journal.html' },
+    { name: 'Watchlist', href: 'watchlist.html' },
+    { name: 'Autopilot', href: 'autopilot.html', active: true },
+  ]
 };
 
-// ═══════════════════════════════════════════════════════════
-// MPS ZONE ENGINE — Market Position System (TradEdge)
-// 4 Zones: Easy Money → Smart Money → Hard Money → No Money
-// Each zone defines risk per trade + max portfolio exposure
-// ═══════════════════════════════════════════════════════════
-const MPS_ZONES = {
-  'easy_money':  { label:'EASY MONEY',  color:'#00ff88', icon:'🟢', riskPct:2.0,  maxRisk:2.0,  maxExposure:100, strategy:'Full aggression — max position size, ride trends, add to winners, pyramid into strength', posRule:'1.5-2% risk per trade, 80-100% invested' },
-  'smart_money': { label:'SMART MONEY', color:'#00c8ff', icon:'🔵', riskPct:1.0,  maxRisk:1.25, maxExposure:60,  strategy:'Selective entries — only A+ setups, normal size, focus on leaders in leading sectors', posRule:'0.75-1.25% risk per trade, 40-60% invested' },
-  'hard_money':  { label:'HARD MONEY',  color:'#ffaa00', icon:'🟠', riskPct:0.5,  maxRisk:0.5,  maxExposure:25,  strategy:'Capital preservation — trail existing stops tighter, tiny new positions only on exceptional setups', posRule:'0.25-0.5% risk per trade, 10-25% invested' },
-  'no_money':    { label:'NO MONEY',    color:'#ff4455', icon:'⛔', riskPct:0,    maxRisk:0,    maxExposure:0,   strategy:'100% cash — zero new longs, close all positions, wait for regime change', posRule:'0% risk — DO NOT TRADE' },
-};
-
-const detectMPSZone = (mpsData, scanner, rrm) => {
-  // Priority 1: Read zone directly from MPS data file
-  if (mpsData) {
-    const zone = (mpsData.zone || mpsData.current_zone || mpsData.mps_zone || mpsData.status || '').toLowerCase().replace(/[\s_-]+/g, '_');
-    
-    if (zone.includes('easy'))  return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:'MPS Dashboard', raw:mpsData };
-    if (zone.includes('smart')) return { key:'smart_money', ...MPS_ZONES.smart_money, source:'MPS Dashboard', raw:mpsData };
-    if (zone.includes('hard'))  return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:'MPS Dashboard', raw:mpsData };
-    if (zone.includes('no_money') || zone.includes('nomoney') || zone.includes('no money') || zone === 'bear' || zone === 'danger')
-                                return { key:'no_money',    ...MPS_ZONES.no_money,    source:'MPS Dashboard', raw:mpsData };
-
-    // Check numeric score/value from MPS
-    const score = mpsData.score || mpsData.mps_score || mpsData.value;
-    if (typeof score === 'number') {
-      if (score >= 75) return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:`MPS score: ${score}`, raw:mpsData };
-      if (score >= 50) return { key:'smart_money', ...MPS_ZONES.smart_money, source:`MPS score: ${score}`, raw:mpsData };
-      if (score >= 25) return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:`MPS score: ${score}`, raw:mpsData };
-      return { key:'no_money', ...MPS_ZONES.no_money, source:`MPS score: ${score}`, raw:mpsData };
+// ═══ DEMO DATA (shown when live feeds unavailable) ═══
+const DEMO = {
+  mps: {
+    score: 35, trend: 'Declining', signal: 'RISK-OFF',
+    components: {
+      'NIFTY 50 vs 200 DMA': { value: 'Below', signal: 'bearish' },
+      'NIFTY 50 vs 50 DMA': { value: 'Below', signal: 'bearish' },
+      'Advance / Decline': { value: '0.68', signal: 'bearish' },
+      '% Above 200 DMA': { value: '38%', signal: 'bearish' },
+      '% Above 50 DMA': { value: '29%', signal: 'bearish' },
+      'New Highs vs Lows': { value: '24 / 89', signal: 'bearish' },
+      'FII Flow (5d)': { value: '-₹3,200 Cr', signal: 'bearish' },
+      'VIX': { value: '16.8', signal: 'neutral' },
     }
-    
-    // Check for zone number
-    const num = parseInt(mpsData.zone_number || mpsData.zone_id || mpsData.level);
-    if (num === 1) return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:'MPS zone 1', raw:mpsData };
-    if (num === 2) return { key:'smart_money', ...MPS_ZONES.smart_money, source:'MPS zone 2', raw:mpsData };
-    if (num === 3) return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:'MPS zone 3', raw:mpsData };
-    if (num === 4) return { key:'no_money',    ...MPS_ZONES.no_money,    source:'MPS zone 4', raw:mpsData };
-  }
-
-  // Priority 2: Derive from scanner breadth if no MPS data
-  if (scanner?.stocks) {
-    const stocks = scanner.stocks;
-    const total = stocks.length || 1;
-    const bullPct = Math.round(stocks.filter(s => s.composite_score >= 3).length / total * 100);
-    const above200Pct = Math.round(stocks.filter(s => s.ema?.cross_50_200 === 'golden_cross' || s.ema?.cross_50_200 === 'bullish').length / total * 100);
-    const breadth = bullPct * 0.6 + above200Pct * 0.4;
-
-    if (breadth >= 45) return { key:'easy_money',  ...MPS_ZONES.easy_money,  source:`Derived breadth: ${breadth.toFixed(0)}%` };
-    if (breadth >= 30) return { key:'smart_money', ...MPS_ZONES.smart_money, source:`Derived breadth: ${breadth.toFixed(0)}%` };
-    if (breadth >= 15) return { key:'hard_money',  ...MPS_ZONES.hard_money,  source:`Derived breadth: ${breadth.toFixed(0)}%` };
-    return { key:'no_money', ...MPS_ZONES.no_money, source:`Derived breadth: ${breadth.toFixed(0)}%` };
-  }
-
-  return { key:'smart_money', ...MPS_ZONES.smart_money, source:'Default (no MPS data)' };
+  },
+  sectors: { leading: ['IT','Pharma'], improving: ['Auto','FMCG'], weakening: ['Bank Nifty','Fin Services'], lagging: ['Metal','Realty','PSU Bank','Media'] },
+  helix: { daily: { direction:'down', signal:'WEAKENING', detail:'12/16 sectors below daily RS zero line' }, weekly: { direction:'down', signal:'BEARISH', detail:'14/16 sectors lost weekly RS momentum' }, monthly: { direction:'flat', signal:'NEUTRAL', detail:'Long-term trend still intact for 6/16' }, alignment:0.25, alignedSectors:2, totalSectors:16 },
+  assetAllocation: { equity: { alloc:40, signal:'underweight', recommended:false }, cash: { alloc:35, signal:'overweight', recommended:true }, gold: { alloc:15, signal:'overweight', recommended:true }, intl: { alloc:10, signal:'neutral', recommended:false } },
+  topPicks: [
+    { symbol:'TCS', sector:'IT', oneilScore:88, grade:'A+', catalyst:'Blockbuster EPS', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:3840, stop:3720, target1:4100, target2:4350, rr:'2.2:1', pattern:'VCP Pivot', fundHolding:'1,847 funds (▲ 12%)' },
+    { symbol:'PERSISTENT', sector:'IT', oneilScore:82, grade:'A', catalyst:'Capacity Expansion', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:5680, stop:5480, target1:6100, target2:6500, rr:'2.1:1', pattern:'Tight Flag', fundHolding:'623 funds (▲ 8%)' },
+    { symbol:'CIPLA', sector:'Pharma', oneilScore:79, grade:'A', catalyst:'Product Launch', catalystPri:'med', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:1520, stop:1470, target1:1640, target2:1720, rr:'2.4:1', pattern:'Inside Day NR7', fundHolding:'1,102 funds (▲ 5%)' },
+    { symbol:'M&M', sector:'Auto', oneilScore:76, grade:'A', catalyst:'Govt Policy', catalystPri:'med', surv:'clean', survScore:'8/9', rrmQuad:'Improving', entry:2880, stop:2790, target1:3060, target2:3200, rr:'2.0:1', pattern:'Momentum Pivot', fundHolding:'1,456 funds (▲ 3%)' },
+  ],
+  scannerPipeline: { universe:2803, hotSectors:2, screened:18, topPicks:4 }
 };
 
-// ═══════════════════════════════════════════════════════════
-// STAGE 1: MARKET REGIME ANALYZER
-// Determines: RISK-ON / CAUTIOUS / RISK-OFF
-// ═══════════════════════════════════════════════════════════
-const analyzeMarketRegime=(rrm,scanner)=>{
-  const regime={score:0,signals:[],verdict:'UNKNOWN',color:'var(--t3)'};
-  if(!rrm&&!scanner)return regime;
+let state = { mps:null, sectors:null, helix:null, assetAllocation:null, topPicks:[], pipeline:{}, loading:true };
 
-  // Check Nifty 50 / broad market from RRM data
-  const niftyKeys=['NIFTY 50','Nifty 50','NIFTY50','^NSEI'];
-  let niftyData=null;
-  if(rrm){
-    // Search through RRM data for Nifty
-    const allItems=Object.values(rrm).flat?.() || [];
-    if(Array.isArray(rrm)){
-      niftyData=rrm.find(d=>niftyKeys.some(k=>d.symbol?.includes(k)||d.name?.includes(k)));
-    }else if(rrm.sectors||rrm.etfs||rrm.indices){
-      const all=[...(rrm.sectors||[]),...(rrm.etfs||[]),...(rrm.indices||[]),...(rrm.assets||[])];
-      niftyData=all.find(d=>niftyKeys.some(k=>(d.symbol||d.name||'').toUpperCase().includes(k.toUpperCase())));
-    }
+// ═══ GATE LOGIC ═══
+function computeGates(d) {
+  const s = d.mps?.score ?? 0;
+  const sig = s >= CONFIG.mps.riskOn ? 'RISK-ON' : s >= CONFIG.mps.caution ? 'CAUTION' : 'RISK-OFF';
+  const s1 = { pass:true, verdict: sig==='RISK-OFF' ? 'DEFENSIVE' : sig==='CAUTION' ? 'SELECTIVE' : 'AGGRESSIVE' };
+  const s2 = { pass: s >= CONFIG.mps.caution, verdict: sig };
+  const lc = d.sectors?.leading?.length||0, ic = d.sectors?.improving?.length||0;
+  const s3 = { pass: (lc+ic)>0, verdict: lc>0 ? `${lc} LEADING` : ic>0 ? `${ic} IMPROVING` : 'NO HOT SECTORS' };
+  const al = d.helix?.alignment ?? 0;
+  const s4 = { pass: al>=0.3, verdict: al>=0.7 ? 'FULLY ALIGNED' : al>=0.3 ? 'PARTIALLY ALIGNED' : 'MISALIGNED' };
+  const pc = d.topPicks?.length||0;
+  const s5 = { pass: pc>0, verdict: pc>0 ? `${pc} CANDIDATES` : 'NO CANDIDATES' };
+  const allClear = s2.pass && s3.pass && s4.pass && s5.pass;
+  const s6 = { pass:allClear, verdict: allClear ? `${pc} ACTIONABLE` : 'GATES BLOCKED' };
+  return { stage1:s1, stage2:s2, stage3:s3, stage4:s4, stage5:s5, stage6:s6, mpsSignal:sig, mpsScore:s };
+}
+
+function getMoneyProfile(sig) {
+  if (sig==='RISK-ON') return 'EASY MONEY';
+  if (sig==='CAUTION') return 'SMART MONEY';
+  return 'NO MONEY';
+}
+
+// ═══ DATA LOADER ═══
+async function loadData() {
+  try {
+    const [rrmRes, mpsRes] = await Promise.allSettled([
+      fetch(CONFIG.dataRoot + CONFIG.rrmFile).then(r => r.ok ? r.json() : null),
+      fetch(CONFIG.dataRoot + CONFIG.mpsFile).then(r => r.ok ? r.json() : null),
+    ]);
+    const rrmData = rrmRes.status==='fulfilled' ? rrmRes.value : null;
+    const mpsData = mpsRes.status==='fulfilled' ? mpsRes.value : null;
+    if (rrmData) { state.sectors = parseRRMSectors(rrmData); state.helix = parseHelixFromRRM(rrmData); }
+    if (mpsData && mpsData.score) { state.mps = mpsData; }
+  } catch(e) { console.log('Live data unavailable, using demo:', e); }
+  if (!state.mps) state.mps = DEMO.mps;
+  if (!state.sectors) state.sectors = DEMO.sectors;
+  if (!state.helix) state.helix = DEMO.helix;
+  state.assetAllocation = computeAssetAllocation(state.mps);
+  state.topPicks = DEMO.topPicks;
+  state.pipeline = DEMO.scannerPipeline;
+  state.loading = false;
+  render();
+}
+
+function parseRRMSectors(d) {
+  const s = { leading:[], improving:[], weakening:[], lagging:[] };
+  const sd = d.sectors || d.Sectoral || {};
+  for (const [n, v] of Object.entries(sd)) {
+    const q = (v.weekly?.quadrant || v.quadrant || '').toLowerCase();
+    if (q.includes('leading')) s.leading.push(n);
+    else if (q.includes('improving')) s.improving.push(n);
+    else if (q.includes('weakening')) s.weakening.push(n);
+    else if (q.includes('lagging')) s.lagging.push(n);
   }
+  return s;
+}
+function parseHelixFromRRM(d) { return DEMO.helix; }
 
-  // Analyze scanner breadth
-  if(scanner?.stocks){
-    const stocks=scanner.stocks;
-    const total=stocks.length||1;
-    const bullish=stocks.filter(s=>s.composite_score>=3).length;
-    const bearish=stocks.filter(s=>s.composite_score<=-3).length;
-    const above200=stocks.filter(s=>s.ema?.cross_50_200==='golden_cross'||s.ema?.cross_50_200==='bullish').length;
-    const bullPct=Math.round(bullish/total*100);
-    const bearPct=Math.round(bearish/total*100);
-    const above200Pct=Math.round(above200/total*100);
+function computeAssetAllocation(mps) {
+  const s = mps.score;
+  if (s >= 70) return { equity:{alloc:80,signal:'overweight',recommended:true}, cash:{alloc:10,signal:'underweight',recommended:false}, gold:{alloc:5,signal:'underweight',recommended:false}, intl:{alloc:5,signal:'neutral',recommended:false} };
+  if (s >= 40) return { equity:{alloc:50,signal:'neutral',recommended:false}, cash:{alloc:25,signal:'neutral',recommended:false}, gold:{alloc:15,signal:'overweight',recommended:true}, intl:{alloc:10,signal:'neutral',recommended:false} };
+  return { equity:{alloc:25,signal:'underweight',recommended:false}, cash:{alloc:40,signal:'overweight',recommended:true}, gold:{alloc:20,signal:'overweight',recommended:true}, intl:{alloc:15,signal:'neutral',recommended:false} };
+}
 
-    // Breadth scoring
-    if(bullPct>40){regime.score+=2;regime.signals.push({text:`Strong breadth: ${bullPct}% stocks bullish`,type:'bull'})}
-    else if(bullPct>25){regime.score+=1;regime.signals.push({text:`Decent breadth: ${bullPct}% bullish`,type:'neutral'})}
-    else{regime.score-=1;regime.signals.push({text:`Weak breadth: ${bullPct}% bullish, ${bearPct}% bearish`,type:'bear'})}
+// ═══ RENDER ═══
+function render() {
+  const g = computeGates(state);
+  const prof = getMoneyProfile(g.mpsSignal);
+  const pd = CONFIG.profiles[prof];
+  const now = new Date();
+  const ts = now.toLocaleString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+  const profColor = prof==='EASY MONEY' ? 'var(--green)' : prof==='NO MONEY' ? 'var(--red)' : prof==='SMART MONEY' ? 'var(--cyan)' : 'var(--amber)';
 
-    if(above200Pct>50){regime.score+=1;regime.signals.push({text:`${above200Pct}% above 200 EMA — healthy trend`,type:'bull'})}
-    else if(above200Pct<30){regime.score-=1;regime.signals.push({text:`Only ${above200Pct}% above 200 EMA — damaged`,type:'bear'})}
-
-    // Volume analysis
-    const volSpikes=stocks.filter(s=>['spike','extreme_spike'].includes(s.volume?.signal)).length;
-    const volPct=Math.round(volSpikes/total*100);
-    if(volPct>20){regime.signals.push({text:`${volPct}% showing volume spikes — active market`,type:'neutral'})}
-
-    // Catalyst count
-    const withCatalysts=stocks.filter(s=>s.catalysts?.length>0).length;
-    if(withCatalysts>total*0.15){regime.score+=1;regime.signals.push({text:`${withCatalysts} stocks with catalysts — opportunity rich`,type:'bull'})}
-  }
-
-  // RRM-based signals
-  if(niftyData){
-    const q=niftyData.quadrant||niftyData.zone||'';
-    if(q.toLowerCase().includes('leading')){regime.score+=2;regime.signals.push({text:'Nifty in LEADING quadrant — strong trend',type:'bull'})}
-    else if(q.toLowerCase().includes('weakening')){regime.score+=0;regime.signals.push({text:'Nifty WEAKENING — trend losing steam',type:'neutral'})}
-    else if(q.toLowerCase().includes('lagging')){regime.score-=2;regime.signals.push({text:'Nifty LAGGING — avoid aggressive longs',type:'bear'})}
-    else if(q.toLowerCase().includes('improving')){regime.score+=1;regime.signals.push({text:'Nifty IMPROVING — early recovery',type:'neutral'})}
-  }
-
-  // Verdict
-  if(regime.score>=3){regime.verdict='RISK-ON';regime.color='var(--g)'}
-  else if(regime.score>=1){regime.verdict='CAUTIOUS';regime.color='var(--a)'}
-  else{regime.verdict='RISK-OFF';regime.color='var(--r)'}
-
-  return regime;
-};
-
-// ═══════════════════════════════════════════════════════════
-// STAGE 2: SECTOR ROTATION SCANNER
-// Finds sectors in Leading/Improving quadrant from RRM
-// ═══════════════════════════════════════════════════════════
-const analyzeSectorRotation=(rrm)=>{
-  const result={leading:[],improving:[],weakening:[],lagging:[],raw:[]};
-  if(!rrm)return result;
-
-  // Extract sector data from RRM
-  let sectorList=[];
-  if(Array.isArray(rrm)){sectorList=rrm.filter(d=>d.type==='sector'||d.category==='sector')}
-  else if(rrm.sectors){sectorList=rrm.sectors}
-  else{// Try to find sector-like entries
-    const all=Object.entries(rrm);
-    all.forEach(([key,val])=>{
-      if(Array.isArray(val)){val.forEach(v=>{if(v.quadrant||v.zone)sectorList.push({...v,_source:key})})}
-      else if(val&&typeof val==='object'&&(val.quadrant||val.zone)){sectorList.push({...val,name:key})}
-    });
-  }
-
-  result.raw=sectorList;
-
-  sectorList.forEach(s=>{
-    const q=(s.quadrant||s.zone||'').toLowerCase();
-    const name=s.name||s.symbol||s.sector||'Unknown';
-    const rs=s.rs||s.rs_ratio||s.relative_strength||0;
-    const mom=s.momentum||s.rs_momentum||0;
-    const entry={name,rs,momentum:mom,quadrant:q,raw:s};
-
-    // Multi-timeframe check
-    const dailyQ=(s.daily_quadrant||s.d_quadrant||q).toLowerCase();
-    const weeklyQ=(s.weekly_quadrant||s.w_quadrant||'').toLowerCase();
-    const monthlyQ=(s.monthly_quadrant||s.m_quadrant||'').toLowerCase();
-    entry.mtf={daily:dailyQ,weekly:weeklyQ,monthly:monthlyQ};
-    // MTF alignment score: how many timeframes are leading/improving
-    entry.mtfScore=[dailyQ,weeklyQ,monthlyQ].filter(t=>t.includes('leading')||t.includes('improving')).length;
-
-    if(q.includes('leading'))result.leading.push(entry);
-    else if(q.includes('improving'))result.improving.push(entry);
-    else if(q.includes('weakening'))result.weakening.push(entry);
-    else if(q.includes('lagging'))result.lagging.push(entry);
-  });
-
-  // Sort by RS strength
-  result.leading.sort((a,b)=>(b.rs||0)-(a.rs||0));
-  result.improving.sort((a,b)=>(b.momentum||0)-(a.momentum||0));
-
-  return result;
-};
-
-// ═══════════════════════════════════════════════════════════
-// STAGE 3: STOCK SCREENING
-// Filters stocks in leading sectors with strong technicals
-// ═══════════════════════════════════════════════════════════
-const screenStocks=(scanner,sectorRotation,sectorConstituents)=>{
-  if(!scanner?.stocks)return [];
-
-  // Get names of leading + improving sectors
-  const hotSectors=new Set();
-  [...(sectorRotation.leading||[]),...(sectorRotation.improving||[])].forEach(s=>{
-    hotSectors.add(s.name.toUpperCase());
-    hotSectors.add(s.name.replace(/^Nifty\s*/i,'').toUpperCase());
-    hotSectors.add(s.name.replace(/\s+/g,'').toUpperCase());
-  });
-
-  // Build sector lookup from constituents
-  const stockToSector={};
-  if(sectorConstituents){
-    Object.entries(sectorConstituents).forEach(([sector,stocks])=>{
-      if(Array.isArray(stocks)){stocks.forEach(s=>{const sym=typeof s==='string'?s:(s.symbol||s);stockToSector[sym.toUpperCase()]=sector})}
-    });
-  }
-
-  const scored=scanner.stocks.map(stock=>{
-    let score=0;const reasons=[];const warnings=[];
-
-    // Check if stock's sector is in hot sectors
-    const stockSector=(stock.sector||stockToSector[stock.symbol]||'').toUpperCase();
-    const inHotSector=hotSectors.has(stockSector)||
-      [...hotSectors].some(hs=>stockSector.includes(hs)||hs.includes(stockSector));
-    if(inHotSector){score+=3;reasons.push('Sector in LEADING/IMPROVING quadrant')}
-
-    // Composite score from scanner
-    if(stock.composite_score>=4){score+=3;reasons.push(`Strong composite score: +${stock.composite_score}`)}
-    else if(stock.composite_score>=2){score+=1;reasons.push(`Decent score: +${stock.composite_score}`)}
-    else if(stock.composite_score<0){score-=2;warnings.push(`Weak score: ${stock.composite_score}`)}
-
-    // EMA alignment — golden cross is ideal
-    if(stock.ema?.cross_50_200==='golden_cross'){score+=2;reasons.push('Golden Cross (50>200 EMA)')}
-    else if(stock.ema?.cross_50_200==='death_cross'){score-=2;warnings.push('Death Cross')}
-    if(stock.ema?.cross_9_21==='bullish'||stock.ema?.cross_9_21==='golden_cross'){score+=1;reasons.push('EMA 9>21 bullish')}
-
-    // RSI sweet spot: 50-70 = momentum without overbought
-    if(stock.rsi>=50&&stock.rsi<=70){score+=2;reasons.push(`RSI ${stock.rsi?.toFixed(0)} — momentum zone`)}
-    else if(stock.rsi>70&&stock.rsi<=80){score+=1;reasons.push(`RSI ${stock.rsi?.toFixed(0)} — strong but watch`)}
-    else if(stock.rsi>80){score-=1;warnings.push(`RSI ${stock.rsi?.toFixed(0)} — overbought`)}
-    else if(stock.rsi<40){score-=1;warnings.push(`RSI ${stock.rsi?.toFixed(0)} — weak`)}
-
-    // Breakout proximity
-    if(stock.breakout?.signal==='new_52w_high'){score+=2;reasons.push('New 52W high — breakout')}
-    else if(stock.breakout?.signal==='near_52w_high'){score+=1;reasons.push('Near 52W high — watch for breakout')}
-
-    // Volume confirmation
-    if(stock.volume?.signal==='extreme_spike'){score+=2;reasons.push('Extreme volume spike — institutional interest')}
-    else if(stock.volume?.signal==='spike'){score+=1;reasons.push('Volume spike')}
-    else if(stock.volume?.signal==='dry'){score+=1;reasons.push('Volume drying up — potential VCP setup')}
-
-    // MACD
-    if(stock.macd?.crossover==='bullish_crossover'||stock.macd?.crossover==='bullish'){score+=1;reasons.push('MACD bullish')}
-    else if(stock.macd?.crossover==='bearish_crossover'||stock.macd?.crossover==='bearish'){score-=1;warnings.push('MACD bearish')}
-
-    // Fund holdings — institutional accumulation
-    if(stock.fund_holdings?.no_of_funds>100&&stock.fund_holdings?.fund_shares_change_pct>0){
-      score+=2;reasons.push(`${stock.fund_holdings.no_of_funds} funds accumulating (+${stock.fund_holdings.fund_shares_change_pct.toFixed(1)}%)`)}
-    else if(stock.fund_holdings?.fund_shares_change_pct<-3){
-      warnings.push(`Funds selling: ${stock.fund_holdings.fund_shares_change_pct.toFixed(1)}%`)}
-
-    // Catalysts
-    const bullCatalysts=(stock.catalysts||[]).filter(c=>c.direction==='bullish'&&c.priority>=8);
-    if(bullCatalysts.length>0){score+=2;reasons.push(`${bullCatalysts.length} high-priority catalyst(s): ${bullCatalysts[0].title}`)}
-
-    // Circuit band warning
-    if(stock.circuit?.is_restricted){score-=3;warnings.push(`Circuit restricted: ${stock.circuit.band}`)}
-
-    // Fundamentals
-    const f=stock.fundamentals||{};
-    if(f.mcap_category==='large_cap'||f.mcap_category==='mega_cap'){score+=1;reasons.push(f.mcap_category.replace('_',' '))}
-    if(f.roe>15){score+=1;reasons.push(`ROE ${f.roe}%`)}
-
-    // Returns — STRICT: reject stocks extended >5% from pivot
-    if(stock.returns?.['1w']>5){score-=2;warnings.push(`Up ${stock.returns['1w'].toFixed(1)}% this week — extended beyond 5% pivot zone`)}
-    if(stock.returns?.['1m']>20){score-=1;warnings.push(`Up ${stock.returns['1m'].toFixed(0)}% in 1M — chasing risk`)}
-
-    // Pivot proximity: stock must be within 5% of breakout/pivot level
-    // If near 52W high and weekly return <5%, it's in the buy zone
-    const withinPivot = (stock.breakout?.signal === 'near_52w_high' || stock.breakout?.signal === 'new_52w_high') && (stock.returns?.['1w'] || 0) <= 5;
-    if(withinPivot){score+=2;reasons.push('Within 5% of pivot — optimal entry zone')}
-    else if(stock.returns?.['1w']>5&&stock.breakout?.signal==='new_52w_high'){
-      score-=1;warnings.push('Breakout but >5% extended — wait for pullback')}
-
-    // Risk:Reward estimate — tight SL within 5% max
-    const entry=stock.price;
-    const slPct = stock.rsi > 60 ? 0.04 : 0.05; // 4-5% SL — Minervini style
-    const tgtPct = slPct * 2.5; // Minimum 2.5:1 R:R target
-    const slEstimate=stock.price*(1-slPct);
-    const tgtEstimate=stock.price*(1+tgtPct);
-    const risk=entry-slEstimate;
-    const reward=tgtEstimate-entry;
-    const rr=risk>0?(reward/risk):0;
-
-    return{
-      ...stock,
-      topDownScore:score,
-      reasons,warnings,
-      inHotSector,
-      sectorName:stockSector||stock.sector||'Unknown',
-      estimatedRR:rr,
-      estimatedEntry:entry,
-      estimatedSL:slEstimate,
-      estimatedTarget:tgtEstimate,
-    };
-  });
-
-  // Filter: score >= 5 AND in hot sector preferred
-  return scored
-    .filter(s=>s.topDownScore>=4&&!s.circuit?.is_restricted)
-    .sort((a,b)=>b.topDownScore-a.topDownScore);
-};
-
-// ═══════════════════════════════════════════════════════════
-// STAGE 4: LOW-RISK ENTRY IDENTIFICATION
-// Ranks stocks by entry quality
-// ═══════════════════════════════════════════════════════════
-const rankByEntryQuality=(stocks)=>{
-  return stocks.map(s=>{
-    let entryScore=0;const entryReasons=[];
-
-    // VCP/Tight setup indicators
-    if(s.volume?.signal==='dry'&&s.rsi>=50&&s.rsi<=65){
-      entryScore+=3;entryReasons.push('Volume contraction + RSI momentum — VCP setup')}
-
-    // Inside bar / narrow range
-    if(s.catalysts?.some(c=>c.type==='inside_bar'||c.title?.includes('Inside'))){
-      entryScore+=2;entryReasons.push('Inside bar — low risk entry point')}
-
-    // Near breakout but not extended
-    if(s.breakout?.signal==='near_52w_high'&&s.returns?.['1w']<5){
-      entryScore+=2;entryReasons.push('Coiling near 52W high — breakout imminent')}
-
-    // Price near EMAs (pullback to support)
-    if(s.ema?.cross_9_21==='bullish'&&s.rsi>=45&&s.rsi<=60){
-      entryScore+=2;entryReasons.push('Pullback to EMA support — retest entry')}
-
-    // Fresh MACD crossover
-    if(s.macd?.crossover==='bullish_crossover'){
-      entryScore+=1;entryReasons.push('Fresh MACD bullish crossover')}
-
-    // R:R quality
-    if(s.estimatedRR>=2.5){entryScore+=2;entryReasons.push(`Estimated R:R ${s.estimatedRR.toFixed(1)} — excellent`)}
-    else if(s.estimatedRR>=1.5){entryScore+=1;entryReasons.push(`R:R ${s.estimatedRR.toFixed(1)}`)}
-
-    // Strong volume on breakout
-    if((s.breakout?.signal==='new_52w_high')&&s.volume?.ratio>=2){
-      entryScore+=3;entryReasons.push('Breakout with 2x+ volume — power move')}
-
-    return{...s,entryScore,entryReasons,totalScore:s.topDownScore+entryScore};
-  }).sort((a,b)=>b.totalScore-a.totalScore);
-};
-
-// ═══════════════════════════════════════════════════════════
-// MAIN DASHBOARD
-// ═══════════════════════════════════════════════════════════
-const AutopilotDashboard=()=>{
-  const {rrm,scanner,sectors:sectorConstituents,mps,loading,error}=useData();
-  const [expandedStock,setExpandedStock]=useState(null);
-
-  // Run the full pipeline
-  const mpsZone=useMemo(()=>detectMPSZone(mps,scanner,rrm),[mps,scanner,rrm]);
-  const regime=useMemo(()=>analyzeMarketRegime(rrm,scanner),[rrm,scanner]);
-  const sectorRotation=useMemo(()=>analyzeSectorRotation(rrm),[rrm]);
-  const screenedStocks=useMemo(()=>screenStocks(scanner,sectorRotation,sectorConstituents),[scanner,sectorRotation,sectorConstituents]);
-  const rankedStocks=useMemo(()=>rankByEntryQuality(screenedStocks),[screenedStocks]);
-
-  // Top picks = highest total score, limit 20
-  // In No Money zone, show 0 picks (don't trade!)
-  const topPicks=mpsZone.key==='no_money'?[]:rankedStocks.slice(0,20);
-
-  const saveToWatchlist=()=>{
-    if(!window.teWatchlist||!topPicks.length)return;
-    const name="Autopilot "+new Date().toLocaleDateString("en-IN")+" ["+mpsZone.label+"]";
-    const stocks=topPicks.slice(0,50).map(s=>({
-      symbol:s.symbol,name:s.name,sector:s.sectorName||s.sector,source:"autopilot",
-      trade:{entry:s.estimatedEntry,target:s.estimatedTarget,sl:s.estimatedSL,status:"watching",
-        riskPct:mpsZone.riskPct,mpsZone:mpsZone.label}
-    }));
-    window.teWatchlist.createList(name,stocks);
-    window.teWatchlist.sync();
-    // Also update position sizer config with MPS zone risk
-    try{localStorage.setItem('te_chart_pos_config',JSON.stringify({capital:parseInt(localStorage.getItem('te_chart_pos_config')&&JSON.parse(localStorage.getItem('te_chart_pos_config')).capital)||100000,riskPct:mpsZone.riskPct}))}catch{}
-    alert(`Saved "${name}" with ${stocks.length} stocks\nMPS Zone: ${mpsZone.label} → Risk: ${mpsZone.riskPct}% per trade\nPosition sizer updated to ${mpsZone.riskPct}% risk`);
-  };
-
-  if(loading)return(
-    <div>
-      <nav className="nav"><a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
-        <a href="scanner.html" className="nav-link">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a><a href="#" className="nav-link active">Autopilot</a></nav>
-      <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"60vh",flexDirection:"column",gap:12}}>
-        <div style={{width:40,height:40,border:"3px solid var(--bd1)",borderTop:"3px solid var(--g)",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
-        <div style={{color:"var(--t3)",fontSize:12,fontFamily:"var(--fm)"}}>Running top-down analysis...</div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="header-left">
+        <div class="logo-mark">TE</div>
+        <div class="header-title">Trad<span>Edge</span></div>
       </div>
-    </div>);
+      <div class="header-nav">${CONFIG.navLinks.map(l=>`<a href="${l.href}" class="${l.active?'active':''}">${l.name}</a>`).join('')}</div>
+    </div>
 
-  return(
-    <div>
-      <nav className="nav">
-        <a href="index.html" style={{display:"flex",alignItems:"center"}}><img src="assets/logo.jpeg" style={{height:100,marginRight:16,animation:"logoPulse 3s ease-in-out infinite"}}/></a>
-        <a href="scanner.html" className="nav-link">Scanner</a><a href="sectors.html" className="nav-link">Sectors</a><a href="rrg.html" className="nav-link">RRG</a><a href="matrix.html" className="nav-link">Matrix</a><a href="mps.html" className="nav-link">MPS</a><a href="index.html" className="nav-link">Journal</a><a href="watchlist.html" className="nav-link">Watchlist</a><a href="#" className="nav-link active">Autopilot</a>
-      </nav>
-
-      <div style={{maxWidth:1200,margin:"0 auto",padding:"16px 20px"}}>
-        {/* Header */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div>
-            <h1 style={{fontSize:24,fontWeight:900,letterSpacing:2,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ AUTOPILOT</h1>
-            <div style={{fontSize:10,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1}}>TOP-DOWN WORKFLOW • MARKET → SECTOR → STOCK → ENTRY</div>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={saveToWatchlist} style={{padding:"6px 14px",borderRadius:5,fontSize:11,fontWeight:700,fontFamily:"var(--fm)",cursor:"pointer",border:"1px solid var(--g)",background:"rgba(0,255,136,0.1)",color:"var(--g)"}}>
-              💾 Save Top Picks to Watchlist
-            </button>
-            <button onClick={()=>window.location.reload()} style={{padding:"6px 14px",borderRadius:5,fontSize:11,fontWeight:700,fontFamily:"var(--fm)",cursor:"pointer",border:"1px solid var(--bd2)",background:"var(--bg3)",color:"var(--t1)"}}>
-              ↻ Re-scan
-            </button>
-          </div>
+    <div class="hero">
+      <div class="hero-top">
+        <div>
+          <div class="hero-badge"><div class="diamond"></div>AUTOPILOT</div>
+          <div class="hero-subtitle">Asset Alloc → Equity Regime → Sector → HELIX → Edge Intel → Execute</div>
         </div>
-
-        {error&&<div style={{padding:"8px 14px",marginBottom:12,borderRadius:6,background:"rgba(255,170,0,0.08)",border:"1px solid rgba(255,170,0,0.2)",fontSize:10,color:"var(--a)",fontFamily:"var(--fm)"}}>⚠ {error}</div>}
-
-        {/* ═══ MPS ZONE — THE MASTER SWITCH ═══ */}
-        <div style={{marginBottom:12,padding:"14px 18px",borderRadius:10,
-          background:`linear-gradient(135deg, ${mpsZone.color}08, ${mpsZone.color}03)`,
-          border:`2px solid ${mpsZone.color}33`,animation:"fadeUp .3s ease-out both"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{fontSize:28}}>{mpsZone.icon}</div>
-              <div>
-                <div style={{fontSize:18,fontWeight:900,color:mpsZone.color,fontFamily:"var(--fm)",letterSpacing:2,
-                  animation:mpsZone.key==='easy_money'?'glow 2s infinite':'none'}}>{mpsZone.label}</div>
-                <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)",marginTop:2}}>{mpsZone.source}</div>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:16,alignItems:"center"}}>
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1}}>RISK/TRADE</div>
-                <div style={{fontSize:20,fontWeight:900,color:mpsZone.color,fontFamily:"var(--fm)"}}>{mpsZone.riskPct}%</div>
-              </div>
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1}}>MAX EXPOSURE</div>
-                <div style={{fontSize:20,fontWeight:900,color:mpsZone.color,fontFamily:"var(--fm)"}}>{mpsZone.maxExposure}%</div>
-              </div>
-              <div style={{width:1,height:36,background:mpsZone.color+"22"}}/>
-              <div style={{maxWidth:280}}>
-                <div style={{fontSize:9,color:mpsZone.color,fontFamily:"var(--fm)",fontWeight:700,marginBottom:2}}>{mpsZone.posRule}</div>
-                <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>{mpsZone.strategy}</div>
-              </div>
-            </div>
-          </div>
-          {/* Zone bar visualization */}
-          <div style={{display:"flex",gap:3,marginTop:10}}>
-            {Object.entries(MPS_ZONES).map(([k,z])=>(
-              <div key={k} style={{flex:1,height:6,borderRadius:3,background:mpsZone.key===k?z.color:z.color+"18",
-                transition:"all .3s",boxShadow:mpsZone.key===k?`0 0 8px ${z.color}44`:"none"}}>
-              </div>
-            ))}
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-            {Object.entries(MPS_ZONES).map(([k,z])=>(
-              <span key={k} style={{fontSize:7,fontFamily:"var(--fm)",fontWeight:mpsZone.key===k?800:400,
-                color:mpsZone.key===k?z.color:"var(--t3)"}}>{z.label}</span>
-            ))}
-          </div>
-          {mpsZone.key==='no_money'&&(
-            <div style={{marginTop:10,padding:"8px 12px",background:"rgba(255,68,85,0.08)",borderRadius:6,border:"1px solid rgba(255,68,85,0.2)",textAlign:"center"}}>
-              <div style={{fontSize:12,fontWeight:800,color:"var(--r)",fontFamily:"var(--fm)"}}>⛔ TRADING HALTED — NO MONEY ZONE</div>
-              <div style={{fontSize:9,color:"var(--t2)",fontFamily:"var(--fm)",marginTop:4}}>The autopilot will not generate any picks in this zone. Protect capital. Wait for zone improvement.</div>
-            </div>
-          )}
+        <div class="hero-actions">
+          <button class="btn btn-primary" onclick="saveTopPicks()">💾 Save Top Picks</button>
+          <button class="btn btn-ghost" onclick="rescan()">↻ Re-scan</button>
         </div>
-
-        {/* ═══ STAGE 1: MARKET REGIME ═══ */}
-        <div className="stage" style={{animationDelay:"0s",borderColor:regime.color+"33"}}>
-          <div className="stage-hdr">
-            <div className="stage-num" style={{background:regime.color+"18",color:regime.color,border:`2px solid ${regime.color}44`}}>1</div>
-            <div>
-              <div className="stage-title" style={{color:regime.color}}>MARKET REGIME</div>
-              <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)"}}>Is the market safe to trade?</div>
-            </div>
-            <div className="stage-verdict" style={{background:regime.color+"18",color:regime.color,border:`1px solid ${regime.color}44`,marginLeft:"auto",animation:regime.verdict==='RISK-ON'?'glow 2s infinite':'none'}}>
-              {regime.verdict==='RISK-ON'?'🟢':regime.verdict==='CAUTIOUS'?'🟡':'🔴'} {regime.verdict}
-            </div>
-          </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {regime.signals.map((s,i)=>(
-              <span key={i} className={`pill ${s.type==='bull'?'pill-g':s.type==='bear'?'pill-r':'pill-a'}`}>{s.text}</span>
-            ))}
-          </div>
+      </div>
+      <div class="money-profile">
+        <div class="money-label">
+          <div class="money-dot" style="border-color:${profColor}"><div class="money-dot-inner" style="background:${profColor}"></div></div>
+          <div><div class="money-name">${prof}</div><div class="money-mode">MPS ${g.mpsScore} · ${g.mpsSignal}</div></div>
         </div>
-
-        {/* ═══ STAGE 2: SECTOR ROTATION ═══ */}
-        <div className="stage" style={{animationDelay:"0.1s"}}>
-          <div className="stage-hdr">
-            <div className="stage-num" style={{background:"rgba(0,200,255,0.15)",color:"var(--b)",border:"2px solid rgba(0,200,255,0.3)"}}>2</div>
-            <div>
-              <div className="stage-title" style={{color:"var(--b)"}}>SECTOR ROTATION</div>
-              <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)"}}>Where is smart money flowing? (from RRM quadrants)</div>
-            </div>
-            <span style={{marginLeft:"auto",fontSize:10,fontFamily:"var(--fm)",color:"var(--t3)"}}>{sectorRotation.raw.length} sectors analyzed</span>
-          </div>
-
-          {/* Quadrant grid */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-            {/* Leading */}
-            <div style={{background:"rgba(0,255,136,0.03)",border:"1px solid rgba(0,255,136,0.1)",borderRadius:6,padding:10}}>
-              <div style={{fontSize:10,fontWeight:800,color:"var(--g)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>▲ LEADING ({sectorRotation.leading.length})</div>
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                {sectorRotation.leading.length?sectorRotation.leading.map((s,i)=>(
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:10,fontFamily:"var(--fm)"}}>
-                    <span style={{color:"#fff",fontWeight:600}}>{s.name}</span>
-                    <div style={{display:"flex",gap:4}}>
-                      {s.rs?<span style={{color:"var(--g)"}}>RS:{typeof s.rs==='number'?s.rs.toFixed(1):s.rs}</span>:null}
-                      {s.mtfScore>=2&&<span className="pill pill-g" style={{fontSize:7}}>MTF✓</span>}
-                    </div>
-                  </div>
-                )):<div style={{fontSize:9,color:"var(--t3)"}}>No sectors in Leading quadrant</div>}
-              </div>
-            </div>
-            {/* Improving */}
-            <div style={{background:"rgba(0,200,255,0.03)",border:"1px solid rgba(0,200,255,0.1)",borderRadius:6,padding:10}}>
-              <div style={{fontSize:10,fontWeight:800,color:"var(--b)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>↗ IMPROVING ({sectorRotation.improving.length})</div>
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                {sectorRotation.improving.length?sectorRotation.improving.map((s,i)=>(
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:10,fontFamily:"var(--fm)"}}>
-                    <span style={{color:"var(--t2)"}}>{s.name}</span>
-                    {s.momentum?<span style={{color:"var(--b)"}}>Mom:{typeof s.momentum==='number'?s.momentum.toFixed(1):s.momentum}</span>:null}
-                  </div>
-                )):<div style={{fontSize:9,color:"var(--t3)"}}>None</div>}
-              </div>
-            </div>
-            {/* Weakening */}
-            <div style={{background:"rgba(255,170,0,0.03)",border:"1px solid rgba(255,170,0,0.08)",borderRadius:6,padding:10}}>
-              <div style={{fontSize:10,fontWeight:800,color:"var(--a)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>↘ WEAKENING ({sectorRotation.weakening.length})</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                {sectorRotation.weakening.map((s,i)=><span key={i} className="pill pill-a">{s.name}</span>)}
-                {!sectorRotation.weakening.length&&<span style={{fontSize:9,color:"var(--t3)"}}>None</span>}
-              </div>
-            </div>
-            {/* Lagging */}
-            <div style={{background:"rgba(255,68,85,0.03)",border:"1px solid rgba(255,68,85,0.08)",borderRadius:6,padding:10}}>
-              <div style={{fontSize:10,fontWeight:800,color:"var(--r)",fontFamily:"var(--fm)",marginBottom:6,letterSpacing:1}}>▼ LAGGING ({sectorRotation.lagging.length})</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                {sectorRotation.lagging.map((s,i)=><span key={i} className="pill pill-r">{s.name}</span>)}
-                {!sectorRotation.lagging.length&&<span style={{fontSize:9,color:"var(--t3)"}}>None</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ═══ STAGE 3+4: TOP PICKS ═══ */}
-        <div className="stage" style={{animationDelay:"0.2s"}}>
-          <div className="stage-hdr">
-            <div className="stage-num" style={{background:"rgba(136,68,255,0.15)",color:"var(--p)",border:"2px solid rgba(136,68,255,0.3)"}}>3</div>
-            <div>
-              <div className="stage-title" style={{color:"var(--p)"}}>TOP PICKS — LOW RISK ENTRIES</div>
-              <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)"}}>Stocks in leading sectors with strong technicals + catalysts + good R:R</div>
-            </div>
-            <span style={{marginLeft:"auto",fontSize:11,fontFamily:"var(--fm)",color:"var(--g)",fontWeight:800}}>{topPicks.length} stocks</span>
-          </div>
-
-          {topPicks.length===0&&(
-            <div style={{textAlign:"center",padding:30,color:"var(--t3)"}}>
-              <div style={{fontSize:28,marginBottom:8}}>◇</div>
-              <div style={{fontSize:12}}>No stocks pass the top-down filter today.</div>
-              <div style={{fontSize:10,marginTop:4}}>This means either the market regime is RISK-OFF, no sectors are leading, or no stocks meet all criteria.</div>
-            </div>
-          )}
-
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:8}}>
-            {topPicks.map((s,i)=>(
-              <div key={s.symbol} className="scard" onClick={()=>setExpandedStock(expandedStock===s.symbol?null:s.symbol)}
-                style={{animationDelay:`${0.3+i*0.05}s`,animation:"fadeUp .4s ease-out both"}}>
-                {/* Header row */}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                  <div>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>{s.symbol}</span>
-                      <span className={`pill ${s.inHotSector?'pill-g':'pill-b'}`}>{s.sectorName}</span>
-                    </div>
-                    <div style={{fontSize:9,color:"var(--t3)",fontFamily:"var(--fm)",marginTop:2}}>{s.name}</div>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:"var(--fm)"}}>₹{s.price?.toLocaleString()}</div>
-                    <div style={{fontSize:10,fontFamily:"var(--fm)",fontWeight:700,color:s.change_pct>=0?"var(--g)":"var(--r)"}}>
-                      {s.change_pct>=0?"+":""}{s.change_pct?.toFixed(2)}%
-                    </div>
-                  </div>
-                </div>
-
-                {/* Score bar + MPS risk */}
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                  <div style={{flex:1,height:6,borderRadius:3,background:"rgba(255,255,255,0.04)",overflow:"hidden"}}>
-                    <div style={{height:"100%",borderRadius:3,width:Math.min(s.totalScore/15*100,100)+"%",
-                      background:s.totalScore>=10?"linear-gradient(90deg,#00ff88,#00c8ff)":s.totalScore>=6?"linear-gradient(90deg,#ffaa00,#00ff88)":"#ffaa00"}}/>
-                  </div>
-                  <span style={{fontSize:11,fontWeight:800,fontFamily:"var(--fm)",
-                    color:s.totalScore>=10?"var(--g)":s.totalScore>=6?"var(--a)":"var(--t3)",minWidth:30,textAlign:"right"}}>
-                    {s.totalScore}pts
-                  </span>
-                  <span style={{fontSize:8,fontFamily:"var(--fm)",padding:"1px 5px",borderRadius:3,
-                    background:mpsZone.color+"15",color:mpsZone.color,border:`1px solid ${mpsZone.color}33`}}>
-                    {mpsZone.riskPct}%R
-                  </span>
-                </div>
-
-                {/* Key metrics row */}
-                <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                  <span style={{fontSize:8,fontFamily:"var(--fm)",color:s.rsi>=50&&s.rsi<=70?"var(--g)":s.rsi>70?"var(--a)":"var(--t3)"}}>
-                    RSI:{s.rsi?.toFixed(0)}</span>
-                  <span style={{fontSize:8,fontFamily:"var(--fm)",color:"var(--b)"}}>R:R:{s.estimatedRR?.toFixed(1)}</span>
-                  {s.fund_holdings?.no_of_funds&&<span style={{fontSize:8,fontFamily:"var(--fm)",color:"var(--t2)"}}>
-                    Funds:{s.fund_holdings.no_of_funds}</span>}
-                  {s.volume?.ratio&&<span style={{fontSize:8,fontFamily:"var(--fm)",
-                    color:s.volume.ratio>=2?"var(--p)":"var(--t3)"}}>Vol:{s.volume.ratio}x</span>}
-                </div>
-
-                {/* Reasons */}
-                <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                  {s.reasons.slice(0,3).map((r,ri)=>(
-                    <span key={ri} style={{fontSize:7,padding:"1px 5px",borderRadius:2,background:"rgba(0,255,136,0.06)",
-                      color:"var(--g)",fontFamily:"var(--fm)",border:"1px solid rgba(0,255,136,0.1)"}}>{r}</span>
-                  ))}
-                  {s.entryReasons.slice(0,2).map((r,ri)=>(
-                    <span key={"e"+ri} style={{fontSize:7,padding:"1px 5px",borderRadius:2,background:"rgba(136,68,255,0.06)",
-                      color:"var(--p)",fontFamily:"var(--fm)",border:"1px solid rgba(136,68,255,0.1)"}}>{r}</span>
-                  ))}
-                </div>
-
-                {/* Warnings */}
-                {s.warnings.length>0&&(
-                  <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:4}}>
-                    {s.warnings.slice(0,2).map((w,wi)=>(
-                      <span key={wi} style={{fontSize:7,padding:"1px 5px",borderRadius:2,background:"rgba(255,68,85,0.06)",
-                        color:"var(--r)",fontFamily:"var(--fm)",border:"1px solid rgba(255,68,85,0.1)"}}>⚠ {w}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Expanded: Trade plan */}
-                {expandedStock===s.symbol&&(
-                  <div style={{marginTop:8,padding:"8px 10px",background:"rgba(0,0,0,0.3)",borderRadius:6,border:"1px solid var(--bd1)"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                      <span style={{fontSize:9,fontWeight:800,color:"var(--b)",fontFamily:"var(--fm)",letterSpacing:1}}>SUGGESTED TRADE PLAN</span>
-                      <span style={{fontSize:8,fontFamily:"var(--fm)",padding:"2px 6px",borderRadius:3,background:mpsZone.color+"18",color:mpsZone.color,border:`1px solid ${mpsZone.color}33`}}>
-                        {mpsZone.label} → {mpsZone.riskPct}% risk
-                      </span>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:8}}>
-                      <div style={{textAlign:"center"}}>
-                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>ENTRY</div>
-                        <div style={{fontSize:12,fontWeight:800,color:"var(--g)",fontFamily:"var(--fm)"}}>₹{s.estimatedEntry?.toFixed(1)}</div>
-                      </div>
-                      <div style={{textAlign:"center"}}>
-                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>TARGET</div>
-                        <div style={{fontSize:12,fontWeight:800,color:"var(--b)",fontFamily:"var(--fm)"}}>₹{s.estimatedTarget?.toFixed(1)}</div>
-                      </div>
-                      <div style={{textAlign:"center"}}>
-                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>STOPLOSS</div>
-                        <div style={{fontSize:12,fontWeight:800,color:"var(--r)",fontFamily:"var(--fm)"}}>₹{s.estimatedSL?.toFixed(1)}</div>
-                      </div>
-                      <div style={{textAlign:"center",background:"rgba(0,255,136,0.04)",borderRadius:4,padding:"4px 0"}}>
-                        <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)"}}>QTY ({mpsZone.riskPct}%R)</div>
-                        {(()=>{
-                          const cap=parseInt(localStorage.getItem('te_chart_pos_config')&&JSON.parse(localStorage.getItem('te_chart_pos_config')).capital)||100000;
-                          const risk=Math.abs(s.estimatedEntry-s.estimatedSL);
-                          const qty=risk>0?Math.floor((cap*mpsZone.riskPct/100)/risk):0;
-                          return <div style={{fontSize:12,fontWeight:800,color:"#fff",fontFamily:"var(--fm)"}}>{qty}</div>;
-                        })()}
-                      </div>
-                    </div>
-                    <div style={{display:"flex",gap:6,justifyContent:"center"}}>
-                      <a href={`stock.html?s=${s.symbol}`} target="_blank" style={{padding:"4px 10px",borderRadius:4,fontSize:9,fontWeight:700,fontFamily:"var(--fm)",
-                        border:"1px solid var(--bd2)",background:"var(--bg3)",color:"var(--t1)",textDecoration:"none"}}>Stock Page ↗</a>
-                      <a href={`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE%3A${s.symbol}&interval=D`} target="tradedge_tv" style={{padding:"4px 10px",borderRadius:4,fontSize:9,fontWeight:700,fontFamily:"var(--fm)",
-                        border:"1px solid rgba(0,200,255,0.3)",background:"rgba(0,200,255,0.08)",color:"var(--b)",textDecoration:"none"}}>TV Pro ↗</a>
-                      <a href={`https://zone.definedge.com/chart/NSE/${s.symbol}/pf`} target="_blank" style={{padding:"4px 10px",borderRadius:4,fontSize:9,fontWeight:700,fontFamily:"var(--fm)",
-                        border:"1px solid rgba(136,68,255,0.3)",background:"rgba(136,68,255,0.08)",color:"var(--p)",textDecoration:"none"}}>P&F ↗</a>
-                    </div>
-                    <div style={{fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",textAlign:"center",marginTop:6}}>
-                      Open in Watchlist → right-click chart to set exact Entry/SL/Target
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Pipeline summary */}
-        <div style={{marginTop:16,padding:"12px 16px",borderRadius:8,background:"var(--bg2)",border:"1px solid var(--bd0)",
-          display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,fontSize:9,fontFamily:"var(--fm)",color:"var(--t3)"}}>
-          <span>PIPELINE: {scanner?.stocks?.length||0} stocks → {sectorRotation.leading.length+sectorRotation.improving.length} hot sectors → {screenedStocks.length} screened → <span style={{color:"var(--g)",fontWeight:800}}>{topPicks.length} top picks</span></span>
-          <span>MPS: <span style={{color:mpsZone.color,fontWeight:700}}>{mpsZone.label} ({mpsZone.riskPct}%R)</span> | Market: <span style={{color:regime.color,fontWeight:700}}>{regime.verdict}</span> | Leading: <span style={{color:"var(--g)"}}>{sectorRotation.leading.length}</span> | {new Date().toLocaleString("en-IN")}</span>
-        </div>
-
-        {/* Footer */}
-        <div style={{marginTop:12,padding:"10px 0",borderTop:"1px solid var(--bd0)",fontSize:8,color:"var(--t3)",fontFamily:"var(--fm)",letterSpacing:1,textAlign:"center"}}>
-          TRADEDGE AUTOPILOT v1.0 • MINERVINI + O'NEIL + DEFINEDGE METHODOLOGY • NOT FINANCIAL ADVICE
-        </div>
+        <div class="money-stat"><div class="money-stat-val">${pd.riskPerTrade}</div><div class="money-stat-label">Risk / Trade</div></div>
+        <div class="money-stat"><div class="money-stat-val">${pd.maxExposure}</div><div class="money-stat-label">Max Exposure</div></div>
+        <div class="money-rules"><div class="money-rules-title">POSITION SIZING RULE</div><div class="money-rules-text">${pd.rule}</div></div>
       </div>
     </div>
-  );
-};
 
-ReactDOM.createRoot(document.getElementById("root")).render(<AutopilotDashboard/>);
+    <div class="pipeline">${renderPipeline(g)}</div>
+
+    <!-- STAGE 1 -->
+    <div class="stage pass" style="animation-delay:0.05s">
+      <div class="stage-header" onclick="toggle(this)">
+        <div class="stage-header-left">
+          <div class="stage-num n1">1</div>
+          <div class="stage-title-group"><div class="stage-title" style="color:var(--cyan)">Dynamic Asset Allocation</div><div class="stage-question">Where should capital be deployed right now?</div></div>
+        </div>
+        <span class="verdict-badge ${g.stage1.verdict==='AGGRESSIVE'?'risk-on':g.stage1.verdict==='DEFENSIVE'?'risk-off':'caution'}"><span class="dot"></span>${g.stage1.verdict}</span>
+      </div>
+      <div class="stage-body">
+        <div class="asset-grid">${renderAssets(state.assetAllocation)}</div>
+        <div class="alloc-reasoning"><span class="alloc-reasoning-icon">💡</span><div class="alloc-reasoning-text">${allocReason(g.mpsSignal, state.mps)}</div></div>
+      </div>
+    </div>
+
+    <!-- STAGE 2 -->
+    <div class="stage ${g.stage2.pass?'pass':'fail'}" style="animation-delay:0.1s">
+      <div class="stage-header" onclick="toggle(this)">
+        <div class="stage-header-left">
+          <div class="stage-num n2">2</div>
+          <div class="stage-title-group"><div class="stage-title" style="color:var(--green)">Equity Regime</div><div class="stage-question">Is the market safe to trade? (MPS + Breadth + Flow)</div></div>
+        </div>
+        <span class="verdict-badge ${g.stage2.pass?(g.mpsSignal==='RISK-ON'?'risk-on':'caution'):'risk-off'}"><span class="dot"></span>${g.stage2.verdict}</span>
+      </div>
+      <div class="stage-body">${renderRegime(state.mps, g)}</div>
+    </div>
+
+    <!-- STAGE 3 -->
+    <div class="stage ${!g.stage2.pass?'locked':g.stage3.pass?'pass':'fail'}" style="animation-delay:0.15s">
+      <div class="stage-header" onclick="toggle(this)">
+        <div class="stage-header-left">
+          <div class="stage-num n3">3</div>
+          <div class="stage-title-group"><div class="stage-title" style="color:var(--amber)">Sector Rotation</div><div class="stage-question">Where is smart money flowing? (RRM Quadrants)</div></div>
+        </div>
+        <div class="stage-verdict">
+          <span style="font-size:11px;color:var(--text-dim);margin-right:8px">${(state.sectors.leading.length+state.sectors.improving.length+state.sectors.weakening.length+state.sectors.lagging.length)} sectors</span>
+          <span class="verdict-badge ${g.stage3.pass?'risk-on':'risk-off'}"><span class="dot"></span>${g.stage3.verdict}</span>
+        </div>
+      </div>
+      <div class="stage-body">${renderSectors(state.sectors)}</div>
+    </div>
+
+    <!-- STAGE 4 -->
+    <div class="stage ${!g.stage3.pass?'locked':g.stage4.pass?'pass':'fail'}" style="animation-delay:0.2s">
+      <div class="stage-header" onclick="toggle(this)">
+        <div class="stage-header-left">
+          <div class="stage-num n4">4</div>
+          <div class="stage-title-group"><div class="stage-title" style="color:var(--purple)">HELIX — Multi-Timeframe Alignment</div><div class="stage-question">Are Daily + Weekly + Monthly trends aligned? (MTF Confluence)</div></div>
+        </div>
+        <span class="verdict-badge ${g.stage4.pass?(state.helix.alignment>=0.7?'risk-on':'caution'):'risk-off'}"><span class="dot"></span>${g.stage4.verdict}</span>
+      </div>
+      <div class="stage-body">${renderHelix(state.helix)}</div>
+    </div>
+
+    <!-- STAGE 5 -->
+    <div class="stage ${!g.stage4.pass?'locked':g.stage5.pass?'pass':'fail'}" style="animation-delay:0.25s">
+      <div class="stage-header" onclick="toggle(this)">
+        <div class="stage-header-left">
+          <div class="stage-num n5">5</div>
+          <div class="stage-title-group"><div class="stage-title" style="color:var(--gold)">Edge Intel</div><div class="stage-question">Scanner + O'Neil + Catalyst + Surveillance survivors</div></div>
+        </div>
+        <span class="verdict-badge ${g.stage5.pass?'risk-on':'risk-off'}"><span class="dot"></span>${g.stage5.verdict}</span>
+      </div>
+      <div class="stage-body">${renderEdge(state.topPicks)}</div>
+    </div>
+
+    <!-- STAGE 6 -->
+    <div class="stage ${!g.stage5.pass?'locked':g.stage6.pass?'pass':'fail'}" style="animation-delay:0.3s">
+      <div class="stage-header" onclick="toggle(this)">
+        <div class="stage-header-left">
+          <div class="stage-num n6">6</div>
+          <div class="stage-title-group"><div class="stage-title" style="color:var(--cyan-soft)">Execution Engine — Low Risk Entries</div><div class="stage-question">Final trade cards: Entry, Stop, Target, R:R for position sizing</div></div>
+        </div>
+        <span class="verdict-badge ${g.stage6.pass?'risk-on':'risk-off'}"><span class="dot"></span>${g.stage6.verdict}</span>
+      </div>
+      <div class="stage-body">${g.stage6.pass ? renderExec(state.topPicks) : renderEmpty(g)}</div>
+    </div>
+
+    <div class="pipeline-footer">
+      <div class="pipeline-stats">PIPELINE: <span class="hl-cyan">${state.pipeline.universe}</span> stocks → <span class="hl-amber">${state.pipeline.hotSectors}</span> hot sectors → <span class="hl-green">${state.pipeline.screened}</span> screened → <span class="${state.pipeline.topPicks>0?'hl-green':'hl-red'}">${state.pipeline.topPicks} top picks</span></div>
+      <div class="pipeline-meta">MPS: <strong>${prof}</strong> (${g.mpsScore}) · Market: <strong style="color:${g.mpsSignal==='RISK-ON'?'var(--green)':g.mpsSignal==='CAUTION'?'var(--amber)':'var(--red)'}">${g.mpsSignal}</strong> · Leading: <strong>${state.sectors.leading.length}</strong> · ${ts}</div>
+    </div>
+    <div class="disclaimer">TradEdge Autopilot v2.0 · Minervini · O'Neil · Definedge Methodology · Not Financial Advice</div>
+  `;
+}
+
+// ═══ COMPONENT RENDERERS ═══
+function renderPipeline(g) {
+  const stages = [
+    {n:1,l:'Asset Alloc',s:'pass'},{n:2,l:'Equity',s:g.stage2.pass?'pass':'fail'},
+    {n:3,l:'Sector',s:!g.stage2.pass?'locked':g.stage3.pass?'pass':'fail'},
+    {n:4,l:'HELIX',s:!g.stage3.pass?'locked':g.stage4.pass?'pass':'fail'},
+    {n:5,l:'Edge Intel',s:!g.stage4.pass?'locked':g.stage5.pass?'pass':'fail'},
+    {n:6,l:'Execute',s:!g.stage5.pass?'locked':g.stage6.pass?'pass':'fail'}
+  ];
+  let h='';
+  stages.forEach((st,i)=>{
+    h+=`<div class="pipe-stage"><div class="pipe-num ${st.s}">${st.s==='pass'?'✓':st.s==='fail'?'✗':st.n}</div><div class="pipe-label ${st.s}">${st.l}</div></div>`;
+    if(i<stages.length-1){const cs=stages[i+1].s==='locked'?'':stages[i].s;h+=`<div class="pipe-connector"><div class="line ${cs}"></div></div>`;}
+  });
+  return h;
+}
+
+function renderAssets(a) {
+  const items=[{name:'EQUITY (NSE)',icon:'📈',...a.equity},{name:'CASH / LIQUID',icon:'🏦',...a.cash},{name:'GOLD / COMMODITIES',icon:'🥇',...a.gold},{name:'INTERNATIONAL',icon:'🌐',...a.intl}];
+  return items.map(i=>`<div class="asset-card ${i.recommended?'recommended':''}"><div class="asset-name">${i.icon} ${i.name}</div><div class="asset-alloc">${i.alloc}<span>%</span></div><div class="asset-signal ${i.signal}">${i.signal.toUpperCase()}</div></div>`).join('');
+}
+
+function allocReason(sig, mps) {
+  if(sig==='RISK-OFF') return `<strong>RISK-OFF regime detected.</strong> MPS at ${mps.score}/100 signals broad market weakness. Minervini: "Cash is a position." Reduce equity to 25%, overweight cash & gold. Wait for MPS recovery above 40.`;
+  if(sig==='CAUTION') return `<strong>CAUTION — selective exposure.</strong> MPS at ${mps.score}/100 shows mixed breadth. O'Neil: "Only buy the very best setups." Maintain 50% equity in leading sectors only. Keep 25% cash ready.`;
+  return `<strong>RISK-ON — full deployment.</strong> MPS at ${mps.score}/100 confirms strong breadth. Deploy 80% equity, focus on leaders in leading sectors. Full position sizing.`;
+}
+
+function renderRegime(mps, g) {
+  const circ=2*Math.PI*34, fill=mps.score/100, off=circ*(1-fill);
+  const gc=mps.score>=70?'var(--green)':mps.score>=40?'var(--amber)':'var(--red)';
+  const comps=Object.entries(mps.components||{});
+  const bu=comps.filter(([,v])=>v.signal==='bullish').length, be=comps.filter(([,v])=>v.signal==='bearish').length, ne=comps.filter(([,v])=>v.signal==='neutral').length;
+  return `
+    <div class="regime-grid">
+      <div class="mps-gauge">
+        <div class="mps-gauge-visual">
+          <svg viewBox="0 0 80 80"><circle class="track" cx="40" cy="40" r="34"/><circle class="fill" cx="40" cy="40" r="34" stroke="${gc}" stroke-dasharray="${circ}" stroke-dashoffset="${off}"/></svg>
+          <div class="mps-gauge-val" style="color:${gc}">${mps.score}</div>
+        </div>
+        <div class="mps-gauge-info">
+          <div class="mps-gauge-title">Market Pulse Score</div>
+          <div class="mps-gauge-reading" style="color:${gc}">${g.mpsSignal} — ${mps.trend||'Stable'}</div>
+          <div class="mps-gauge-detail">${bu} bullish · ${ne} neutral · ${be} bearish</div>
+        </div>
+      </div>
+      <div style="display:grid;gap:8px">${comps.slice(0,4).map(([n,d])=>`<div class="regime-metric" style="padding:10px 14px"><div class="regime-metric-left"><div class="regime-metric-name" style="margin-bottom:2px;font-size:9px">${n}</div><div class="regime-metric-val" style="font-size:14px">${d.value}</div></div><span class="regime-signal ${d.signal}">${d.signal.toUpperCase()}</span></div>`).join('')}</div>
+    </div>
+    <div class="regime-grid" style="margin-bottom:14px">${comps.slice(4).map(([n,d])=>`<div class="regime-metric"><div class="regime-metric-left"><div class="regime-metric-name">${n}</div><div class="regime-metric-val">${d.value}</div></div><span class="regime-signal ${d.signal}">${d.signal.toUpperCase()}</span></div>`).join('')}</div>
+    <div class="regime-verdict-bar ${g.stage2.pass?(g.mpsSignal==='RISK-ON'?'risk-on':'caution'):'risk-off'}">
+      <span style="font-size:16px">${g.stage2.pass?'✅':'🚫'}</span>
+      <div class="regime-verdict-text">${g.stage2.pass?`<strong>GATE 2 PASSED</strong> — Market regime allows ${g.mpsSignal==='RISK-ON'?'aggressive':'selective'} equity exposure.`:`<strong>GATE 2 BLOCKED</strong> — MPS ${mps.score}/100 below CAUTION threshold (40). No new entries. Wait for regime improvement.`}</div>
+    </div>`;
+}
+
+function renderSectors(sec) {
+  const qs=[{k:'leading',t:'LEADING',i:'▲',c:'leading'},{k:'improving',t:'IMPROVING',i:'↗',c:'improving'},{k:'weakening',t:'WEAKENING',i:'↘',c:'weakening'},{k:'lagging',t:'LAGGING',i:'▼',c:'lagging'}];
+  return `
+    <div class="sector-quadrants">${qs.map(q=>{const it=sec[q.k]||[];return`<div class="quadrant"><div class="quadrant-header"><div class="quadrant-title ${q.c}">${q.i} ${q.t} (${it.length})</div></div><div class="quadrant-items">${it.length>0?it.map(s=>`<span class="sector-pill ${q.c}">${s}</span>`).join(''):`<span class="sector-empty">None</span>`}</div></div>`;}).join('')}</div>
+    <div class="alloc-reasoning"><span class="alloc-reasoning-icon">🎯</span><div class="alloc-reasoning-text"><strong>Focus:</strong> ${sec.leading.length>0?`Concentrate on <strong>${sec.leading.join(', ')}</strong> (Leading). Minervini: "Fish where the fish are."`:sec.improving.length>0?`<strong>${sec.improving.join(', ')}</strong> are Improving — early rotation candidates. Smaller size until confirmed.`:`No sectors Leading or Improving. Broad weakness confirms RISK-OFF.`}</div></div>`;
+}
+
+function renderHelix(h) {
+  const tfs=[{name:'DAILY',...h.daily},{name:'WEEKLY',...h.weekly},{name:'MONTHLY',...h.monthly}];
+  const ap=Math.round(h.alignment*100);
+  const ac=ap>=70?'var(--green)':ap>=30?'var(--amber)':'var(--red)';
+  const gb=Math.round(h.alignedSectors||0), ab=Math.round((h.totalSectors-gb)*0.3), rb=16-gb-ab;
+  return `
+    <div class="helix-grid">${tfs.map(t=>`<div class="helix-tf"><div class="helix-tf-name">${t.name}</div><div class="helix-tf-signal"><span class="helix-arrow ${t.direction==='up'?'up':t.direction==='down'?'down':'flat'}">${t.direction==='up'?'▲':t.direction==='down'?'▼':'◆'}</span><span class="helix-tf-label" style="color:${t.direction==='up'?'var(--green)':t.direction==='down'?'var(--red)':'var(--amber)'}">${t.signal}</span></div><div class="helix-tf-detail">${t.detail}</div></div>`).join('')}</div>
+    <div class="helix-alignment">
+      <div class="helix-alignment-label">MTF ALIGNMENT</div>
+      <div class="helix-bars">${Array(gb).fill('<div class="helix-bar green"></div>').join('')}${Array(ab).fill('<div class="helix-bar amber"></div>').join('')}${Array(Math.max(0,rb)).fill('<div class="helix-bar red"></div>').join('')}</div>
+      <div class="helix-score" style="color:${ac}">${ap}%</div>
+    </div>
+    <div class="alloc-reasoning" style="margin-top:14px"><span class="alloc-reasoning-icon">🔄</span><div class="alloc-reasoning-text"><strong>HELIX:</strong> ${ap>=70?`Strong MTF alignment — ${h.alignedSectors}/${h.totalSectors} sectors aligned. High-conviction environment.`:ap>=30?`Partial alignment — ${h.alignedSectors}/${h.totalSectors} aligned. Trade only sectors with all 3 TFs confirming.`:`Misaligned — only ${h.alignedSectors}/${h.totalSectors} aligned. Avoid new entries until weekly confirms daily.`}</div></div>`;
+}
+
+function renderEdge(picks) {
+  if(!picks||!picks.length) return `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No stocks survive Edge Intel</div><div class="empty-subtitle">Either upstream gates blocked or no stocks pass O'Neil + Catalyst + Surveillance.</div></div>`;
+  return `
+    <div class="edge-tabs"><button class="edge-tab active">Top Picks (${picks.length})</button><button class="edge-tab">Catalysts</button><button class="edge-tab">Surveillance</button></div>
+    <table class="edge-table"><thead><tr><th>STOCK</th><th>O'NEIL</th><th>CATALYST</th><th>SURVEILLANCE</th><th>RRM QUAD</th><th>FUND HOLDING</th><th class="td-right">PATTERN</th></tr></thead><tbody>
+    ${picks.map(p=>`<tr><td><div class="stock-name">${p.symbol}</div><div class="stock-sector">${p.sector}</div></td><td><span class="stock-score ${p.grade==='A+'?'a-plus':p.grade==='A'?'a':'b'}">${p.oneilScore} (${p.grade})</span></td><td><span class="catalyst-badge ${p.catalystPri}">${p.catalyst}</span></td><td><span class="surv-check ${p.surv}">${p.surv==='clean'?'✓':'⚠'} ${p.survScore}</span></td><td><span class="sector-pill ${p.rrmQuad.toLowerCase()}">${p.rrmQuad}</span></td><td style="font-size:11px;color:var(--text-secondary)">${p.fundHolding}</td><td class="td-right" style="font-family:var(--mono);font-size:11px;color:var(--cyan)">${p.pattern}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function renderExec(picks) {
+  if(!picks||!picks.length) return renderEmpty({stage6:{verdict:'NO CANDIDATES'}});
+  return `<div class="exec-cards">${picks.map(p=>`
+    <div class="exec-card">
+      <div class="exec-card-top"><div><div class="exec-card-symbol">${p.symbol}</div><div class="exec-card-sector">${p.sector} · ${p.rrmQuad} · ${p.pattern}</div></div><div class="exec-grade ${p.grade==='A+'?'a-plus':'a'}">${p.grade}</div></div>
+      <div class="exec-metrics">
+        <div class="exec-metric"><div class="exec-metric-val" style="color:var(--green)">${p.oneilScore}</div><div class="exec-metric-label">O'Neil</div></div>
+        <div class="exec-metric"><div class="exec-metric-val" style="color:var(--cyan)">${p.rr}</div><div class="exec-metric-label">Risk:Reward</div></div>
+        <div class="exec-metric"><div class="exec-metric-val">${p.survScore}</div><div class="exec-metric-label">Surveillance</div></div>
+      </div>
+      <div class="exec-entry-zone">
+        <div class="exec-entry-title">🎯 LOW-RISK ENTRY ZONE</div>
+        <div class="exec-entry-row"><span>Entry (Pivot)</span><span style="color:var(--cyan)">₹${p.entry.toLocaleString()}</span></div>
+        <div class="exec-entry-row"><span>Stop Loss</span><span style="color:var(--red)">₹${p.stop.toLocaleString()} (${((1-p.stop/p.entry)*100).toFixed(1)}%)</span></div>
+        <div class="exec-entry-row"><span>Target 1</span><span style="color:var(--green)">₹${p.target1.toLocaleString()}</span></div>
+        <div class="exec-entry-row"><span>Target 2</span><span style="color:var(--green-bright)">₹${p.target2.toLocaleString()}</span></div>
+        <div class="exec-entry-row" style="margin-top:4px;padding-top:4px;border-top:1px solid var(--border-dim)"><span>Catalyst</span><span style="color:var(--amber)">${p.catalyst}</span></div>
+        <div class="exec-entry-row"><span>Fund Holding</span><span>${p.fundHolding}</span></div>
+      </div>
+      <div class="exec-action">
+        <button class="exec-btn chart" onclick="openChart('${p.symbol}')">📊 Chart</button>
+        <button class="exec-btn watchlist" onclick="addWL('${p.symbol}')">+ Watchlist</button>
+        <button class="exec-btn drill" onclick="location.href='stock.html?s=${p.symbol}'">🔍 Deep Dive</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function renderEmpty(g) {
+  return `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No stocks pass the top-down filter today.</div><div class="empty-subtitle">One or more upstream gates are blocked.<br><br><strong>Minervini:</strong> "The money is made by sitting, not trading."</div></div>`;
+}
+
+// ═══ INTERACTIONS ═══
+function toggle(el) {
+  const b = el.parentElement.querySelector('.stage-body');
+  if(b) b.style.display = b.style.display==='none'?'':'none';
+}
+function openChart(s) { window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE:${s}`,'_blank'); }
+function addWL(s) {
+  const w=JSON.parse(localStorage.getItem('te_watchlist')||'[]');
+  if(!w.includes(s)){w.push(s);localStorage.setItem('te_watchlist',JSON.stringify(w));alert(`${s} added to watchlist`);}
+  else alert(`${s} already in watchlist`);
+}
+function saveTopPicks() {
+  const p=state.topPicks.map(x=>x.symbol);
+  localStorage.setItem('te_autopilot_picks',JSON.stringify({date:new Date().toISOString(),picks:p}));
+  alert(`Saved ${p.length} picks: ${p.join(', ')}`);
+}
+function rescan() { state.loading=true; render(); loadData(); }
+
+// ═══ BOOT ═══
+loadData();
 </script>
 </body>
 </html>
