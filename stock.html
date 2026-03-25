@@ -67,7 +67,7 @@
 <main class="main" id="main"><div class="loading" id="ld"><div class="spinner"></div>Loading stock data...</div></main>
 <script>
 const TV='8RFOgQZr',WK='https://spring-fire-41a0.drrgware.workers.dev',GROQ='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',COL={promo:'#8b5cf6',fii:'#22c55e',dii:'#f59e0b',pub:'#3b82f6'},FUND_PE_THRESHOLD=40;
-let D=null,F=null,allS=[],scannerStock=null,shpData=null;
+let D=null,F=null,allS=[],scannerStock=null,shpData=null,circuitData=null;
 
 function $(id){return document.getElementById(id)}
 function go(s){location.href='stock.html?s='+s}
@@ -128,6 +128,8 @@ async function init(){
 
 async function loadSyms(){
   try{const r=await fetch('data/scanner_results.json');if(r.ok){const d=await r.json();const stocks=d.all_stocks||[];allS=stocks.map(x=>({s:x.symbol,n:x.name||x.symbol,...x}));}}catch(e){}
+  // Load circuit limits data
+  try{const r=await fetch('data/circuit_limits.json');if(r.ok){circuitData=await r.json();}}catch(e){}
 }
 
 function setupSrch(){const i=$('srch'),dd=$('srchDD');if(!i||!dd)return;i.oninput=function(){const q=i.value.trim().toUpperCase();if(!q){dd.classList.remove('on');return;}const m=allS.filter(x=>x.s.includes(q)||x.n.toUpperCase().includes(q)).slice(0,10);dd.innerHTML=m.length?m.map(x=>'<div class="srch-it" data-s="'+x.s+'"><span style="font-family:var(--mono);color:var(--accent)">'+x.s+'</span><span style="font-size:10px;color:var(--t4)">'+x.n+'</span></div>').join(''):'<div style="padding:12px;color:var(--t4);text-align:center">No matches</div>';dd.classList.add('on');};dd.onclick=function(e){const t=e.target.closest('[data-s]');if(t)go(t.dataset.s);};document.onclick=function(e){if(!e.target.closest('.srch')&&!e.target.closest('.srch-dd'))dd.classList.remove('on');};}
@@ -281,7 +283,7 @@ function drawShpTrend(){
 
 function renderSurv(){
   const s=D.surveillance||{};const dataFlags=s.flags||[];
-  const checks=[{n:'NSE ASM List',key:'asm',f:false},{n:'NSE GSM List',key:'gsm',f:false},{n:'High Debt',key:'high_debt',f:false},{n:'Low Inst.',key:'low_inst',f:false},{n:'Penny Stock',key:'penny',f:false},{n:'High Pledging',key:'high_pledge',f:false},{n:'Low Liquidity',key:'low_liq',f:false},{n:'Inst. Decline',key:'inst_decline',f:false}];
+  const checks=[{n:'NSE ASM List',key:'asm',f:false},{n:'NSE GSM List',key:'gsm',f:false},{n:'Circuit Limited',key:'circuit',f:false},{n:'High Debt',key:'high_debt',f:false},{n:'Low Inst.',key:'low_inst',f:false},{n:'Penny Stock',key:'penny',f:false},{n:'High Pledging',key:'high_pledge',f:false},{n:'Low Liquidity',key:'low_liq',f:false},{n:'Inst. Decline',key:'inst_decline',f:false}];
   dataFlags.forEach(function(flag){if(!flag)return;const fn=flag.name||flag.n||'';const isFlagged=flag.flagged===true||flag.f===true;for(let i=0;i<checks.length;i++){if(fn.toLowerCase().includes(checks[i].key)){checks[i].f=isFlagged;break;}}});
   // Auto-detect from scanner data
   if(scannerStock){
@@ -291,6 +293,13 @@ function renderSurv(){
     if(sc.close<50||sc.cmp<50)checks.find(c=>c.key==='penny').f=true;
     if(sc.volume_ratio<0.3)checks.find(c=>c.key==='low_liq').f=true;
     if(sc.surveillance_status&&sc.surveillance_status!=='normal'){checks.find(c=>c.key==='asm').f=true;}
+  }
+  // Circuit limit from circuit_limits.json (real NSE data)
+  if(circuitData&&circuitData.stocks){
+    const ci=circuitData.stocks[D.symbol];
+    if(ci&&ci.is_restricted){checks.find(c=>c.key==='circuit').f=true;}
+    // Also check band directly
+    if(ci&&(ci.band==='2%'||ci.band==='5%')){checks.find(c=>c.key==='circuit').f=true;}
   }
   const rc=checks.filter(c=>c.f).length;const st=rc===0?'safe':rc<=2?'caution':'danger';
   // Sync red flag count to Key Metrics after a tick (DOM needs to exist first)
