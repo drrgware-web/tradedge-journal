@@ -12,16 +12,12 @@
 body{background:var(--bg);color:var(--t1);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
 body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,.008) 2px,rgba(255,255,255,.008) 4px);pointer-events:none;z-index:9999}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:4px}
-
 @keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @keyframes logoPulse{0%,100%{box-shadow:0 0 20px rgba(0,229,255,.2),0 0 40px rgba(0,229,255,.1),0 0 80px rgba(0,229,255,.05)}50%{box-shadow:0 0 40px rgba(0,229,255,.5),0 0 80px rgba(0,229,255,.25),0 0 120px rgba(0,229,255,.1),0 0 160px rgba(0,229,255,.05)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes borderGlow{0%,100%{border-color:rgba(0,229,255,.08)}50%{border-color:rgba(0,229,255,.25)}}
 @keyframes dotPulse{0%,100%{opacity:1;box-shadow:0 0 6px currentColor}50%{opacity:.4;box-shadow:none}}
 @keyframes gridPulse{0%,100%{opacity:.03}50%{opacity:.07}}
 @keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-
 .hero{position:relative;text-align:center;padding:50px 20px 30px;overflow:hidden}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(0,229,255,.05),transparent 70%);pointer-events:none}
 .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:60px 60px;animation:gridPulse 8s ease-in-out infinite;pointer-events:none}
@@ -32,11 +28,9 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .hero-tagline b{color:var(--cyan);font-weight:700}
 .hero-clock{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px}
 .market-dot{width:8px;height:8px;border-radius:50%;display:inline-block;animation:dotPulse 2s ease-in-out infinite}
-
 .section{padding:0 20px;margin-bottom:28px;max-width:1200px;margin-left:auto;margin-right:auto}
 .section-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.25em;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--bd2),transparent)}
-
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 .card{position:relative;background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:22px;cursor:pointer;transition:all .3s ease;overflow:hidden;animation:fadeUp .5s ease-out both;text-decoration:none;color:inherit;display:block}
 .card::before{content:'';position:absolute;inset:0;border-radius:14px;background:radial-gradient(circle at 50% 0%,var(--card-glow,rgba(0,229,255,.04)),transparent 70%);opacity:0;transition:opacity .3s}
@@ -49,23 +43,18 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .card-badge{padding:2px 8px;border-radius:10px;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.05em}
 .card-arrow{position:absolute;top:20px;right:20px;font-size:16px;color:var(--t4);transition:all .3s}
 .card:hover .card-arrow{color:var(--card-border,var(--cyan));transform:translateX(4px)}
-
 .footer{text-align:center;padding:30px 20px;font-family:var(--mono);font-size:8px;color:var(--t4);letter-spacing:.12em;border-top:1px solid var(--bd)}
 .footer a{color:var(--cyan);text-decoration:none;opacity:.5}.footer a:hover{opacity:1}
 </style>
 </head>
 <body>
-
 <div class="hero">
   <div class="hero-grid"></div>
   <img src="./assets/logo.jpeg" alt="TradEdge" class="logo" onerror="this.style.display='none';document.querySelector('.logo-fallback').style.display='flex'">
   <div class="logo-fallback">TE</div>
   <div class="hero-title">TradEdge</div>
   <div class="hero-tagline">Define Your Edge With <b>TradEdge</b></div>
-  <div class="hero-clock">
-    <span id="clock"></span>
-    <span id="market-status"></span>
-  </div>
+  <div class="hero-clock"><span id="clock"></span><span id="market-status"></span></div>
 </div>
 
 <!-- INTELLIGENCE -->
@@ -79,28 +68,34 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
       <div class="card-desc">Multi-Asset Timeframe Rating & Intelligence X-ray. Signal engine with GREEN/RED/BLUE/YELLOW scoring across 160+ instruments.</div>
       <div class="card-status"><span class="card-badge" style="background:rgba(0,255,136,.1);color:#00ff88">FLAGSHIP</span><span style="color:var(--t3)">· Live signals</span></div>
     </a>
-    <a href="./matrix.html" class="card" style="--card-glow:rgba(0,255,136,.04);--card-border:rgba(0,255,136,.15);animation-delay:.15s" onmouseenter="playHover()" onclick="playClick()">
+    <a href="./rrm-scanner.html" class="card" style="--card-glow:rgba(0,255,136,.08);--card-border:rgba(0,255,136,.25);animation-delay:.15s" onmouseenter="playHover()" onclick="playClick()">
+      <span class="card-arrow">→</span>
+      <span class="card-icon">🧬</span>
+      <div class="card-name">HELIX</div>
+      <div class="card-desc">Sweet Spot entry finder. RRM quadrants + RSI across Daily/Weekly/Monthly. Ranks 2,640 NSE stocks by momentum alignment and pullback zones.</div>
+      <div class="card-status"><span class="card-badge" style="background:rgba(0,255,136,.12);color:#00ff88">NEW</span><span style="color:var(--t3)">· 2,640 stocks · Sweet Spot</span></div>
+    </a>
+    <a href="./matrix.html" class="card" style="--card-glow:rgba(0,255,136,.04);--card-border:rgba(0,255,136,.15);animation-delay:.2s" onmouseenter="playHover()" onclick="playClick()">
       <span class="card-arrow">→</span>
       <span class="card-icon">🔮</span>
       <div class="card-name">ULTIMATE MATRIX</div>
       <div class="card-desc">Advanced MATRIX view with enhanced visualization, deeper signal analysis, and alternate layout for power users.</div>
       <div class="card-status"><span class="card-badge" style="background:rgba(167,139,250,.1);color:#a78bfa">PRO</span><span style="color:var(--t3)">· Power view</span></div>
     </a>
-    <a href="./allocation.html" class="card" style="--card-glow:rgba(0,200,255,.06);--card-border:rgba(0,200,255,.2);animation-delay:.2s" onmouseenter="playHover()" onclick="playClick()">
+    <a href="./allocation.html" class="card" style="--card-glow:rgba(0,200,255,.06);--card-border:rgba(0,200,255,.2);animation-delay:.25s" onmouseenter="playHover()" onclick="playClick()">
       <span class="card-arrow">→</span>
       <span class="card-icon">⚖️</span>
       <div class="card-name">SMART ALLOCATION</div>
       <div class="card-desc">Dynamic asset allocation engine. 3 risk profiles, regime detection, gold safe-haven logic, signal-adjusted weights.</div>
       <div class="card-status"><span class="card-badge" style="background:rgba(0,200,255,.1);color:#00c8ff">NEW</span><span style="color:var(--t3)">· Auto-rebalance</span></div>
     </a>
-    <a href="./edge-intel.html" class="card" style="--card-glow:rgba(255,208,0,.06);--card-border:rgba(255,208,0,.2);animation-delay:.25s" onmouseenter="playHover()" onclick="playClick()">
+    <a href="./edge-intel.html" class="card" style="--card-glow:rgba(255,208,0,.06);--card-border:rgba(255,208,0,.2);animation-delay:.3s" onmouseenter="playHover()" onclick="playClick()">
       <span class="card-arrow">→</span>
       <span class="card-icon">⚡</span>
       <div class="card-name">EDGE INTEL</div>
       <div class="card-desc">News intelligence, earnings analysis, BSE announcements, AI-powered sentiment with Groq. Real-time market pulse.</div>
       <div class="card-status"><span class="card-badge" style="background:rgba(255,208,0,.1);color:#ffd000">AI</span><span style="color:var(--t3)">· Groq-powered</span></div>
     </a>
-   
   </div>
 </div>
 
@@ -195,68 +190,15 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
   </div>
 </div>
 
-<div class="footer">
-  TRADEDGE COMMAND CENTER · v4.3 · Built by <a href="https://github.com/drrgware-web" target="_blank">drrgware</a> · Define Your Edge With TradEdge · ✦
-</div>
+<div class="footer">TRADEDGE COMMAND CENTER · v4.4 · Built by <a href="https://github.com/drrgware-web" target="_blank">drrgware</a> · Define Your Edge With TradEdge · ✦</div>
 
 <script>
-// ═══ SOUND ENGINE ═══
-const AudioCtx=window.AudioContext||window.webkitAudioContext;
-let audioCtx=null;
-function ensureAudio(){if(!audioCtx)audioCtx=new AudioCtx();}
-
-function playHover(){
-  try{
-    ensureAudio();
-    const o=audioCtx.createOscillator();const g=audioCtx.createGain();
-    o.connect(g);g.connect(audioCtx.destination);
-    o.type='sine';o.frequency.setValueAtTime(2800,audioCtx.currentTime);
-    o.frequency.exponentialRampToValueAtTime(3200,audioCtx.currentTime+0.04);
-    g.gain.setValueAtTime(0.06,audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.06);
-    o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+0.06);
-  }catch(e){}
-}
-
-function playClick(){
-  try{
-    ensureAudio();
-    // Short punchy bullet/click
-    const o=audioCtx.createOscillator();const g=audioCtx.createGain();
-    const o2=audioCtx.createOscillator();const g2=audioCtx.createGain();
-    o.connect(g);g.connect(audioCtx.destination);
-    o2.connect(g2);g2.connect(audioCtx.destination);
-    // High transient
-    o.type='square';o.frequency.setValueAtTime(1200,audioCtx.currentTime);
-    o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+0.08);
-    g.gain.setValueAtTime(0.12,audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.1);
-    // Low thud
-    o2.type='sine';o2.frequency.setValueAtTime(150,audioCtx.currentTime);
-    o2.frequency.exponentialRampToValueAtTime(60,audioCtx.currentTime+0.12);
-    g2.gain.setValueAtTime(0.15,audioCtx.currentTime);
-    g2.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.15);
-    o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+0.1);
-    o2.start(audioCtx.currentTime);o2.stop(audioCtx.currentTime+0.15);
-  }catch(e){}
-}
-
-// ═══ LIVE CLOCK ═══
-function updateClock(){
-  const now=new Date();
-  const ist=now.toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
-  const dateStr=now.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short',day:'numeric',month:'short',year:'numeric'});
-  document.getElementById('clock').textContent=dateStr+' · '+ist+' IST';
-  const h=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getHours();
-  const m=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getMinutes();
-  const day=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getDay();
-  const mins=h*60+m;
-  const isOpen=day>=1&&day<=5&&mins>=555&&mins<=930;
-  document.getElementById('market-status').innerHTML=`<span class="market-dot" style="color:${isOpen?'#00ff88':'#ff3366'};background:${isOpen?'#00ff88':'#ff3366'}"></span><span style="color:${isOpen?'#00ff88':'#ff3366'};font-weight:600">${isOpen?'MARKET OPEN':'MARKET CLOSED'}</span>`;
-}
+const AudioCtx=window.AudioContext||window.webkitAudioContext;let audioCtx=null;
+function ensureAudio(){if(!audioCtx)audioCtx=new AudioCtx()}
+function playHover(){try{ensureAudio();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.type='sine';o.frequency.setValueAtTime(2800,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(3200,audioCtx.currentTime+.04);g.gain.setValueAtTime(.06,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.06);o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+.06)}catch(e){}}
+function playClick(){try{ensureAudio();const o=audioCtx.createOscillator(),g=audioCtx.createGain(),o2=audioCtx.createOscillator(),g2=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o2.connect(g2);g2.connect(audioCtx.destination);o.type='square';o.frequency.setValueAtTime(1200,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+.08);g.gain.setValueAtTime(.12,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.1);o2.type='sine';o2.frequency.setValueAtTime(150,audioCtx.currentTime);o2.frequency.exponentialRampToValueAtTime(60,audioCtx.currentTime+.12);g2.gain.setValueAtTime(.15,audioCtx.currentTime);g2.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.15);o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+.1);o2.start(audioCtx.currentTime);o2.stop(audioCtx.currentTime+.15)}catch(e){}}
+function updateClock(){const now=new Date();const ist=now.toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});const dateStr=now.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short',day:'numeric',month:'short',year:'numeric'});document.getElementById('clock').textContent=dateStr+' · '+ist+' IST';const h=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getHours(),m=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getMinutes(),day=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getDay(),mins=h*60+m,isOpen=day>=1&&day<=5&&mins>=555&&mins<=930;document.getElementById('market-status').innerHTML='<span class="market-dot" style="color:'+(isOpen?'#00ff88':'#ff3366')+';background:'+(isOpen?'#00ff88':'#ff3366')+'"></span><span style="color:'+(isOpen?'#00ff88':'#ff3366')+';font-weight:600">'+(isOpen?'MARKET OPEN':'MARKET CLOSED')+'</span>'}
 updateClock();setInterval(updateClock,1000);
-
-// ═══ MACRO PULSE REMOVED ═══
 </script>
 </body>
 </html>
