@@ -75,6 +75,11 @@ tr.row-green{border-left:3px solid #22c55e}tr.row-yellow{border-left:3px solid #
     <div class="logo-sub">Multi-Timeframe Rotation Scanner · Daily / Weekly / Monthly</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
+    <label class="toggle-wrap" title="Hide circuit-limited stocks (2%/5% bands)">
+      <span class="toggle-lbl">⚡ Circuit</span>
+      <input type="checkbox" id="circuitToggle">
+      <span class="toggle-slider"></span>
+    </label>
     <label class="toggle-wrap" title="Toggle RSI columns">
       <span class="toggle-lbl">RSI</span>
       <input type="checkbox" id="rsiToggle" checked>
@@ -96,11 +101,14 @@ tr.row-green{border-left:3px solid #22c55e}tr.row-yellow{border-left:3px solid #
 const DATA_URL='data/rrm_scanner.json';
 let allStocks=[],filtered=[],sortCol='sweet',sortDir=-1;
 let filterSignal=null,filterQuad=null,filterSweet=null,searchQ='';
+let circuitData=null,hideCircuit=false;
 
 async function init(){
   try{
     const r=await fetch(DATA_URL);if(!r.ok)throw new Error('HTTP '+r.status);
     const d=await r.json();allStocks=d.stocks||[];
+    // Load circuit limits
+    try{const cr=await fetch('data/circuit_limits.json');if(cr.ok){circuitData=await cr.json();}}catch(e){}
     render(d.meta);
   }catch(e){
     document.getElementById('content').innerHTML='<div class="loading"><div style="font-size:32px;margin-bottom:16px">⚠️</div><div>RRM Scanner data not available</div><div style="font-size:10px;margin-top:8px;color:var(--t4)">Run the GitHub Action first: Actions → RRM Scanner Daily → Run workflow</div></div>';
@@ -186,6 +194,13 @@ function render(meta){
     document.querySelector('.tbl-wrap').classList.toggle('hide-rsi',!showRSI);
   };}
 
+  // Circuit toggle — hide 2%/5% restricted stocks
+  const circTog=document.getElementById('circuitToggle');
+  if(circTog){circTog.onchange=()=>{
+    hideCircuit=circTog.checked;
+    applyFilters();
+  };}
+
   renderHead();applyFilters();
 }
 
@@ -217,11 +232,19 @@ function renderHead(){
   }});
 }
 
+function isCircuitRestricted(sym){
+  if(!circuitData||!circuitData.stocks)return false;
+  const ci=circuitData.stocks[sym];
+  if(!ci)return false;
+  return ci.is_restricted===true||ci.band==='2%'||ci.band==='5%';
+}
+
 function applyFilters(){
   filtered=allStocks.filter(s=>{
     if(filterSignal&&s.signal!==filterSignal)return false;
     if(filterQuad){if(s.d_quad!==filterQuad&&s.w_quad!==filterQuad&&s.m_quad!==filterQuad)return false;}
     if(filterSweet&&s.sweet_label!==filterSweet)return false;
+    if(hideCircuit&&isCircuitRestricted(s.symbol))return false;
     if(searchQ&&!s.symbol?.toUpperCase().includes(searchQ)&&!s.name?.toUpperCase().includes(searchQ)&&!s.sector?.toUpperCase().includes(searchQ))return false;
     return true;
   });
