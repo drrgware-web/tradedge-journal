@@ -204,7 +204,7 @@ function renderMetrics(){
       (bestGuru!=='—'?'<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between"><div><div style="font-size:9px;color:var(--t4)">Best Guru Match</div><div style="font-size:11px;font-weight:600;color:var(--accent2)">'+bestGuru+'</div></div><div style="text-align:right"><div style="font-size:9px;color:var(--t4)">Guru Score</div><div style="font-size:11px;font-weight:600;color:var(--t1)">'+bestGuruScore+'/100</div></div></div>':'')+
     '</div></div>':'<div class="card"><div class="card-h"><span class="card-t">📊 RATINGS</span></div><div class="card-b" style="text-align:center;padding:30px;color:var(--t4);font-size:12px">Scanner data not available for this stock</div></div>')+
     // RIGHT: Fundamental Metrics
-    '<div class="card"><div class="card-h"><span class="card-t">💰 FUNDAMENTALS</span></div><div class="card-b"><div class="met-grid">'+
+    '<div class="card"><div class="card-h"><span class="card-t">💰 FUNDAMENTALS</span></div><div class="card-b"><div class="met-grid" id="fundMetGrid">'+
       [{l:'Market Cap',v:'₹'+fmtCr(f.market_cap_cr)+'Cr',c:''},
        {l:'P/E',v:f.pe_ratio?fmt(f.pe_ratio,1):'—',c:f.pe_ratio>40?'var(--red)':f.pe_ratio>25?'var(--amber)':f.pe_ratio>0?'var(--green)':''},
        {l:'P/B',v:f.pb_ratio?fmt(f.pb_ratio,2):'—',c:f.pb_ratio>5?'var(--red)':f.pb_ratio>3?'var(--amber)':f.pb_ratio>0?'var(--green)':''},
@@ -337,7 +337,22 @@ async function fetchFundScorecard(sym){
     }
     // Update metrics
     if(data.info){const f=D.fundamentals;if(data.info.mcapCr)f.market_cap_cr=data.info.mcapCr;if(data.info.pe)f.pe_ratio=data.info.pe;if(data.info.roe!=null)f.roe=data.info.roe;if(data.info.roce!=null)f.roce=data.info.roce;if(data.info.bookValue)f.book_value=data.info.bookValue;if(data.info.dividendYield!=null)f.dividend_yield=data.info.dividendYield;
-      const mg=document.querySelector('.met-grid');if(mg){const f2=D.fundamentals;const deR=f2.debt_to_equity;const deD=deR!=null?(deR>2?fmt(deR/100,2):fmt(deR,2)):'—';const rg2=scannerStock?.revenue_growth||0;const pm2=scannerStock?.profit_margin||0;const liveFlags=document.querySelectorAll('.surv-item.fail').length;mg.innerHTML=[{l:'Market Cap',v:'₹'+fmtCr(f2.market_cap_cr)+'Cr'},{l:'P/E',v:f2.pe_ratio?fmt(f2.pe_ratio,1):'—'},{l:'P/B',v:f2.pb_ratio?fmt(f2.pb_ratio,2):'—'},{l:'ROE',v:f2.roe?fmt(f2.roe,1)+'%':'—'},{l:'ROCE',v:f2.roce?fmt(f2.roce,1)+'%':'—'},{l:'D/E',v:deD},{l:'Div Yield',v:f2.dividend_yield?fmt(f2.dividend_yield,2)+'%':'—'},{l:'Book Value',v:f2.book_value?'₹'+fmt(f2.book_value,0):'—'},{l:'EPS',v:f2.eps?'₹'+fmt(f2.eps,2):'—'},{l:'Rev Growth',v:rg2?fmtP(rg2):'—'},{l:'Profit Margin',v:pm2?fmt(pm2,1)+'%':'—'},{l:'Red Flags',v:'<span style="color:'+(liveFlags===0?'var(--green)':liveFlags<=2?'var(--amber)':'var(--red)')+'">'+liveFlags+'</span>'}].map(m=>'<div class="met-box"><div class="met-v">'+m.v+'</div><div class="met-l">'+m.l+'</div></div>').join('');}
+      const mg=$('fundMetGrid');if(mg){const f2=D.fundamentals;const deR=f2.debt_to_equity;const deD=deR!=null?(deR>2?fmt(deR/100,2):fmt(deR,2)):'—';const rg2=scannerStock?.revenue_growth||0;const pm2=scannerStock?.profit_margin||0;const liveFlags=document.querySelectorAll('.surv-item.fail').length;
+      function mc(l,n){if(l==='P/E')return n>40?'color:var(--red)':n>25?'color:var(--amber)':n>0?'color:var(--green)':'';if(l==='P/B')return n>5?'color:var(--red)':n>3?'color:var(--amber)':n>0?'color:var(--green)':'';if(l==='ROE'||l==='ROCE')return n>15?'color:var(--green)':n>0?'color:var(--amber)':n<0?'color:var(--red)':'';if(l==='D/E')return deR!=null?(deR>100?'color:var(--red)':deR>50?'color:var(--amber)':'color:var(--green)'):'';if(l==='Div Yield')return n>3?'color:var(--green)':n>1?'color:var(--accent2)':'';if(l==='EPS')return n>0?'color:var(--green)':n<0?'color:var(--red)':'';if(l==='Rev Growth'||l==='Profit Margin')return n>15?'color:var(--green)':n>0?'color:var(--accent2)':n<0?'color:var(--red)':'';if(l==='Red Flags')return n===0?'color:var(--green)':n<=2?'color:var(--amber)':'color:var(--red)';return'';}
+      mg.innerHTML=[
+        {l:'Market Cap',v:'₹'+fmtCr(f2.market_cap_cr)+'Cr',n:0},
+        {l:'P/E',v:f2.pe_ratio?fmt(f2.pe_ratio,1):'—',n:f2.pe_ratio||0},
+        {l:'P/B',v:f2.pb_ratio?fmt(f2.pb_ratio,2):'—',n:f2.pb_ratio||0},
+        {l:'ROE',v:f2.roe!=null&&f2.roe!==0?fmt(f2.roe,1)+'%':'—',n:f2.roe||0},
+        {l:'ROCE',v:f2.roce!=null&&f2.roce!==0?fmt(f2.roce,1)+'%':'—',n:f2.roce||0},
+        {l:'D/E',v:deD,n:0},
+        {l:'Div Yield',v:f2.dividend_yield?fmt(f2.dividend_yield,2)+'%':'—',n:f2.dividend_yield||0},
+        {l:'Book Value',v:f2.book_value?'₹'+fmt(f2.book_value,0):'—',n:0},
+        {l:'EPS',v:f2.eps!=null&&f2.eps!==0?'₹'+fmt(f2.eps,2):'—',n:f2.eps||0},
+        {l:'Rev Growth',v:rg2?fmtP(rg2):'—',n:rg2},
+        {l:'Profit Margin',v:pm2?fmt(pm2,1)+'%':'—',n:pm2},
+        {l:'Red Flags',v:liveFlags+'',n:liveFlags}
+      ].map(m=>'<div class="met-box"><div class="met-v" style="'+mc(m.l,m.n)+'">'+m.v+'</div><div class="met-l">'+m.l+'</div></div>').join('');}
     }
     // Render scorecard
     const sc2=score>=70?'#22c55e':score>=40?'#eab308':'#f87171';const pe2=info.pe||0;const pc2=pe2>40?'#f87171':pe2>25?'#eab308':pe2>0?'#22c55e':'var(--t4)';
