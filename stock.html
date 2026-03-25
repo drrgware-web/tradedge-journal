@@ -285,6 +285,36 @@ function fundCalcScore(parsed){
   return{score:Math.max(0,Math.min(100,score)),flags};
 }
 
+// Update surveillance flags from real Screener data
+function updateSurveillanceFromData(info, holdings){
+  const checks=$('main')?.querySelectorAll('.surv-item');
+  if(!checks||!checks.length)return;
+  const flagMap={};
+  // High Debt: debt_equity > 1 or negative ROE with low ROCE
+  if(info.roe<0||info.roce<0)flagMap['High Debt']=true;
+  // Low Inst: institutional < 10%
+  const inst=(holdings.fii_pct||0)+(holdings.dii_pct||0);
+  if(inst<10)flagMap['Low Inst. Holding']=true;
+  // Penny: price < 50
+  if(info.currentPrice&&info.currentPrice<50)flagMap['Penny Stock']=true;
+  // Inst decline: fii_chg < 0 and dii_chg < 0
+  if((holdings.fii_chg||0)<-0.5&&(holdings.dii_chg||0)<-0.5)flagMap['Inst. Decline']=true;
+
+  let rc=0;
+  checks.forEach(el=>{
+    const text=el.querySelector('.surv-text');
+    if(!text)return;
+    const name=text.textContent.trim();
+    if(flagMap[name]){el.classList.add('fail');el.querySelector('.surv-icon').textContent='🚩';rc++;}
+  });
+  // Update status badge
+  const badge=$('main')?.querySelector('.surv-st');
+  if(badge){
+    badge.className='surv-st '+(rc===0?'safe':rc<=2?'caution':'danger');
+    badge.textContent=rc===0?'✓ All Clear':'⚠ '+rc+' Red Flag'+(rc>1?'s':'');
+  }
+}
+
 async function fetchFundScorecard(sym){
   const c=$('fundScorecardC');if(!c)return;
   const workerUrl=localStorage.getItem('zd_worker_url')||'';
@@ -298,46 +328,79 @@ async function fetchFundScorecard(sym){
     const data=await r.json();
     if(!data.quarters||!data.quarters.length)throw new Error('No quarter data');
 
-    // Parse into scorecard format
-    const info={name:data.info?.name||sym,sector:data.info?.sector||'',industry:data.info?.industry||'',mcapCr:data.info?.mcapCr||0,pe:data.info?.pe||0,ttmPE:data.info?.pe||0,roe:data.info?.roe||0,roce:data.info?.roce||0,currentPrice:data.info?.currentPrice||0,bookValue:data.info?.bookValue||0};
+    // Parse into scorecard format — worker returns roe/roce as percentages already (e.g. 17.2 not 0.172)
+    const rawRoe=data.info?.roe||0;const rawRoce=data.info?.roce||0;
+    const info={name:data.info?.name||sym,sector:data.info?.sector||'',industry:data.info?.industry||'',mcapCr:data.info?.mcapCr||0,pe:data.info?.pe||0,ttmPE:data.info?.pe||0,roe:rawRoe,roce:rawRoce,currentPrice:data.info?.currentPrice||0,bookValue:data.info?.bookValue||0,dividendYield:data.info?.dividendYield||0,faceValue:data.info?.faceValue||0};
     const quarters=data.quarters.map(q=>({label:q.label||'',eps:q.eps||0,epsYoY:q.epsYoY??null,epsQoQ:q.epsQoQ??null,revenueCr:q.sales||0,salesYoY:q.salesYoY??null,salesQoQ:q.salesQoQ??null,opm:q.opm||0,opmYoY:q.opmYoY??null,opmQoQ:q.opmQoQ??null}));
     F={info,quarters};
     const{score,flags}=fundCalcScore(F);
 
-    // Update shareholding if available
+    // Update shareholding from worker arrays: {quarters:[], promoter:[], fii:[], dii:[], public:[]}
     if(data.shareholding){
-      const h=D.fund_holdings;
-      if(data.shareholding.promoter_pct!=null)h.promoter_pct=data.shareholding.promoter_pct;
-      if(data.shareholding.promoter_chg!=null)h.promoter_chg=data.shareholding.promoter_chg;
-      if(data.shareholding.fii_pct!=null)h.fii_pct=data.shareholding.fii_pct;
-      if(data.shareholding.fii_chg!=null)h.fii_chg=data.shareholding.fii_chg;
-      if(data.shareholding.dii_pct!=null)h.dii_pct=data.shareholding.dii_pct;
-      if(data.shareholding.dii_chg!=null)h.dii_chg=data.shareholding.dii_chg;
-      if(data.shareholding.public_pct!=null)h.public_pct=data.shareholding.public_pct;
-      if(data.shareholding.public_chg!=null)h.public_chg=data.shareholding.public_chg;
+      const shp=data.shareholding;const h=D.fund_holdings;
+      if(Array.isArray(shp.promoter)&&shp.promoter.length){
+        const latest=shp.promoter[shp.promoter.length-1];const prev=shp.promoter.length>=2?shp.promoter[shp.promoter.length-2]:latest;
+        h.promoter_pct=latest;h.promoter_chg=latest-prev;
+      }
+      if(Array.isArray(shp.fii)&&shp.fii.length){
+        const latest=shp.fii[shp.fii.length-1];const prev=shp.fii.length>=2?shp.fii[shp.fii.length-2]:latest;
+        h.fii_pct=latest;h.fii_chg=latest-prev;
+      }
+      if(Array.isArray(shp.dii)&&shp.dii.length){
+        const latest=shp.dii[shp.dii.length-1];const prev=shp.dii.length>=2?shp.dii[shp.dii.length-2]:latest;
+        h.dii_pct=latest;h.dii_chg=latest-prev;
+      }
+      if(Array.isArray(shp.public)&&shp.public.length){
+        const latest=shp.public[shp.public.length-1];const prev=shp.public.length>=2?shp.public[shp.public.length-2]:latest;
+        h.public_pct=latest;h.public_chg=latest-prev;
+      }
+      // Re-render shareholding with real QoQ data
+      const shpBody=$('shpBody');
+      if(shpBody){
+        const holders=[];
+        function cb2(c){if(c>0.01)return'<div class="shp-chg up">▲'+c.toFixed(2)+'%</div>';if(c<-0.01)return'<div class="shp-chg dn">▼'+Math.abs(c).toFixed(2)+'%</div>';return'<div class="shp-chg flat">—</div>';}
+        if(h.promoter_pct>0)holders.push({n:'Promoters',p:h.promoter_pct,c:h.promoter_chg||0,col:COL.promo});
+        if(h.fii_pct>0)holders.push({n:'FII/FPI',p:h.fii_pct,c:h.fii_chg||0,col:COL.fii});
+        if(h.dii_pct>0)holders.push({n:'DII',p:h.dii_pct,c:h.dii_chg||0,col:COL.dii});
+        const pub2=h.public_pct||Math.max(0,100-(h.promoter_pct||0)-(h.fii_pct||0)-(h.dii_pct||0));
+        if(pub2>0)holders.push({n:'Public',p:pub2,c:h.public_chg||0,col:COL.pub});
+        shpBody.innerHTML='<div class="shp-wrap"><div class="shp-donut"><canvas id="shpC" width="160" height="160"></canvas><div class="shp-center">👥</div></div><div class="shp-list">'+holders.map(x=>'<div class="shp-row"><div class="shp-dot" style="background:'+x.col+'"></div><div class="shp-name">'+x.n+'</div><div class="shp-pct">'+x.p.toFixed(1)+'%</div>'+cb2(x.c)+'</div>').join('')+'</div></div>';
+        drawDonut();
+      }
     }
 
-    // Update metrics with real data
+    // Update key metrics with real data (values already in correct units from worker)
     if(data.info){
       const f=D.fundamentals;
       if(data.info.mcapCr)f.market_cap_cr=data.info.mcapCr;
       if(data.info.pe)f.pe_ratio=data.info.pe;
+      // Worker returns roe/roce as percentages directly (e.g. 17.2 not 0.172)
       if(data.info.roe!=null)f.roe=data.info.roe;
       if(data.info.roce!=null)f.roce=data.info.roce;
       if(data.info.bookValue)f.book_value=data.info.bookValue;
-      if(data.info.dividendYield)f.dividend_yield=data.info.dividendYield;
+      // Worker returns dividendYield as percentage directly (e.g. 2.48 not 0.0248)
+      if(data.info.dividendYield!=null)f.dividend_yield=data.info.dividendYield;
+      // Re-render metrics section with fresh data
+      const metEl=document.querySelector('.met-grid');
+      if(metEl){
+        const metrics2=[{l:'Market Cap',v:'₹'+fmtCr(f.market_cap_cr)+'Cr'},{l:'P/E Ratio',v:f.pe_ratio?fmt(f.pe_ratio,1):'—'},{l:'P/B Ratio',v:f.pb_ratio?fmt(f.pb_ratio,2):'—'},{l:'ROE',v:f.roe?fmt(f.roe,1)+'%':'—'},{l:'ROCE',v:f.roce?fmt(f.roce,1)+'%':'—'},{l:'Debt/Equity',v:f.debt_to_equity!=null?fmt(f.debt_to_equity,2):'—'},{l:'Div Yield',v:f.dividend_yield?fmt(f.dividend_yield,2)+'%':'—'},{l:'Book Value',v:f.book_value?'₹'+fmt(f.book_value,2):'—'},{l:'EPS (TTM)',v:f.eps?'₹'+fmt(f.eps,2):'—'}];
+        metEl.innerHTML=metrics2.map(m=>'<div class="met-box"><div class="met-v">'+m.v+'</div><div class="met-l">'+m.l+'</div></div>').join('');
+      }
+      // Update surveillance flags based on real data
+      updateSurveillanceFromData(data.info, D.fund_holdings);
     }
 
     // Render QE Pro-style scorecard
     const scoreColor=score>=70?'#22c55e':score>=40?'#eab308':'#f87171';
-    const pe=info.ttmPE||info.pe||0;
-    const peColor=pe>FUND_PE_THRESHOLD?'#f87171':pe>25?'#eab308':'#22c55e';
+    const ttmPE=info.ttmPE||info.pe||0;
+    const peColor=ttmPE>FUND_PE_THRESHOLD?'#f87171':ttmPE>25?'#eab308':ttmPE>0?'#22c55e':'var(--t4)';
     const fmtG=v=>v!=null?(v>=0?'+':'')+v.toFixed(1)+'%':'—';
     const fmtGC=v=>v!=null?(v>=0?'#22c55e':'#f87171'):'var(--t4)';
 
-    const qRows=quarters.slice(0,8).map(q=>'<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--t2)">'+q.label+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:var(--t1);text-align:right">'+(q.eps?.toFixed(1)??'—')+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.epsYoY)+';text-align:right">'+fmtG(q.epsYoY)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.epsQoQ)+';text-align:right">'+fmtG(q.epsQoQ)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:var(--t1);text-align:right">'+q.revenueCr+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.salesYoY)+';text-align:right">'+fmtG(q.salesYoY)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.salesQoQ)+';text-align:right">'+fmtG(q.salesQoQ)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+(q.opm>=0?'#22c55e':'#f87171')+';text-align:right">'+q.opm.toFixed(1)+'%</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+peColor+';text-align:right">'+(pe?pe.toFixed(1):'—')+'</td></tr>').join('');
+    // P/E column: show TTM PE only in header row, blank for other quarters
+    const qRows=quarters.slice(0,8).map((q,idx)=>'<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--t2)">'+q.label+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:var(--t1);text-align:right">'+(q.eps?.toFixed(1)??'—')+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.epsYoY)+';text-align:right">'+fmtG(q.epsYoY)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.epsQoQ)+';text-align:right">'+fmtG(q.epsQoQ)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:var(--t1);text-align:right">'+q.revenueCr+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.salesYoY)+';text-align:right">'+fmtG(q.salesYoY)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+fmtGC(q.salesQoQ)+';text-align:right">'+fmtG(q.salesQoQ)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+(q.opm>=0?'#22c55e':'#f87171')+';text-align:right">'+q.opm.toFixed(1)+'%</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+peColor+';text-align:right">'+(idx===0&&ttmPE?ttmPE.toFixed(1):'—')+'</td></tr>').join('');
 
-    c.innerHTML='<div class="card" style="padding:0;overflow:hidden;border-left:3px solid '+scoreColor+'"><div style="padding:12px 16px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px"><div><span style="font-size:14px;font-weight:800;color:var(--t1)">'+(info.name||sym)+'</span>'+(info.mcapCr>5000?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(234,179,8,.15);color:#eab308;font-weight:700;margin-left:4px">F&O</span>':'')+'<div style="font-size:10px;color:var(--t4);margin-top:2px">mcap '+info.mcapCr.toLocaleString('en-IN')+' Cr · roe '+(typeof info.roe==='number'?(info.roe<1?(info.roe*100).toFixed(1):info.roe.toFixed(1)):'—')+'%</div></div><div style="text-align:center"><div style="font-size:28px;font-weight:800;color:'+scoreColor+'">'+score+'</div><div style="font-size:9px;color:var(--t4);font-weight:600">FUND SCORE</div></div></div>'+(flags.length?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+flags.map(f=>'<span style="font-size:9px;padding:1px 6px;border-radius:6px;background:'+(f.severity==='red'?'rgba(248,113,113,.15)':'rgba(234,179,8,.12)')+';color:'+(f.severity==='red'?'#f87171':'#eab308')+';font-weight:600">'+f.metric+': '+(typeof f.val==='number'?f.val.toFixed(1):f.val)+'</span>').join('')+'</div>':'')+'</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--accent);font-weight:700">FQ</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">EPS</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">YOY</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">QOQ</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">SALES</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">YOY</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">QOQ</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">OPM%</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">P/E</th></tr></thead><tbody>'+qRows+'</tbody></table></div></div>';
+    c.innerHTML='<div class="card" style="padding:0;overflow:hidden;border-left:3px solid '+scoreColor+'"><div style="padding:12px 16px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px"><div><span style="font-size:14px;font-weight:800;color:var(--t1)">'+(info.name||sym)+'</span>'+(info.mcapCr>5000?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(234,179,8,.15);color:#eab308;font-weight:700;margin-left:4px">F&O</span>':'')+'<div style="font-size:10px;color:var(--t4);margin-top:2px">mcap '+info.mcapCr.toLocaleString('en-IN')+' Cr · roe '+info.roe.toFixed(1)+'%</div></div><div style="text-align:center"><div style="font-size:28px;font-weight:800;color:'+scoreColor+'">'+score+'</div><div style="font-size:9px;color:var(--t4);font-weight:600">FUND SCORE</div></div></div>'+(flags.length?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+flags.map(f=>'<span style="font-size:9px;padding:1px 6px;border-radius:6px;background:'+(f.severity==='red'?'rgba(248,113,113,.15)':'rgba(234,179,8,.12)')+';color:'+(f.severity==='red'?'#f87171':'#eab308')+';font-weight:600">'+f.metric+': '+(typeof f.val==='number'?f.val.toFixed(1):f.val)+'</span>').join('')+'</div>':'')+'</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--accent);font-weight:700">FQ</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">EPS</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">YOY</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">QOQ</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">SALES</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">YOY</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">QOQ</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">OPM%</th><th style="padding:6px;text-align:right;font-size:10px;color:var(--t3);font-weight:700">P/E</th></tr></thead><tbody>'+qRows+'</tbody></table></div></div>';
 
   }catch(e){
     console.error('Fund scorecard error:',e);
