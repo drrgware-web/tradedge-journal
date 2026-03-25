@@ -275,7 +275,7 @@ def load_symbols(top_n=None, specific=None):
                         "sector": s.get("sector", ""),
                         "cmp": s.get("close") or s.get("cmp", 0),
                         "change_pct": s.get("change_pct", 0),
-                        "market_cap_cr": s.get("market_cap_cr", 0),
+                        "market_cap_cr": s.get("market_cap_cr") or 0,
                         "oneil_grade": s.get("oneil_grade", ""),
                         "composite_score": s.get("composite_score", 0),
                         "eps_strength": s.get("eps_strength", 0),
@@ -301,7 +301,7 @@ def load_symbols(top_n=None, specific=None):
         sys.exit(1)
 
     # Sort by market cap and take top N
-   if top_n:
+    if top_n:
         stocks.sort(key=lambda x: x.get("market_cap_cr") or 0, reverse=True)
         stocks = stocks[:top_n]
         print(f"  Filtered to top {top_n} by market cap")
