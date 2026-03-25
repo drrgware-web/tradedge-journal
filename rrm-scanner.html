@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RRM Scanner | TradEdge</title>
+<link rel="icon" type="image/jpeg" href="assets/logo.jpeg">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#04060a;--bg2:#080c14;--bg3:#0c1018;--bg4:#121822;--border:rgba(0,255,136,.07);--accent:#00ff88;--accent2:#00c8ff;--accent3:#8b5cf6;--red:#ef4444;--amber:#f59e0b;--green:#22c55e;--t1:#f1f5f9;--t2:#cbd5e1;--t3:#94a3b8;--t4:#64748b;--mono:'IBM Plex Mono',monospace;--sans:'Outfit',sans-serif;
+--sig-green:linear-gradient(135deg,rgba(0,255,136,.12),rgba(0,255,136,.04));--sig-yellow:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.04));--sig-blue:linear-gradient(135deg,rgba(0,200,255,.12),rgba(0,200,255,.04));--sig-red:linear-gradient(135deg,rgba(239,68,68,.08),rgba(239,68,68,.02))}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--sans);background:var(--bg);color:var(--t1);min-height:100vh}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.hdr{background:rgba(8,12,20,.95);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo{font-family:var(--mono);font-size:22px;font-weight:900;letter-spacing:3px;background:linear-gradient(90deg,#00ff88,#00c8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:10px;color:var(--t4);letter-spacing:1px;margin-top:2px}
+.nav-links{display:flex;gap:8px}.nav-link{padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t3);text-decoration:none;font-size:11px;font-weight:600}.nav-link:hover,.nav-link.active{color:var(--accent);border-color:var(--accent)}
+.main{max-width:1600px;margin:0 auto;padding:16px 20px}
+/* Stats bar */
+.stats{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.stat-card{padding:10px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;text-align:center;min-width:90px}
+.stat-val{font-size:22px;font-weight:800;font-family:var(--mono)}.stat-lbl{font-size:8px;color:var(--t4);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+/* Filters */
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-grp{display:flex;gap:2px;background:var(--bg3);border-radius:6px;padding:2px;border:1px solid var(--border)}
+.fbtn{padding:6px 12px;border:none;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--mono);cursor:pointer;background:transparent;color:var(--t4);transition:all .15s}.fbtn:hover{color:var(--t2)}.fbtn.on{background:rgba(0,255,136,.1);color:var(--accent)}
+.fbtn.green{color:#22c55e}.fbtn.yellow{color:#f59e0b}.fbtn.blue{color:#00c8ff}.fbtn.red{color:#ef4444}
+.fbtn.green.on{background:rgba(34,197,94,.15)}.fbtn.yellow.on{background:rgba(245,158,11,.15)}.fbtn.blue.on{background:rgba(0,200,255,.15)}.fbtn.red.on{background:rgba(239,68,68,.12)}
+.srch{padding:8px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:11px;width:200px}.srch:focus{outline:none;border-color:var(--accent)}
+.quad-pill{display:inline-block;padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;font-family:var(--mono);min-width:70px;text-align:center}
+.quad-pill.Leading{background:rgba(34,197,94,.15);color:#22c55e}.quad-pill.Weakening{background:rgba(245,158,11,.15);color:#f59e0b}.quad-pill.Improving{background:rgba(0,200,255,.15);color:#00c8ff}.quad-pill.Lagging{background:rgba(239,68,68,.12);color:#ef4444}.quad-pill.Unknown{background:var(--bg4);color:var(--t4)}
+.signal-dot{width:10px;height:10px;border-radius:50%;display:inline-block}.signal-dot.GREEN{background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.5)}.signal-dot.YELLOW{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.5)}.signal-dot.BLUE{background:#00c8ff;box-shadow:0 0 6px rgba(0,200,255,.5)}.signal-dot.RED{background:#ef4444;box-shadow:0 0 4px rgba(239,68,68,.3)}
+.signal-tag{padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;font-family:var(--mono);letter-spacing:.5px}
+.signal-tag.GREEN{background:rgba(34,197,94,.15);color:#22c55e}.signal-tag.YELLOW{background:rgba(245,158,11,.15);color:#f59e0b}.signal-tag.BLUE{background:rgba(0,200,255,.15);color:#00c8ff}.signal-tag.RED{background:rgba(239,68,68,.1);color:#ef4444}
+.score-bar{display:flex;gap:2px}.score-pip{width:8px;height:8px;border-radius:2px;background:var(--bg4)}.score-pip.lit{background:var(--accent)}
+/* Table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--bg2)}
+table{width:100%;border-collapse:collapse;min-width:1100px}
+thead{position:sticky;top:0;z-index:10}
+th{padding:10px 8px;background:rgba(0,0,0,.4);border-bottom:2px solid var(--border);font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;cursor:pointer;white-space:nowrap;user-select:none}
+th:hover{color:#fff}th .sort-arrow{margin-left:3px;font-size:8px;opacity:.5}th.sorted .sort-arrow{opacity:1;color:var(--accent)}
+td{padding:8px;border-bottom:1px solid var(--border);font-size:11px;white-space:nowrap}
+tr{transition:background .1s}tr:hover{background:rgba(0,255,136,.03)}
+tr.row-green{border-left:3px solid #22c55e}tr.row-yellow{border-left:3px solid #f59e0b}tr.row-blue{border-left:3px solid #00c8ff}tr.row-red{border-left:3px solid rgba(239,68,68,.3)}
+.sym-cell{font-family:var(--mono);font-weight:700;color:var(--accent);cursor:pointer;font-size:12px}.sym-cell:hover{text-decoration:underline}
+.nm-cell{font-size:9px;color:var(--t4);max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.num{font-family:var(--mono);font-size:11px;text-align:right}.up{color:#22c55e}.dn{color:#ef4444}
+.grade{display:inline-block;width:20px;height:20px;border-radius:4px;text-align:center;line-height:20px;font-size:10px;font-weight:800;font-family:var(--mono)}
+.grade.A{background:rgba(34,197,94,.2);color:#22c55e}.grade.B{background:rgba(0,200,255,.2);color:#00c8ff}.grade.C{background:rgba(245,158,11,.2);color:#f59e0b}.grade.D,.grade.F{background:rgba(239,68,68,.15);color:#ef4444}
+.sector-pill{font-size:8px;padding:2px 6px;background:var(--bg4);border-radius:3px;color:var(--t4)}
+.meta-bar{display:flex;justify-content:space-between;padding:10px 0;font-size:10px;color:var(--t4);font-family:var(--mono)}
+.legend{display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--t3);font-family:var(--mono)}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;color:var(--t4)}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:768px){.stats{gap:6px}.stat-card{min-width:70px;padding:8px 10px}.stat-val{font-size:16px}.srch{width:140px}}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div>
+    <div class="logo">RRM SCANNER</div>
+    <div class="logo-sub">Relative Rotation Matrix · Daily / Weekly / Monthly</div>
+  </div>
+  <div class="nav-links">
+    <a href="matrix.html" class="nav-link">MATRIX</a>
+    <a href="scanner-builder.html" class="nav-link">Scanner</a>
+    <a href="watchlist.html" class="nav-link">Watchlist</a>
+  </div>
+</header>
+
+<main class="main">
+  <div id="content"><div class="loading"><div class="spinner"></div>Loading RRM Scanner data...</div></div>
+</main>
+
+<script>
+const DATA_URL='data/rrm_scanner.json';
+let allStocks=[],filtered=[],sortCol='score',sortDir=-1;
+let filterSignal=null,filterQuad=null,searchQ='';
+
+async function init(){
+  try{
+    const r=await fetch(DATA_URL);if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();allStocks=d.stocks||[];
+    render(d.meta);
+  }catch(e){
+    document.getElementById('content').innerHTML='<div class="loading"><div style="font-size:32px;margin-bottom:16px">⚠️</div><div>RRM Scanner data not available</div><div style="font-size:10px;margin-top:8px;color:var(--t4)">Run the GitHub Action first: Actions → RRM Scanner Daily → Run workflow</div></div>';
+  }
+}
+
+function render(meta){
+  const c=document.getElementById('content');
+  const sd=meta?.signal_distribution||{};const qd=meta?.quadrant_distribution||{};
+  c.innerHTML=`
+    <div class="stats">
+      <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${allStocks.length}</div><div class="stat-lbl">Stocks</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#22c55e">${sd.GREEN||0}</div><div class="stat-lbl">🟢 Green</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#f59e0b">${sd.YELLOW||0}</div><div class="stat-lbl">🟡 Yellow</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#00c8ff">${sd.BLUE||0}</div><div class="stat-lbl">🔵 Blue</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#ef4444">${sd.RED||0}</div><div class="stat-lbl">🔴 Red</div></div>
+      <div class="stat-card"><div class="stat-val">${qd.Leading||0}</div><div class="stat-lbl">Leading</div></div>
+      <div class="stat-card"><div class="stat-val">${qd.Improving||0}</div><div class="stat-lbl">Improving</div></div>
+      <div style="margin-left:auto;font-size:9px;color:var(--t4);font-family:var(--mono);text-align:right"><div>Updated: ${meta?.generated_at?new Date(meta.generated_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}):'—'}</div><div>Benchmark: ${meta?.benchmark||'—'}</div></div>
+    </div>
+
+    <div class="filters">
+      <div class="filter-grp">
+        <button class="fbtn on" data-sig="ALL">ALL</button>
+        <button class="fbtn green" data-sig="GREEN">🟢 GREEN</button>
+        <button class="fbtn yellow" data-sig="YELLOW">🟡 YELLOW</button>
+        <button class="fbtn blue" data-sig="BLUE">🔵 BLUE</button>
+        <button class="fbtn red" data-sig="RED">🔴 RED</button>
+      </div>
+      <div class="filter-grp">
+        <button class="fbtn on" data-quad="ALL">ALL</button>
+        <button class="fbtn" data-quad="Leading">Leading</button>
+        <button class="fbtn" data-quad="Improving">Improving</button>
+        <button class="fbtn" data-quad="Weakening">Weakening</button>
+        <button class="fbtn" data-quad="Lagging">Lagging</button>
+      </div>
+      <input type="text" class="srch" id="srch" placeholder="Search symbol..." autocomplete="off">
+      <div style="margin-left:auto;font-size:10px;color:var(--t4);font-family:var(--mono)" id="countLbl"></div>
+    </div>
+
+    <div class="legend">
+      <div class="leg-item"><span class="signal-dot GREEN"></span>GREEN — M+W+D right side</div>
+      <div class="leg-item"><span class="signal-dot YELLOW"></span>YELLOW — M strong, W dip, D ↑</div>
+      <div class="leg-item"><span class="signal-dot BLUE"></span>BLUE — W+D strong, no M backing</div>
+      <div class="leg-item"><span class="signal-dot RED"></span>RED — Structural weakness</div>
+      <div class="leg-item" style="margin-left:auto;color:var(--t4)">Score 4-5 = High conviction · Click header to sort</div>
+    </div>
+
+    <div class="tbl-wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+    <div class="meta-bar"><span id="showCount"></span><span>◈ TradEdge RRM Scanner v1.0</span></div>
+  `;
+
+  // Wire filters
+  document.querySelectorAll('[data-sig]').forEach(b=>{b.onclick=()=>{
+    filterSignal=b.dataset.sig==='ALL'?null:b.dataset.sig;
+    b.closest('.filter-grp').querySelectorAll('.fbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    applyFilters();
+  }});
+  document.querySelectorAll('[data-quad]').forEach(b=>{b.onclick=()=>{
+    filterQuad=b.dataset.quad==='ALL'?null:b.dataset.quad;
+    b.closest('.filter-grp').querySelectorAll('.fbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    applyFilters();
+  }});
+  document.getElementById('srch').oninput=e=>{searchQ=e.target.value.trim().toUpperCase();applyFilters()};
+
+  renderHead();applyFilters();
+}
+
+const COLS=[
+  {k:'signal',l:'SIG',w:'50px',align:'center'},
+  {k:'score',l:'SCORE',w:'60px',align:'center'},
+  {k:'symbol',l:'STOCK',w:'140px'},
+  {k:'sector',l:'SECTOR',w:'100px'},
+  {k:'cmp',l:'CMP',w:'80px',align:'right'},
+  {k:'change_pct',l:'CHG%',w:'65px',align:'right'},
+  {k:'m_quad',l:'MONTHLY',w:'85px',align:'center'},
+  {k:'w_quad',l:'WEEKLY',w:'85px',align:'center'},
+  {k:'d_quad',l:'DAILY',w:'85px',align:'center'},
+  {k:'composite_score',l:'O\'NEIL',w:'55px',align:'center'},
+  {k:'oneil_grade',l:'GRD',w:'40px',align:'center'},
+  {k:'rsi',l:'RSI',w:'45px',align:'right'},
+  {k:'volume_ratio',l:'VOLR',w:'50px',align:'right'},
+];
+
+function renderHead(){
+  const thead=document.getElementById('thead');
+  thead.innerHTML='<tr>'+COLS.map(c=>'<th style="width:'+c.w+';text-align:'+(c.align||'left')+'" data-col="'+c.k+'" class="'+(sortCol===c.k?'sorted':'')+'">'+c.l+'<span class="sort-arrow">'+(sortCol===c.k?(sortDir>0?'▲':'▼'):'⇅')+'</span></th>').join('')+'</tr>';
+  thead.querySelectorAll('th').forEach(th=>{th.onclick=()=>{
+    const col=th.dataset.col;if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=-1;}
+    renderHead();renderRows();
+  }});
+}
+
+function applyFilters(){
+  filtered=allStocks.filter(s=>{
+    if(filterSignal&&s.signal!==filterSignal)return false;
+    if(filterQuad){if(s.d_quad!==filterQuad&&s.w_quad!==filterQuad&&s.m_quad!==filterQuad)return false;}
+    if(searchQ&&!s.symbol?.toUpperCase().includes(searchQ)&&!s.name?.toUpperCase().includes(searchQ)&&!s.sector?.toUpperCase().includes(searchQ))return false;
+    return true;
+  });
+  renderRows();
+}
+
+function renderRows(){
+  // Sort
+  const quadOrder={Leading:0,Improving:1,Weakening:2,Lagging:3,Unknown:4};
+  const sigOrder={GREEN:0,YELLOW:1,BLUE:2,RED:3};
+  filtered.sort((a,b)=>{
+    let va=a[sortCol],vb=b[sortCol];
+    if(sortCol==='signal'){va=sigOrder[va]??9;vb=sigOrder[vb]??9;}
+    else if(sortCol.includes('quad')){va=quadOrder[va]??9;vb=quadOrder[vb]??9;}
+    else if(sortCol==='oneil_grade'){const go={A:0,B:1,C:2,D:3,F:4,'':5};va=go[va]??9;vb=go[vb]??9;}
+    else{va=va??-999;vb=vb??-999;}
+    if(va<vb)return -1*sortDir;if(va>vb)return sortDir;return 0;
+  });
+
+  const tbody=document.getElementById('tbody');
+  const show=filtered.slice(0,500);
+  tbody.innerHTML=show.map(s=>{
+    const chgCls=(s.change_pct||0)>=0?'up':'dn';
+    const scorePips=Array.from({length:5},(_,i)=>'<div class="score-pip'+(i<(s.score||0)?' lit':'')+'"></div>').join('');
+    return'<tr class="row-'+s.signal+'" onclick="go(\''+s.symbol+'\')">'+
+      '<td style="text-align:center"><span class="signal-dot '+s.signal+'"></span> <span class="signal-tag '+s.signal+'">'+s.signal+'</span></td>'+
+      '<td style="text-align:center"><div class="score-bar" title="Score: '+(s.score||0)+'/5">'+scorePips+'</div></td>'+
+      '<td><div class="sym-cell">'+s.symbol+'</div><div class="nm-cell">'+(s.name||'')+'</div></td>'+
+      '<td><span class="sector-pill">'+(s.sector||'—')+'</span></td>'+
+      '<td class="num">₹'+(s.cmp?s.cmp.toLocaleString('en-IN',{maximumFractionDigits:1}):'—')+'</td>'+
+      '<td class="num '+chgCls+'">'+(s.change_pct!=null?(s.change_pct>=0?'+':'')+s.change_pct.toFixed(1)+'%':'—')+'</td>'+
+      '<td style="text-align:center"><span class="quad-pill '+(s.m_quad||'Unknown')+'">'+(s.m_quad||'—')+'</span></td>'+
+      '<td style="text-align:center"><span class="quad-pill '+(s.w_quad||'Unknown')+'">'+(s.w_quad||'—')+'</span></td>'+
+      '<td style="text-align:center"><span class="quad-pill '+(s.d_quad||'Unknown')+'">'+(s.d_quad||'—')+'</span></td>'+
+      '<td class="num" style="text-align:center">'+(s.composite_score||'—')+'</td>'+
+      '<td style="text-align:center">'+(s.oneil_grade?'<span class="grade '+s.oneil_grade+'">'+s.oneil_grade+'</span>':'—')+'</td>'+
+      '<td class="num" style="color:'+(s.rsi>70?'var(--red)':s.rsi<30?'var(--green)':'var(--t2)')+'">'+(s.rsi?s.rsi.toFixed(0):'—')+'</td>'+
+      '<td class="num" style="color:'+(s.volume_ratio>=1.5?'var(--green)':'var(--t3)')+'">'+(s.volume_ratio?s.volume_ratio.toFixed(1)+'x':'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  document.getElementById('showCount').textContent='Showing '+show.length+' of '+filtered.length+(filtered.length<allStocks.length?' (filtered from '+allStocks.length+')':'');
+}
+
+function go(sym){window.open('stock.html?s='+sym,'_blank');}
+
+init();
+</script>
+</body>
+</html>
