@@ -302,8 +302,8 @@ def load_symbols(top_n=None, specific=None):
 
     # Sort by market cap and take top N
     if top_n:
-        stocks.sort(key=lambda x: x.get("market_cap_cr", 0), reverse=True)
-        stocks = stocks[:top_n]
+     stocks.sort(key=lambda x: x.get("market_cap_cr") or 0, reverse=True)
+      stocks = stocks[:top_n]
         print(f"  Filtered to top {top_n} by market cap")
 
     return stocks
