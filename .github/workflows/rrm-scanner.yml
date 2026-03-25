@@ -1,0 +1,51 @@
+name: RRM Scanner Daily
+
+on:
+  schedule:
+    - cron: '30 12 * * 1-5'  # 6:00 PM IST (12:30 UTC) Mon-Fri
+  workflow_dispatch:
+    inputs:
+      top_n:
+        description: 'Top N stocks by market cap (blank = all)'
+        required: false
+        default: ''
+      symbols:
+        description: 'Specific symbols (comma-separated, blank = all)'
+        required: false
+        default: ''
+
+jobs:
+  rrm-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance pandas numpy
+
+      - name: Run RRM Scanner
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.top_n }}" ]; then
+            ARGS="$ARGS --top ${{ github.event.inputs.top_n }}"
+          fi
+          if [ -n "${{ github.event.inputs.symbols }}" ]; then
+            ARGS="$ARGS --symbols ${{ github.event.inputs.symbols }}"
+          fi
+          python scripts/rrm_scanner.py $ARGS
+
+      - name: Commit & Push
+        run: |
+          git config user.name "TradEdge Bot"
+          git config user.email "bot@tradedge.dev"
+          git add data/rrm_scanner.json
+          git diff --cached --quiet || git commit -m "RRM Scanner $(date +'%Y-%m-%d %H:%M IST')"
+          git push
