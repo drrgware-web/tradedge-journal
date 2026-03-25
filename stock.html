@@ -205,19 +205,19 @@ function renderMetrics(){
     '</div></div>':'<div class="card"><div class="card-h"><span class="card-t">📊 RATINGS</span></div><div class="card-b" style="text-align:center;padding:30px;color:var(--t4);font-size:12px">Scanner data not available for this stock</div></div>')+
     // RIGHT: Fundamental Metrics
     '<div class="card"><div class="card-h"><span class="card-t">💰 FUNDAMENTALS</span></div><div class="card-b"><div class="met-grid">'+
-      [{l:'Market Cap',v:'₹'+fmtCr(f.market_cap_cr)+'Cr'},
-       {l:'P/E',v:f.pe_ratio?fmt(f.pe_ratio,1):'—'},
-       {l:'P/B',v:f.pb_ratio?fmt(f.pb_ratio,2):'—'},
-       {l:'ROE',v:f.roe?fmt(f.roe,1)+'%':'—'},
-       {l:'ROCE',v:f.roce?fmt(f.roce,1)+'%':'—'},
-       {l:'D/E',v:deDisplay},
-       {l:'Div Yield',v:f.dividend_yield?fmt(f.dividend_yield,2)+'%':'—'},
-       {l:'Book Value',v:f.book_value?'₹'+fmt(f.book_value,0):'—'},
-       {l:'EPS',v:f.eps?'₹'+fmt(f.eps,2):'—'},
-       {l:'Rev Growth',v:revGrowth?fmtP(revGrowth):'—'},
-       {l:'Profit Margin',v:profitMargin?fmt(profitMargin,1)+'%':'—'},
-       {l:'Red Flags',v:sc.red_flag_count!=null?sc.red_flag_count+'':'—'}
-      ].map(m=>'<div class="met-box"><div class="met-v">'+m.v+'</div><div class="met-l">'+m.l+'</div></div>').join('')+
+      [{l:'Market Cap',v:'₹'+fmtCr(f.market_cap_cr)+'Cr',c:''},
+       {l:'P/E',v:f.pe_ratio?fmt(f.pe_ratio,1):'—',c:f.pe_ratio>40?'var(--red)':f.pe_ratio>25?'var(--amber)':f.pe_ratio>0?'var(--green)':''},
+       {l:'P/B',v:f.pb_ratio?fmt(f.pb_ratio,2):'—',c:f.pb_ratio>5?'var(--red)':f.pb_ratio>3?'var(--amber)':f.pb_ratio>0?'var(--green)':''},
+       {l:'ROE',v:f.roe?fmt(f.roe,1)+'%':'—',c:f.roe>15?'var(--green)':f.roe>0?'var(--amber)':f.roe<0?'var(--red)':''},
+       {l:'ROCE',v:f.roce?fmt(f.roce,1)+'%':'—',c:f.roce>15?'var(--green)':f.roce>0?'var(--amber)':f.roce<0?'var(--red)':''},
+       {l:'D/E',v:deDisplay,c:deRaw!=null?(deRaw>100?'var(--red)':deRaw>50?'var(--amber)':'var(--green)'):''},
+       {l:'Div Yield',v:f.dividend_yield?fmt(f.dividend_yield,2)+'%':'—',c:f.dividend_yield>3?'var(--green)':f.dividend_yield>1?'var(--accent2)':''},
+       {l:'Book Value',v:f.book_value?'₹'+fmt(f.book_value,0):'—',c:''},
+       {l:'EPS',v:f.eps?'₹'+fmt(f.eps,2):'—',c:f.eps>0?'var(--green)':f.eps<0?'var(--red)':''},
+       {l:'Rev Growth',v:revGrowth?fmtP(revGrowth):'—',c:revGrowth>15?'var(--green)':revGrowth>0?'var(--accent2)':revGrowth<0?'var(--red)':''},
+       {l:'Profit Margin',v:profitMargin?fmt(profitMargin,1)+'%':'—',c:profitMargin>15?'var(--green)':profitMargin>5?'var(--accent2)':profitMargin>0?'var(--amber)':profitMargin<0?'var(--red)':''},
+       {l:'Red Flags',v:'<span id="metRedFlags">—</span>',c:'',raw:true}
+      ].map(m=>'<div class="met-box"><div class="met-v" style="'+(m.c?'color:'+m.c:'')+'">'+m.v+'</div><div class="met-l">'+m.l+'</div></div>').join('')+
     '</div></div></div>'+
   '</div></div>';
 }
@@ -293,6 +293,8 @@ function renderSurv(){
     if(sc.surveillance_status&&sc.surveillance_status!=='normal'){checks.find(c=>c.key==='asm').f=true;}
   }
   const rc=checks.filter(c=>c.f).length;const st=rc===0?'safe':rc<=2?'caution':'danger';
+  // Sync red flag count to Key Metrics after a tick (DOM needs to exist first)
+  setTimeout(()=>{const el=$('metRedFlags');if(el){el.textContent=rc;el.style.color=rc===0?'var(--green)':rc<=2?'var(--amber)':'var(--red)';}},50);
   return'<div class="sec-t">Surveillance</div><div class="card"><div class="card-h"><span class="card-t">🛡️ SURVEILLANCE</span></div><div class="card-b"><div class="surv-st '+st+'">'+(rc===0?'✓ All Clear':'⚠ '+rc+' Red Flag'+(rc>1?'s':''))+'</div><div class="surv-grid">'+checks.map(c=>'<div class="surv-item '+(c.f?'fail':'')+'"><span class="surv-icon">'+(c.f?'🚩':'✓')+'</span><span class="surv-text">'+c.n+'</span></div>').join('')+'</div></div></div>';
 }
 
