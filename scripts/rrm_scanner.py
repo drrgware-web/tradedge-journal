@@ -31,10 +31,11 @@ try:
     import numpy as np
 except ImportError:
     print("Installing dependencies...")
-    os.system("pip install yfinance pandas numpy --break-system-packages -q")
-    import yfinance as yf
+    os.system("pip install pandas numpy requests --break-system-packages -q")
     import pandas as pd
     import numpy as np
+
+import requests
 
 # ════════════════════════════════════════════════════════════════
 #  CONFIG
@@ -174,25 +175,47 @@ def compute_score(d_quad, w_quad, m_quad, signal):
 #  DATA FETCHING
 # ════════════════════════════════════════════════════════════════
 
+# Worker URL for Yahoo Finance proxy (avoids Yahoo blocking GitHub Actions IPs)
+WORKER_URL = os.environ.get("WORKER_URL", "https://spring-fire-41a0.drrgware.workers.dev")
+
 def fetch_closes(ticker: str, tf_key: str) -> list:
-    """Fetch closing prices from Yahoo Finance for given timeframe."""
+    """Fetch closing prices via Cloudflare worker."""
     tf = TIMEFRAMES[tf_key]
     try:
-        data = yf.download(
-            ticker,
-            period=tf["range"],
-            interval=tf["interval"],
-            progress=False,
-            timeout=10,
-        )
-        if data is None or data.empty:
+        # For index tickers (^NSEI etc) or tickers with dots, use yahoo-proxy with raw ticker
+        # For stock symbols (RELIANCE), use yahoo-chart which auto-adds .NS
+        is_index = ticker.startswith("^") or ticker.startswith("%5E")
+        is_ns = ticker.endswith(".NS")
+
+        if is_index or is_ns:
+            # Use yahoo-proxy with raw ticker (no .NS manipulation)
+            resp = requests.post(
+                WORKER_URL,
+                json={"ticker": ticker, "range": tf["range"], "interval": tf["interval"]},
+                headers={"X-Kite-Action": "yahoo-proxy", "Content-Type": "application/json"},
+                timeout=15,
+            )
+            if not resp.ok:
+                return []
+            data = resp.json()
+            result = data.get("chart", {}).get("result", [{}])[0]
+            closes_raw = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+            return [float(c) for c in closes_raw if c is not None and not math.isnan(float(c))]
+        else:
+            # Use yahoo-chart for stocks (auto-adds .NS, returns pre-parsed)
+            resp = requests.post(
+                WORKER_URL,
+                json={"symbol": ticker.replace(".NS", ""), "range": tf["range"], "interval": tf["interval"]},
+                headers={"X-Kite-Action": "yahoo-chart", "Content-Type": "application/json"},
+                timeout=15,
+            )
+            if resp.ok:
+                data = resp.json()
+                prices = data.get("prices", [])
+                if prices:
+                    return [p["c"] for p in prices if p.get("c") is not None]
             return []
-        closes = data["Close"].dropna().tolist()
-        # Handle MultiIndex columns from yfinance
-        if isinstance(closes[0], (list, tuple)):
-            closes = [c[0] if isinstance(c, (list, tuple)) else c for c in closes]
-        return [float(c) for c in closes if not math.isnan(c)]
-    except Exception:
+    except Exception as e:
         return []
 
 
