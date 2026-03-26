@@ -739,31 +739,145 @@ function getMoneyProfile(sig) {
   return 'NO MONEY';
 }
 
-// ═══ DATA LOADER ═══
+// ═══ SCANNER DATA PARSER (rrm_scanner.json → Stage 5 Edge Intel) ═══
+function parseScannerData(d, sectors) {
+  const stocks = d.stocks || d || [];
+  const meta = d.meta || {};
+  if (!Array.isArray(stocks) || stocks.length === 0) return { picks: [], pipeline: {}, allScanned: [] };
+
+  // Leading/Improving sectors from Stage 3
+  const bullSectors = [...(sectors?.leading || []), ...(sectors?.improving || [])].map(s => s.toLowerCase());
+
+  // ── FILTER PIPELINE ──
+  const total = stocks.length;
+
+  // Step 1: PERFECT or high sweet (≥ 9)
+  const sweet = stocks.filter(s => s.sweet >= 9);
+
+  // Step 2: GREEN or YELLOW signal only
+  const signaled = sweet.filter(s => s.signal === 'GREEN' || s.signal === 'YELLOW');
+
+  // Step 3: Monthly quad = Leading
+  const mLeading = signaled.filter(s => s.m_quad === 'Leading');
+
+  // Step 4: Weekly quad = Leading or Improving
+  const wBull = mLeading.filter(s => s.w_quad === 'Leading' || s.w_quad === 'Improving');
+
+  // Step 5: Daily quad = Leading or Improving
+  const dBull = wBull.filter(s => s.d_quad === 'Leading' || s.d_quad === 'Improving');
+
+  // Step 6: Sector alignment (if sector data available, prefer stocks in leading sectors)
+  // Don't hard-filter here — instead boost score for aligned sectors
+  const scored = dBull.map(s => {
+    let boost = 0;
+    const secLower = (s.sector || '').toLowerCase();
+    // Check if stock's sector matches any leading/improving sector name
+    if (bullSectors.some(bs => secLower.includes(bs) || bs.includes(secLower.replace('nifty ', '')))) boost += 10;
+    // O'Neil grade boost
+    const gradeBoost = s.oneil_grade === 'A+' ? 20 : s.oneil_grade === 'A' ? 15 : s.oneil_grade === 'B' ? 10 : s.oneil_grade === 'C' ? 5 : 0;
+    // Composite score + sweet + signal + grade
+    const totalScore = (s.composite_score || 0) + (s.sweet || 0) * 3 + (s.signal === 'GREEN' ? 10 : 5) + gradeBoost + boost + (s.eps_strength || 0) * 0.1 + (s.volume_ratio > 1.5 ? 5 : 0);
+    return { ...s, _totalScore: totalScore };
+  });
+
+  // Sort by total score descending, then by sweet, then by composite
+  scored.sort((a, b) => b._totalScore - a._totalScore || b.sweet - a.sweet || b.composite_score - a.composite_score);
+
+  // Take top 20 picks
+  const topPicks = scored.slice(0, 20).map((s, i) => {
+    // Determine RS tier
+    const rank = i + 1;
+    const rsTier = rank <= Math.ceil(scored.length * 0.1) ? 'top10' : rank <= Math.ceil(scored.length * 0.25) ? 'top25' : 'top50';
+
+    // Determine pyramid level from existing positions
+    // (will be computed live in openOrderBuilder, not hardcoded here)
+
+    return {
+      symbol: s.symbol,
+      name: s.name || s.symbol,
+      sector: s.sector || 'Unknown',
+      cmp: s.cmp,
+      changePct: s.change_pct,
+      entry: s.cmp, // Current price as entry reference
+      stop: Math.round(s.cmp * 0.92 * 100) / 100, // Default 8% SL
+      target1: Math.round(s.cmp * 1.15 * 100) / 100, // 15% target
+      target2: Math.round(s.cmp * 1.25 * 100) / 100, // 25% target
+      rr: '2.0:1',
+      grade: s.oneil_grade || '-',
+      oneilScore: s.composite_score || 0,
+      epsStrength: s.eps_strength || 0,
+      priceStrength: s.price_strength || 0,
+      rsRank: rank,
+      rsTier,
+      pattern: `Sweet ${s.sweet_label || s.sweet}`,
+      catalyst: s.signal === 'GREEN' ? 'MTF Aligned' : 'Partial Align',
+      rrmQuad: s.m_quad || 'Unknown',
+      signal: s.signal,
+      sweet: s.sweet,
+      sweetLabel: s.sweet_label || '',
+      mQuad: s.m_quad, wQuad: s.w_quad, dQuad: s.d_quad,
+      mRsi: s.m_rsi, wRsi: s.w_rsi, dRsi: s.d_rsi,
+      marketCap: s.market_cap_cr,
+      volumeRatio: s.volume_ratio,
+      fundHolding: '', // Will be enriched from scanner_results.json later
+      slLadder: { initial: Math.round(s.cmp * 0.92 * 100) / 100 },
+      atr: { atr14: Math.round(s.cmp * 0.025 * 100) / 100 }, // Approximate 2.5% ATR
+    };
+  });
+
+  const pipeline = {
+    total,
+    sweet: sweet.length,
+    signaled: signaled.length,
+    mLeading: mLeading.length,
+    wBull: wBull.length,
+    dBull: dBull.length,
+    final: topPicks.length,
+    meta: {
+      generated: meta.generated_at || '',
+      benchmark: meta.benchmark || '',
+      version: meta.version || '',
+      signals: meta.signal_distribution || {},
+      sweetDist: meta.sweet_distribution || {},
+      quadrants: meta.quadrant_distribution || {},
+    }
+  };
+
+  log_info(`Scanner: ${total} → sweet≥9: ${sweet.length} → GREEN/YELLOW: ${signaled.length} → M-Leading: ${mLeading.length} → W-bull: ${wBull.length} → D-bull: ${dBull.length} → Top ${topPicks.length} picks`);
+
+  return { picks: topPicks, pipeline, allScanned: scored };
+}
 async function loadData() {
   try {
-    const [rrmRes, mpsRes, mpsHistRes] = await Promise.allSettled([
+    const [rrmRes, mpsRes, mpsHistRes, scanRes] = await Promise.allSettled([
       fetch(CONFIG.dataRoot + CONFIG.rrmFile).then(r => r.ok ? r.json() : null),
       fetch(CONFIG.dataRoot + CONFIG.mpsFile).then(r => r.ok ? r.json() : null),
       fetch(CONFIG.dataRoot + 'mps_history.json').then(r => r.ok ? r.json() : null),
+      fetch(CONFIG.dataRoot + 'rrm_scanner.json').then(r => r.ok ? r.json() : null),
     ]);
     const rrmData = rrmRes.status==='fulfilled' ? rrmRes.value : null;
     const mpsData = mpsRes.status==='fulfilled' ? mpsRes.value : null;
     const mpsHistory = mpsHistRes.status==='fulfilled' ? mpsHistRes.value : null;
+    const scanData = scanRes.status==='fulfilled' ? scanRes.value : null;
     if (rrmData) {
       state.sectors = parseRRMSectors(rrmData);
       state.etfs = parseRRMETFs(rrmData);
       state.helix = parseHelixFromRRM(rrmData);
     }
     if (mpsData) { state.mps = parseMPSData(mpsData, mpsHistory); }
+    if (scanData) {
+      const result = parseScannerData(scanData, state.sectors);
+      state.topPicks = result.picks;
+      state.pipeline = result.pipeline;
+      state.allScanned = result.allScanned;
+    }
   } catch(e) { console.log('Live data unavailable, using demo:', e); }
   if (!state.mps) state.mps = DEMO.mps;
   if (!state.sectors) state.sectors = DEMO.sectors;
   if (!state.etfs || state.etfs.length === 0) state.etfs = DEMO.etfs;
   if (!state.helix) state.helix = DEMO.helix;
+  if (!state.topPicks || state.topPicks.length === 0) { state.topPicks = DEMO.topPicks; state.pipeline = DEMO.scannerPipeline; }
   state.assetAllocation = computeAssetAllocation(state.mps);
-  state.topPicks = DEMO.topPicks;
-  state.pipeline = DEMO.scannerPipeline;
   state.loading = false;
   render();
 }
@@ -1111,8 +1225,8 @@ function render() {
     </div>
 
     <div class="pipeline-footer">
-      <div class="pipeline-stats">PIPELINE: <span class="hl-cyan">${state.pipeline.universe}</span> stocks → <span class="hl-amber">${state.pipeline.hotSectors}</span> hot sectors → <span class="hl-green">${state.pipeline.screened}</span> screened → <span class="${state.pipeline.topPicks>0?'hl-green':'hl-red'}">${state.pipeline.topPicks} top picks</span></div>
-      <div class="pipeline-meta">MPS: <strong>${prof}</strong> (${g.mpsScore}) · Market: <strong style="color:${g.mpsSignal==='RISK-ON'?'var(--green)':g.mpsSignal==='CAUTION'?'var(--amber)':'var(--red)'}">${g.mpsSignal}</strong> · Leading: <strong>${state.sectors.leading.length}</strong> · ${ts}</div>
+      <div class="pipeline-stats">PIPELINE: <span class="hl-cyan">${state.pipeline.total || state.pipeline.universe || '?'}</span> stocks → <span class="hl-amber">Sweet≥9: ${state.pipeline.sweet || '?'}</span> → <span class="hl-green">GREEN/YELLOW: ${state.pipeline.signaled || state.pipeline.screened || '?'}</span> → <span class="hl-cyan">M-Leading: ${state.pipeline.mLeading || '?'}</span> → <span class="${(state.pipeline.final||state.pipeline.topPicks)>0?'hl-green':'hl-red'}">${state.pipeline.final || state.pipeline.topPicks || 0} top picks</span></div>
+      <div class="pipeline-meta">MPS: <strong>${prof}</strong> (${g.mpsScore}) · Market: <strong style="color:${g.mpsSignal==='RISK-ON'?'var(--green)':g.mpsSignal==='CAUTION'?'var(--amber)':'var(--red)'}">${g.mpsSignal}</strong> · Leading: <strong>${state.sectors.leading.length}</strong> · ${ts}${state.pipeline.meta?.generated ? ` · Scanner: ${state.pipeline.meta.generated.split('T')[0]}` : ''}</div>
     </div>
     <div class="disclaimer">TradEdge Edge Pilot v2.0 · Minervini · O'Neil · Definedge Methodology · Not Financial Advice</div>
   `;
@@ -1280,29 +1394,63 @@ function renderHelix(h) {
 }
 
 function renderEdge(picks) {
-  if(!picks||!picks.length) return `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No stocks survive Edge Intel</div><div class="empty-subtitle">Either upstream gates blocked or no stocks pass O'Neil + Catalyst + Surveillance.</div></div>`;
+  if(!picks||!picks.length) return `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No stocks survive Edge Intel</div><div class="empty-subtitle">Either upstream gates blocked or no stocks pass the HELIX filter pipeline.</div></div>`;
+
+  // Pipeline stats banner
+  const p = state.pipeline || {};
+  const pipelineBanner = p.total ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;font-size:10px;font-family:var(--mono)">
+      <span style="padding:3px 8px;background:rgba(34,211,238,0.08);border-radius:4px;color:var(--cyan)">${p.total} Universe</span>
+      <span style="color:var(--text-dim)">→</span>
+      <span style="padding:3px 8px;background:rgba(251,191,36,0.08);border-radius:4px;color:var(--gold)">🌟 ${p.sweet} Sweet≥9</span>
+      <span style="color:var(--text-dim)">→</span>
+      <span style="padding:3px 8px;background:rgba(16,185,129,0.08);border-radius:4px;color:var(--green)">${p.signaled} GREEN/YELLOW</span>
+      <span style="color:var(--text-dim)">→</span>
+      <span style="padding:3px 8px;background:rgba(34,211,238,0.08);border-radius:4px;color:var(--cyan)">M-Lead: ${p.mLeading}</span>
+      <span style="color:var(--text-dim)">→</span>
+      <span style="padding:3px 8px;background:rgba(16,185,129,0.08);border-radius:4px;color:var(--green)">W-Bull: ${p.wBull}</span>
+      <span style="color:var(--text-dim)">→</span>
+      <span style="padding:3px 8px;background:rgba(16,185,129,0.12);border-radius:4px;color:var(--green-bright);font-weight:700">${p.dBull} D-Bull → TOP ${p.final}</span>
+    </div>` : '';
+
   return `
+    ${pipelineBanner}
     <div class="edge-tabs"><button class="edge-tab active">Top Picks (${picks.length})</button><button class="edge-tab">Catalysts</button><button class="edge-tab">Surveillance</button></div>
-    <table class="edge-table"><thead><tr><th>STOCK</th><th>O'NEIL</th><th>RS RANK</th><th>CATALYST</th><th>SURVEILLANCE</th><th>RRM QUAD</th><th>PYRAMID</th><th class="td-right">PATTERN</th></tr></thead><tbody>
-    ${picks.map(p=>{
-      const tier = p.rsTier || 'top50';
-      const tierLabel = tier === 'top10' ? 'TOP 10%' : tier === 'top25' ? 'TOP 25%' : tier === 'top50' ? 'TOP 50%' : 'BOTTOM';
-      const pyLevel = p.pyramidLevel || 'p1';
-      const pyLabel = pyLevel === 'p1' ? 'P1 50%' : pyLevel === 'p2' ? 'P2 +30%' : 'P3 +20%';
+    <div style="overflow-x:auto">
+    <table class="edge-table"><thead><tr>
+      <th>STOCK</th><th>SIG</th><th>SWEET</th><th>O'NEIL</th><th>RS RANK</th>
+      <th>M-QUAD</th><th>W-QUAD</th><th>D-QUAD</th>
+      <th>M-RSI</th><th>W-RSI</th><th>D-RSI</th>
+      <th class="td-right">CMP</th><th class="td-right">CHG%</th>
+    </tr></thead><tbody>
+    ${picks.map(pk => {
+      const tier = pk.rsTier || 'top50';
+      const tierLabel = tier === 'top10' ? 'TOP 10%' : tier === 'top25' ? 'TOP 25%' : 'TOP 50%';
       const sizeMulti = CONFIG.rsRankTiers[tier]?.sizeMultiplier ?? 1;
+      const sigColor = pk.signal === 'GREEN' ? 'var(--green)' : pk.signal === 'YELLOW' ? 'var(--gold)' : pk.signal === 'BLUE' ? 'var(--cyan)' : 'var(--red)';
+      const sweetColor = pk.sweet >= 10 ? 'var(--green-bright)' : pk.sweet >= 9 ? 'var(--green)' : 'var(--amber)';
+      const qColor = q => q === 'Leading' ? 'var(--green)' : q === 'Improving' ? 'var(--cyan)' : q === 'Weakening' ? 'var(--amber)' : 'var(--red)';
+      const chgColor = pk.changePct >= 0 ? 'var(--green)' : 'var(--red-bright)';
+      const gradeClass = pk.grade === 'A+' ? 'a-plus' : pk.grade === 'A' ? 'a' : pk.grade === 'B' ? 'b' : 'c';
+
       return `<tr>
-        <td><div class="stock-name">${p.symbol}</div><div class="stock-sector">${p.sector} · ${p.fundHolding}</div></td>
-        <td><span class="stock-score ${p.grade==='A+'?'a-plus':p.grade==='A'?'a':'b'}">${p.oneilScore} (${p.grade})</span></td>
-        <td><span class="rs-rank ${tier}">RS #${p.rsRank || '—'} ${tierLabel}</span>${sizeMulti !== 1 ? `<div style="font-size:8px;color:var(--text-dim);margin-top:2px">${sizeMulti}x size</div>` : ''}</td>
-        <td><span class="catalyst-badge ${p.catalystPri}">${p.catalyst}</span></td>
-        <td><span class="surv-check ${p.surv}">${p.surv==='clean'?'✓':'⚠'} ${p.survScore}</span></td>
-        <td><span class="sector-pill ${p.rrmQuad.toLowerCase()}">${p.rrmQuad}</span></td>
-        <td><span class="pyramid-badge ${pyLevel}">${pyLabel}</span></td>
-        <td class="td-right" style="font-family:var(--mono);font-size:11px;color:var(--cyan)">${p.pattern}</td>
+        <td><div class="stock-name">${pk.symbol}</div><div class="stock-sector">${pk.sector}${pk.marketCap ? ` · ₹${Math.round(pk.marketCap).toLocaleString()}Cr` : ''}</div></td>
+        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${sigColor}"></span></td>
+        <td><span style="font-family:var(--mono);font-weight:700;color:${sweetColor}">${pk.sweet}</span><div style="font-size:7px;color:var(--text-dim)">${pk.sweetLabel || ''}</div></td>
+        <td><span class="stock-score ${gradeClass}">${pk.oneilScore} (${pk.grade})</span></td>
+        <td><span class="rs-rank ${tier}">RS #${pk.rsRank} ${tierLabel}</span>${sizeMulti !== 1 ? `<div style="font-size:8px;color:var(--text-dim);margin-top:2px">${sizeMulti}x size</div>` : ''}</td>
+        <td><span class="sector-pill" style="color:${qColor(pk.mQuad)};border-color:${qColor(pk.mQuad)}">${pk.mQuad}</span></td>
+        <td><span class="sector-pill" style="color:${qColor(pk.wQuad)};border-color:${qColor(pk.wQuad)}">${pk.wQuad}</span></td>
+        <td><span class="sector-pill" style="color:${qColor(pk.dQuad)};border-color:${qColor(pk.dQuad)}">${pk.dQuad}</span></td>
+        <td style="font-family:var(--mono);font-size:10px;color:${pk.mRsi > 55 ? 'var(--green)' : pk.mRsi > 45 ? 'var(--text-secondary)' : 'var(--red)'}">${pk.mRsi || '—'}</td>
+        <td style="font-family:var(--mono);font-size:10px;color:${pk.wRsi > 55 ? 'var(--green)' : pk.wRsi > 45 ? 'var(--text-secondary)' : 'var(--red)'}">${pk.wRsi || '—'}</td>
+        <td style="font-family:var(--mono);font-size:10px;color:${pk.dRsi > 55 ? 'var(--green)' : pk.dRsi > 45 ? 'var(--text-secondary)' : 'var(--red)'}">${pk.dRsi || '—'}</td>
+        <td class="td-right" style="font-family:var(--mono);font-weight:600">₹${pk.cmp?.toLocaleString() || '—'}</td>
+        <td class="td-right" style="font-family:var(--mono);color:${chgColor}">${pk.changePct >= 0 ? '+' : ''}${pk.changePct?.toFixed(1) || '—'}%</td>
       </tr>`;
     }).join('')}
-    </tbody></table>
-    <div class="alloc-reasoning" style="margin-top:12px"><span class="alloc-reasoning-icon">⚡</span><div class="alloc-reasoning-text"><strong>RS Ranking:</strong> Stocks sorted by relative strength vs their sector index. <strong>Top 10%</strong> get 1.5x normal position size. Top 25% get standard size. Bottom 50% are filtered out. <strong>Pyramiding:</strong> P1 = 50% initial, P2 = add 30% after +5-8% gain at new tight area, P3 = final 20% at +10-15%.</div></div>`;
+    </tbody></table></div>
+    <div class="alloc-reasoning" style="margin-top:12px"><span class="alloc-reasoning-icon">⚡</span><div class="alloc-reasoning-text"><strong>HELIX Filter:</strong> ${p.total || '?'} stocks → PERFECT sweet (≥9) → GREEN/YELLOW signal → Monthly Leading → Weekly bull → Daily bull → <strong>Top ${picks.length} picks</strong> ranked by composite score + O'Neil grade + sector alignment. <strong>RS Ranking:</strong> Top 10% = 1.5x size. <strong>Pyramiding:</strong> P1=50%, P2=+30% at +5-8%, P3=+20% at +10-15%.</div></div>`;
 }
 
 function renderExec(picks) {
