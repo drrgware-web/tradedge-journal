@@ -504,7 +504,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 const CONFIG = {
   dataRoot: 'data/',
   rrmFile: 'rrm_data.json',
-  mpsFile: 'mps_data.json',
+  mpsFile: 'mps_latest.json',
   scannerFile: 'scanner_results.json',
   catalystFile: 'catalyst_alerts.json',
   mps: { riskOn: 70, caution: 40, riskOff: 0 },
@@ -742,18 +742,20 @@ function getMoneyProfile(sig) {
 // ═══ DATA LOADER ═══
 async function loadData() {
   try {
-    const [rrmRes, mpsRes] = await Promise.allSettled([
+    const [rrmRes, mpsRes, mpsHistRes] = await Promise.allSettled([
       fetch(CONFIG.dataRoot + CONFIG.rrmFile).then(r => r.ok ? r.json() : null),
       fetch(CONFIG.dataRoot + CONFIG.mpsFile).then(r => r.ok ? r.json() : null),
+      fetch(CONFIG.dataRoot + 'mps_history.json').then(r => r.ok ? r.json() : null),
     ]);
     const rrmData = rrmRes.status==='fulfilled' ? rrmRes.value : null;
     const mpsData = mpsRes.status==='fulfilled' ? mpsRes.value : null;
+    const mpsHistory = mpsHistRes.status==='fulfilled' ? mpsHistRes.value : null;
     if (rrmData) {
       state.sectors = parseRRMSectors(rrmData);
       state.etfs = parseRRMETFs(rrmData);
       state.helix = parseHelixFromRRM(rrmData);
     }
-    if (mpsData && mpsData.score) { state.mps = mpsData; }
+    if (mpsData) { state.mps = parseMPSData(mpsData, mpsHistory); }
   } catch(e) { console.log('Live data unavailable, using demo:', e); }
   if (!state.mps) state.mps = DEMO.mps;
   if (!state.sectors) state.sectors = DEMO.sectors;
@@ -766,43 +768,219 @@ async function loadData() {
   render();
 }
 
+function parseMPSData(d, externalHistory) {
+  const c = d.current || d;
+  const score = c.final_score ?? c.mps ?? c.score ?? 0;
+  const zone = c.zone || '';
+  const pillars = c.pillar_scores || [];
+  const modifiers = c.modifiers || [];
+  const paradox = c.paradox_alerts || [];
+
+  // Determine trend from history (prefer external mps_history.json)
+  const history = externalHistory || d.history || [];
+  let trend = 'Stable';
+  let weeklyDelta = 0;
+  let prevScore = score;
+  if (Array.isArray(history) && history.length >= 2) {
+    // History is sorted by date, get previous entry
+    const sorted = [...history].sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    const prev = sorted[sorted.length - 2];
+    prevScore = prev?.mps ?? prev?.final_score ?? score;
+    weeklyDelta = Math.round(score - prevScore);
+    trend = weeklyDelta > 5 ? 'Rising' : weeklyDelta < -5 ? 'Declining' : 'Stable';
+  }
+
+  // Map pillars to our component format for Stage 2 display
+  const components = {};
+
+  // Key pillars
+  pillars.forEach(p => {
+    components[p.name] = {
+      value: typeof p.raw_value === 'number' ? (p.name === 'Sentiment' ? `VIX ${p.raw_value.toFixed(1)}` : `${p.raw_value.toFixed(1)}${p.name === 'Structural' || p.name === 'Breadth' || p.name === 'Momentum' ? '%' : ''}`) : String(p.raw_value),
+      signal: p.raw_score >= 60 ? 'bullish' : p.raw_score >= 30 ? 'neutral' : 'bearish',
+      score: p.raw_score,
+      weighted: p.weighted_score,
+    };
+  });
+
+  // Add key raw inputs as components
+  const raw = d.raw_inputs || {};
+  if (raw.nse) {
+    components['Advance / Decline'] = { value: `${raw.nse.advances} / ${raw.nse.declines}`, signal: raw.nse.advances > raw.nse.declines ? 'bullish' : 'bearish' };
+    components['New Highs vs Lows'] = { value: `${raw.nse.new_52w_highs} / ${raw.nse.new_52w_lows}`, signal: raw.nse.new_52w_highs > raw.nse.new_52w_lows ? 'bullish' : 'bearish' };
+    if (raw.nse.fii_net !== undefined) {
+      const fii = raw.nse.fii_net;
+      components['FII Flow (today)'] = { value: `₹${(fii/1).toFixed(0)} Cr`, signal: fii > 0 ? 'bullish' : 'bearish' };
+    }
+  }
+  if (raw.macro) {
+    if (raw.macro.brent_crude) components['Brent Crude'] = { value: `$${raw.macro.brent_crude.toFixed(1)}`, signal: raw.macro.brent_crude > 85 ? 'bearish' : 'bullish' };
+    if (raw.macro.usd_inr) components['USD/INR'] = { value: `₹${raw.macro.usd_inr.toFixed(2)}`, signal: raw.macro.usd_inr > 87 ? 'bearish' : 'neutral' };
+  }
+
+  // State info
+  const st = d.state || {};
+  const fiiConsecSellDays = st.fii_consecutive_sell_days || 0;
+  const fii5dNet = st.fii_5day_net || 0;
+  if (fiiConsecSellDays > 0) {
+    components['FII Sell Streak'] = { value: `${fiiConsecSellDays} days (₹${Math.round(fii5dNet)} Cr 5d)`, signal: fiiConsecSellDays >= 5 ? 'bearish' : 'neutral' };
+  }
+
+  // Active modifiers count
+  const activeModifiers = modifiers.filter(m => m.triggered);
+  const totalPenalty = c.total_modifier || 0;
+
+  log_info(`MPS parsed: score=${score}, zone=${zone}, pillars=${pillars.length}, modifiers=${activeModifiers.length}/${modifiers.length}, penalty=${totalPenalty}`);
+
+  return {
+    score: Math.max(0, Math.round(score)),
+    trend,
+    signal: zone,
+    weeklyDelta,
+    prevWeekScore: prevScore,
+    zone,
+    zoneEmoji: c.zone_emoji || '',
+    zoneAction: c.zone_action || '',
+    riskPerTrade: c.risk_per_trade || '',
+    stateMessage: c.state_message || '',
+    baseScore: c.base_score || 0,
+    totalModifier: totalPenalty,
+    atrRegime: c.atr_regime || '',
+    burstLabel: c.burst_label || '',
+    burstRatio: c.burst_ratio || 0,
+    macroSummary: c.macro_summary || '',
+    paradoxAlerts: paradox,
+    components,
+    pillars,
+    modifiers,
+    activeModifierCount: activeModifiers.length,
+    date: c.date || '',
+  };
+}
+
 function parseRRMSectors(d) {
   const s = { leading:[], improving:[], weakening:[], lagging:[] };
-  const sd = d.sectors || d.Sectoral || {};
-  for (const [n, v] of Object.entries(sd)) {
-    const q = (v.weekly?.quadrant || v.quadrant || '').toLowerCase();
-    if (q.includes('leading')) s.leading.push(n);
-    else if (q.includes('improving')) s.improving.push(n);
-    else if (q.includes('weakening')) s.weakening.push(n);
-    else if (q.includes('lagging')) s.lagging.push(n);
-  }
+  // Actual structure: benchmarks_data.^NSEI.daily.sectors[]
+  const benchmarks = d.benchmarks_data || d;
+  const nsei = benchmarks['^NSEI'] || benchmarks['NSEI'] || Object.values(benchmarks)[0] || {};
+  const daily = nsei.daily || {};
+  const sectors = daily.sectors || [];
+
+  sectors.forEach(sec => {
+    const name = sec.name || sec.symbol || '?';
+    const q = (sec.quadrant || '').toLowerCase();
+    // Clean name: remove "Nifty " prefix for cleaner display
+    const cleanName = name.replace(/^Nifty\s*/i, '');
+    if (q === 'leading') s.leading.push(cleanName);
+    else if (q === 'improving') s.improving.push(cleanName);
+    else if (q === 'weakening') s.weakening.push(cleanName);
+    else if (q === 'lagging') s.lagging.push(cleanName);
+  });
+
   return s;
 }
 
 function parseRRMETFs(d) {
   const etfs = [];
-  // rrm_data.json may have ETFs under 'ETFs' or 'etfs' key
-  const etfData = d.ETFs || d.etfs || d.ETF || {};
-  for (const [symbol, v] of Object.entries(etfData)) {
-    const q = (v.weekly?.quadrant || v.quadrant || '').toLowerCase();
-    let quadrant = 'lagging';
-    if (q.includes('leading')) quadrant = 'leading';
-    else if (q.includes('improving')) quadrant = 'improving';
-    else if (q.includes('weakening')) quadrant = 'weakening';
-    // Match to our master ETF list for name/group
-    const master = RRM_ETFS.find(e => e.symbol === symbol || symbol.includes(e.symbol));
+  const benchmarks = d.benchmarks_data || d;
+  const nsei = benchmarks['^NSEI'] || benchmarks['NSEI'] || Object.values(benchmarks)[0] || {};
+  const daily = nsei.daily || {};
+
+  // Parse ETFs from the etfs[] array
+  const etfData = daily.etfs || [];
+  etfData.forEach(e => {
+    const q = (e.quadrant || '').toLowerCase();
+    const sym = (e.symbol || '').replace('.NS', '');
     etfs.push({
-      symbol,
-      name: master?.name || symbol,
-      group: master?.group || 'Other',
-      quadrant
+      symbol: sym,
+      name: e.name || sym,
+      group: 'ETF',
+      quadrant: q === 'leading' ? 'leading' : q === 'improving' ? 'improving' : q === 'weakening' ? 'weakening' : 'lagging',
+      rsRatio: e.current?.rs_ratio,
+      rsMomentum: e.current?.rs_momentum,
+      rsi: e.current?.rsi,
     });
-  }
-  // If no ETF data in rrm_data.json, fall back to master list with demo quadrants
+  });
+
+  // Also parse thematic_indices[] — they have a "group" field (Sectoral/Thematic)
+  const thematic = daily.thematic_indices || [];
+  thematic.forEach(t => {
+    const q = (t.quadrant || '').toLowerCase();
+    const sym = (t.symbol || '').replace('.NS', '').replace('NIFTY_', '');
+    etfs.push({
+      symbol: sym,
+      name: t.name || sym,
+      group: t.group || 'Thematic',
+      quadrant: q === 'leading' ? 'leading' : q === 'improving' ? 'improving' : q === 'weakening' ? 'weakening' : 'lagging',
+      rsRatio: t.current?.rs_ratio,
+      rsMomentum: t.current?.rs_momentum,
+      rsi: t.current?.rsi,
+    });
+  });
+
   if (etfs.length === 0) return DEMO.etfs;
+  log_info(`Parsed ${etfs.length} ETFs + thematic from live RRM data`);
   return etfs;
 }
-function parseHelixFromRRM(d) { return DEMO.helix; }
+
+function parseHelixFromRRM(d) {
+  // Parse HELIX alignment from multi-timeframe data
+  const benchmarks = d.benchmarks_data || d;
+  const nsei = benchmarks['^NSEI'] || benchmarks['NSEI'] || Object.values(benchmarks)[0] || {};
+
+  const timeframes = ['daily', 'weekly', 'monthly'];
+  const tfData = {};
+  let totalAligned = 0;
+  let totalSectors = 0;
+
+  timeframes.forEach(tf => {
+    const sectors = nsei[tf]?.sectors || [];
+    totalSectors = Math.max(totalSectors, sectors.length);
+    const leading = sectors.filter(s => s.quadrant === 'Leading').length;
+    const improving = sectors.filter(s => s.quadrant === 'Improving').length;
+    const bullish = leading + improving;
+    const bearish = sectors.length - bullish;
+
+    if (tf === 'daily') {
+      tfData.daily = {
+        direction: bullish > bearish ? 'up' : bullish === bearish ? 'flat' : 'down',
+        signal: bullish > bearish * 1.5 ? 'BULLISH' : bullish > bearish ? 'NEUTRAL' : 'WEAKENING',
+        detail: `${leading} Leading + ${improving} Improving of ${sectors.length} sectors`
+      };
+    } else if (tf === 'weekly') {
+      tfData.weekly = {
+        direction: bullish > bearish ? 'up' : bullish === bearish ? 'flat' : 'down',
+        signal: bullish > bearish * 1.5 ? 'STRONG' : bullish > bearish ? 'NEUTRAL' : 'BEARISH',
+        detail: `${leading} Leading + ${improving} Improving of ${sectors.length} sectors`
+      };
+      totalAligned = bullish; // Use weekly as primary alignment measure
+    } else {
+      tfData.monthly = {
+        direction: bullish > bearish ? 'up' : bullish === bearish ? 'flat' : 'down',
+        signal: bullish > bearish * 1.5 ? 'BULLISH' : bullish > bearish ? 'NEUTRAL' : 'BEARISH',
+        detail: `${leading} Leading + ${improving} Improving of ${sectors.length} sectors`
+      };
+    }
+  });
+
+  // If only daily available, use it for all
+  if (!tfData.weekly) tfData.weekly = tfData.daily || DEMO.helix.weekly;
+  if (!tfData.monthly) tfData.monthly = tfData.daily || DEMO.helix.monthly;
+  if (!tfData.daily) return DEMO.helix;
+
+  const alignment = totalSectors > 0 ? totalAligned / totalSectors : 0;
+
+  return {
+    daily: tfData.daily,
+    weekly: tfData.weekly,
+    monthly: tfData.monthly,
+    alignment,
+    alignedSectors: totalAligned,
+    totalSectors,
+  };
+}
+
+function log_info(msg) { console.log('[EdgePilot]', msg); }
 
 function computeAssetAllocation(mps) {
   const s = mps.score;
