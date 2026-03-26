@@ -1882,94 +1882,76 @@ async function executePartialSell(tradeId, sellPct, sellPrice, reason, atrMultip
   if (tradeIdx === -1) return;
 
   const trade = trades[tradeIdx];
-  const remaining = trade.remainingQty ?? trade.qty;
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+
+  // Determine remaining qty based on format
+  let remaining, entryPrice;
+  if (trade.entries && Array.isArray(trade.entries)) {
+    // Journal format
+    const totalEntryQty = trade.entries.reduce((s, e) => s + (e.qty || 0), 0);
+    const totalExitQty = (trade.exits || []).reduce((s, e) => s + (e.qty || 0), 0);
+    remaining = totalEntryQty - totalExitQty;
+    entryPrice = totalEntryQty > 0 ? trade.entries.reduce((s, e) => s + e.price * e.qty, 0) / totalEntryQty : 0;
+  } else {
+    // Edge Pilot format
+    remaining = trade.remainingQty ?? trade.qty;
+    entryPrice = trade.price || 0;
+  }
+
   const sellQty = Math.floor(remaining * (sellPct / 100));
   if (sellQty <= 0) return;
 
   const newRemaining = remaining - sellQty;
-  const now = new Date();
-  const pnlPerShare = sellPrice - trade.price;
+  const pnlPerShare = sellPrice - entryPrice;
   const pnlTotal = pnlPerShare * sellQty;
-  const rMultiple = trade.riskAmount > 0 ? (pnlTotal / trade.riskAmount) : 0;
+  const riskAmount = trade._epRiskAmount || (entryPrice * 0.08 * remaining); // Fallback: 8% SL
+  const rMultiple = riskAmount > 0 ? (pnlTotal / riskAmount) : 0;
 
-  // Create partial sell record
-  const sellRecord = {
-    date: now.toISOString(),
-    dateStr: now.toLocaleDateString('en-IN'),
-    qty: sellQty,
-    price: sellPrice,
-    pctSold: sellPct,
-    reason,
-    atrMultiple: atrMultiple || null,
-    pnlPerShare,
-    pnlTotal: Math.round(pnlTotal),
-    rMultiple: rMultiple.toFixed(2),
-    remainingAfter: newRemaining,
-  };
-
-  // Update parent trade
-  if (!trade.partialSells) trade.partialSells = [];
-  trade.partialSells.push(sellRecord);
-  trade.remainingQty = newRemaining;
-  trade.status = newRemaining <= 0 ? 'CLOSED' : 'PARTIAL';
-  if (newRemaining <= 0) {
-    trade.exitPrice = sellPrice;
-    trade.exitDate = now.toISOString();
-    // Calculate total P&L across all sells
-    const totalSellValue = trade.partialSells.reduce((s, ps) => s + (ps.qty * ps.price), 0);
-    const totalBuyCost = trade.qty * trade.price;
-    trade.pnl = ((totalSellValue - totalBuyCost) / totalBuyCost * 100).toFixed(2);
-    trade.rMultiple = (trade.partialSells.reduce((s, ps) => s + ps.pnlTotal, 0) / trade.riskAmount).toFixed(2);
+  // ═══ UPDATE TRADE IN JOURNAL FORMAT ═══
+  if (trade.entries && Array.isArray(trade.entries)) {
+    // Journal format — add to exits array
+    if (!trade.exits) trade.exits = [];
+    trade.exits.push({ date: dateStr, price: sellPrice, qty: sellQty });
+    trade.status = newRemaining <= 0 ? 'Closed' : 'Open'; // Journal uses "Closed" not "CLOSED"
+  } else {
+    // Edge Pilot format — use partialSells
+    if (!trade.partialSells) trade.partialSells = [];
+    trade.partialSells.push({
+      date: now.toISOString(), dateStr: now.toLocaleDateString('en-IN'),
+      qty: sellQty, price: sellPrice, pctSold: sellPct, reason,
+      atrMultiple: atrMultiple || null, pnlPerShare,
+      pnlTotal: Math.round(pnlTotal), rMultiple: rMultiple.toFixed(2),
+      remainingAfter: newRemaining,
+    });
+    trade.remainingQty = newRemaining;
+    trade.status = newRemaining <= 0 ? 'Closed' : 'Open';
+    if (newRemaining <= 0) {
+      trade.exitPrice = sellPrice;
+      trade.exitDate = now.toISOString();
+    }
   }
 
   trades[tradeIdx] = trade;
   localStorage.setItem('te_trades', JSON.stringify(trades));
-
-  // Also log as separate journal entry
-  const journal = JSON.parse(localStorage.getItem('te_journal') || '[]');
-  journal.push({
-    id: `EP-SELL-${now.getTime()}`,
-    date: now.toISOString(),
-    dateStr: now.toLocaleDateString('en-IN'),
-    type: newRemaining <= 0 ? 'FINAL_EXIT' : 'PARTIAL_EXIT',
-    symbol: trade.symbol,
-    sector: trade.sector,
-    action: 'SELL',
-    price: sellPrice,
-    qty: sellQty,
-    reason,
-    atrMultiple,
-    pnlPerShare,
-    pnlTotal: Math.round(pnlTotal),
-    rMultiple: rMultiple.toFixed(2),
-    remainingQty: newRemaining,
-    parentTradeId: trade.id,
-    regime: computeGates(state).mpsSignal,
-  });
-  localStorage.setItem('te_journal', JSON.stringify(journal));
+  computeCurrentCapital(); // Refresh cached capital
 
   // Sync to Supabase
   let supaOk = false;
   try {
-    // Update parent trade
     supaOk = await supabaseUpdate('trades', 'trade_id', trade.id, {
-      status: trade.status,
+      status: newRemaining <= 0 ? 'CLOSED' : 'PARTIAL',
       remaining_qty: newRemaining,
-      partial_sells: JSON.stringify(trade.partialSells),
-      exit_price: trade.exitPrice,
-      exit_date: trade.exitDate,
-      pnl: trade.pnl,
-      r_multiple: trade.rMultiple,
+      partial_sells: JSON.stringify(trade.partialSells || trade.exits || []),
+      exit_price: newRemaining <= 0 ? sellPrice : null,
+      exit_date: newRemaining <= 0 ? now.toISOString() : null,
     });
-    // Insert sell event
     await supabaseUpsert('trade_events', {
-      event_id: `EP-SELL-${now.getTime()}`,
+      event_id: `SELL-${Date.now()}`,
       trade_id: trade.id,
       symbol: trade.symbol,
       event_type: newRemaining <= 0 ? 'FINAL_EXIT' : 'PARTIAL_EXIT',
-      qty: sellQty,
-      price: sellPrice,
-      reason,
+      qty: sellQty, price: sellPrice, reason,
       atr_multiple: atrMultiple,
       pnl_total: Math.round(pnlTotal),
       r_multiple: rMultiple.toFixed(2),
@@ -1980,7 +1962,7 @@ async function executePartialSell(tradeId, sellPct, sellPrice, reason, atrMultip
 
   showToast(newRemaining <= 0 ? '🏁' : '📤',
     `${trade.symbol} — ${newRemaining <= 0 ? 'FULLY CLOSED' : `SOLD ${sellPct}%`}`,
-    `${sellQty} shares @ ₹${sellPrice.toLocaleString()} · P&L: ₹${Math.round(pnlTotal).toLocaleString()} (${rMultiple.toFixed(1)}R) · ${newRemaining} remaining · ${supaOk ? 'Supabase ✓' : 'local only'}`,
+    `${sellQty} @ ₹${sellPrice.toLocaleString()} · P&L: ₹${Math.round(pnlTotal).toLocaleString()} (${rMultiple.toFixed(1)}R) · ${newRemaining} remaining · ${supaOk ? 'Cloud ✓' : 'Local'}`,
     5000
   );
   return trade;
@@ -1993,10 +1975,15 @@ async function logSLMove(tradeId, newSL, reason) {
   if (tradeIdx === -1) return;
 
   const trade = trades[tradeIdx];
-  const prevSL = trade.stopLoss;
-  if (!trade.slMoves) trade.slMoves = [];
-  trade.slMoves.push({ date: new Date().toISOString(), from: prevSL, to: newSL, reason });
-  trade.stopLoss = newSL;
+  const prevSL = trade.sl || trade.stopLoss || 0;
+
+  // Update SL in both formats
+  trade.sl = newSL;        // Journal format uses 'sl'
+  trade.stopLoss = newSL;  // Edge Pilot format uses 'stopLoss'
+
+  // Track SL move history
+  if (!trade._epSlMoves) trade._epSlMoves = [];
+  trade._epSlMoves.push({ date: new Date().toISOString(), from: prevSL, to: newSL, reason });
 
   trades[tradeIdx] = trade;
   localStorage.setItem('te_trades', JSON.stringify(trades));
@@ -2004,10 +1991,10 @@ async function logSLMove(tradeId, newSL, reason) {
   // Sync to Supabase
   await supabaseUpdate('trades', 'trade_id', trade.id, {
     stop_loss: newSL,
-    sl_moves: JSON.stringify(trade.slMoves)
+    sl_moves: JSON.stringify(trade._epSlMoves)
   });
   await supabaseUpsert('trade_events', {
-    event_id: `EP-SL-${Date.now()}`, trade_id: trade.id, symbol: trade.symbol,
+    event_id: `SL-${Date.now()}`, trade_id: trade.id, symbol: trade.symbol,
     event_type: 'SL_MOVE', price: newSL, reason,
     created_at: new Date().toISOString()
   });
@@ -2246,34 +2233,104 @@ const BROKERS = {
   }
 };
 
-// ── POSITION DETECTION ──
+// ── POSITION DETECTION (supports Journal + Edge Pilot formats) ──
+
+// Normalize any trade to a common format for reading
+function normalizeTrade(t) {
+  if (t.entries && Array.isArray(t.entries)) {
+    // Journal format: { entries: [{date,price,qty}], exits: [{date,price,qty}], status: "Open" }
+    const totalEntryQty = t.entries.reduce((s, e) => s + (e.qty || 0), 0);
+    const totalExitQty = (t.exits || []).reduce((s, e) => s + (e.qty || 0), 0);
+    const avgEntry = totalEntryQty > 0 ? t.entries.reduce((s, e) => s + e.price * e.qty, 0) / totalEntryQty : 0;
+    return {
+      id: t.id,
+      symbol: t.symbol,
+      price: avgEntry,
+      qty: totalEntryQty,
+      remainingQty: totalEntryQty - totalExitQty,
+      stopLoss: t.sl || 0,
+      status: (t.status || '').toUpperCase(), // Normalize "Open" → "OPEN"
+      pyramidLevel: t.pyramidLevel || t._epPyramid || null,
+      parentTradeId: t.parentTradeId || t._epParentId || null,
+      source: t.source || 'journal',
+      dateStr: t.entries[0]?.date || '',
+      sector: t.sector || '',
+      _isJournal: true,
+      _original: t,
+    };
+  } else {
+    // Edge Pilot format: { price, qty, status: "OPEN", pyramidLevel, ... }
+    return {
+      id: t.id,
+      symbol: t.symbol,
+      price: t.price || t.entry || 0,
+      qty: t.qty || 0,
+      remainingQty: t.remainingQty ?? t.qty ?? 0,
+      stopLoss: t.stopLoss || t.sl || 0,
+      status: (t.status || '').toUpperCase(),
+      pyramidLevel: t.pyramidLevel || null,
+      parentTradeId: t.parentTradeId || null,
+      source: t.broker || t.source || 'edgepilot',
+      dateStr: t.dateStr || '',
+      sector: t.sector || '',
+      _isJournal: false,
+      _original: t,
+    };
+  }
+}
+
 function getOpenPositions(symbol) {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  return trades.filter(t => t.symbol === symbol && t.status === 'OPEN');
+  return trades
+    .filter(t => t.symbol === symbol)
+    .map(normalizeTrade)
+    .filter(t => t.status === 'OPEN' && t.remainingQty > 0);
 }
 
 function detectPyramidLevel(symbol, pick) {
   const openPos = getOpenPositions(symbol);
   if (openPos.length === 0) return { level: 'p1', existing: [], canPyramid: true, reason: 'No existing position — fresh P1 entry' };
 
-  const p1 = openPos.find(t => t.pyramidLevel === 'p1');
-  const p2 = openPos.find(t => t.pyramidLevel === 'p2');
-  const p3 = openPos.find(t => t.pyramidLevel === 'p3');
+  // Check pyramid levels from existing positions
+  const withPyramid = openPos.filter(t => t.pyramidLevel);
+  const p1 = withPyramid.find(t => t.pyramidLevel === 'p1');
+  const p2 = withPyramid.find(t => t.pyramidLevel === 'p2');
+  const p3 = withPyramid.find(t => t.pyramidLevel === 'p3');
+
+  // If existing positions don't have pyramid levels (Journal trades), treat first as P1
+  if (withPyramid.length === 0 && openPos.length > 0) {
+    // Journal trades without pyramid tagging — treat as P1 already filled
+    const avgEntry = openPos[0].price;
+    const cmp = pick.cmp || pick.entry;
+    const gainPct = ((cmp - avgEntry) / avgEntry * 100);
+
+    if (openPos.length >= 3) return { level: 'full', existing: openPos, canPyramid: false, reason: 'FULLY PYRAMIDED — 3+ entries already exist.' };
+
+    if (openPos.length === 1) {
+      if (gainPct >= 5) return { level: 'p2', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from entry (₹${avgEntry.toFixed(0)}). P2 ADD eligible.`, parentId: openPos[0].id };
+      else return { level: 'p2_wait', existing: openPos, canPyramid: false, reason: `Stock only +${gainPct.toFixed(1)}% from entry. Need +5-8% for P2.` };
+    }
+
+    if (openPos.length === 2) {
+      if (gainPct >= 10) return { level: 'p3', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from entry. P3 TOP-UP eligible.`, parentId: openPos[0].id };
+      else return { level: 'p3_wait', existing: openPos, canPyramid: false, reason: `Stock +${gainPct.toFixed(1)}% from entry. Need +10-15% for P3.` };
+    }
+  }
 
   if (p1 && p2 && p3) return { level: 'full', existing: openPos, canPyramid: false, reason: 'FULLY PYRAMIDED — all 3 levels filled. No more adds.' };
 
   const cmp = pick.cmp || pick.entry;
-  const avgEntry = p1 ? p1.price : pick.entry;
+  const avgEntry = p1 ? p1.price : openPos[0].price;
   const gainPct = ((cmp - avgEntry) / avgEntry * 100);
 
   if (p1 && !p2) {
-    if (gainPct >= 5) return { level: 'p2', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from P1 (₹${avgEntry}). P2 ADD eligible — need tight base/new pivot.`, parentId: p1.id };
-    else return { level: 'p2_wait', existing: openPos, canPyramid: false, reason: `Stock only +${gainPct.toFixed(1)}% from P1. Need +5-8% with new tight area for P2 add.` };
+    if (gainPct >= 5) return { level: 'p2', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from P1 (₹${avgEntry.toFixed(0)}). P2 ADD eligible.`, parentId: p1.id };
+    else return { level: 'p2_wait', existing: openPos, canPyramid: false, reason: `Stock only +${gainPct.toFixed(1)}% from P1. Need +5-8% for P2.` };
   }
 
   if (p1 && p2 && !p3) {
-    if (gainPct >= 10) return { level: 'p3', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from P1. P3 TOP-UP eligible — final 20% add at next pivot.`, parentId: p1.id };
-    else return { level: 'p3_wait', existing: openPos, canPyramid: false, reason: `Stock +${gainPct.toFixed(1)}% from P1. Need +10-15% for P3 top-up.` };
+    if (gainPct >= 10) return { level: 'p3', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from P1. P3 TOP-UP eligible.`, parentId: p1.id };
+    else return { level: 'p3_wait', existing: openPos, canPyramid: false, reason: `Stock +${gainPct.toFixed(1)}% from P1. Need +10-15% for P3.` };
   }
 
   return { level: 'p1', existing: openPos, canPyramid: true, reason: 'Fresh entry' };
@@ -2294,9 +2351,9 @@ function calcOrderDetails(pick, pyramidInfo) {
   const adjQty = Math.floor(qty * sizeMulti * (pyPct / 100));
   const adjCost = adjQty * entry;
 
-  // Calculate total position across all pyramid levels
-  const existingQty = (pyramidInfo?.existing || []).reduce((sum, t) => sum + (t.qty || 0), 0);
-  const existingCost = (pyramidInfo?.existing || []).reduce((sum, t) => sum + ((t.qty || 0) * (t.price || 0)), 0);
+  // Calculate total position across all pyramid levels (normalized format)
+  const existingQty = (pyramidInfo?.existing || []).reduce((sum, t) => sum + (t.remainingQty || t.qty || 0), 0);
+  const existingCost = (pyramidInfo?.existing || []).reduce((sum, t) => sum + ((t.remainingQty || t.qty || 0) * (t.price || 0)), 0);
   const totalQtyAfter = existingQty + adjQty;
   const totalCostAfter = existingCost + adjCost;
   const avgPriceAfter = totalQtyAfter > 0 ? (totalCostAfter / totalQtyAfter) : entry;
@@ -2585,75 +2642,61 @@ async function executeOrder(symbol) {
   const o = calcOrderDetails(pick, pyramidInfo);
   const gates = computeGates(state);
   const now = new Date();
+  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
-  // Build journal entry
-  const journalEntry = {
-    id: `EP-${now.getTime()}`,
-    date: now.toISOString(),
-    dateStr: now.toLocaleDateString('en-IN'),
-    timeStr: now.toLocaleTimeString('en-IN'),
-    type: 'ENTRY',
+  // ═══ BUILD JOURNAL-COMPATIBLE TRADE ═══
+  // Format: { id, symbol, side, status, entries:[{date,price,qty}], exits:[], source, sl, ... }
+  // This is the SAME format your Journal (index.html) uses in te_trades
+  const journalTrade = {
+    id: `${now.getTime()}${Math.random().toString().slice(2,18)}`,
     symbol: o.symbol,
+    setup: `${o.pattern} · ${o.catalyst}`,
+    side: 'Buy',
+    status: 'Open',  // Journal uses "Open" not "OPEN"
+    sl: o.sl,
+    plan: `Entry ₹${o.entry} → T1 ₹${o.target1} → T2 ₹${o.target2} · R:R ${o.rr}`,
+    exitTrigger: `TSL: 21 EMA / 10 DMA / Chandelier · ATR sell: 5×/6×/7×`,
+    growth: o.grade,
+    notes: `Edge Pilot ${o.pyLevel.toUpperCase()} · ${gates.mpsSignal} MPS ${gates.mpsScore} · ${o.sector} · O'Neil ${o.oneilScore} (${o.grade}) · RS #${pick.rsRank} ${o.rsTier} ${o.sizeMulti}× · ATR ₹${o.atr14}`,
+    source: BROKERS[selectedBroker]?.name?.toLowerCase() || 'dhan',
+    entries: [
+      { date: dateStr, price: o.entry, qty: o.adjQty }
+    ],
+    exits: [],
+    cmp: o.entry,
+    // Edge Pilot metadata (prefixed with _ep to avoid conflicts with Journal)
+    _epPyramid: o.pyLevel,
+    _epParentId: o.parentId || null,
+    _epRsTier: o.rsTier,
+    _epSizeMulti: o.sizeMulti,
+    _epRiskAmount: o.riskAmount,
+    _epAtr14: o.atr14,
+    _epAtrSellLevels: { x5: o.entry + o.atr14*5, x6: o.entry + o.atr14*6, x7: o.entry + o.atr14*7 },
+    _epRegime: gates.mpsSignal,
+    _epMpsScore: gates.mpsScore,
+    _epSlMoves: [{ date: now.toISOString(), from: null, to: o.sl, reason: 'Initial SL' }],
     sector: o.sector,
-    action: 'BUY',
-    price: o.entry,
-    qty: o.adjQty,
-    totalCost: o.totalCost,
-    stopLoss: o.sl,
-    target1: o.target1,
-    target2: o.target2,
-    riskAmount: o.riskAmount,
-    riskPct: RISK_PCT,
-    rr: o.rr,
-    pattern: o.pattern,
-    catalyst: o.catalyst,
-    grade: o.grade,
-    oneilScore: o.oneilScore,
-    rsRank: pick.rsRank,
-    rsTier: pick.rsTier,
-    sizeMultiplier: o.sizeMulti,
-    pyramidLevel: o.pyLevel,
-    pyramidPct: o.pyPct,
-    parentTradeId: o.parentId || null,
-    existingQtyBefore: o.existingQty,
-    totalQtyAfter: o.totalQtyAfter,
-    avgPriceAfter: o.avgPriceAfter,
-    atr14: o.atr14,
-    atrSellLevels: { x5: o.entry + o.atr14*5, x6: o.entry + o.atr14*6, x7: o.entry + o.atr14*7 },
-    regime: gates.mpsSignal,
-    mpsScore: gates.mpsScore,
-    helixAlignment: state.helix?.alignment,
-    rrmQuad: pick.rrmQuad,
-    broker: BROKERS[selectedBroker]?.name || 'Unknown',
-    status: 'OPEN',
-    slMoves: [{ date: now.toISOString(), from: null, to: o.sl, reason: 'Initial SL' }],
-    partialSells: [],
-    exitPrice: null,
-    exitDate: null,
-    pnl: null,
-    rMultiple: null,
   };
 
-  // Save to localStorage (te_trades — same key as your Position Tracker)
+  // ═══ 1. SAVE TO localStorage (te_trades — shared with Journal) ═══
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  trades.push(journalEntry);
+  trades.push(journalTrade);
   localStorage.setItem('te_trades', JSON.stringify(trades));
 
-  // Also save to journal-specific key
-  const journal = JSON.parse(localStorage.getItem('te_journal') || '[]');
-  journal.push(journalEntry);
-  localStorage.setItem('te_journal', JSON.stringify(journal));
+  // Update cached capital
+  computeCurrentCapital();
 
-  // Save to Supabase
+  // ═══ 2. SAVE TO SUPABASE (Edge Pilot's own table for advanced tracking) ═══
   let supaOk = false;
   try {
     supaOk = await supabaseUpsert('trades', {
-      trade_id: journalEntry.id,
+      trade_id: journalTrade.id,
       symbol: o.symbol,
       sector: o.sector,
       action: 'BUY',
       entry_price: o.entry,
       qty: o.adjQty,
+      remaining_qty: o.adjQty,
       stop_loss: o.sl,
       target_1: o.target1,
       target_2: o.target2,
@@ -2664,27 +2707,30 @@ async function executeOrder(symbol) {
       oneil_score: o.oneilScore,
       rs_rank: pick.rsRank,
       pyramid_level: o.pyLevel,
+      parent_trade_id: o.parentId || null,
+      total_qty_after: o.totalQtyAfter,
+      avg_price_after: o.avgPriceAfter,
       atr_14: o.atr14,
       regime: gates.mpsSignal,
       mps_score: gates.mpsScore,
       broker: BROKERS[selectedBroker]?.name,
       status: 'OPEN',
+      partial_sells: '[]',
+      sl_moves: JSON.stringify(journalTrade._epSlMoves),
       created_at: now.toISOString()
     });
-  } catch(e) { console.log('Supabase trade log error:', e); }
+  } catch(e) { console.log('Supabase trade save error:', e); }
 
-  // Open broker deep link if L2
+  // ═══ 3. OPEN BROKER ═══
   const broker = BROKERS[selectedBroker];
   if (broker?.deepLink) {
-    const link = broker.deepLink(o.symbol, o.adjQty, o.entry, o.sl, o.target1);
-    window.open(link, '_blank');
+    window.open(broker.deepLink(o.symbol, o.adjQty, o.entry, o.sl, o.target1), '_blank');
   }
 
-  // Close modal + show toast
   closeModal();
   showToast('⚡',
-    `${o.symbol} EXECUTED — Logged to Journal`,
-    `BUY ${o.adjQty} @ ₹${o.entry} · SL ₹${o.sl} · ${BROKERS[selectedBroker]?.name} · ${supaOk ? 'Supabase ✓' : 'localStorage'} · Trade ID: ${journalEntry.id}`,
+    `${o.symbol} ${o.pyLevel.toUpperCase()} — Logged to Journal + ${supaOk ? 'Cloud' : 'Local'}`,
+    `BUY ${o.adjQty} @ ₹${o.entry} · SL ₹${o.sl} · ${BROKERS[selectedBroker]?.name} · ID: ${journalTrade.id.slice(0,8)}...`,
     6000
   );
 }
