@@ -1,0 +1,71 @@
+# ═══════════════════════════════════════════════════════════════
+# EDGE PILOT — INTRADAY ALERT MONITOR
+# Runs every 30 min during NSE market hours (9:15 AM – 3:45 PM IST)
+# Lightweight: only checks SL hits + ATR climax signals
+# TSL moves are handled by tsl-monitor.yml (EOD only)
+# ═══════════════════════════════════════════════════════════════
+
+name: Edge Pilot Intraday
+
+on:
+  schedule:
+    # Every 20 min during NSE market hours (9:15 AM – 3:45 PM IST)
+    # Mon-Fri only
+    - cron: '45 3 * * 1-5'    # 9:15 AM IST
+    - cron: '5 4 * * 1-5'     # 9:35 AM IST
+    - cron: '25 4 * * 1-5'    # 9:55 AM IST
+    - cron: '45 4 * * 1-5'    # 10:15 AM IST
+    - cron: '5 5 * * 1-5'     # 10:35 AM IST
+    - cron: '25 5 * * 1-5'    # 10:55 AM IST
+    - cron: '45 5 * * 1-5'    # 11:15 AM IST
+    - cron: '5 6 * * 1-5'     # 11:35 AM IST
+    - cron: '25 6 * * 1-5'    # 11:55 AM IST
+    - cron: '45 6 * * 1-5'    # 12:15 PM IST
+    - cron: '5 7 * * 1-5'     # 12:35 PM IST
+    - cron: '25 7 * * 1-5'    # 12:55 PM IST
+    - cron: '45 7 * * 1-5'    # 1:15 PM IST
+    - cron: '5 8 * * 1-5'     # 1:35 PM IST
+    - cron: '25 8 * * 1-5'    # 1:55 PM IST
+    - cron: '45 8 * * 1-5'    # 2:15 PM IST
+    - cron: '5 9 * * 1-5'     # 2:35 PM IST
+    - cron: '25 9 * * 1-5'    # 2:55 PM IST
+    - cron: '45 9 * * 1-5'    # 3:15 PM IST
+    - cron: '5 10 * * 1-5'    # 3:35 PM IST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance requests pandas
+
+      - name: Run Intraday Monitor
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+        run: python scripts/intraday_alerts.py --force
+
+      - name: Commit alert state
+        run: |
+          git config user.name "Edge Pilot Bot"
+          git config user.email "bot@tradedge.app"
+          git add data/intraday_alerts_sent.json 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "⚡ Intraday alert state $(date -u +%H:%M)"
+          git push || true
