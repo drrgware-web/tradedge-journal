@@ -60,10 +60,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger('TSL')
 
 # ═══ CONFIG ═══
-SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://jbknnyjywernroaulfwp.supabase.co')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
-TELEGRAM_CHAT = os.environ.get('TELEGRAM_CHAT_ID', '')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://urnrdpyhncezljirpnmy.supabase.co')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzY5MDIsImV4cCI6MjA4ODM1MjkwMn0.eExEFw1XGAlYBGECqCpl928UvXv5Jchuyr1YYkcrbdw')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8659936599:AAFKV6MKfHOSJKKTVqISJI-SwQ_cerTaAbQ')
+TELEGRAM_CHAT = os.environ.get('TELEGRAM_CHAT_ID', '183752078')
 
 DATA_DIR = Path('data')
 TSL_OUTPUT = DATA_DIR / 'tsl_levels.json'
