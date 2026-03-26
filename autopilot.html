@@ -2166,8 +2166,12 @@ function rescan() { state.loading=true; render(); loadData(); }
 // EXECUTION BRIDGE — ORDER BUILDER + BROKER + JOURNAL
 // ═══════════════════════════════════════════════════════════
 
-const CAPITAL = 2500000; // Rs.25L — configurable
-const RISK_PCT = 1; // 1% risk per trade
+// ═══ CAPITAL — reads from Capital Management page (allocation.html) ═══
+const _capData = JSON.parse(localStorage.getItem('te_current_capital') || 'null');
+const CAPITAL = _capData?.capital || 5000000; // ₹50L default
+const RISK_PCT = _capData?.riskPct || 1; // 1% risk per trade
+const MAX_POSITIONS = _capData?.maxPositions || 10;
+const MAX_SECTOR_PCT = _capData?.maxSectorPct || 30;
 
 let selectedBroker = 'dhan';
 let orderModal = null;
