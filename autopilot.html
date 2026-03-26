@@ -1415,7 +1415,12 @@ function renderEdge(picks) {
 
   return `
     ${pipelineBanner}
-    <div class="edge-tabs"><button class="edge-tab active">Top Picks (${picks.length})</button><button class="edge-tab">Catalysts</button><button class="edge-tab">Surveillance</button></div>
+    <div class="edge-tabs">
+      <button class="edge-tab active" onclick="switchEdgeTab('picks',this)">Top Picks (${picks.length})</button>
+      <button class="edge-tab" onclick="switchEdgeTab('catalysts',this)">Catalysts</button>
+      <button class="edge-tab" onclick="switchEdgeTab('surveillance',this)">Surveillance</button>
+    </div>
+    <div id="edge-tab-content">
     <div style="overflow-x:auto">
     <table class="edge-table"><thead><tr>
       <th>STOCK</th><th>SIG</th><th>SWEET</th><th>O'NEIL</th><th>RS RANK</th>
@@ -1450,7 +1455,83 @@ function renderEdge(picks) {
       </tr>`;
     }).join('')}
     </tbody></table></div>
+    </div><!-- edge-tab-content -->
     <div class="alloc-reasoning" style="margin-top:12px"><span class="alloc-reasoning-icon">⚡</span><div class="alloc-reasoning-text"><strong>HELIX Filter:</strong> ${p.total || '?'} stocks → PERFECT sweet (≥9) → GREEN/YELLOW signal → Monthly Leading → Weekly bull → Daily bull → <strong>Top ${picks.length} picks</strong> ranked by composite score + O'Neil grade + sector alignment. <strong>RS Ranking:</strong> Top 10% = 1.5x size. <strong>Pyramiding:</strong> P1=50%, P2=+30% at +5-8%, P3=+20% at +10-15%.</div></div>`;
+}
+
+function switchEdgeTab(tab, btn) {
+  // Toggle active tab styling
+  btn.parentElement.querySelectorAll('.edge-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+
+  const container = document.getElementById('edge-tab-content');
+  if (!container) return;
+  const picks = state.topPicks || [];
+
+  if (tab === 'picks') {
+    // Re-render full page (simplest approach)
+    render();
+    return;
+  }
+
+  if (tab === 'catalysts') {
+    // Group picks by catalyst/signal type
+    const green = picks.filter(p => p.signal === 'GREEN');
+    const yellow = picks.filter(p => p.signal === 'YELLOW');
+    container.innerHTML = `
+      <div style="margin-bottom:16px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--green);margin-bottom:8px">🟢 GREEN — ALL TIMEFRAMES ALIGNED (${green.length})</div>
+        ${green.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${green.map(p => `
+          <div style="padding:6px 10px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.12);border-radius:6px;font-size:11px">
+            <span style="font-weight:700;color:var(--green)">${p.symbol}</span>
+            <span style="color:var(--text-dim);font-size:9px;margin-left:4px">${p.sector}</span>
+            <span style="color:var(--text-secondary);font-size:9px;margin-left:6px">Sweet ${p.sweet} · O'Neil ${p.oneilScore}${p.grade !== '-' ? ' ('+p.grade+')' : ''}</span>
+            <span style="color:${p.changePct >= 0 ? 'var(--green)' : 'var(--red)'};font-family:var(--mono);font-size:9px;margin-left:6px">${p.changePct >= 0 ? '+' : ''}${p.changePct?.toFixed(1)}%</span>
+          </div>`).join('')}</div>` : '<div style="color:var(--text-dim);font-size:11px">No GREEN signal stocks in top picks</div>'}
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px">🟡 YELLOW — PARTIAL ALIGNMENT (${yellow.length})</div>
+        ${yellow.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${yellow.map(p => `
+          <div style="padding:6px 10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.12);border-radius:6px;font-size:11px">
+            <span style="font-weight:700;color:var(--gold)">${p.symbol}</span>
+            <span style="color:var(--text-dim);font-size:9px;margin-left:4px">${p.sector}</span>
+            <span style="color:var(--text-secondary);font-size:9px;margin-left:6px">Sweet ${p.sweet} · W:${p.wQuad} · D:${p.dQuad}</span>
+          </div>`).join('')}</div>` : '<div style="color:var(--text-dim);font-size:11px">No YELLOW signal stocks</div>'}
+      </div>
+      <div style="margin-top:14px;padding:10px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:10px;color:var(--text-dim)">
+        <strong style="color:var(--text-secondary)">Signal Legend:</strong> GREEN = M+W+D right side (Leading/Improving). YELLOW = M strong, W dip or D transition. BLUE = W+D strong, no M. RED = Weakness across timeframes.
+      </div>`;
+    return;
+  }
+
+  if (tab === 'surveillance') {
+    // Show O'Neil grade breakdown + volume + market cap checks
+    const graded = picks.filter(p => p.grade && p.grade !== '-');
+    const ungraded = picks.filter(p => !p.grade || p.grade === '-');
+    const highVol = picks.filter(p => p.volumeRatio > 1.5);
+    const lowCap = picks.filter(p => p.marketCap > 0 && p.marketCap < 500);
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div style="padding:10px 14px;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.1);border-radius:8px">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin-bottom:6px">O'NEIL GRADED (${graded.length})</div>
+          ${graded.map(p => `<div style="font-size:11px;margin-bottom:3px"><span style="font-weight:700;color:var(--text-primary)">${p.symbol}</span> <span class="stock-score ${p.grade==='A+'?'a-plus':p.grade==='A'?'a':p.grade==='B'?'b':'c'}" style="font-size:9px">${p.oneilScore} (${p.grade})</span> <span style="color:var(--text-dim);font-size:9px">EPS ${p.epsStrength} · Price ${p.priceStrength}</span></div>`).join('')}
+        </div>
+        <div style="padding:10px 14px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.1);border-radius:8px">
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--amber);margin-bottom:6px">UNGRADED — NEEDS MANUAL CHECK (${ungraded.length})</div>
+          ${ungraded.map(p => `<div style="font-size:11px;margin-bottom:3px"><span style="font-weight:700;color:var(--text-primary)">${p.symbol}</span> <span style="color:var(--text-dim);font-size:9px">${p.sector} · ₹${p.cmp?.toLocaleString()}</span></div>`).join('')}
+        </div>
+      </div>
+      ${highVol.length ? `<div style="padding:8px 12px;background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.1);border-radius:6px;margin-bottom:8px;font-size:10px">
+        <strong style="color:var(--cyan)">🔊 HIGH VOLUME (>${'1.5'}× avg):</strong> ${highVol.map(p => `${p.symbol} (${p.volumeRatio?.toFixed(1)}×)`).join(', ')}
+      </div>` : ''}
+      ${lowCap.length ? `<div style="padding:8px 12px;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.1);border-radius:6px;font-size:10px">
+        <strong style="color:var(--red)">⚠ SMALL CAP (&lt;₹500 Cr):</strong> ${lowCap.map(p => `${p.symbol} (₹${Math.round(p.marketCap)}Cr)`).join(', ')} — <em>Higher risk, tighter SL</em>
+      </div>` : ''}
+      <div style="margin-top:14px;padding:10px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:10px;color:var(--text-dim)">
+        <strong style="color:var(--text-secondary)">Surveillance checks:</strong> O'Neil grading (EPS + Price strength), volume ratio vs 20d avg, market cap filter. Ungraded stocks need manual verification of fundamentals before entry.
+      </div>`;
+    return;
+  }
 }
 
 function renderExec(picks) {
