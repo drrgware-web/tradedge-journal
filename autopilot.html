@@ -2167,12 +2167,61 @@ function rescan() { state.loading=true; render(); loadData(); }
 // EXECUTION BRIDGE — ORDER BUILDER + BROKER + JOURNAL
 // ═══════════════════════════════════════════════════════════
 
-// ═══ CAPITAL — reads from Capital Management page (allocation.html) ═══
-const _capData = JSON.parse(localStorage.getItem('te_current_capital') || 'null');
-const CAPITAL = _capData?.capital || 5000000; // ₹50L default
-const RISK_PCT = _capData?.riskPct || 1; // 1% risk per trade
-const MAX_POSITIONS = _capData?.maxPositions || 10;
-const MAX_SECTOR_PCT = _capData?.maxSectorPct || 30;
+// ═══ CAPITAL — computed from te_trades (Journal format) + te_capital_config ═══
+const STARTING_CAPITAL = 5000000; // ₹50L — set in allocation.html
+const _capConfig = JSON.parse(localStorage.getItem('te_capital_config') || 'null');
+const RISK_PCT = _capConfig?.riskPct || 1;
+const MAX_POSITIONS = _capConfig?.maxPositions || 10;
+const MAX_SECTOR_PCT = _capConfig?.maxSectorPct || 30;
+
+// Compute live capital from te_trades (supports both Journal and Edge Pilot trade formats)
+function computeCurrentCapital() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  let investedInOpen = 0;
+  let realizedPnl = 0;
+
+  trades.forEach(t => {
+    if (t.entries && Array.isArray(t.entries)) {
+      // Journal format: entries[{date,price,qty}], exits[{date,price,qty}]
+      const entryValue = t.entries.reduce((s, e) => s + (e.price * e.qty), 0);
+      const exitValue = (t.exits || []).reduce((s, e) => s + (e.price * e.qty), 0);
+      if (t.status === 'Open') {
+        investedInOpen += entryValue - exitValue; // Partial exits reduce invested
+      } else {
+        realizedPnl += exitValue - entryValue;
+      }
+    } else if (t.price && t.qty) {
+      // Edge Pilot format: flat {price, qty, status, partialSells[]}
+      if (t.status === 'OPEN' || t.status === 'PARTIAL') {
+        investedInOpen += (t.remainingQty || t.qty) * t.price;
+      } else if (t.status === 'CLOSED' && t.partialSells) {
+        const sellValue = t.partialSells.reduce((s, ps) => s + (ps.qty * ps.price), 0);
+        const buyValue = t.qty * t.price;
+        realizedPnl += sellValue - buyValue;
+      }
+    }
+  });
+
+  const currentCapital = STARTING_CAPITAL + realizedPnl;
+  const availableCash = currentCapital - investedInOpen;
+
+  // Cache for allocation page to read
+  localStorage.setItem('te_current_capital', JSON.stringify({
+    capital: currentCapital,
+    startingCapital: STARTING_CAPITAL,
+    invested: investedInOpen,
+    available: availableCash,
+    realizedPnl,
+    riskPct: RISK_PCT,
+    maxPositions: MAX_POSITIONS,
+    maxSectorPct: MAX_SECTOR_PCT,
+    updatedAt: new Date().toISOString()
+  }));
+
+  return currentCapital;
+}
+
+const CAPITAL = computeCurrentCapital();
 
 let selectedBroker = 'dhan';
 let orderModal = null;
