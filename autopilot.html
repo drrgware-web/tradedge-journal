@@ -312,6 +312,34 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .toast-detail{font-size:10px;color:var(--text-secondary);line-height:1.5;}
 .toast-close{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;padding:4px;}
 
+/* ═══ ENHANCEMENT: REGIME SPEED INDICATOR ═══ */
+.regime-speed{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:8px;margin-top:10px;}
+.regime-speed-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.regime-speed-bar{flex:1;height:6px;background:var(--border-subtle);border-radius:3px;overflow:hidden;position:relative;}
+.regime-speed-fill{height:100%;border-radius:3px;transition:width 0.6s ease;}
+.regime-speed-val{font-family:var(--mono);font-size:11px;font-weight:700;flex-shrink:0;min-width:50px;text-align:right;}
+.regime-delta{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;}
+.regime-delta.up{background:rgba(16,185,129,0.1);color:var(--green-bright);}
+.regime-delta.down{background:rgba(239,68,68,0.1);color:var(--red-bright);}
+.regime-delta.flat{background:rgba(100,116,139,0.1);color:var(--text-dim);}
+
+/* ═══ ENHANCEMENT: RS RANK BADGE ═══ */
+.rs-rank{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:0.3px;}
+.rs-rank.top10{background:rgba(16,185,129,0.12);color:var(--green-bright);border:1px solid rgba(16,185,129,0.2);}
+.rs-rank.top25{background:rgba(34,211,238,0.08);color:var(--cyan);border:1px solid rgba(34,211,238,0.15);}
+.rs-rank.top50{background:rgba(245,158,11,0.08);color:var(--amber);border:1px solid rgba(245,158,11,0.12);}
+.rs-rank.bottom{background:rgba(100,116,139,0.08);color:var(--text-dim);border:1px solid var(--border-dim);}
+
+/* ═══ ENHANCEMENT: PYRAMID INDICATOR ═══ */
+.pyramid-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:0.3px;}
+.pyramid-badge.p1{background:rgba(34,211,238,0.1);color:var(--cyan);border:1px solid rgba(34,211,238,0.15);}
+.pyramid-badge.p2{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.15);}
+.pyramid-badge.p3{background:rgba(251,191,36,0.1);color:var(--gold);border:1px solid rgba(251,191,36,0.15);}
+.pyramid-blocks{display:flex;gap:2px;align-items:flex-end;}
+.pyramid-block{width:6px;border-radius:1px;}
+.pyramid-block.filled{background:var(--cyan);}
+.pyramid-block.empty{background:var(--border-subtle);}
+
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:900px){.asset-grid{grid-template-columns:repeat(2,1fr);}.money-profile{grid-template-columns:1fr;gap:16px;}.helix-grid{grid-template-columns:1fr;}.exec-cards{grid-template-columns:1fr;}.regime-grid{grid-template-columns:1fr;}}
 @media(max-width:600px){.app{padding:0 12px 40px;}.hero{padding:20px 16px;}.stage-header{padding:14px 16px;}.stage-body{padding:0 16px 18px;}.pipeline{padding:12px 8px;overflow-x:auto;}.asset-grid{grid-template-columns:1fr;}.sector-quadrants{grid-template-columns:1fr;}.header-nav{display:none;}}
@@ -340,10 +368,38 @@ const CONFIG = {
   scannerFile: 'scanner_results.json',
   catalystFile: 'catalyst_alerts.json',
   mps: { riskOn: 70, caution: 40, riskOff: 0 },
+
+  // ═══ ENHANCEMENT 1: WEEKLY REGIME SPEED ═══
+  // Instead of monthly MPS, track weekly delta for faster regime detection
+  // mpsWeeklyDelta > +5 = "Accelerating" (enter early)
+  // mpsWeeklyDelta < -5 = "Decelerating" (tighten stops / reduce size)
+  regimeSpeed: {
+    accelerating: 5,    // weekly delta > +5 → early entry signal
+    decelerating: -5,   // weekly delta < -5 → tighten / reduce
+    turbo: 10,          // weekly delta > +10 → new bull leg detected
+  },
+
+  // ═══ ENHANCEMENT 2: RS RANK TIERS ═══
+  // Within each Leading sector, rank stocks by RS vs sector index
+  rsRankTiers: {
+    top10: { label: 'RS TOP 10%', sizeMultiplier: 1.5 },  // 150% normal size
+    top25: { label: 'RS TOP 25%', sizeMultiplier: 1.0 },  // normal size
+    top50: { label: 'RS TOP 50%', sizeMultiplier: 0.5 },  // half size
+    bottom: { label: 'RS BOTTOM', sizeMultiplier: 0 },     // skip
+  },
+
+  // ═══ ENHANCEMENT 3: PYRAMID LEVELS ═══
+  // Add to winners at higher pivots
+  pyramid: {
+    p1: { trigger: 'Initial entry at pivot', sizePercent: 50, label: 'P1 — INITIAL' },
+    p2: { trigger: 'Stock +5-8% from entry, new tight area', sizePercent: 30, label: 'P2 — ADD' },
+    p3: { trigger: 'Stock +10-15%, final add at next pivot', sizePercent: 20, label: 'P3 — TOP-UP' },
+  },
+
   profiles: {
-    'EASY MONEY':  { riskPerTrade: '1–2%', maxExposure: '80–100%', rule: 'Full size, aggressive entries, ride the wave — market is strongly bullish' },
-    'SMART MONEY': { riskPerTrade: '0.75–1.25%', maxExposure: '40–60%', rule: 'Selective entries — only A+ setups, normal size, focus on leaders in leading sectors' },
-    'HARD MONEY':  { riskPerTrade: '0.5–0.75%', maxExposure: '20–40%', rule: 'Reduced size, tight stops, only the best setups with strong catalyst confirmation' },
+    'EASY MONEY':  { riskPerTrade: '1–2%', maxExposure: '80–100%', rule: 'Full size, aggressive entries, pyramid into winners. RS Top 10% get 1.5x size.' },
+    'SMART MONEY': { riskPerTrade: '0.75–1.25%', maxExposure: '40–60%', rule: 'Selective entries — only A+ setups in RS Top 25%. Pyramid only with P2 confirmation.' },
+    'HARD MONEY':  { riskPerTrade: '0.5–0.75%', maxExposure: '20–40%', rule: 'Reduced size, no pyramiding, only RS Top 10% stocks with confirmed catalyst.' },
     'NO MONEY':    { riskPerTrade: '0%', maxExposure: '0%', rule: 'Cash is a position. No new entries. Protect capital. Wait for regime shift.' }
   },
   navLinks: [
@@ -442,6 +498,8 @@ RRM_ETFS.forEach((etf, i) => {
 const DEMO = {
   mps: {
     score: 35, trend: 'Declining', signal: 'RISK-OFF',
+    weeklyDelta: -8, // MPS changed -8 points this week
+    prevWeekScore: 43,
     components: {
       'NIFTY 50 vs 200 DMA': { value: 'Below', signal: 'bearish' },
       'NIFTY 50 vs 50 DMA': { value: 'Below', signal: 'bearish' },
@@ -458,10 +516,10 @@ const DEMO = {
   helix: { daily: { direction:'down', signal:'WEAKENING', detail:'12/16 sectors below daily RS zero line' }, weekly: { direction:'down', signal:'BEARISH', detail:'14/16 sectors lost weekly RS momentum' }, monthly: { direction:'flat', signal:'NEUTRAL', detail:'Long-term trend still intact for 6/16' }, alignment:0.25, alignedSectors:2, totalSectors:16 },
   assetAllocation: { equity: { alloc:40, signal:'underweight', recommended:false }, cash: { alloc:35, signal:'overweight', recommended:true }, gold: { alloc:15, signal:'overweight', recommended:true }, intl: { alloc:10, signal:'neutral', recommended:false } },
   topPicks: [
-    { symbol:'TCS', sector:'IT', oneilScore:88, grade:'A+', catalyst:'Blockbuster EPS', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:3840, stop:3720, target1:4100, target2:4350, rr:'2.2:1', pattern:'VCP Pivot', fundHolding:'1,847 funds (▲ 12%)' },
-    { symbol:'PERSISTENT', sector:'IT', oneilScore:82, grade:'A', catalyst:'Capacity Expansion', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:5680, stop:5480, target1:6100, target2:6500, rr:'2.1:1', pattern:'Tight Flag', fundHolding:'623 funds (▲ 8%)' },
-    { symbol:'CIPLA', sector:'Pharma', oneilScore:79, grade:'A', catalyst:'Product Launch', catalystPri:'med', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:1520, stop:1470, target1:1640, target2:1720, rr:'2.4:1', pattern:'Inside Day NR7', fundHolding:'1,102 funds (▲ 5%)' },
-    { symbol:'M&M', sector:'Auto', oneilScore:76, grade:'A', catalyst:'Govt Policy', catalystPri:'med', surv:'clean', survScore:'8/9', rrmQuad:'Improving', entry:2880, stop:2790, target1:3060, target2:3200, rr:'2.0:1', pattern:'Momentum Pivot', fundHolding:'1,456 funds (▲ 3%)' },
+    { symbol:'TCS', sector:'IT', oneilScore:88, grade:'A+', catalyst:'Blockbuster EPS', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:3840, stop:3720, target1:4100, target2:4350, rr:'2.2:1', pattern:'VCP Pivot', fundHolding:'1,847 funds (▲ 12%)', rsRank:6, rsTier:'top10', pyramidLevel:'p1', pyramidNote:'Initial entry — 50% of full position' },
+    { symbol:'PERSISTENT', sector:'IT', oneilScore:82, grade:'A', catalyst:'Capacity Expansion', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:5680, stop:5480, target1:6100, target2:6500, rr:'2.1:1', pattern:'Tight Flag', fundHolding:'623 funds (▲ 8%)', rsRank:12, rsTier:'top25', pyramidLevel:'p1', pyramidNote:'Initial entry — 50% of full position' },
+    { symbol:'CIPLA', sector:'Pharma', oneilScore:79, grade:'A', catalyst:'Product Launch', catalystPri:'med', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:1520, stop:1470, target1:1640, target2:1720, rr:'2.4:1', pattern:'Inside Day NR7', fundHolding:'1,102 funds (▲ 5%)', rsRank:8, rsTier:'top10', pyramidLevel:'p2', pyramidNote:'Add 30% — stock already +7% from initial, new tight base' },
+    { symbol:'M&M', sector:'Auto', oneilScore:76, grade:'A', catalyst:'Govt Policy', catalystPri:'med', surv:'clean', survScore:'8/9', rrmQuad:'Improving', entry:2880, stop:2790, target1:3060, target2:3200, rr:'2.0:1', pattern:'Momentum Pivot', fundHolding:'1,456 funds (▲ 3%)', rsRank:22, rsTier:'top25', pyramidLevel:'p1', pyramidNote:'Initial entry — sector still Improving, wait for Leading' },
   ],
   scannerPipeline: { universe:2803, hotSectors:2, screened:18, topPicks:4 }
 };
@@ -744,7 +802,44 @@ function renderRegime(mps, g) {
     <div class="regime-verdict-bar ${g.stage2.pass?(g.mpsSignal==='RISK-ON'?'risk-on':'caution'):'risk-off'}">
       <span style="font-size:16px">${g.stage2.pass?'✅':'🚫'}</span>
       <div class="regime-verdict-text">${g.stage2.pass?`<strong>GATE 2 PASSED</strong> — Market regime allows ${g.mpsSignal==='RISK-ON'?'aggressive':'selective'} equity exposure.`:`<strong>GATE 2 BLOCKED</strong> — MPS ${mps.score}/100 below CAUTION threshold (40). No new entries. Wait for regime improvement.`}</div>
+    </div>
+    ${renderRegimeSpeed(mps)}`;
+}
+
+function renderRegimeSpeed(mps) {
+  const delta = mps.weeklyDelta || 0;
+  const prev = mps.prevWeekScore || mps.score;
+  const speed = delta >= CONFIG.regimeSpeed.turbo ? 'TURBO' :
+                delta >= CONFIG.regimeSpeed.accelerating ? 'ACCELERATING' :
+                delta <= CONFIG.regimeSpeed.decelerating ? 'DECELERATING' : 'STEADY';
+  const speedColor = speed === 'TURBO' ? 'var(--green-bright)' :
+                     speed === 'ACCELERATING' ? 'var(--green)' :
+                     speed === 'DECELERATING' ? 'var(--red)' : 'var(--text-dim)';
+  const deltaClass = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
+  const fillPct = Math.min(100, Math.max(5, Math.abs(delta) * 5));
+
+  let speedAdvice = '';
+  if (speed === 'TURBO') speedAdvice = 'New bull leg detected! Enter aggressively at pivots — this is where 30-50% of annual returns are captured.';
+  else if (speed === 'ACCELERATING') speedAdvice = 'Regime improving fast. Be ready for Follow-Through Day confirmation — start building positions.';
+  else if (speed === 'DECELERATING') speedAdvice = 'Regime deteriorating. Tighten all stops to breakeven. No new entries until weekly delta turns positive.';
+  else speedAdvice = 'Regime stable. Continue current exposure level per money profile.';
+
+  return `
+    <div class="regime-speed">
+      <div class="regime-speed-label">WEEKLY SPEED</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="regime-delta ${deltaClass}">${delta > 0 ? '▲' : delta < 0 ? '▼' : '—'} ${delta > 0 ? '+' : ''}${delta} pts/wk</span>
+          <span style="font-family:var(--mono);font-size:10px;color:${speedColor};font-weight:700">${speed}</span>
+          <span style="font-size:9px;color:var(--text-dim)">(prev: ${prev})</span>
+        </div>
+        <div class="regime-speed-bar">
+          <div class="regime-speed-fill" style="width:${fillPct}%;background:${speedColor}"></div>
+        </div>
+        <div style="font-size:9.5px;color:var(--text-dim);margin-top:4px;line-height:1.5">💡 ${speedAdvice}</div>
+      </div>
     </div>`;
+}
 }
 
 function renderSectors(sec) {
@@ -821,21 +916,69 @@ function renderEdge(picks) {
   if(!picks||!picks.length) return `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No stocks survive Edge Intel</div><div class="empty-subtitle">Either upstream gates blocked or no stocks pass O'Neil + Catalyst + Surveillance.</div></div>`;
   return `
     <div class="edge-tabs"><button class="edge-tab active">Top Picks (${picks.length})</button><button class="edge-tab">Catalysts</button><button class="edge-tab">Surveillance</button></div>
-    <table class="edge-table"><thead><tr><th>STOCK</th><th>O'NEIL</th><th>CATALYST</th><th>SURVEILLANCE</th><th>RRM QUAD</th><th>FUND HOLDING</th><th class="td-right">PATTERN</th></tr></thead><tbody>
-    ${picks.map(p=>`<tr><td><div class="stock-name">${p.symbol}</div><div class="stock-sector">${p.sector}</div></td><td><span class="stock-score ${p.grade==='A+'?'a-plus':p.grade==='A'?'a':'b'}">${p.oneilScore} (${p.grade})</span></td><td><span class="catalyst-badge ${p.catalystPri}">${p.catalyst}</span></td><td><span class="surv-check ${p.surv}">${p.surv==='clean'?'✓':'⚠'} ${p.survScore}</span></td><td><span class="sector-pill ${p.rrmQuad.toLowerCase()}">${p.rrmQuad}</span></td><td style="font-size:11px;color:var(--text-secondary)">${p.fundHolding}</td><td class="td-right" style="font-family:var(--mono);font-size:11px;color:var(--cyan)">${p.pattern}</td></tr>`).join('')}
-    </tbody></table>`;
+    <table class="edge-table"><thead><tr><th>STOCK</th><th>O'NEIL</th><th>RS RANK</th><th>CATALYST</th><th>SURVEILLANCE</th><th>RRM QUAD</th><th>PYRAMID</th><th class="td-right">PATTERN</th></tr></thead><tbody>
+    ${picks.map(p=>{
+      const tier = p.rsTier || 'top50';
+      const tierLabel = tier === 'top10' ? 'TOP 10%' : tier === 'top25' ? 'TOP 25%' : tier === 'top50' ? 'TOP 50%' : 'BOTTOM';
+      const pyLevel = p.pyramidLevel || 'p1';
+      const pyLabel = pyLevel === 'p1' ? 'P1 50%' : pyLevel === 'p2' ? 'P2 +30%' : 'P3 +20%';
+      const sizeMulti = CONFIG.rsRankTiers[tier]?.sizeMultiplier ?? 1;
+      return `<tr>
+        <td><div class="stock-name">${p.symbol}</div><div class="stock-sector">${p.sector} · ${p.fundHolding}</div></td>
+        <td><span class="stock-score ${p.grade==='A+'?'a-plus':p.grade==='A'?'a':'b'}">${p.oneilScore} (${p.grade})</span></td>
+        <td><span class="rs-rank ${tier}">RS #${p.rsRank || '—'} ${tierLabel}</span>${sizeMulti !== 1 ? `<div style="font-size:8px;color:var(--text-dim);margin-top:2px">${sizeMulti}x size</div>` : ''}</td>
+        <td><span class="catalyst-badge ${p.catalystPri}">${p.catalyst}</span></td>
+        <td><span class="surv-check ${p.surv}">${p.surv==='clean'?'✓':'⚠'} ${p.survScore}</span></td>
+        <td><span class="sector-pill ${p.rrmQuad.toLowerCase()}">${p.rrmQuad}</span></td>
+        <td><span class="pyramid-badge ${pyLevel}">${pyLabel}</span></td>
+        <td class="td-right" style="font-family:var(--mono);font-size:11px;color:var(--cyan)">${p.pattern}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>
+    <div class="alloc-reasoning" style="margin-top:12px"><span class="alloc-reasoning-icon">⚡</span><div class="alloc-reasoning-text"><strong>RS Ranking:</strong> Stocks sorted by relative strength vs their sector index. <strong>Top 10%</strong> get 1.5x normal position size. Top 25% get standard size. Bottom 50% are filtered out. <strong>Pyramiding:</strong> P1 = 50% initial, P2 = add 30% after +5-8% gain at new tight area, P3 = final 20% at +10-15%.</div></div>`;
 }
 
 function renderExec(picks) {
   if(!picks||!picks.length) return renderEmpty({stage6:{verdict:'NO CANDIDATES'}});
-  return `<div class="exec-cards">${picks.map(p=>`
+  const gates = computeGates(state);
+  return `<div class="exec-cards">${picks.map(p=>{
+    const tier = p.rsTier || 'top25';
+    const sizeMulti = CONFIG.rsRankTiers[tier]?.sizeMultiplier ?? 1;
+    const pyLevel = p.pyramidLevel || 'p1';
+    const pyConfig = CONFIG.pyramid[pyLevel];
+    const pyPct = pyConfig?.sizePercent || 50;
+    const effectiveSize = (sizeMulti * pyPct / 100 * 100).toFixed(0);
+    const filledBlocks = pyLevel === 'p1' ? 1 : pyLevel === 'p2' ? 2 : 3;
+    
+    return `
     <div class="exec-card">
-      <div class="exec-card-top"><div><div class="exec-card-symbol">${p.symbol}</div><div class="exec-card-sector">${p.sector} · ${p.rrmQuad} · ${p.pattern}</div></div><div class="exec-grade ${p.grade==='A+'?'a-plus':'a'}">${p.grade}</div></div>
+      <div class="exec-card-top">
+        <div>
+          <div class="exec-card-symbol">${p.symbol} <span class="rs-rank ${tier}" style="font-size:8px;vertical-align:middle;margin-left:4px">RS #${p.rsRank||'—'}</span></div>
+          <div class="exec-card-sector">${p.sector} · ${p.rrmQuad} · ${p.pattern}</div>
+        </div>
+        <div class="exec-grade ${p.grade==='A+'?'a-plus':'a'}">${p.grade}</div>
+      </div>
       <div class="exec-metrics">
         <div class="exec-metric"><div class="exec-metric-val" style="color:var(--green)">${p.oneilScore}</div><div class="exec-metric-label">O'Neil</div></div>
         <div class="exec-metric"><div class="exec-metric-val" style="color:var(--cyan)">${p.rr}</div><div class="exec-metric-label">Risk:Reward</div></div>
         <div class="exec-metric"><div class="exec-metric-val">${p.survScore}</div><div class="exec-metric-label">Surveillance</div></div>
       </div>
+
+      <!-- Pyramid + Size Row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.08);border-radius:6px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="pyramid-badge ${pyLevel}">${pyConfig?.label || 'P1'}</span>
+          <div class="pyramid-blocks">
+            ${[1,2,3].map(i => `<div class="pyramid-block ${i <= filledBlocks ? 'filled' : 'empty'}" style="height:${8 + i*4}px"></div>`).join('')}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--cyan)">${effectiveSize}%</div>
+          <div style="font-size:8px;color:var(--text-dim);letter-spacing:0.5px">EFFECTIVE SIZE</div>
+        </div>
+      </div>
+
       <div class="exec-entry-zone">
         <div class="exec-entry-title">🎯 LOW-RISK ENTRY ZONE</div>
         <div class="exec-entry-row"><span>Entry (Pivot)</span><span style="color:var(--cyan)">₹${p.entry.toLocaleString()}</span></div>
@@ -843,14 +986,16 @@ function renderExec(picks) {
         <div class="exec-entry-row"><span>Target 1</span><span style="color:var(--green)">₹${p.target1.toLocaleString()}</span></div>
         <div class="exec-entry-row"><span>Target 2</span><span style="color:var(--green-bright)">₹${p.target2.toLocaleString()}</span></div>
         <div class="exec-entry-row" style="margin-top:4px;padding-top:4px;border-top:1px solid var(--border-dim)"><span>Catalyst</span><span style="color:var(--amber)">${p.catalyst}</span></div>
-        <div class="exec-entry-row"><span>Fund Holding</span><span>${p.fundHolding}</span></div>
+        <div class="exec-entry-row"><span>RS Rank (${tier.toUpperCase()})</span><span style="color:var(--cyan)">#${p.rsRank||'—'} → ${sizeMulti}x size</span></div>
+        <div class="exec-entry-row"><span>Pyramid</span><span>${p.pyramidNote || pyConfig?.trigger || ''}</span></div>
       </div>
       <div class="exec-action">
         <button class="exec-btn chart" onclick="openChart('${p.symbol}')">📊 Chart</button>
         <button class="exec-btn watchlist" onclick="addWL('${p.symbol}')">+ Watchlist</button>
         <button class="exec-btn drill" onclick="location.href='stock.html?s=${p.symbol}'">🔍 Deep Dive</button>
       </div>
-    </div>`).join('')}</div>`;
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderEmpty(g) {
