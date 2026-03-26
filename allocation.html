@@ -119,7 +119,41 @@ body{background:var(--bg);color:var(--text-primary);font-family:var(--font);min-
     <div id="equity-bar"></div>
   </div>
 
-  <!-- ADD TRANSACTION -->
+  <!-- DHAN BROKER SYNC -->
+  <div class="section">
+    <div class="section-title">🔗 Dhan Broker Sync</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div class="config-card">
+        <label>Dhan Client ID</label>
+        <input type="text" id="dhan-client-id" placeholder="1000XXXXXX" onchange="saveDhanConfig()">
+      </div>
+      <div class="config-card">
+        <label>Dhan Access Token <span style="color:var(--red);font-size:7px">(expires daily)</span></label>
+        <input type="password" id="dhan-token" placeholder="Paste from web.dhan.co" onchange="saveDhanConfig()">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <button class="btn btn-cyan" onclick="fetchDhanBalance()">🔄 Fetch Dhan Balance</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('dhan-token').type = document.getElementById('dhan-token').type === 'password' ? 'text' : 'password'">👁 Show/Hide Token</button>
+    </div>
+    <div id="dhan-balance-panel"></div>
+  </div>
+
+  <!-- QUARTERLY SETTLEMENT -->
+  <div class="section">
+    <div class="section-title">📅 SEBI Quarterly Settlement</div>
+    <div style="padding:14px 18px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:10px">
+        SEBI requires brokers to return idle funds to your bank account on the last Friday of every quarter. This is a <strong style="color:var(--cyan)">round-trip</strong> — not real capital movement. Next settlement dates:
+      </div>
+      <div id="settlement-dates" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+      <div style="font-size:10px;color:var(--text-dim);padding:8px 10px;background:rgba(0,0,0,0.2);border-radius:6px">
+        💡 <strong>How to handle:</strong> Don't log settlements as deposits/withdrawals — they inflate your totals. Only log <strong style="color:var(--green)">real additions</strong> (new savings for trading) and <strong style="color:var(--red)">real withdrawals</strong> (profits you're spending). The round-trip money is the same capital.
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD TRANSACTION (moved here, was above) -->
   <div class="section">
     <div class="section-title">➕ Add Transaction</div>
     <div class="form-row">
@@ -192,7 +226,9 @@ let config = { riskPct: 1, maxPositions: 10, maxSectorPct: 30 };
 function init() {
   document.getElementById('txn-date').value = new Date().toISOString().split('T')[0];
   loadConfig();
+  loadDhanConfig();
   loadTransactions();
+  renderSettlementDates();
 }
 
 // ═══ LOAD/SAVE ═══
@@ -448,6 +484,160 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ═══ DHAN BROKER SYNC ═══
+function loadDhanConfig() {
+  const dc = JSON.parse(localStorage.getItem('te_dhan_config') || 'null');
+  if (dc) {
+    document.getElementById('dhan-client-id').value = dc.clientId || '';
+    document.getElementById('dhan-token').value = dc.token || '';
+  }
+}
+
+function saveDhanConfig() {
+  const clientId = document.getElementById('dhan-client-id').value.trim();
+  const token = document.getElementById('dhan-token').value.trim();
+  localStorage.setItem('te_dhan_config', JSON.stringify({ clientId, token }));
+  showToast('✓ Dhan credentials saved');
+}
+
+async function fetchDhanBalance() {
+  const dc = JSON.parse(localStorage.getItem('te_dhan_config') || '{}');
+  if (!dc.clientId || !dc.token) {
+    showToast('⚠ Enter Dhan Client ID and Access Token first');
+    return;
+  }
+
+  const panel = document.getElementById('dhan-balance-panel');
+  panel.innerHTML = '<div style="font-size:11px;color:var(--text-dim)">Fetching from Dhan API...</div>';
+
+  try {
+    const r = await fetch('https://api.dhan.co/v2/fundlimit', {
+      headers: { 'Content-Type': 'application/json', 'access-token': dc.token }
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      panel.innerHTML = `<div style="padding:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);border-radius:8px;font-size:11px;color:var(--red)">
+        ❌ Dhan API Error: ${err.errorMessage || r.status} — ${r.status === 401 ? 'Token expired. Generate a new one at web.dhan.co' : 'Check credentials'}
+      </div>`;
+      return;
+    }
+
+    const data = await r.json();
+    const available = data.availabelBalance || data.availableBalance || 0;
+    const utilized = data.utilizedAmount || 0;
+    const collateral = data.collateralAmount || 0;
+    const withdrawable = data.withdrawableBalance || 0;
+    const blocked = data.blockedPayoutAmount || 0;
+    const sodLimit = data.sodLimit || 0;
+    const brokerTotal = available + utilized;
+
+    // Compare with our capital tracking
+    const equity = computeEquity();
+    const diff = equity.currentEquity - brokerTotal;
+    const diffPct = equity.currentEquity > 0 ? (diff / equity.currentEquity * 100) : 0;
+
+    // Save last sync
+    const syncData = { available, utilized, collateral, withdrawable, brokerTotal, syncedAt: new Date().toISOString() };
+    localStorage.setItem('te_dhan_last_sync', JSON.stringify(syncData));
+
+    panel.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+        <div style="padding:10px 14px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.1);border-radius:8px">
+          <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin-bottom:4px">AVAILABLE</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green)">₹${Math.round(available).toLocaleString()}</div>
+        </div>
+        <div style="padding:10px 14px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.1);border-radius:8px">
+          <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--purple);margin-bottom:4px">UTILIZED (IN POSITIONS)</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--purple)">₹${Math.round(utilized).toLocaleString()}</div>
+        </div>
+        <div style="padding:10px 14px;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.1);border-radius:8px">
+          <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);margin-bottom:4px">BROKER TOTAL</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--cyan)">₹${Math.round(brokerTotal).toLocaleString()}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:6px;font-size:10px">
+          <span style="color:var(--text-dim)">Withdrawable:</span> <span style="font-family:var(--mono);color:var(--text-primary)">₹${Math.round(withdrawable).toLocaleString()}</span>
+        </div>
+        <div style="padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:6px;font-size:10px">
+          <span style="color:var(--text-dim)">Collateral:</span> <span style="font-family:var(--mono);color:var(--text-primary)">₹${Math.round(collateral).toLocaleString()}</span>
+        </div>
+      </div>
+      <div style="padding:12px 16px;background:${Math.abs(diffPct) < 5 ? 'rgba(16,185,129,0.06)' : 'rgba(251,191,36,0.06)'};border:1px solid ${Math.abs(diffPct) < 5 ? 'rgba(16,185,129,0.1)' : 'rgba(251,191,36,0.1)'};border-radius:8px;font-size:11px">
+        <strong style="color:${Math.abs(diffPct) < 5 ? 'var(--green)' : 'var(--amber)'}">
+          ${Math.abs(diffPct) < 5 ? '✅ MATCHED' : '⚠️ MISMATCH'} — Capital Page vs Broker
+        </strong>
+        <div style="display:flex;gap:20px;margin-top:6px;font-size:10px;color:var(--text-secondary)">
+          <span>Capital Page: ₹${Math.round(equity.currentEquity).toLocaleString()}</span>
+          <span>Broker: ₹${Math.round(brokerTotal).toLocaleString()}</span>
+          <span style="color:${Math.abs(diffPct) < 5 ? 'var(--green)' : 'var(--amber)'}">Diff: ${diff >= 0 ? '+' : ''}₹${Math.round(diff).toLocaleString()} (${diffPct.toFixed(1)}%)</span>
+        </div>
+        ${Math.abs(diffPct) >= 5 ? `<div style="font-size:9px;color:var(--text-dim);margin-top:4px">
+          This could be: SEBI settlement pending re-deposit, unlogged deposit/withdrawal, or realized P&L not yet accounted.
+        </div>` : ''}
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:8px">Last synced: ${new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata'})}</div>
+    `;
+
+    showToast('✓ Dhan balance fetched');
+  } catch (e) {
+    panel.innerHTML = `<div style="padding:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);border-radius:8px;font-size:11px;color:var(--red)">
+      ❌ Connection failed: ${e.message}. Check if CORS is allowed or try from a different network.
+    </div>`;
+  }
+}
+
+// ═══ SEBI QUARTERLY SETTLEMENT DATES ═══
+function renderSettlementDates() {
+  // Last Friday of each quarter: Mar, Jun, Sep, Dec
+  const now = new Date();
+  const year = now.getFullYear();
+  const quarters = [
+    { month: 2, label: 'Q4 (Mar)' },  // March
+    { month: 5, label: 'Q1 (Jun)' },  // June
+    { month: 8, label: 'Q2 (Sep)' },  // September
+    { month: 11, label: 'Q3 (Dec)' }, // December
+  ];
+
+  const dates = quarters.map(q => {
+    // Find last Friday of the quarter-end month
+    const lastDay = new Date(year, q.month + 1, 0); // Last day of month
+    const dayOfWeek = lastDay.getDay();
+    const offset = dayOfWeek >= 5 ? dayOfWeek - 5 : dayOfWeek + 2;
+    const lastFriday = new Date(lastDay);
+    lastFriday.setDate(lastDay.getDate() - offset);
+
+    // If past, show next year
+    const d = lastFriday < now ? new Date(year + 1, q.month, lastFriday.getDate()) : lastFriday;
+    const isPast = lastFriday < now;
+    const isNext = !isPast && quarters.findIndex(qq => {
+      const ld = new Date(year, qq.month + 1, 0);
+      const dow = ld.getDay();
+      const off = dow >= 5 ? dow - 5 : dow + 2;
+      const lf = new Date(ld); lf.setDate(ld.getDate() - off);
+      return lf >= now;
+    }) === quarters.indexOf(q);
+
+    return {
+      label: q.label,
+      date: lastFriday,
+      dateStr: lastFriday.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      isPast,
+      isNext,
+    };
+  });
+
+  document.getElementById('settlement-dates').innerHTML = dates.map(d => `
+    <div style="padding:6px 12px;border-radius:6px;font-size:10px;font-family:var(--mono);
+      background:${d.isNext ? 'rgba(251,191,36,0.1)' : d.isPast ? 'rgba(0,0,0,0.2)' : 'rgba(34,211,238,0.06)'};
+      border:1px solid ${d.isNext ? 'rgba(251,191,36,0.2)' : 'var(--border-subtle)'};
+      color:${d.isNext ? 'var(--gold)' : d.isPast ? 'var(--text-dim)' : 'var(--text-secondary)'}">
+      ${d.label}: ${d.dateStr} ${d.isNext ? '← NEXT' : d.isPast ? '✓' : ''}
+    </div>
+  `).join('');
 }
 
 // ═══ BOOT ═══
