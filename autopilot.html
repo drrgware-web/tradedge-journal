@@ -207,6 +207,22 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .sector-pill.lagging{background:rgba(239,68,68,0.08);color:var(--red-bright);border:1px solid rgba(239,68,68,0.12);}
 .sector-empty{font-size:10.5px;color:var(--text-muted);font-style:italic;}
 
+/* ═══ SUB-GROUP FILTER PILLS ═══ */
+.subgroup-filter{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;}
+.subgroup-pill{font-size:10px;font-weight:600;padding:5px 14px;border-radius:6px;cursor:pointer;color:var(--text-dim);background:transparent;border:1px solid var(--border-dim);font-family:var(--font);letter-spacing:0.5px;transition:all 0.2s;}
+.subgroup-pill:hover{color:var(--text-secondary);border-color:var(--border-accent);}
+.subgroup-pill.active{color:var(--cyan);background:var(--cyan-dim);border-color:rgba(34,211,238,0.2);}
+.subgroup-pill .pill-count{font-family:var(--mono);font-size:9px;opacity:0.7;margin-left:4px;}
+.etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;margin-bottom:14px;}
+.etf-item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:6px;font-size:10px;transition:border-color 0.2s;}
+.etf-item:hover{border-color:var(--border-accent);}
+.etf-name{font-weight:600;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+.etf-quad{font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;flex-shrink:0;}
+.etf-quad.leading{background:rgba(16,185,129,0.1);color:var(--green-bright);}
+.etf-quad.improving{background:rgba(34,211,238,0.08);color:var(--cyan-soft);}
+.etf-quad.weakening{background:rgba(245,158,11,0.08);color:var(--amber-bright);}
+.etf-quad.lagging{background:rgba(239,68,68,0.08);color:var(--red-bright);}
+
 /* ═══ STAGE 4: HELIX ═══ */
 .helix-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
 .helix-tf{background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:10px;padding:14px 16px;}
@@ -334,6 +350,86 @@ const CONFIG = {
 };
 
 // ═══ DEMO DATA (shown when live feeds unavailable) ═══
+// Full RRM universe: 16 Sectors + 54 ETFs + 47 Thematic + 12 Assets + 11 Segments + 25 Global
+const RRM_ETFS = [
+  // ── Broad Market ETFs ──
+  { symbol:'NIFTYBEES', name:'Nifty 50 ETF', group:'Broad' },
+  { symbol:'JUNIORBEES', name:'Nifty Next 50 ETF', group:'Broad' },
+  { symbol:'N100', name:'Nifty 100 ETF', group:'Broad' },
+  { symbol:'MOM100', name:'Nifty 100 Momentum', group:'Broad' },
+  { symbol:'MOM50', name:'Nifty 50 Momentum', group:'Broad' },
+  { symbol:'MIDCAP150', name:'Nifty Midcap 150 ETF', group:'Broad' },
+  { symbol:'SMLCAP250', name:'Nifty Smallcap 250 ETF', group:'Broad' },
+  { symbol:'MIDSELECT', name:'Midcap Select ETF', group:'Broad' },
+  { symbol:'NIF500', name:'Nifty 500 ETF', group:'Broad' },
+  { symbol:'MICROCAP250', name:'Nifty Microcap 250 ETF', group:'Broad' },
+  // ── Sector ETFs ──
+  { symbol:'BANKBEES', name:'Bank Nifty ETF', group:'Sector' },
+  { symbol:'ITBEES', name:'IT ETF', group:'Sector' },
+  { symbol:'PSUBNKBEES', name:'PSU Bank ETF', group:'Sector' },
+  { symbol:'PVTBANIETF', name:'Private Bank ETF', group:'Sector' },
+  { symbol:'FINIETF', name:'Financial Services ETF', group:'Sector' },
+  { symbol:'PHARMABEES', name:'Pharma ETF', group:'Sector' },
+  { symbol:'AUTOBEES', name:'Auto ETF', group:'Sector' },
+  { symbol:'METALBEES', name:'Metal ETF', group:'Sector' },
+  { symbol:'FMCGIETF', name:'FMCG ETF', group:'Sector' },
+  { symbol:'ENERGYBEES', name:'Energy ETF', group:'Sector' },
+  { symbol:'REALTYETF', name:'Realty ETF', group:'Sector' },
+  { symbol:'INFRAIETF', name:'Infra ETF', group:'Sector' },
+  { symbol:'MEDIAIETF', name:'Media ETF', group:'Sector' },
+  { symbol:'CONSUMBEES', name:'Consumption ETF', group:'Sector' },
+  // ── Thematic / Strategy ETFs ──
+  { symbol:'HEALTHIETF', name:'Healthcare ETF', group:'Thematic' },
+  { symbol:'COMMOIETF', name:'Commodities ETF', group:'Thematic' },
+  { symbol:'DIVOPPBEES', name:'Dividend Opp ETF', group:'Thematic' },
+  { symbol:'ALPHAETF', name:'Alpha ETF', group:'Thematic' },
+  { symbol:'LOWVOLETF', name:'Low Volatility ETF', group:'Thematic' },
+  { symbol:'QUALITYETF', name:'Quality ETF', group:'Thematic' },
+  { symbol:'VALUEETF', name:'Value ETF', group:'Thematic' },
+  { symbol:'GROWWETF', name:'Growth ETF', group:'Thematic' },
+  { symbol:'DEFENCEETF', name:'Defence ETF', group:'Thematic' },
+  { symbol:'MNFGETF', name:'Manufacturing ETF', group:'Thematic' },
+  { symbol:'EVINDIA', name:'EV India ETF', group:'Thematic' },
+  { symbol:'DIGITALETF', name:'Digital India ETF', group:'Thematic' },
+  { symbol:'CPSE', name:'CPSE ETF', group:'Thematic' },
+  { symbol:'MOMETF', name:'Momentum ETF', group:'Thematic' },
+  { symbol:'TECHNOLOGYETF', name:'Technology ETF', group:'Thematic' },
+  { symbol:'GREENEX', name:'Green Energy ETF', group:'Thematic' },
+  // ── International / Gold ETFs ──
+  { symbol:'GOLDBEES', name:'Gold ETF', group:'Intl/Gold' },
+  { symbol:'SILVERBEES', name:'Silver ETF', group:'Intl/Gold' },
+  { symbol:'GOLDCASE', name:'Gold Case ETF', group:'Intl/Gold' },
+  { symbol:'N50USDETF', name:'Nifty 50 USD ETF', group:'Intl/Gold' },
+  { symbol:'NASDAQ100', name:'Nasdaq 100 FoF', group:'Intl/Gold' },
+  { symbol:'SP500ETF', name:'S&P 500 ETF', group:'Intl/Gold' },
+  { symbol:'HANGSENGBEES', name:'Hang Seng ETF', group:'Intl/Gold' },
+  // ── Fixed Income / Liquid ETFs ──
+  { symbol:'LIQUIDBEES', name:'Liquid ETF', group:'Fixed Inc' },
+  { symbol:'LIQUIDCASE', name:'Liquid Case ETF', group:'Fixed Inc' },
+  { symbol:'GILTETF', name:'G-Sec Gilt ETF', group:'Fixed Inc' },
+  { symbol:'LONGTERMETF', name:'Long Duration ETF', group:'Fixed Inc' },
+  { symbol:'SDL24BEES', name:'SDL 2024 ETF', group:'Fixed Inc' },
+  { symbol:'TRIPARTYETF', name:'Tri-Party Repo ETF', group:'Fixed Inc' },
+  { symbol:'NETFSDL26', name:'SDL 2026 ETF', group:'Fixed Inc' },
+];
+
+// Demo ETF quadrant assignments (simulated)
+const DEMO_ETF_QUADS = {};
+RRM_ETFS.forEach((etf, i) => {
+  // Distribute across quadrants for demo
+  const quads = ['leading','improving','weakening','lagging'];
+  // In risk-off demo: mostly weakening/lagging
+  if (etf.group === 'Sector' && ['ITBEES','PHARMABEES'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'leading';
+  else if (etf.group === 'Sector' && ['AUTOBEES','FMCGIETF'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'improving';
+  else if (etf.group === 'Intl/Gold' && ['GOLDBEES','SILVERBEES'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'leading';
+  else if (etf.group === 'Thematic' && ['DEFENCEETF','MNFGETF','CPSE'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'improving';
+  else if (['BANKBEES','FINIETF','PVTBANIETF','PSUBNKBEES'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'weakening';
+  else if (['METALBEES','REALTYETF','MEDIAIETF','ENERGYBEES'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'lagging';
+  else if (['NIFTYBEES','JUNIORBEES','N100','NIF500'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'weakening';
+  else if (['LIQUIDBEES','LIQUIDCASE','TRIPARTYETF','GILTETF','LONGTERMETF','SDL24BEES','NETFSDL26'].includes(etf.symbol)) DEMO_ETF_QUADS[etf.symbol] = 'leading';
+  else DEMO_ETF_QUADS[etf.symbol] = quads[i % 4];
+});
+
 const DEMO = {
   mps: {
     score: 35, trend: 'Declining', signal: 'RISK-OFF',
@@ -349,6 +445,7 @@ const DEMO = {
     }
   },
   sectors: { leading: ['IT','Pharma'], improving: ['Auto','FMCG'], weakening: ['Bank Nifty','Fin Services'], lagging: ['Metal','Realty','PSU Bank','Media'] },
+  etfs: RRM_ETFS.map(e => ({ ...e, quadrant: DEMO_ETF_QUADS[e.symbol] || 'lagging' })),
   helix: { daily: { direction:'down', signal:'WEAKENING', detail:'12/16 sectors below daily RS zero line' }, weekly: { direction:'down', signal:'BEARISH', detail:'14/16 sectors lost weekly RS momentum' }, monthly: { direction:'flat', signal:'NEUTRAL', detail:'Long-term trend still intact for 6/16' }, alignment:0.25, alignedSectors:2, totalSectors:16 },
   assetAllocation: { equity: { alloc:40, signal:'underweight', recommended:false }, cash: { alloc:35, signal:'overweight', recommended:true }, gold: { alloc:15, signal:'overweight', recommended:true }, intl: { alloc:10, signal:'neutral', recommended:false } },
   topPicks: [
@@ -360,7 +457,7 @@ const DEMO = {
   scannerPipeline: { universe:2803, hotSectors:2, screened:18, topPicks:4 }
 };
 
-let state = { mps:null, sectors:null, helix:null, assetAllocation:null, topPicks:[], pipeline:{}, loading:true };
+let state = { mps:null, sectors:null, etfs:[], helix:null, assetAllocation:null, topPicks:[], pipeline:{}, loading:true, activeSubgroup:'sectors' };
 
 // ═══ GATE LOGIC ═══
 function computeGates(d) {
@@ -394,11 +491,16 @@ async function loadData() {
     ]);
     const rrmData = rrmRes.status==='fulfilled' ? rrmRes.value : null;
     const mpsData = mpsRes.status==='fulfilled' ? mpsRes.value : null;
-    if (rrmData) { state.sectors = parseRRMSectors(rrmData); state.helix = parseHelixFromRRM(rrmData); }
+    if (rrmData) {
+      state.sectors = parseRRMSectors(rrmData);
+      state.etfs = parseRRMETFs(rrmData);
+      state.helix = parseHelixFromRRM(rrmData);
+    }
     if (mpsData && mpsData.score) { state.mps = mpsData; }
   } catch(e) { console.log('Live data unavailable, using demo:', e); }
   if (!state.mps) state.mps = DEMO.mps;
   if (!state.sectors) state.sectors = DEMO.sectors;
+  if (!state.etfs || state.etfs.length === 0) state.etfs = DEMO.etfs;
   if (!state.helix) state.helix = DEMO.helix;
   state.assetAllocation = computeAssetAllocation(state.mps);
   state.topPicks = DEMO.topPicks;
@@ -418,6 +520,30 @@ function parseRRMSectors(d) {
     else if (q.includes('lagging')) s.lagging.push(n);
   }
   return s;
+}
+
+function parseRRMETFs(d) {
+  const etfs = [];
+  // rrm_data.json may have ETFs under 'ETFs' or 'etfs' key
+  const etfData = d.ETFs || d.etfs || d.ETF || {};
+  for (const [symbol, v] of Object.entries(etfData)) {
+    const q = (v.weekly?.quadrant || v.quadrant || '').toLowerCase();
+    let quadrant = 'lagging';
+    if (q.includes('leading')) quadrant = 'leading';
+    else if (q.includes('improving')) quadrant = 'improving';
+    else if (q.includes('weakening')) quadrant = 'weakening';
+    // Match to our master ETF list for name/group
+    const master = RRM_ETFS.find(e => e.symbol === symbol || symbol.includes(e.symbol));
+    etfs.push({
+      symbol,
+      name: master?.name || symbol,
+      group: master?.group || 'Other',
+      quadrant
+    });
+  }
+  // If no ETF data in rrm_data.json, fall back to master list with demo quadrants
+  if (etfs.length === 0) return DEMO.etfs;
+  return etfs;
 }
 function parseHelixFromRRM(d) { return DEMO.helix; }
 
@@ -502,10 +628,10 @@ function render() {
       <div class="stage-header" onclick="toggle(this)">
         <div class="stage-header-left">
           <div class="stage-num n3">3</div>
-          <div class="stage-title-group"><div class="stage-title" style="color:var(--amber)">Sector Rotation</div><div class="stage-question">Where is smart money flowing? (RRM Quadrants)</div></div>
+          <div class="stage-title-group"><div class="stage-title" style="color:var(--amber)">Sector Rotation</div><div class="stage-question">Where is smart money flowing? (16 Sectors + 54 ETFs via RRM Quadrants)</div></div>
         </div>
         <div class="stage-verdict">
-          <span style="font-size:11px;color:var(--text-dim);margin-right:8px">${(state.sectors.leading.length+state.sectors.improving.length+state.sectors.weakening.length+state.sectors.lagging.length)} sectors</span>
+          <span style="font-size:11px;color:var(--text-dim);margin-right:8px">${(state.sectors.leading.length+state.sectors.improving.length+state.sectors.weakening.length+state.sectors.lagging.length)} sectors + ${state.etfs.length} ETFs</span>
           <span class="verdict-badge ${g.stage3.pass?'risk-on':'risk-off'}"><span class="dot"></span>${g.stage3.verdict}</span>
         </div>
       </div>
@@ -613,9 +739,57 @@ function renderRegime(mps, g) {
 
 function renderSectors(sec) {
   const qs=[{k:'leading',t:'LEADING',i:'▲',c:'leading'},{k:'improving',t:'IMPROVING',i:'↗',c:'improving'},{k:'weakening',t:'WEAKENING',i:'↘',c:'weakening'},{k:'lagging',t:'LAGGING',i:'▼',c:'lagging'}];
+
+  // ETF stats by quadrant
+  const etfs = state.etfs || [];
+  const etfByQuad = { leading:[], improving:[], weakening:[], lagging:[] };
+  etfs.forEach(e => { if (etfByQuad[e.quadrant]) etfByQuad[e.quadrant].push(e); });
+  const etfLeading = etfByQuad.leading.length;
+  const etfImproving = etfByQuad.improving.length;
+  const totalSectors = sec.leading.length + sec.improving.length + sec.weakening.length + sec.lagging.length;
+
+  // ETF groups for sub-filter
+  const groups = [...new Set(etfs.map(e => e.group))];
+  const activeGrp = state.activeSubgroup || 'all';
+  const filteredETFs = activeGrp === 'all' ? etfs : etfs.filter(e => e.group === activeGrp);
+
   return `
-    <div class="sector-quadrants">${qs.map(q=>{const it=sec[q.k]||[];return`<div class="quadrant"><div class="quadrant-header"><div class="quadrant-title ${q.c}">${q.i} ${q.t} (${it.length})</div></div><div class="quadrant-items">${it.length>0?it.map(s=>`<span class="sector-pill ${q.c}">${s}</span>`).join(''):`<span class="sector-empty">None</span>`}</div></div>`;}).join('')}</div>
-    <div class="alloc-reasoning"><span class="alloc-reasoning-icon">🎯</span><div class="alloc-reasoning-text"><strong>Focus:</strong> ${sec.leading.length>0?`Concentrate on <strong>${sec.leading.join(', ')}</strong> (Leading). Minervini: "Fish where the fish are."`:sec.improving.length>0?`<strong>${sec.improving.join(', ')}</strong> are Improving — early rotation candidates. Smaller size until confirmed.`:`No sectors Leading or Improving. Broad weakness confirms RISK-OFF.`}</div></div>`;
+    <!-- Sub-group filter pills -->
+    <div class="subgroup-filter">
+      <button class="subgroup-pill ${state.activeSubgroup==='sectors'?'active':''}" onclick="setSubgroup('sectors')">Sectors<span class="pill-count">(${totalSectors})</span></button>
+      <button class="subgroup-pill ${state.activeSubgroup==='all'?'active':''}" onclick="setSubgroup('all')">All ETFs<span class="pill-count">(${etfs.length})</span></button>
+      ${groups.map(g => `<button class="subgroup-pill ${state.activeSubgroup===g?'active':''}" onclick="setSubgroup('${g}')">${g}<span class="pill-count">(${etfs.filter(e=>e.group===g).length})</span></button>`).join('')}
+    </div>
+
+    ${state.activeSubgroup === 'sectors' || state.activeSubgroup === '' ? `
+      <!-- Sector Quadrants -->
+      <div class="sector-quadrants">${qs.map(q=>{const it=sec[q.k]||[];return`<div class="quadrant"><div class="quadrant-header"><div class="quadrant-title ${q.c}">${q.i} ${q.t} (${it.length})</div></div><div class="quadrant-items">${it.length>0?it.map(s=>`<span class="sector-pill ${q.c}">${s}</span>`).join(''):`<span class="sector-empty">None</span>`}</div></div>`;}).join('')}</div>
+    ` : `
+      <!-- ETF Quadrants -->
+      <div class="sector-quadrants">
+        ${qs.map(q => {
+          const items = filteredETFs.filter(e => e.quadrant === q.k);
+          return `<div class="quadrant">
+            <div class="quadrant-header"><div class="quadrant-title ${q.c}">${q.i} ${q.t} (${items.length})</div></div>
+            <div class="quadrant-items">
+              ${items.length > 0 ? items.map(e => `<span class="sector-pill ${q.c}" title="${e.name}">${e.symbol}</span>`).join('') : `<span class="sector-empty">None</span>`}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- ETF Detail Grid -->
+      <div class="etf-grid">
+        ${filteredETFs.map(e => `
+          <div class="etf-item">
+            <span class="etf-name" title="${e.name}">${e.symbol} <span style="color:var(--text-muted);font-weight:400;font-size:9px">${e.group}</span></span>
+            <span class="etf-quad ${e.quadrant}">${e.quadrant.toUpperCase()}</span>
+          </div>
+        `).join('')}
+      </div>
+    `}
+
+    <div class="alloc-reasoning"><span class="alloc-reasoning-icon">🎯</span><div class="alloc-reasoning-text"><strong>Focus:</strong> ${sec.leading.length>0?`Concentrate on <strong>${sec.leading.join(', ')}</strong> (Leading). Minervini: "Fish where the fish are." ETF flow: ${etfLeading} ETFs in Leading, ${etfImproving} Improving — confirms sector strength.`:sec.improving.length>0?`<strong>${sec.improving.join(', ')}</strong> are Improving — early rotation candidates. ${etfImproving} ETFs also improving. Smaller size until confirmed.`:`No sectors Leading or Improving. Only ${etfLeading} ETFs in Leading quadrant (likely defensive/gold). Broad weakness confirms RISK-OFF.`}</div></div>`;
 }
 
 function renderHelix(h) {
@@ -677,6 +851,10 @@ function renderEmpty(g) {
 function toggle(el) {
   const b = el.parentElement.querySelector('.stage-body');
   if(b) b.style.display = b.style.display==='none'?'':'none';
+}
+function setSubgroup(grp) {
+  state.activeSubgroup = grp;
+  render();
 }
 function openChart(s) { window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE:${s}`,'_blank'); }
 function addWL(s) {
