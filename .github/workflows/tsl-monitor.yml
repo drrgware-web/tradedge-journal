@@ -1,0 +1,42 @@
+# ═══════════════════════════════════════════
+# EDGE PILOT — TSL MONITOR WORKFLOW
+# Runs Mon-Fri at 4:00 PM IST (10:30 UTC)
+# ═══════════════════════════════════════════
+
+name: TSL Monitor
+
+on:
+  schedule:
+    - cron: '30 10 * * 1-5'  # 4:00 PM IST (Mon-Fri)
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance requests pandas numpy
+
+      - name: Run TSL Monitor
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/tsl_monitor.py
+
+      - name: Commit TSL levels
+        run: |
+          git config user.name "Edge Pilot Bot"
+          git config user.email "bot@tradedge.app"
+          git add data/tsl_levels.json
+          git diff --cached --quiet || git commit -m "🛡️ TSL levels updated $(date +'%Y-%m-%d %H:%M')"
+          git push
