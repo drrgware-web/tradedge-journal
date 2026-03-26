@@ -410,6 +410,79 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:900px){.asset-grid{grid-template-columns:repeat(2,1fr);}.money-profile{grid-template-columns:1fr;gap:16px;}.helix-grid{grid-template-columns:1fr;}.exec-cards{grid-template-columns:1fr;}.regime-grid{grid-template-columns:1fr;}}
 @media(max-width:600px){.app{padding:0 12px 40px;}.hero{padding:20px 16px;}.stage-header{padding:14px 16px;}.stage-body{padding:0 16px 18px;}.pipeline{padding:12px 8px;overflow-x:auto;}.asset-grid{grid-template-columns:1fr;}.sector-quadrants{grid-template-columns:1fr;}.header-nav{display:none;}}
+
+/* ═══ ORDER BUILDER MODAL ═══ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:2000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.modal-overlay.show{opacity:1;pointer-events:auto;}
+.modal{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:16px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.6);animation:modalIn 0.3s ease-out;}
+@keyframes modalIn{from{transform:translateY(20px) scale(0.97);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 14px;border-bottom:1px solid var(--border-dim);}
+.modal-title{font-size:16px;font-weight:800;letter-spacing:1px;}
+.modal-close{background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all 0.2s;}
+.modal-close:hover{color:var(--text-primary);background:var(--bg-elevated);}
+.modal-body{padding:20px 24px;}
+.modal-footer{padding:14px 24px 20px;border-top:1px solid var(--border-dim);display:flex;gap:8px;justify-content:flex-end;}
+
+/* Order Details */
+.order-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.order-field{padding:10px 12px;background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:8px;}
+.order-field-label{font-size:8px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;}
+.order-field-val{font-family:var(--mono);font-size:16px;font-weight:700;}
+.order-field.full{grid-column:1/-1;}
+
+/* Broker Selector */
+.broker-select{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.broker-card{padding:12px;background:var(--bg-inset);border:2px solid var(--border-dim);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;}
+.broker-card:hover{border-color:var(--border-accent);}
+.broker-card.selected{border-color:var(--cyan);background:rgba(34,211,238,0.05);box-shadow:0 0 12px rgba(34,211,238,0.1);}
+.broker-name{font-size:13px;font-weight:700;margin-bottom:2px;}
+.broker-type{font-size:9px;color:var(--text-dim);letter-spacing:0.5px;}
+.broker-level{font-size:8px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-top:6px;padding:2px 8px;border-radius:3px;display:inline-block;}
+.broker-level.l1{background:rgba(100,116,139,0.1);color:var(--text-dim);}
+.broker-level.l2{background:rgba(245,158,11,0.1);color:var(--amber);}
+.broker-level.l3{background:rgba(16,185,129,0.1);color:var(--green);}
+
+/* Order Type Tabs */
+.order-tabs{display:flex;gap:4px;margin-bottom:14px;}
+.order-tab{font-size:10px;font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;color:var(--text-dim);background:transparent;border:1px solid transparent;font-family:var(--font);letter-spacing:0.5px;transition:all 0.2s;}
+.order-tab.active{color:var(--cyan);background:var(--cyan-dim);border-color:rgba(34,211,238,0.15);}
+
+/* Order clipboard */
+.order-clipboard{background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:8px;padding:12px;font-family:var(--mono);font-size:10px;color:var(--text-secondary);line-height:1.8;white-space:pre-wrap;margin-bottom:12px;position:relative;}
+.copy-btn{position:absolute;top:8px;right:8px;padding:4px 10px;border-radius:4px;background:var(--cyan-dim);border:1px solid rgba(34,211,238,0.15);color:var(--cyan);font-size:9px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.copy-btn:hover{background:rgba(34,211,238,0.15);}
+
+/* Execute button styles */
+.exec-btn.execute{background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(34,211,238,0.1));border-color:rgba(16,185,129,0.25);color:var(--green-bright);font-weight:800;letter-spacing:1px;}
+.exec-btn.execute:hover{background:linear-gradient(135deg,rgba(16,185,129,0.3),rgba(34,211,238,0.15));box-shadow:0 0 12px rgba(16,185,129,0.15);}
+
+/* Journal log preview */
+.journal-preview{padding:10px 12px;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.1);border-radius:8px;margin-top:12px;}
+.journal-preview-title{font-size:8px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--purple);margin-bottom:6px;}
+.journal-row{display:flex;justify-content:space-between;font-size:10px;color:var(--text-secondary);margin-bottom:2px;}
+.journal-row span:last-child{font-family:var(--mono);color:var(--text-primary);font-weight:600;}
+
+/* ═══ EXISTING POSITION PANEL ═══ */
+.existing-pos{padding:12px 14px;border-radius:8px;margin-bottom:14px;}
+.existing-pos.has-pos{background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.12);}
+.existing-pos.no-pos{background:rgba(16,185,129,0.04);border:1px solid rgba(16,185,129,0.1);}
+.existing-pos-title{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;}
+.existing-pos-title.has{color:var(--cyan);}
+.existing-pos-title.no{color:var(--green);}
+.pos-entry{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:5px;margin-bottom:4px;font-size:10px;}
+.pos-entry-left{display:flex;align-items:center;gap:8px;}
+.pos-entry-level{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;}
+.pos-entry-level.p1{background:rgba(34,211,238,0.1);color:var(--cyan);}
+.pos-entry-level.p2{background:rgba(16,185,129,0.1);color:var(--green);}
+.pos-entry-level.p3{background:rgba(251,191,36,0.1);color:var(--gold);}
+.pyramid-progress{display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(0,0,0,0.15);border-radius:6px;margin-top:8px;}
+.pyramid-progress-label{font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.pyramid-progress-bar{flex:1;height:8px;background:var(--border-subtle);border-radius:4px;overflow:hidden;display:flex;}
+.pyramid-progress-fill{height:100%;border-radius:4px;transition:width 0.3s;}
+.pyramid-progress-fill.p1{background:var(--cyan);}
+.pyramid-progress-fill.p2{background:var(--green);}
+.pyramid-progress-fill.p3{background:var(--gold);}
+.pyramid-progress-pct{font-family:var(--mono);font-size:11px;font-weight:700;flex-shrink:0;min-width:36px;text-align:right;}
 </style>
 </head>
 <body>
@@ -574,7 +647,7 @@ RRM_ETFS.forEach((etf, i) => {
 const DEMO = {
   mps: {
     score: 35, trend: 'Declining', signal: 'RISK-OFF',
-    weeklyDelta: -8, // MPS changed -8 points this week
+    weeklyDelta: -8,
     prevWeekScore: 43,
     components: {
       'NIFTY 50 vs 200 DMA': { value: 'Below', signal: 'bearish' },
@@ -1214,9 +1287,10 @@ function renderExec(picks) {
 
       <!-- Actions -->
       <div class="exec-action">
+        <button class="exec-btn execute" onclick="openOrderBuilder('${p.symbol}')">⚡ EXECUTE</button>
         <button class="exec-btn chart" onclick="openChart('${p.symbol}')">📊 Chart</button>
-        <button class="exec-btn watchlist" onclick="addWL('${p.symbol}')">+ Watchlist</button>
-        <button class="exec-btn drill" onclick="location.href='stock.html?s=${p.symbol}'">🔍 Deep Dive</button>
+        <button class="exec-btn watchlist" onclick="addWL('${p.symbol}')">+ Watch</button>
+        <button class="exec-btn drill" onclick="location.href='stock.html?s=${p.symbol}'">🔍 Drill</button>
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -1310,24 +1384,227 @@ function renderEmpty(g) {
   return `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No stocks pass the top-down filter today.</div><div class="empty-subtitle">One or more upstream gates are blocked.<br><br><strong>Minervini:</strong> "The money is made by sitting, not trading."</div></div>`;
 }
 
-// ═══ SUPABASE CONFIG ═══
-const SUPABASE_URL = 'https://jbknnyjywernroaulfwp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impia25ueWp5d2VybnJvdmx3cCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzE3MTUyNzE2LCJleHAiOjIwMzI3Mjg3MTZ9.placeholder'; // Replace with your actual anon key
+// ═══ SUPABASE CONFIG — SOURCE OF TRUTH ═══
+const SUPABASE_URL = 'https://urnrdpyhncezljirpnmy.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzY5MDIsImV4cCI6MjA4ODM1MjkwMn0.eExEFw1XGAlYBGECqCpl928UvXv5Jchuyr1YYkcrbdw'; // Replace with your actual anon key
 
+// ── Supabase CRUD ──
 async function supabaseUpsert(table, data) {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Prefer': 'resolution=merge-duplicates'
-      },
+      headers: { 'Content-Type':'application/json', 'apikey':SUPABASE_KEY, 'Authorization':`Bearer ${SUPABASE_KEY}`, 'Prefer':'resolution=merge-duplicates' },
       body: JSON.stringify(data)
     });
     return res.ok;
-  } catch(e) { console.log('Supabase save failed:', e); return false; }
+  } catch(e) { console.log('Supabase upsert failed:', e); return false; }
+}
+
+async function supabaseFetch(table, filter='') {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*${filter}`, {
+      headers: { 'apikey':SUPABASE_KEY, 'Authorization':`Bearer ${SUPABASE_KEY}` }
+    });
+    return res.ok ? await res.json() : [];
+  } catch(e) { console.log('Supabase fetch failed:', e); return []; }
+}
+
+async function supabaseUpdate(table, matchCol, matchVal, data) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${matchCol}=eq.${matchVal}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type':'application/json', 'apikey':SUPABASE_KEY, 'Authorization':`Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify(data)
+    });
+    return res.ok;
+  } catch(e) { console.log('Supabase update failed:', e); return false; }
+}
+
+// ── CLOUD SYNC ON BOOT ──
+// Supabase is source of truth. On boot: fetch cloud → merge with local → render
+async function syncTradesFromCloud() {
+  try {
+    const cloudTrades = await supabaseFetch('trades', '&order=created_at.desc');
+    if (cloudTrades && cloudTrades.length > 0) {
+      // Cloud → transform to local format
+      const mapped = cloudTrades.map(ct => ({
+        id: ct.trade_id, date: ct.created_at, symbol: ct.symbol, sector: ct.sector,
+        action: ct.action, price: ct.entry_price, qty: ct.qty,
+        stopLoss: ct.stop_loss, target1: ct.target_1, target2: ct.target_2,
+        riskAmount: ct.risk_amount, pattern: ct.pattern, catalyst: ct.catalyst,
+        grade: ct.grade, oneilScore: ct.oneil_score, rsRank: ct.rs_rank,
+        pyramidLevel: ct.pyramid_level, parentTradeId: ct.parent_trade_id,
+        atr14: ct.atr_14, regime: ct.regime, mpsScore: ct.mps_score,
+        broker: ct.broker, status: ct.status || 'OPEN',
+        remainingQty: ct.remaining_qty ?? ct.qty,
+        partialSells: ct.partial_sells ? JSON.parse(ct.partial_sells) : [],
+        slMoves: ct.sl_moves ? JSON.parse(ct.sl_moves) : [],
+        exitPrice: ct.exit_price, exitDate: ct.exit_date,
+        totalQtyAfter: ct.total_qty_after, avgPriceAfter: ct.avg_price_after,
+        dateStr: new Date(ct.created_at).toLocaleDateString('en-IN'),
+        timeStr: new Date(ct.created_at).toLocaleTimeString('en-IN'),
+        type: ct.action === 'BUY' ? 'ENTRY' : ct.action === 'SELL_PARTIAL' ? 'PARTIAL_EXIT' : 'EXIT',
+      }));
+
+      // Merge: cloud wins for existing IDs, keep local-only trades
+      const localTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+      const cloudIds = new Set(mapped.map(t => t.id));
+      const localOnly = localTrades.filter(t => !cloudIds.has(t.id));
+      const merged = [...mapped, ...localOnly];
+
+      localStorage.setItem('te_trades', JSON.stringify(merged));
+      console.log(`Cloud sync: ${cloudTrades.length} from Supabase, ${localOnly.length} local-only, ${merged.length} total`);
+      return merged;
+    }
+  } catch(e) { console.log('Cloud sync failed, using localStorage:', e); }
+  return JSON.parse(localStorage.getItem('te_trades') || '[]');
+}
+
+// ═══ STAGGERED EXIT SYSTEM ═══
+// Handles partial sells in tranches: 25% at 5×ATR, 50% at 6×ATR, etc.
+// Each partial sell:
+//   1. Creates a SELL journal entry linked to parent trade
+//   2. Updates parent trade's remainingQty
+//   3. Sets status to PARTIAL if qty remains, CLOSED if fully exited
+//   4. Logs to both localStorage and Supabase
+
+async function executePartialSell(tradeId, sellPct, sellPrice, reason, atrMultiple) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const tradeIdx = trades.findIndex(t => t.id === tradeId);
+  if (tradeIdx === -1) return;
+
+  const trade = trades[tradeIdx];
+  const remaining = trade.remainingQty ?? trade.qty;
+  const sellQty = Math.floor(remaining * (sellPct / 100));
+  if (sellQty <= 0) return;
+
+  const newRemaining = remaining - sellQty;
+  const now = new Date();
+  const pnlPerShare = sellPrice - trade.price;
+  const pnlTotal = pnlPerShare * sellQty;
+  const rMultiple = trade.riskAmount > 0 ? (pnlTotal / trade.riskAmount) : 0;
+
+  // Create partial sell record
+  const sellRecord = {
+    date: now.toISOString(),
+    dateStr: now.toLocaleDateString('en-IN'),
+    qty: sellQty,
+    price: sellPrice,
+    pctSold: sellPct,
+    reason,
+    atrMultiple: atrMultiple || null,
+    pnlPerShare,
+    pnlTotal: Math.round(pnlTotal),
+    rMultiple: rMultiple.toFixed(2),
+    remainingAfter: newRemaining,
+  };
+
+  // Update parent trade
+  if (!trade.partialSells) trade.partialSells = [];
+  trade.partialSells.push(sellRecord);
+  trade.remainingQty = newRemaining;
+  trade.status = newRemaining <= 0 ? 'CLOSED' : 'PARTIAL';
+  if (newRemaining <= 0) {
+    trade.exitPrice = sellPrice;
+    trade.exitDate = now.toISOString();
+    // Calculate total P&L across all sells
+    const totalSellValue = trade.partialSells.reduce((s, ps) => s + (ps.qty * ps.price), 0);
+    const totalBuyCost = trade.qty * trade.price;
+    trade.pnl = ((totalSellValue - totalBuyCost) / totalBuyCost * 100).toFixed(2);
+    trade.rMultiple = (trade.partialSells.reduce((s, ps) => s + ps.pnlTotal, 0) / trade.riskAmount).toFixed(2);
+  }
+
+  trades[tradeIdx] = trade;
+  localStorage.setItem('te_trades', JSON.stringify(trades));
+
+  // Also log as separate journal entry
+  const journal = JSON.parse(localStorage.getItem('te_journal') || '[]');
+  journal.push({
+    id: `EP-SELL-${now.getTime()}`,
+    date: now.toISOString(),
+    dateStr: now.toLocaleDateString('en-IN'),
+    type: newRemaining <= 0 ? 'FINAL_EXIT' : 'PARTIAL_EXIT',
+    symbol: trade.symbol,
+    sector: trade.sector,
+    action: 'SELL',
+    price: sellPrice,
+    qty: sellQty,
+    reason,
+    atrMultiple,
+    pnlPerShare,
+    pnlTotal: Math.round(pnlTotal),
+    rMultiple: rMultiple.toFixed(2),
+    remainingQty: newRemaining,
+    parentTradeId: trade.id,
+    regime: computeGates(state).mpsSignal,
+  });
+  localStorage.setItem('te_journal', JSON.stringify(journal));
+
+  // Sync to Supabase
+  let supaOk = false;
+  try {
+    // Update parent trade
+    supaOk = await supabaseUpdate('trades', 'trade_id', trade.id, {
+      status: trade.status,
+      remaining_qty: newRemaining,
+      partial_sells: JSON.stringify(trade.partialSells),
+      exit_price: trade.exitPrice,
+      exit_date: trade.exitDate,
+      pnl: trade.pnl,
+      r_multiple: trade.rMultiple,
+    });
+    // Insert sell event
+    await supabaseUpsert('trade_events', {
+      event_id: `EP-SELL-${now.getTime()}`,
+      trade_id: trade.id,
+      symbol: trade.symbol,
+      event_type: newRemaining <= 0 ? 'FINAL_EXIT' : 'PARTIAL_EXIT',
+      qty: sellQty,
+      price: sellPrice,
+      reason,
+      atr_multiple: atrMultiple,
+      pnl_total: Math.round(pnlTotal),
+      r_multiple: rMultiple.toFixed(2),
+      remaining_qty: newRemaining,
+      created_at: now.toISOString()
+    });
+  } catch(e) { console.log('Supabase sell sync error:', e); }
+
+  showToast(newRemaining <= 0 ? '🏁' : '📤',
+    `${trade.symbol} — ${newRemaining <= 0 ? 'FULLY CLOSED' : `SOLD ${sellPct}%`}`,
+    `${sellQty} shares @ ₹${sellPrice.toLocaleString()} · P&L: ₹${Math.round(pnlTotal).toLocaleString()} (${rMultiple.toFixed(1)}R) · ${newRemaining} remaining · ${supaOk ? 'Supabase ✓' : 'local only'}`,
+    5000
+  );
+  return trade;
+}
+
+// ── SL MOVE LOGGING ──
+async function logSLMove(tradeId, newSL, reason) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const tradeIdx = trades.findIndex(t => t.id === tradeId);
+  if (tradeIdx === -1) return;
+
+  const trade = trades[tradeIdx];
+  const prevSL = trade.stopLoss;
+  if (!trade.slMoves) trade.slMoves = [];
+  trade.slMoves.push({ date: new Date().toISOString(), from: prevSL, to: newSL, reason });
+  trade.stopLoss = newSL;
+
+  trades[tradeIdx] = trade;
+  localStorage.setItem('te_trades', JSON.stringify(trades));
+
+  // Sync to Supabase
+  await supabaseUpdate('trades', 'trade_id', trade.id, {
+    stop_loss: newSL,
+    sl_moves: JSON.stringify(trade.slMoves)
+  });
+  await supabaseUpsert('trade_events', {
+    event_id: `EP-SL-${Date.now()}`, trade_id: trade.id, symbol: trade.symbol,
+    event_type: 'SL_MOVE', price: newSL, reason,
+    created_at: new Date().toISOString()
+  });
+
+  showToast('🛡️', `${trade.symbol} — SL moved`, `₹${prevSL} → ₹${newSL} · ${reason}`);
 }
 
 // ═══ TOAST SYSTEM ═══
@@ -1478,8 +1755,495 @@ async function saveTopPicks() {
 
 function rescan() { state.loading=true; render(); loadData(); }
 
-// ═══ BOOT ═══
-loadData();
+// ═══════════════════════════════════════════════════════════
+// EXECUTION BRIDGE — ORDER BUILDER + BROKER + JOURNAL
+// ═══════════════════════════════════════════════════════════
+
+const CAPITAL = 2500000; // Rs.25L — configurable
+const RISK_PCT = 1; // 1% risk per trade
+
+let selectedBroker = 'dhan';
+let orderModal = null;
+
+// ── BROKER CONFIGS ──
+const BROKERS = {
+  dhan: {
+    name: 'Dhan', type: 'API + Deep Link', levels: ['l1','l2','l3'],
+    deepLink: (sym, qty, price, sl, target) =>
+      `https://web.dhan.co/orders?symbol=${sym}&exchange=NSE&qty=${qty}&price=${price}&trigger=${sl}&ordertype=SL&product=CNC`,
+    apiEndpoint: 'https://api.dhan.co/orders',
+  },
+  zerodha: {
+    name: 'Zerodha', type: 'Kite Deep Link', levels: ['l1','l2'],
+    deepLink: (sym, qty, price, sl, target) =>
+      `https://kite.zerodha.com/orders?tradingsymbol=${sym}&exchange=NSE&transaction_type=BUY&quantity=${qty}&price=${price}&trigger_price=${sl}&order_type=SL&product=CNC`,
+  },
+  definedge: {
+    name: 'Definedge', type: 'Zone Deep Link', levels: ['l1','l2'],
+    deepLink: (sym) =>
+      `https://zone.definedge.com/#!/stock/${sym}`,
+  }
+};
+
+// ── POSITION DETECTION ──
+function getOpenPositions(symbol) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  return trades.filter(t => t.symbol === symbol && t.status === 'OPEN');
+}
+
+function detectPyramidLevel(symbol, pick) {
+  const openPos = getOpenPositions(symbol);
+  if (openPos.length === 0) return { level: 'p1', existing: [], canPyramid: true, reason: 'No existing position — fresh P1 entry' };
+
+  const p1 = openPos.find(t => t.pyramidLevel === 'p1');
+  const p2 = openPos.find(t => t.pyramidLevel === 'p2');
+  const p3 = openPos.find(t => t.pyramidLevel === 'p3');
+
+  if (p1 && p2 && p3) return { level: 'full', existing: openPos, canPyramid: false, reason: 'FULLY PYRAMIDED — all 3 levels filled. No more adds.' };
+
+  const cmp = pick.cmp || pick.entry;
+  const avgEntry = p1 ? p1.price : pick.entry;
+  const gainPct = ((cmp - avgEntry) / avgEntry * 100);
+
+  if (p1 && !p2) {
+    if (gainPct >= 5) return { level: 'p2', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from P1 (₹${avgEntry}). P2 ADD eligible — need tight base/new pivot.`, parentId: p1.id };
+    else return { level: 'p2_wait', existing: openPos, canPyramid: false, reason: `Stock only +${gainPct.toFixed(1)}% from P1. Need +5-8% with new tight area for P2 add.` };
+  }
+
+  if (p1 && p2 && !p3) {
+    if (gainPct >= 10) return { level: 'p3', existing: openPos, canPyramid: true, reason: `Stock +${gainPct.toFixed(1)}% from P1. P3 TOP-UP eligible — final 20% add at next pivot.`, parentId: p1.id };
+    else return { level: 'p3_wait', existing: openPos, canPyramid: false, reason: `Stock +${gainPct.toFixed(1)}% from P1. Need +10-15% for P3 top-up.` };
+  }
+
+  return { level: 'p1', existing: openPos, canPyramid: true, reason: 'Fresh entry' };
+}
+
+function calcOrderDetails(pick, pyramidInfo) {
+  const entry = pick.entry;
+  const sl = pick.slLadder?.initial || pick.stop;
+  const riskPerShare = entry - sl;
+  const riskAmount = CAPITAL * (RISK_PCT / 100);
+  const qty = Math.floor(riskAmount / riskPerShare);
+  const tier = pick.rsTier || 'top25';
+  const sizeMulti = CONFIG.rsRankTiers[tier]?.sizeMultiplier ?? 1;
+
+  // Auto-detect pyramid level from open positions
+  const pyLevel = pyramidInfo?.canPyramid ? pyramidInfo.level : 'blocked';
+  const pyPct = pyLevel === 'p1' ? 50 : pyLevel === 'p2' ? 30 : pyLevel === 'p3' ? 20 : 0;
+  const adjQty = Math.floor(qty * sizeMulti * (pyPct / 100));
+  const adjCost = adjQty * entry;
+
+  // Calculate total position across all pyramid levels
+  const existingQty = (pyramidInfo?.existing || []).reduce((sum, t) => sum + (t.qty || 0), 0);
+  const existingCost = (pyramidInfo?.existing || []).reduce((sum, t) => sum + ((t.qty || 0) * (t.price || 0)), 0);
+  const totalQtyAfter = existingQty + adjQty;
+  const totalCostAfter = existingCost + adjCost;
+  const avgPriceAfter = totalQtyAfter > 0 ? (totalCostAfter / totalQtyAfter) : entry;
+
+  return {
+    symbol: pick.symbol, sector: pick.sector, grade: pick.grade,
+    entry, sl, target1: pick.target1, target2: pick.target2,
+    riskPerShare, riskAmount: Math.round(riskAmount),
+    rawQty: qty, adjQty, totalCost: Math.round(adjCost),
+    capitalPct: ((adjCost / CAPITAL) * 100).toFixed(1),
+    rr: pick.rr, pattern: pick.pattern, catalyst: pick.catalyst,
+    sizeMulti, pyLevel, pyPct,
+    atr14: pick.atr?.atr14 || 0,
+    oneilScore: pick.oneilScore,
+    // Position totals
+    existingQty, existingCost: Math.round(existingCost),
+    totalQtyAfter, totalCostAfter: Math.round(totalCostAfter),
+    avgPriceAfter: Math.round(avgPriceAfter),
+    parentId: pyramidInfo?.parentId || null,
+  };
+}
+
+function openOrderBuilder(symbol) {
+  const pick = state.topPicks.find(p => p.symbol === symbol);
+  if (!pick) return;
+
+  // Detect pyramid level from open positions
+  const pyramidInfo = detectPyramidLevel(symbol, pick);
+  const o = calcOrderDetails(pick, pyramidInfo);
+
+  let overlay = document.getElementById('order-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'order-modal';
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  const canExecute = pyramidInfo.canPyramid && o.adjQty > 0;
+  const pyLevelDisplay = o.pyLevel === 'p1' ? 'P1 — INITIAL (50%)' : o.pyLevel === 'p2' ? 'P2 — ADD (30%)' : o.pyLevel === 'p3' ? 'P3 — TOP-UP (20%)' : o.pyLevel === 'full' ? 'FULLY PYRAMIDED' : 'WAITING';
+  const pyColor = o.pyLevel === 'p1' ? 'var(--cyan)' : o.pyLevel === 'p2' ? 'var(--green)' : o.pyLevel === 'p3' ? 'var(--gold)' : 'var(--red)';
+
+  // Pyramid progress calculation
+  const filledLevels = pyramidInfo.existing?.length || 0;
+  const totalLevelsAfter = canExecute ? filledLevels + 1 : filledLevels;
+  const progressPct = (totalLevelsAfter / 3 * 100);
+
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">⚡ EXECUTE — ${o.symbol} <span style="color:${pyColor};font-size:13px">(${o.pyLevel.toUpperCase()})</span></div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${o.sector} · ${o.pattern} · ${o.grade} · O'Neil ${o.oneilScore}</div>
+        </div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- EXISTING POSITION DETECTION -->
+        <div class="existing-pos ${pyramidInfo.existing.length > 0 ? 'has-pos' : 'no-pos'}">
+          <div class="existing-pos-title ${pyramidInfo.existing.length > 0 ? 'has' : 'no'}">
+            ${pyramidInfo.existing.length > 0 ? '📊 EXISTING POSITION DETECTED' : '✅ NO EXISTING POSITION — FRESH ENTRY'}
+          </div>
+
+          ${pyramidInfo.existing.length > 0 ? `
+            ${pyramidInfo.existing.map(t => {
+              const tPnl = pick.cmp ? ((pick.cmp - t.price) / t.price * 100).toFixed(1) : '—';
+              const tPnlColor = tPnl > 0 ? 'var(--green-bright)' : tPnl < 0 ? 'var(--red-bright)' : 'var(--text-dim)';
+              return `<div class="pos-entry">
+                <div class="pos-entry-left">
+                  <span class="pos-entry-level ${t.pyramidLevel}">${t.pyramidLevel?.toUpperCase()}</span>
+                  <span style="color:var(--text-primary);font-weight:600">${t.qty} shares @ ₹${t.price?.toLocaleString()}</span>
+                  <span style="font-size:9px;color:var(--text-dim)">${t.dateStr || ''}</span>
+                </div>
+                <span style="font-family:var(--mono);font-weight:700;color:${tPnlColor}">${tPnl > 0 ? '+' : ''}${tPnl}%</span>
+              </div>`;
+            }).join('')}
+
+            <!-- Pyramid Progress Bar -->
+            <div class="pyramid-progress">
+              <div class="pyramid-progress-label">PYRAMID</div>
+              <div class="pyramid-progress-bar">
+                ${filledLevels >= 1 ? '<div class="pyramid-progress-fill p1" style="width:33.3%"></div>' : ''}
+                ${filledLevels >= 2 ? '<div class="pyramid-progress-fill p2" style="width:33.3%"></div>' : ''}
+                ${filledLevels >= 3 ? '<div class="pyramid-progress-fill p3" style="width:33.3%"></div>' : ''}
+              </div>
+              <div class="pyramid-progress-pct" style="color:${pyColor}">${filledLevels}/3</div>
+            </div>
+          ` : ''}
+
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:6px;padding:6px 8px;background:rgba(0,0,0,0.15);border-radius:4px">
+            <strong style="color:${pyColor}">${pyLevelDisplay}</strong> — ${pyramidInfo.reason}
+          </div>
+        </div>
+
+        ${!canExecute ? `
+          <div style="text-align:center;padding:20px;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.12);border-radius:8px;margin-bottom:14px">
+            <div style="font-size:14px;margin-bottom:6px">🚫</div>
+            <div style="font-size:12px;font-weight:700;color:var(--red-bright);margin-bottom:4px">${o.pyLevel === 'full' ? 'FULLY PYRAMIDED' : 'PYRAMID ADD NOT YET ELIGIBLE'}</div>
+            <div style="font-size:10px;color:var(--text-dim)">${pyramidInfo.reason}</div>
+          </div>
+        ` : `
+          <!-- Order Details -->
+          <div class="order-grid">
+            <div class="order-field"><div class="order-field-label">Entry Price</div><div class="order-field-val" style="color:var(--cyan)">₹${o.entry.toLocaleString()}</div></div>
+            <div class="order-field"><div class="order-field-label">Stop Loss</div><div class="order-field-val" style="color:var(--red)">₹${o.sl.toLocaleString()}</div></div>
+            <div class="order-field"><div class="order-field-label">${o.pyLevel.toUpperCase()} Qty (RS ${o.sizeMulti}× · ${o.pyPct}%)</div><div class="order-field-val" style="color:var(--text-primary)">${o.adjQty} shares</div></div>
+            <div class="order-field"><div class="order-field-label">${o.pyLevel.toUpperCase()} Cost</div><div class="order-field-val">₹${o.totalCost.toLocaleString()} <span style="font-size:10px;color:var(--text-dim)">(${o.capitalPct}%)</span></div></div>
+            ${o.existingQty > 0 ? `
+              <div class="order-field"><div class="order-field-label">Total Position After</div><div class="order-field-val" style="color:var(--cyan)">${o.totalQtyAfter} shares</div></div>
+              <div class="order-field"><div class="order-field-label">Avg Price After</div><div class="order-field-val">₹${o.avgPriceAfter.toLocaleString()}</div></div>
+            ` : `
+              <div class="order-field"><div class="order-field-label">Target 1</div><div class="order-field-val" style="color:var(--green)">₹${o.target1.toLocaleString()}</div></div>
+              <div class="order-field"><div class="order-field-label">Target 2</div><div class="order-field-val" style="color:var(--green-bright)">₹${o.target2.toLocaleString()}</div></div>
+            `}
+            <div class="order-field"><div class="order-field-label">Risk Amount (${RISK_PCT}%)</div><div class="order-field-val" style="color:var(--amber)">₹${o.riskAmount.toLocaleString()}</div></div>
+            <div class="order-field"><div class="order-field-label">Risk/Share</div><div class="order-field-val">₹${o.riskPerShare} (${((o.riskPerShare/o.entry)*100).toFixed(1)}%)</div></div>
+          </div>
+
+          <!-- Broker Selector -->
+          <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">SELECT BROKER</div>
+          <div class="broker-select">
+            ${Object.entries(BROKERS).map(([key, b]) => `
+              <div class="broker-card ${selectedBroker === key ? 'selected' : ''}" onclick="selectBroker('${key}')">
+                <div class="broker-name">${b.name}</div>
+                <div class="broker-type">${b.type}</div>
+                <div style="display:flex;gap:3px;justify-content:center;margin-top:4px">
+                  ${b.levels.map(l => `<span class="broker-level ${l}">${l.toUpperCase()}</span>`).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Level Tabs -->
+          <div class="order-tabs">
+            <button class="order-tab active" onclick="switchOrderLevel('clipboard', this)">📋 L1: Clipboard</button>
+            <button class="order-tab" onclick="switchOrderLevel('deeplink', this)">🔗 L2: Deep Link</button>
+            <button class="order-tab" onclick="switchOrderLevel('api', this)">⚡ L3: API Order</button>
+          </div>
+          <div id="order-level-content">${renderClipboard(o)}</div>
+        `}
+
+        <!-- Journal Preview -->
+        <div class="journal-preview">
+          <div class="journal-preview-title">📓 AUTO-JOURNAL ENTRY</div>
+          <div class="journal-row"><span>Date</span><span>${new Date().toLocaleDateString('en-IN')}</span></div>
+          <div class="journal-row"><span>Symbol</span><span>${o.symbol} (${o.sector})</span></div>
+          <div class="journal-row"><span>Action</span><span>${canExecute ? `BUY · ${o.pyLevel.toUpperCase()}${o.parentId ? ' (linked to '+o.parentId+')' : ''}` : 'BLOCKED'}</span></div>
+          <div class="journal-row"><span>Qty × Price</span><span>${o.adjQty} × ₹${o.entry.toLocaleString()} = ₹${o.totalCost.toLocaleString()}</span></div>
+          ${o.existingQty > 0 ? `<div class="journal-row"><span>Position After</span><span>${o.totalQtyAfter} shares · Avg ₹${o.avgPriceAfter.toLocaleString()}</span></div>` : ''}
+          <div class="journal-row"><span>SL · R:R · ATR</span><span>₹${o.sl.toLocaleString()} · ${o.rr} · ATR ₹${o.atr14}</span></div>
+          <div class="journal-row"><span>Setup</span><span>${o.pattern} · ${o.catalyst} · ${o.grade}</span></div>
+          <div class="journal-row"><span>Regime</span><span>MPS ${state.mps.score} · ${computeGates(state).mpsSignal}</span></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        ${canExecute ? `
+          <button class="btn btn-primary" onclick="executeOrder('${o.symbol}')" style="font-weight:800;letter-spacing:1px">
+            ⚡ ${o.pyLevel === 'p1' ? 'EXECUTE' : o.pyLevel === 'p2' ? 'ADD P2' : 'TOP-UP P3'} + LOG
+          </button>
+        ` : `
+          <button class="btn btn-ghost" style="opacity:0.4;cursor:not-allowed" disabled>🚫 Cannot Execute</button>
+        `}
+      </div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => overlay.classList.add('show'));
+}
+
+function renderClipboard(o) {
+  const text = `═══ EDGE PILOT ORDER ═══
+Symbol: ${o.symbol} (NSE)
+Action: BUY
+Entry:  ₹${o.entry.toLocaleString()}
+Qty:    ${o.adjQty} shares
+SL:     ₹${o.sl.toLocaleString()} (${((o.riskPerShare/o.entry)*100).toFixed(1)}%)
+T1:     ₹${o.target1.toLocaleString()}
+T2:     ₹${o.target2.toLocaleString()}
+R:R:    ${o.rr}
+Cost:   ₹${o.totalCost.toLocaleString()} (${o.capitalPct}% capital)
+Risk:   ₹${o.riskAmount.toLocaleString()} (${RISK_PCT}%)
+Setup:  ${o.pattern} · ${o.catalyst}
+Grade:  ${o.grade} · O'Neil ${o.oneilScore}
+ATR:    ₹${o.atr14} · Sell: 5×/6×/7×
+═══════════════════════`;
+  return `
+    <div class="order-clipboard" id="clipboard-text">${text}<button class="copy-btn" onclick="copyOrder()">📋 Copy</button></div>
+    <div style="font-size:9px;color:var(--text-dim);text-align:center">Copy and paste into your broker's order window</div>
+  `;
+}
+
+function renderDeepLink(o) {
+  const broker = BROKERS[selectedBroker];
+  const link = broker?.deepLink?.(o.symbol, o.adjQty, o.entry, o.sl, o.target1) || '#';
+  return `
+    <div style="text-align:center;padding:20px 0">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">
+        Opens <strong style="color:var(--text-primary)">${broker?.name || 'Broker'}</strong> with pre-filled order details
+      </div>
+      <a href="${link}" target="_blank" class="btn btn-primary" style="text-decoration:none;padding:12px 32px;font-size:13px;font-weight:800;letter-spacing:1px">
+        🔗 OPEN ${(broker?.name || 'BROKER').toUpperCase()} ORDER WINDOW
+      </a>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:10px">
+        ${selectedBroker === 'definedge' ? 'Opens Definedge Zone chart — place order from Zone' :
+          `Pre-fills: ${o.symbol} · BUY · ${o.adjQty} qty · ₹${o.entry} · SL ₹${o.sl}`}
+      </div>
+    </div>
+  `;
+}
+
+function renderAPIOrder(o) {
+  const isSupported = selectedBroker === 'dhan';
+  return `
+    <div style="text-align:center;padding:16px 0">
+      ${isSupported ? `
+        <div style="font-size:11px;color:var(--green);margin-bottom:8px;font-weight:700">✅ Dhan API Bracket Order</div>
+        <div style="font-size:10px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
+          Places a <strong>bracket order</strong> via Dhan API:<br>
+          BUY ${o.adjQty} × ${o.symbol} @ ₹${o.entry} · SL ₹${o.sl} · Target ₹${o.target1}<br>
+          <span style="color:var(--amber)">Requires DHAN_API_KEY in config</span>
+        </div>
+        <button class="btn btn-primary" onclick="placeDhanOrder('${o.symbol}')" style="padding:12px 32px;font-size:13px;font-weight:800">
+          ⚡ PLACE BRACKET ORDER VIA API
+        </button>
+      ` : `
+        <div style="font-size:11px;color:var(--amber);margin-bottom:8px;font-weight:700">⚠️ API not available for ${BROKERS[selectedBroker]?.name}</div>
+        <div style="font-size:10px;color:var(--text-dim);line-height:1.6">
+          API execution is currently supported only for <strong style="color:var(--green)">Dhan</strong>.<br>
+          For ${BROKERS[selectedBroker]?.name}, use Deep Link (L2) or Clipboard (L1).
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function selectBroker(key) {
+  selectedBroker = key;
+  const pick = state.topPicks.find(p => {
+    const modal = document.getElementById('order-modal');
+    return modal?.innerHTML?.includes(p.symbol);
+  });
+  if (pick) openOrderBuilder(pick.symbol);
+}
+
+function switchOrderLevel(level, btn) {
+  document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const modal = document.getElementById('order-modal');
+  const symbolMatch = modal?.innerHTML?.match(/EXECUTE — (\w+)/);
+  if (!symbolMatch) return;
+  const pick = state.topPicks.find(p => p.symbol === symbolMatch[1]);
+  if (!pick) return;
+  const o = calcOrderDetails(pick);
+  const content = document.getElementById('order-level-content');
+  if (!content) return;
+  if (level === 'clipboard') content.innerHTML = renderClipboard(o);
+  else if (level === 'deeplink') content.innerHTML = renderDeepLink(o);
+  else content.innerHTML = renderAPIOrder(o);
+}
+
+function copyOrder() {
+  const el = document.getElementById('clipboard-text');
+  if (el) {
+    const text = el.innerText.replace('📋 Copy', '').trim();
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('📋', 'Order copied to clipboard', 'Paste into your broker order window');
+    });
+  }
+}
+
+function closeModal() {
+  const overlay = document.getElementById('order-modal');
+  if (overlay) overlay.classList.remove('show');
+}
+
+// ── EXECUTE + JOURNAL LOG ──
+async function executeOrder(symbol) {
+  const pick = state.topPicks.find(p => p.symbol === symbol);
+  if (!pick) return;
+  const pyramidInfo = detectPyramidLevel(symbol, pick);
+  if (!pyramidInfo.canPyramid) return;
+  const o = calcOrderDetails(pick, pyramidInfo);
+  const gates = computeGates(state);
+  const now = new Date();
+
+  // Build journal entry
+  const journalEntry = {
+    id: `EP-${now.getTime()}`,
+    date: now.toISOString(),
+    dateStr: now.toLocaleDateString('en-IN'),
+    timeStr: now.toLocaleTimeString('en-IN'),
+    type: 'ENTRY',
+    symbol: o.symbol,
+    sector: o.sector,
+    action: 'BUY',
+    price: o.entry,
+    qty: o.adjQty,
+    totalCost: o.totalCost,
+    stopLoss: o.sl,
+    target1: o.target1,
+    target2: o.target2,
+    riskAmount: o.riskAmount,
+    riskPct: RISK_PCT,
+    rr: o.rr,
+    pattern: o.pattern,
+    catalyst: o.catalyst,
+    grade: o.grade,
+    oneilScore: o.oneilScore,
+    rsRank: pick.rsRank,
+    rsTier: pick.rsTier,
+    sizeMultiplier: o.sizeMulti,
+    pyramidLevel: o.pyLevel,
+    pyramidPct: o.pyPct,
+    parentTradeId: o.parentId || null,
+    existingQtyBefore: o.existingQty,
+    totalQtyAfter: o.totalQtyAfter,
+    avgPriceAfter: o.avgPriceAfter,
+    atr14: o.atr14,
+    atrSellLevels: { x5: o.entry + o.atr14*5, x6: o.entry + o.atr14*6, x7: o.entry + o.atr14*7 },
+    regime: gates.mpsSignal,
+    mpsScore: gates.mpsScore,
+    helixAlignment: state.helix?.alignment,
+    rrmQuad: pick.rrmQuad,
+    broker: BROKERS[selectedBroker]?.name || 'Unknown',
+    status: 'OPEN',
+    slMoves: [{ date: now.toISOString(), from: null, to: o.sl, reason: 'Initial SL' }],
+    partialSells: [],
+    exitPrice: null,
+    exitDate: null,
+    pnl: null,
+    rMultiple: null,
+  };
+
+  // Save to localStorage (te_trades — same key as your Position Tracker)
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  trades.push(journalEntry);
+  localStorage.setItem('te_trades', JSON.stringify(trades));
+
+  // Also save to journal-specific key
+  const journal = JSON.parse(localStorage.getItem('te_journal') || '[]');
+  journal.push(journalEntry);
+  localStorage.setItem('te_journal', JSON.stringify(journal));
+
+  // Save to Supabase
+  let supaOk = false;
+  try {
+    supaOk = await supabaseUpsert('trades', {
+      trade_id: journalEntry.id,
+      symbol: o.symbol,
+      sector: o.sector,
+      action: 'BUY',
+      entry_price: o.entry,
+      qty: o.adjQty,
+      stop_loss: o.sl,
+      target_1: o.target1,
+      target_2: o.target2,
+      risk_amount: o.riskAmount,
+      pattern: o.pattern,
+      catalyst: o.catalyst,
+      grade: o.grade,
+      oneil_score: o.oneilScore,
+      rs_rank: pick.rsRank,
+      pyramid_level: o.pyLevel,
+      atr_14: o.atr14,
+      regime: gates.mpsSignal,
+      mps_score: gates.mpsScore,
+      broker: BROKERS[selectedBroker]?.name,
+      status: 'OPEN',
+      created_at: now.toISOString()
+    });
+  } catch(e) { console.log('Supabase trade log error:', e); }
+
+  // Open broker deep link if L2
+  const broker = BROKERS[selectedBroker];
+  if (broker?.deepLink) {
+    const link = broker.deepLink(o.symbol, o.adjQty, o.entry, o.sl, o.target1);
+    window.open(link, '_blank');
+  }
+
+  // Close modal + show toast
+  closeModal();
+  showToast('⚡',
+    `${o.symbol} EXECUTED — Logged to Journal`,
+    `BUY ${o.adjQty} @ ₹${o.entry} · SL ₹${o.sl} · ${BROKERS[selectedBroker]?.name} · ${supaOk ? 'Supabase ✓' : 'localStorage'} · Trade ID: ${journalEntry.id}`,
+    6000
+  );
+}
+
+async function placeDhanOrder(symbol) {
+  // Dhan API bracket order — requires DHAN_API_KEY
+  showToast('⚠️', 'Dhan API Key Required',
+    'Set DHAN_API_KEY in config to enable auto bracket orders. For now, use Deep Link (L2) to open pre-filled order.',
+    5000
+  );
+}
+
+// ═══ BOOT — CLOUD SYNC FIRST ═══
+async function boot() {
+  // 1. Sync trades from Supabase (source of truth)
+  await syncTradesFromCloud();
+  // 2. Load market data
+  await loadData();
+}
+boot();
 </script>
 </body>
 </html>
