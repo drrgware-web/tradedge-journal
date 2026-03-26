@@ -340,6 +340,73 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .pyramid-block.filled{background:var(--cyan);}
 .pyramid-block.empty{background:var(--border-subtle);}
 
+/* ═══ POSITION MANAGEMENT SYSTEM ═══ */
+.exec-lifecycle{display:flex;gap:0;margin-bottom:12px;position:relative;}
+.exec-lifecycle::before{content:'';position:absolute;top:50%;left:24px;right:24px;height:2px;background:var(--border-subtle);transform:translateY(-50%);z-index:0;}
+.lc-phase{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;}
+.lc-dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:8px;font-weight:800;border:2px solid var(--border-subtle);background:var(--bg-inset);color:var(--text-dim);transition:all 0.3s;}
+.lc-dot.done{border-color:var(--green);background:var(--green-dim);color:var(--green);}
+.lc-dot.active{border-color:var(--cyan);background:var(--cyan-dim);color:var(--cyan);box-shadow:0 0 8px rgba(34,211,238,0.25);animation:pulse-dot 2s infinite;}
+.lc-dot.next{border-color:var(--amber);background:var(--amber-dim);color:var(--amber);}
+.lc-dot.skip{opacity:0.3;}
+.lc-label{font-size:7px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--text-muted);text-align:center;max-width:60px;line-height:1.3;}
+.lc-label.done{color:var(--green);}.lc-label.active{color:var(--cyan);}.lc-label.next{color:var(--amber);}
+
+/* SL Ladder */
+.sl-ladder{padding:10px 14px;background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:8px;margin-bottom:10px;}
+.sl-ladder-title{font-size:8.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.sl-track{position:relative;height:28px;background:var(--bg-card);border-radius:6px;overflow:hidden;margin-bottom:6px;}
+.sl-zone{position:absolute;top:0;height:100%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;letter-spacing:0.5px;transition:all 0.3s;}
+.sl-zone.loss{background:linear-gradient(90deg,rgba(239,68,68,0.25),rgba(239,68,68,0.1));color:var(--red-bright);}
+.sl-zone.be{background:linear-gradient(90deg,rgba(245,158,11,0.15),rgba(245,158,11,0.08));color:var(--amber);}
+.sl-zone.profit{background:linear-gradient(90deg,rgba(16,185,129,0.15),rgba(16,185,129,0.08));color:var(--green);}
+.sl-zone.target{background:linear-gradient(90deg,rgba(34,211,238,0.12),rgba(34,211,238,0.06));color:var(--cyan);}
+.sl-marker{position:absolute;top:-2px;width:2px;height:32px;z-index:2;}
+.sl-marker-label{position:absolute;top:-12px;font-size:6px;font-weight:700;white-space:nowrap;transform:translateX(-50%);}
+.sl-levels{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.sl-level{text-align:center;padding:5px 4px;background:rgba(0,0,0,0.2);border-radius:4px;}
+.sl-level-price{font-family:var(--mono);font-size:11px;font-weight:700;}
+.sl-level-name{font-size:7px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--text-dim);margin-top:1px;}
+.sl-level-pct{font-family:var(--mono);font-size:8px;margin-top:1px;}
+
+/* Sell-into-strength zones */
+.sell-zones{padding:10px 14px;background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.08);border-radius:8px;margin-bottom:10px;}
+.sell-zones-title{font-size:8.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;}
+.sell-rule{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border-dim);font-size:10px;color:var(--text-secondary);}
+.sell-rule:last-child{border-bottom:none;}
+.sell-trigger{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;flex-shrink:0;min-width:60px;text-align:center;}
+.sell-trigger.partial{background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.12);}
+.sell-trigger.full{background:rgba(239,68,68,0.1);color:var(--red-bright);border:1px solid rgba(239,68,68,0.12);}
+.sell-trigger.hold{background:rgba(16,185,129,0.08);color:var(--green);border:1px solid rgba(16,185,129,0.12);}
+.sell-action{font-weight:600;color:var(--text-primary);}
+
+/* ═══ ATR SELL-INTO-STRENGTH METER ═══ */
+.atr-meter{padding:12px 14px;background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.08);border-radius:8px;margin-bottom:10px;}
+.atr-meter-title{font-size:8.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+.atr-bar-wrap{position:relative;height:32px;background:var(--bg-card);border-radius:6px;overflow:hidden;margin-bottom:8px;}
+.atr-zone{position:absolute;top:0;height:100%;display:flex;align-items:center;justify-content:center;font-size:7.5px;font-weight:700;letter-spacing:0.3px;border-right:1px solid rgba(255,255,255,0.05);}
+.atr-zone.normal{background:linear-gradient(90deg,rgba(16,185,129,0.1),rgba(16,185,129,0.05));color:var(--green);}
+.atr-zone.alert{background:linear-gradient(90deg,rgba(245,158,11,0.15),rgba(245,158,11,0.08));color:var(--amber);}
+.atr-zone.climax{background:linear-gradient(90deg,rgba(239,68,68,0.2),rgba(239,68,68,0.1));color:var(--red-bright);}
+.atr-zone.exhaust{background:linear-gradient(90deg,rgba(167,139,250,0.2),rgba(167,139,250,0.1));color:var(--purple);}
+.atr-needle{position:absolute;top:-4px;width:3px;height:40px;background:var(--cyan);border-radius:2px;z-index:3;transition:left 0.5s ease;}
+.atr-needle::after{content:'▼';position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--cyan);}
+.atr-levels{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+.atr-level{text-align:center;padding:6px 4px;border-radius:5px;border:1px solid var(--border-dim);}
+.atr-level.triggered{border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.06);}
+.atr-level-x{font-family:var(--mono);font-size:14px;font-weight:800;}
+.atr-level-action{font-size:7.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-top:2px;}
+.atr-level-detail{font-size:8px;color:var(--text-dim);margin-top:2px;}
+.atr-current{display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:5px;}
+.atr-current-label{font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);}
+.atr-current-val{font-family:var(--mono);font-size:13px;font-weight:700;}
+
+/* Position summary bar */
+.pos-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px;}
+.pos-stat{text-align:center;padding:6px 4px;background:rgba(0,0,0,0.2);border-radius:5px;}
+.pos-stat-val{font-family:var(--mono);font-size:12px;font-weight:700;}
+.pos-stat-label{font-size:7px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--text-dim);margin-top:1px;}
+
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:900px){.asset-grid{grid-template-columns:repeat(2,1fr);}.money-profile{grid-template-columns:1fr;gap:16px;}.helix-grid{grid-template-columns:1fr;}.exec-cards{grid-template-columns:1fr;}.regime-grid{grid-template-columns:1fr;}}
 @media(max-width:600px){.app{padding:0 12px 40px;}.hero{padding:20px 16px;}.stage-header{padding:14px 16px;}.stage-body{padding:0 16px 18px;}.pipeline{padding:12px 8px;overflow-x:auto;}.asset-grid{grid-template-columns:1fr;}.sector-quadrants{grid-template-columns:1fr;}.header-nav{display:none;}}
@@ -394,6 +461,15 @@ const CONFIG = {
     p1: { trigger: 'Initial entry at pivot', sizePercent: 50, label: 'P1 — INITIAL' },
     p2: { trigger: 'Stock +5-8% from entry, new tight area', sizePercent: 30, label: 'P2 — ADD' },
     p3: { trigger: 'Stock +10-15%, final add at next pivot', sizePercent: 20, label: 'P3 — TOP-UP' },
+  },
+
+  // ═══ ENHANCEMENT 4: ATR-BASED SELLING INTO STRENGTH ═══
+  // When daily range expands to N × ATR(14), it signals climax/exhaustion
+  atrSell: {
+    x5: { label: '5× ATR', action: 'Sell 25%', type: 'partial', note: 'Range expansion alert — book 1/4, tighten TSL to low of day' },
+    x6: { label: '6× ATR', action: 'Sell 50%', type: 'partial', note: 'Climax move — sell half, move TSL to intraday VWAP' },
+    x7: { label: '7× ATR', action: 'Sell 75-100%', type: 'full', note: 'Exhaustion blow-off — sell most/all, this is the top for now' },
+    reversal: { label: 'REVERSAL', action: 'Sell ALL', type: 'full', note: 'High-volume reversal candle after 5×+ ATR day = immediate full exit' },
   },
 
   profiles: {
@@ -516,10 +592,51 @@ const DEMO = {
   helix: { daily: { direction:'down', signal:'WEAKENING', detail:'12/16 sectors below daily RS zero line' }, weekly: { direction:'down', signal:'BEARISH', detail:'14/16 sectors lost weekly RS momentum' }, monthly: { direction:'flat', signal:'NEUTRAL', detail:'Long-term trend still intact for 6/16' }, alignment:0.25, alignedSectors:2, totalSectors:16 },
   assetAllocation: { equity: { alloc:40, signal:'underweight', recommended:false }, cash: { alloc:35, signal:'overweight', recommended:true }, gold: { alloc:15, signal:'overweight', recommended:true }, intl: { alloc:10, signal:'neutral', recommended:false } },
   topPicks: [
-    { symbol:'TCS', sector:'IT', oneilScore:88, grade:'A+', catalyst:'Blockbuster EPS', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:3840, stop:3720, target1:4100, target2:4350, rr:'2.2:1', pattern:'VCP Pivot', fundHolding:'1,847 funds (▲ 12%)', rsRank:6, rsTier:'top10', pyramidLevel:'p1', pyramidNote:'Initial entry — 50% of full position' },
-    { symbol:'PERSISTENT', sector:'IT', oneilScore:82, grade:'A', catalyst:'Capacity Expansion', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:5680, stop:5480, target1:6100, target2:6500, rr:'2.1:1', pattern:'Tight Flag', fundHolding:'623 funds (▲ 8%)', rsRank:12, rsTier:'top25', pyramidLevel:'p1', pyramidNote:'Initial entry — 50% of full position' },
-    { symbol:'CIPLA', sector:'Pharma', oneilScore:79, grade:'A', catalyst:'Product Launch', catalystPri:'med', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:1520, stop:1470, target1:1640, target2:1720, rr:'2.4:1', pattern:'Inside Day NR7', fundHolding:'1,102 funds (▲ 5%)', rsRank:8, rsTier:'top10', pyramidLevel:'p2', pyramidNote:'Add 30% — stock already +7% from initial, new tight base' },
-    { symbol:'M&M', sector:'Auto', oneilScore:76, grade:'A', catalyst:'Govt Policy', catalystPri:'med', surv:'clean', survScore:'8/9', rrmQuad:'Improving', entry:2880, stop:2790, target1:3060, target2:3200, rr:'2.0:1', pattern:'Momentum Pivot', fundHolding:'1,456 funds (▲ 3%)', rsRank:22, rsTier:'top25', pyramidLevel:'p1', pyramidNote:'Initial entry — sector still Improving, wait for Leading' },
+    { symbol:'TCS', sector:'IT', oneilScore:88, grade:'A+', catalyst:'Blockbuster EPS', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:3840, stop:3720, target1:4100, target2:4350, rr:'2.2:1', pattern:'VCP Pivot', fundHolding:'1,847 funds (▲ 12%)', rsRank:6, rsTier:'top10', pyramidLevel:'p1', pyramidNote:'Initial entry — 50% of full position',
+      cmp:3840, phase:'entry', daysHeld:0,
+      slLadder: { initial:3720, breakeven:3840, tsl1:3960, tsl2:4050 },
+      atr: { atr14:48, todayRange:52, xATR:1.1, avgVol:'4.2M', todayVol:'3.8M' },
+      sellRules: [
+        { trigger:'5× ATR', price:3840+(48*5), action:'Sell 25%', type:'partial', note:'Range expansion → book 1/4, tighten TSL to low of day', isATR:true, xLevel:5 },
+        { trigger:'6× ATR', price:3840+(48*6), action:'Sell 50%', type:'partial', note:'Climax move → sell half, move TSL to intraday VWAP', isATR:true, xLevel:6 },
+        { trigger:'7× ATR', price:3840+(48*7), action:'Sell 75-100%', type:'full', note:'Exhaustion blow-off → sell most/all', isATR:true, xLevel:7 },
+        { trigger:'HV Reversal', price:null, action:'Sell ALL', type:'full', note:'High-vol reversal candle after 5×+ ATR day = immediate exit', isATR:false },
+        { trigger:'Close < 10 DMA', price:null, action:'Sell ALL', type:'full', note:'Trend break — exit all remaining position', isATR:false },
+      ]
+    },
+    { symbol:'PERSISTENT', sector:'IT', oneilScore:82, grade:'A', catalyst:'Capacity Expansion', catalystPri:'high', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:5680, stop:5480, target1:6100, target2:6500, rr:'2.1:1', pattern:'Tight Flag', fundHolding:'623 funds (▲ 8%)', rsRank:12, rsTier:'top25', pyramidLevel:'p1', pyramidNote:'Initial entry — 50% of full position',
+      cmp:5680, phase:'entry', daysHeld:0,
+      slLadder: { initial:5480, breakeven:5680, tsl1:5850, tsl2:5980 },
+      atr: { atr14:72, todayRange:65, xATR:0.9, avgVol:'1.8M', todayVol:'1.5M' },
+      sellRules: [
+        { trigger:'5× ATR', price:5680+(72*5), action:'Sell 25%', type:'partial', note:'Range expansion alert', isATR:true, xLevel:5 },
+        { trigger:'6× ATR', price:5680+(72*6), action:'Sell 50%', type:'partial', note:'Climax — book half', isATR:true, xLevel:6 },
+        { trigger:'7× ATR', price:5680+(72*7), action:'Sell 75-100%', type:'full', note:'Blow-off top', isATR:true, xLevel:7 },
+        { trigger:'Close < 21 EMA', price:null, action:'Sell ALL', type:'full', note:'Weekly trend break', isATR:false },
+      ]
+    },
+    { symbol:'CIPLA', sector:'Pharma', oneilScore:79, grade:'A', catalyst:'Product Launch', catalystPri:'med', surv:'clean', survScore:'9/9', rrmQuad:'Leading', entry:1520, stop:1470, target1:1640, target2:1720, rr:'2.4:1', pattern:'Inside Day NR7', fundHolding:'1,102 funds (▲ 5%)', rsRank:8, rsTier:'top10', pyramidLevel:'p2', pyramidNote:'Add 30% — stock already +7% from initial, new tight base',
+      cmp:1625, phase:'tsl', daysHeld:12,
+      slLadder: { initial:1470, breakeven:1520, tsl1:1580, tsl2:1610 },
+      atr: { atr14:22, todayRange:35, xATR:1.6, avgVol:'3.1M', todayVol:'4.8M' },
+      sellRules: [
+        { trigger:'5× ATR', price:1520+(22*5), action:'Sell 25%', type:'partial', note:'Range expansion — tighten TSL', isATR:true, xLevel:5 },
+        { trigger:'6× ATR', price:1520+(22*6), action:'Sell 50%', type:'partial', note:'Climax in pharma = aggressive booking', isATR:true, xLevel:6 },
+        { trigger:'7× ATR', price:1520+(22*7), action:'Sell 75-100%', type:'full', note:'Parabolic exhaustion', isATR:true, xLevel:7 },
+        { trigger:'Close < 50 DMA', price:null, action:'Sell ALL', type:'full', note:'Sector rotation risk', isATR:false },
+      ]
+    },
+    { symbol:'M&M', sector:'Auto', oneilScore:76, grade:'A', catalyst:'Govt Policy', catalystPri:'med', surv:'clean', survScore:'8/9', rrmQuad:'Improving', entry:2880, stop:2790, target1:3060, target2:3200, rr:'2.0:1', pattern:'Momentum Pivot', fundHolding:'1,456 funds (▲ 3%)', rsRank:22, rsTier:'top25', pyramidLevel:'p1', pyramidNote:'Initial entry — sector still Improving, wait for Leading',
+      cmp:2940, phase:'breakeven', daysHeld:5,
+      slLadder: { initial:2790, breakeven:2880, tsl1:2940, tsl2:2990 },
+      atr: { atr14:38, todayRange:42, xATR:1.1, avgVol:'5.5M', todayVol:'5.2M' },
+      sellRules: [
+        { trigger:'5× ATR', price:2880+(38*5), action:'Sell 25%', type:'partial', note:'Range expansion — Improving sector = quicker booking', isATR:true, xLevel:5 },
+        { trigger:'6× ATR', price:2880+(38*6), action:'Sell 50%', type:'partial', note:'Auto sector tends to reverse at round numbers', isATR:true, xLevel:6 },
+        { trigger:'7× ATR', price:2880+(38*7), action:'Sell 75-100%', type:'full', note:'Exhaustion', isATR:true, xLevel:7 },
+        { trigger:'Sector → Lagging', price:null, action:'Sell ALL', type:'full', note:'RRM quadrant shift = immediate exit', isATR:false },
+      ]
+    },
   ],
   scannerPipeline: { universe:2803, hotSectors:2, screened:18, topPicks:4 }
 };
@@ -948,46 +1065,154 @@ function renderExec(picks) {
     const pyPct = pyConfig?.sizePercent || 50;
     const effectiveSize = (sizeMulti * pyPct / 100 * 100).toFixed(0);
     const filledBlocks = pyLevel === 'p1' ? 1 : pyLevel === 'p2' ? 2 : 3;
-    
+
+    // Position lifecycle phase
+    const phase = p.phase || 'entry';
+    const phases = [
+      { id:'entry', label:'ENTRY', icon:'1' },
+      { id:'initial_sl', label:'INITIAL SL', icon:'2' },
+      { id:'breakeven', label:'MOVE TO B/E', icon:'3' },
+      { id:'pyramid', label:'PYRAMID ADD', icon:'4' },
+      { id:'tsl', label:'TRAIL STOP', icon:'5' },
+      { id:'sell', label:'SELL RULES', icon:'6' },
+    ];
+    const phaseIdx = phases.findIndex(ph => ph.id === phase);
+
+    // SL Ladder calculations
+    const sl = p.slLadder || {};
+    const cmp = p.cmp || p.entry;
+    const pnlPct = ((cmp - p.entry) / p.entry * 100).toFixed(1);
+    const pnlColor = pnlPct > 0 ? 'var(--green-bright)' : pnlPct < 0 ? 'var(--red-bright)' : 'var(--text-dim)';
+    const riskFromEntry = ((p.entry - sl.initial) / p.entry * 100).toFixed(1);
+
+    // Current active SL
+    const activeSL = phase === 'entry' || phase === 'initial_sl' ? sl.initial :
+                     phase === 'breakeven' ? sl.breakeven :
+                     phase === 'tsl' ? sl.tsl1 :
+                     phase === 'pyramid' ? sl.breakeven : sl.initial;
+    const currentRisk = ((cmp - activeSL) / cmp * 100).toFixed(1);
+
+    // SL track zones (visual bar from SL to Target2)
+    const priceRange = p.target2 - sl.initial;
+    const slToEntry = ((p.entry - sl.initial) / priceRange * 100).toFixed(0);
+    const entryToBE = 0;
+    const beToT1 = ((p.target1 - p.entry) / priceRange * 100).toFixed(0);
+    const t1ToT2 = ((p.target2 - p.target1) / priceRange * 100).toFixed(0);
+    const cmpPos = Math.max(0, Math.min(100, ((cmp - sl.initial) / priceRange * 100))).toFixed(0);
+
+    // Sell rules
+    // Sell rules from data
+
     return `
     <div class="exec-card">
+      <!-- Header -->
       <div class="exec-card-top">
         <div>
           <div class="exec-card-symbol">${p.symbol} <span class="rs-rank ${tier}" style="font-size:8px;vertical-align:middle;margin-left:4px">RS #${p.rsRank||'—'}</span></div>
-          <div class="exec-card-sector">${p.sector} · ${p.rrmQuad} · ${p.pattern}</div>
+          <div class="exec-card-sector">${p.sector} · ${p.rrmQuad} · ${p.pattern} · Day ${p.daysHeld || 0}</div>
         </div>
         <div class="exec-grade ${p.grade==='A+'?'a-plus':'a'}">${p.grade}</div>
       </div>
-      <div class="exec-metrics">
-        <div class="exec-metric"><div class="exec-metric-val" style="color:var(--green)">${p.oneilScore}</div><div class="exec-metric-label">O'Neil</div></div>
-        <div class="exec-metric"><div class="exec-metric-val" style="color:var(--cyan)">${p.rr}</div><div class="exec-metric-label">Risk:Reward</div></div>
-        <div class="exec-metric"><div class="exec-metric-val">${p.survScore}</div><div class="exec-metric-label">Surveillance</div></div>
+
+      <!-- Position Summary -->
+      <div class="pos-summary">
+        <div class="pos-stat"><div class="pos-stat-val" style="color:var(--cyan)">₹${cmp.toLocaleString()}</div><div class="pos-stat-label">CMP</div></div>
+        <div class="pos-stat"><div class="pos-stat-val" style="color:${pnlColor}">${pnlPct > 0 ? '+' : ''}${pnlPct}%</div><div class="pos-stat-label">P&L</div></div>
+        <div class="pos-stat"><div class="pos-stat-val" style="color:var(--red)">₹${activeSL.toLocaleString()}</div><div class="pos-stat-label">Active SL</div></div>
+        <div class="pos-stat"><div class="pos-stat-val">${currentRisk}%</div><div class="pos-stat-label">Risk Left</div></div>
+        <div class="pos-stat"><div class="pos-stat-val" style="color:var(--cyan)">${effectiveSize}%</div><div class="pos-stat-label">Size</div></div>
       </div>
 
-      <!-- Pyramid + Size Row -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.08);border-radius:6px;margin-bottom:10px">
+      <!-- Trade Lifecycle -->
+      <div class="exec-lifecycle">
+        ${phases.map((ph, idx) => {
+          const cls = idx < phaseIdx ? 'done' : idx === phaseIdx ? 'active' : idx === phaseIdx + 1 ? 'next' : 'skip';
+          return `<div class="lc-phase"><div class="lc-dot ${cls}">${cls === 'done' ? '✓' : ph.icon}</div><div class="lc-label ${cls}">${ph.label}</div></div>`;
+        }).join('')}
+      </div>
+
+      <!-- Pyramid + Size -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.08);border-radius:6px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:8px">
           <span class="pyramid-badge ${pyLevel}">${pyConfig?.label || 'P1'}</span>
-          <div class="pyramid-blocks">
-            ${[1,2,3].map(i => `<div class="pyramid-block ${i <= filledBlocks ? 'filled' : 'empty'}" style="height:${8 + i*4}px"></div>`).join('')}
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--cyan)">${effectiveSize}%</div>
-          <div style="font-size:8px;color:var(--text-dim);letter-spacing:0.5px">EFFECTIVE SIZE</div>
+          <div class="pyramid-blocks">${[1,2,3].map(i => `<div class="pyramid-block ${i <= filledBlocks ? 'filled' : 'empty'}" style="height:${8+i*4}px"></div>`).join('')}</div>
+          <span style="font-size:9px;color:var(--text-dim)">${p.pyramidNote || ''}</span>
         </div>
       </div>
 
-      <div class="exec-entry-zone">
-        <div class="exec-entry-title">🎯 LOW-RISK ENTRY ZONE</div>
-        <div class="exec-entry-row"><span>Entry (Pivot)</span><span style="color:var(--cyan)">₹${p.entry.toLocaleString()}</span></div>
-        <div class="exec-entry-row"><span>Stop Loss</span><span style="color:var(--red)">₹${p.stop.toLocaleString()} (${((1-p.stop/p.entry)*100).toFixed(1)}%)</span></div>
-        <div class="exec-entry-row"><span>Target 1</span><span style="color:var(--green)">₹${p.target1.toLocaleString()}</span></div>
-        <div class="exec-entry-row"><span>Target 2</span><span style="color:var(--green-bright)">₹${p.target2.toLocaleString()}</span></div>
-        <div class="exec-entry-row" style="margin-top:4px;padding-top:4px;border-top:1px solid var(--border-dim)"><span>Catalyst</span><span style="color:var(--amber)">${p.catalyst}</span></div>
-        <div class="exec-entry-row"><span>RS Rank (${tier.toUpperCase()})</span><span style="color:var(--cyan)">#${p.rsRank||'—'} → ${sizeMulti}x size</span></div>
-        <div class="exec-entry-row"><span>Pyramid</span><span>${p.pyramidNote || pyConfig?.trigger || ''}</span></div>
+      <!-- SL LADDER -->
+      <div class="sl-ladder">
+        <div class="sl-ladder-title">
+          <span>🛡️ STOP-LOSS LADDER</span>
+          <span style="font-family:var(--mono);color:${pnlColor}">${pnlPct > 0 ? '+' : ''}${pnlPct}% from entry</span>
+        </div>
+
+        <!-- Visual SL Track -->
+        <div class="sl-track">
+          <div class="sl-zone loss" style="left:0;width:${slToEntry}%">LOSS</div>
+          <div class="sl-zone profit" style="left:${slToEntry}%;width:${beToT1}%">PROFIT</div>
+          <div class="sl-zone target" style="left:${Number(slToEntry)+Number(beToT1)}%;width:${t1ToT2}%">TARGET</div>
+          <!-- CMP marker -->
+          <div class="sl-marker" style="left:${cmpPos}%;background:var(--cyan)">
+            <div class="sl-marker-label" style="color:var(--cyan)">CMP</div>
+          </div>
+        </div>
+
+        <!-- SL Levels -->
+        <div class="sl-levels">
+          <div class="sl-level">
+            <div class="sl-level-price" style="color:var(--red)">₹${sl.initial?.toLocaleString()}</div>
+            <div class="sl-level-name">Initial SL</div>
+            <div class="sl-level-pct" style="color:var(--red)">-${riskFromEntry}%</div>
+          </div>
+          <div class="sl-level" ${phase==='breakeven'||phase==='tsl'||phase==='sell'?'style="border:1px solid rgba(245,158,11,0.2);border-radius:4px"':''}>
+            <div class="sl-level-price" style="color:var(--amber)">₹${sl.breakeven?.toLocaleString()}</div>
+            <div class="sl-level-name">Breakeven</div>
+            <div class="sl-level-pct" style="color:var(--amber)">0%</div>
+          </div>
+          <div class="sl-level" ${phase==='tsl'?'style="border:1px solid rgba(34,211,238,0.2);border-radius:4px"':''}>
+            <div class="sl-level-price" style="color:var(--cyan)">₹${sl.tsl1?.toLocaleString()}</div>
+            <div class="sl-level-name">TSL 1</div>
+            <div class="sl-level-pct pos">+${((sl.tsl1 - p.entry) / p.entry * 100).toFixed(1)}%</div>
+          </div>
+          <div class="sl-level">
+            <div class="sl-level-price" style="color:var(--green)">₹${sl.tsl2?.toLocaleString()}</div>
+            <div class="sl-level-name">TSL 2</div>
+            <div class="sl-level-pct pos">+${((sl.tsl2 - p.entry) / p.entry * 100).toFixed(1)}%</div>
+          </div>
+        </div>
       </div>
+
+      <!-- ATR SELL-INTO-STRENGTH METER -->
+      ${renderATRMeter(p)}
+
+      <!-- Additional Sell Rules (non-ATR) -->
+      ${p.sellRules.filter(r => !r.isATR).length > 0 ? `
+      <div style="padding:6px 14px;background:var(--bg-inset);border:1px solid var(--border-dim);border-radius:6px;margin-bottom:10px">
+        <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px">⚠️ ADDITIONAL EXIT RULES</div>
+        ${p.sellRules.filter(r => !r.isATR).map(r => `
+          <div class="sell-rule">
+            <span class="sell-trigger ${r.type}">${r.trigger}</span>
+            <span class="sell-action">${r.action}</span>
+            <span style="flex:1;font-size:9px;color:var(--text-dim)">${r.note}</span>
+          </div>
+        `).join('')}
+      </div>` : ''}
+
+      <!-- Entry Zone (condensed) -->
+      <div class="exec-entry-zone">
+        <div class="exec-entry-title">🎯 ENTRY · TARGET · RISK</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div class="exec-entry-row"><span>Entry</span><span style="color:var(--cyan)">₹${p.entry.toLocaleString()}</span></div>
+          <div class="exec-entry-row"><span>Initial SL</span><span style="color:var(--red)">₹${p.stop.toLocaleString()} (${riskFromEntry}%)</span></div>
+          <div class="exec-entry-row"><span>Target 1</span><span style="color:var(--green)">₹${p.target1.toLocaleString()}</span></div>
+          <div class="exec-entry-row"><span>Target 2</span><span style="color:var(--green-bright)">₹${p.target2.toLocaleString()}</span></div>
+        </div>
+        <div class="exec-entry-row" style="margin-top:4px;padding-top:4px;border-top:1px solid var(--border-dim)"><span>Catalyst</span><span style="color:var(--amber)">${p.catalyst}</span></div>
+        <div class="exec-entry-row"><span>Fund Holding</span><span>${p.fundHolding}</span></div>
+      </div>
+
+      <!-- Actions -->
       <div class="exec-action">
         <button class="exec-btn chart" onclick="openChart('${p.symbol}')">📊 Chart</button>
         <button class="exec-btn watchlist" onclick="addWL('${p.symbol}')">+ Watchlist</button>
@@ -995,6 +1220,90 @@ function renderExec(picks) {
       </div>
     </div>`;
   }).join('')}</div>`;
+}
+
+function renderATRMeter(p) {
+  const atr = p.atr || { atr14:0, todayRange:0, xATR:0, avgVol:'—', todayVol:'—' };
+  const x = atr.xATR || 0;
+  const atr14 = atr.atr14 || 1;
+  const atrRules = p.sellRules?.filter(r => r.isATR) || [];
+
+  // Needle position: map 0-8x ATR to 0-100%
+  const needlePos = Math.min(100, Math.max(2, (x / 8) * 100));
+
+  // Zone widths: 0-3x=NORMAL, 3-5x=ALERT, 5-7x=CLIMAX, 7+=EXHAUSTION
+  const zoneNormal = (3/8*100);
+  const zoneAlert = (2/8*100);
+  const zoneClimax = (2/8*100);
+  const zoneExhaust = (1/8*100);
+
+  // Current status
+  const status = x >= 7 ? 'EXHAUSTION' : x >= 5 ? 'CLIMAX' : x >= 3 ? 'ELEVATED' : 'NORMAL';
+  const statusColor = x >= 7 ? 'var(--purple)' : x >= 5 ? 'var(--red)' : x >= 3 ? 'var(--amber)' : 'var(--green)';
+
+  // Volume confirmation
+  const volRatio = atr.todayVol && atr.avgVol ? 
+    (parseFloat(atr.todayVol) / parseFloat(atr.avgVol)).toFixed(1) : '—';
+
+  return `
+    <div class="atr-meter">
+      <div class="atr-meter-title">
+        <span>📈 SELL INTO STRENGTH — ATR(14) EXPANSION</span>
+        <span style="font-family:var(--mono);color:${statusColor};font-size:10px">${status}</span>
+      </div>
+
+      <!-- ATR Gauge Bar -->
+      <div class="atr-bar-wrap">
+        <div class="atr-zone normal" style="left:0;width:${zoneNormal}%">NORMAL 0-3×</div>
+        <div class="atr-zone alert" style="left:${zoneNormal}%;width:${zoneAlert}%">ALERT 3-5×</div>
+        <div class="atr-zone climax" style="left:${zoneNormal+zoneAlert}%;width:${zoneClimax}%">CLIMAX 5-7×</div>
+        <div class="atr-zone exhaust" style="left:${zoneNormal+zoneAlert+zoneClimax}%;width:${zoneExhaust}%">7×+</div>
+        <div class="atr-needle" style="left:${needlePos}%"></div>
+      </div>
+
+      <!-- Current ATR Reading -->
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div class="atr-current" style="flex:1">
+          <span class="atr-current-label">ATR(14)</span>
+          <span class="atr-current-val" style="color:var(--text-primary)">₹${atr14}</span>
+        </div>
+        <div class="atr-current" style="flex:1">
+          <span class="atr-current-label">Today Range</span>
+          <span class="atr-current-val" style="color:${statusColor}">₹${atr.todayRange}</span>
+        </div>
+        <div class="atr-current" style="flex:1">
+          <span class="atr-current-label">Current ×ATR</span>
+          <span class="atr-current-val" style="color:${statusColor};font-size:15px">${x.toFixed(1)}×</span>
+        </div>
+        <div class="atr-current" style="flex:1">
+          <span class="atr-current-label">Vol Ratio</span>
+          <span class="atr-current-val" style="color:${volRatio > 1.5 ? 'var(--amber)' : 'var(--text-dim)'}">${volRatio}×</span>
+        </div>
+      </div>
+
+      <!-- ATR Sell Levels -->
+      <div class="atr-levels">
+        ${[
+          { x:5, color:'var(--amber)', action:'SELL 25%', detail:'Tighten TSL to low of day' },
+          { x:6, color:'var(--red)', action:'SELL 50%', detail:'TSL to intraday VWAP' },
+          { x:7, color:'var(--purple)', action:'SELL 75-100%', detail:'Blow-off top signal' },
+          { x:0, color:'var(--red-bright)', action:'REVERSAL = EXIT', detail:'HV reversal after 5×+', label:'REV' },
+        ].map(lv => {
+          const triggered = lv.x > 0 ? x >= lv.x : false;
+          const priceAtX = lv.x > 0 ? p.entry + (atr14 * lv.x) : null;
+          return `<div class="atr-level ${triggered ? 'triggered' : ''}">
+            <div class="atr-level-x" style="color:${lv.color}">${lv.label || lv.x + '×'}</div>
+            <div class="atr-level-action" style="color:${lv.color}">${lv.action}</div>
+            ${priceAtX ? `<div class="atr-level-detail">₹${Math.round(priceAtX).toLocaleString()}</div>` : ''}
+            <div class="atr-level-detail">${lv.detail}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div style="font-size:9px;color:var(--text-dim);line-height:1.6;padding:6px 0 0;border-top:1px solid var(--border-dim)">
+        💡 <strong style="color:var(--text-secondary)">Minervini Rule:</strong> When a stock moves 5-7× its ATR in a single day on heavy volume, it's selling into strength territory. The larger the expansion + volume spike, the more aggressive the selling. A high-volume reversal candle after a 5×+ day = immediate full exit.
+      </div>
+    </div>`;
 }
 
 function renderEmpty(g) {
