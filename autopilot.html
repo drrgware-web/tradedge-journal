@@ -303,6 +303,15 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .pipeline-meta strong{color:var(--text-dim);font-weight:600;}
 .disclaimer{text-align:center;padding:16px 0;font-size:9.5px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;}
 
+/* ═══ TOAST NOTIFICATION ═══ */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg-elevated);border:1px solid var(--border-accent);border-radius:10px;padding:12px 20px;display:flex;align-items:center;gap:10px;z-index:1000;opacity:0;transition:all 0.4s cubic-bezier(0.16,1,0.3,1);pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,0.5);max-width:500px;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
+.toast-icon{font-size:18px;flex-shrink:0;}
+.toast-body{flex:1;}
+.toast-title{font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:2px;}
+.toast-detail{font-size:10px;color:var(--text-secondary);line-height:1.5;}
+.toast-close{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;padding:4px;}
+
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:900px){.asset-grid{grid-template-columns:repeat(2,1fr);}.money-profile{grid-template-columns:1fr;gap:16px;}.helix-grid{grid-template-columns:1fr;}.exec-cards{grid-template-columns:1fr;}.regime-grid{grid-template-columns:1fr;}}
 @media(max-width:600px){.app{padding:0 12px 40px;}.hero{padding:20px 16px;}.stage-header{padding:14px 16px;}.stage-body{padding:0 16px 18px;}.pipeline{padding:12px 8px;overflow-x:auto;}.asset-grid{grid-template-columns:1fr;}.sector-quadrants{grid-template-columns:1fr;}.header-nav{display:none;}}
@@ -580,6 +589,7 @@ function render() {
         </div>
         <div class="hero-actions">
           <button class="btn btn-primary" onclick="saveTopPicks()">💾 Save Top Picks</button>
+          <button class="btn btn-ghost" onclick="window.location.href='watchlist.html'">📋 Watchlist</button>
           <button class="btn btn-ghost" onclick="rescan()">↻ Re-scan</button>
         </div>
       </div>
@@ -847,6 +857,55 @@ function renderEmpty(g) {
   return `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">No stocks pass the top-down filter today.</div><div class="empty-subtitle">One or more upstream gates are blocked.<br><br><strong>Minervini:</strong> "The money is made by sitting, not trading."</div></div>`;
 }
 
+// ═══ SUPABASE CONFIG ═══
+const SUPABASE_URL = 'https://jbknnyjywernroaulfwp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impia25ueWp5d2VybnJvdmx3cCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzE3MTUyNzE2LCJleHAiOjIwMzI3Mjg3MTZ9.placeholder'; // Replace with your actual anon key
+
+async function supabaseUpsert(table, data) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(data)
+    });
+    return res.ok;
+  } catch(e) { console.log('Supabase save failed:', e); return false; }
+}
+
+// ═══ TOAST SYSTEM ═══
+let toastTimer = null;
+function showToast(icon, title, detail, duration=4000) {
+  let toast = document.getElementById('ep-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'ep-toast';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      <div class="toast-detail">${detail}</div>
+    </div>
+    <button class="toast-close" onclick="hideToast()">✕</button>
+  `;
+  clearTimeout(toastTimer);
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+    toastTimer = setTimeout(hideToast, duration);
+  });
+}
+function hideToast() {
+  const t = document.getElementById('ep-toast');
+  if (t) t.classList.remove('show');
+}
+
 // ═══ INTERACTIONS ═══
 function toggle(el) {
   const b = el.parentElement.querySelector('.stage-body');
@@ -857,16 +916,113 @@ function setSubgroup(grp) {
   render();
 }
 function openChart(s) { window.open(`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE:${s}`,'_blank'); }
-function addWL(s) {
-  const w=JSON.parse(localStorage.getItem('te_watchlist')||'[]');
-  if(!w.includes(s)){w.push(s);localStorage.setItem('te_watchlist',JSON.stringify(w));alert(`${s} added to watchlist`);}
-  else alert(`${s} already in watchlist`);
+
+function addWL(symbol) {
+  // Add single stock to watchlist (localStorage + Supabase)
+  const wl = JSON.parse(localStorage.getItem('te_watchlist') || '[]');
+  if (!wl.find(w => (typeof w === 'string' ? w : w.symbol) === symbol)) {
+    const entry = { symbol, addedFrom: 'edgepilot', addedAt: new Date().toISOString() };
+    wl.push(entry);
+    localStorage.setItem('te_watchlist', JSON.stringify(wl));
+    // Also save to Supabase
+    supabaseUpsert('watchlist', { symbol, source: 'edgepilot', added_at: new Date().toISOString() });
+    showToast('⭐', `${symbol} added to Watchlist`, 'Saved to localStorage + Supabase');
+  } else {
+    showToast('ℹ️', `${symbol} already in Watchlist`, 'No duplicate added');
+  }
 }
-function saveTopPicks() {
-  const p=state.topPicks.map(x=>x.symbol);
-  localStorage.setItem('te_edgepilot_picks',JSON.stringify({date:new Date().toISOString(),picks:p}));
-  alert(`Saved ${p.length} picks: ${p.join(', ')}`);
+
+async function saveTopPicks() {
+  const picks = state.topPicks;
+  if (!picks || picks.length === 0) {
+    showToast('⚠️', 'No picks to save', 'All gates must pass to generate top picks');
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const symbols = picks.map(p => p.symbol);
+  const gates = computeGates(state);
+
+  // ── 1. Save to localStorage (edgepilot picks history) ──
+  const history = JSON.parse(localStorage.getItem('te_edgepilot_picks') || '[]');
+  const pickRecord = {
+    date: now.toISOString(),
+    dateStr,
+    regime: gates.mpsSignal,
+    mps: gates.mpsScore,
+    picks: picks.map(p => ({
+      symbol: p.symbol, sector: p.sector, grade: p.grade,
+      oneilScore: p.oneilScore, catalyst: p.catalyst,
+      entry: p.entry, stop: p.stop, target1: p.target1, target2: p.target2,
+      rr: p.rr, pattern: p.pattern, rrmQuad: p.rrmQuad
+    }))
+  };
+  history.push(pickRecord);
+  localStorage.setItem('te_edgepilot_picks', JSON.stringify(history));
+
+  // ── 2. Auto-copy ALL picks to Watchlist ──
+  const wl = JSON.parse(localStorage.getItem('te_watchlist') || '[]');
+  let newAdded = 0;
+  picks.forEach(p => {
+    const existing = wl.find(w => (typeof w === 'string' ? w : w.symbol) === p.symbol);
+    if (!existing) {
+      wl.push({
+        symbol: p.symbol,
+        sector: p.sector,
+        grade: p.grade,
+        entry: p.entry,
+        stop: p.stop,
+        target1: p.target1,
+        rr: p.rr,
+        pattern: p.pattern,
+        catalyst: p.catalyst,
+        rrmQuad: p.rrmQuad,
+        addedFrom: 'edgepilot',
+        addedAt: now.toISOString()
+      });
+      newAdded++;
+    }
+  });
+  localStorage.setItem('te_watchlist', JSON.stringify(wl));
+
+  // ── 3. Save to Supabase ──
+  let supabaseOk = false;
+  try {
+    // Save pick record
+    supabaseOk = await supabaseUpsert('edgepilot_picks', {
+      date: dateStr,
+      regime: gates.mpsSignal,
+      mps_score: gates.mpsScore,
+      picks: JSON.stringify(pickRecord.picks),
+      created_at: now.toISOString()
+    });
+    // Also upsert each to watchlist table
+    for (const p of picks) {
+      await supabaseUpsert('watchlist', {
+        symbol: p.symbol,
+        sector: p.sector,
+        source: 'edgepilot',
+        grade: p.grade,
+        entry_price: p.entry,
+        stop_loss: p.stop,
+        target_1: p.target1,
+        rr_ratio: p.rr,
+        pattern: p.pattern,
+        catalyst: p.catalyst,
+        added_at: now.toISOString()
+      });
+    }
+  } catch(e) { console.log('Supabase save error:', e); }
+
+  // ── 4. Show toast ──
+  showToast('✅',
+    `${symbols.length} picks saved + synced to Watchlist`,
+    `${symbols.join(', ')} · ${newAdded} new to watchlist · ${supabaseOk ? 'Supabase ✓' : 'localStorage only'} · ${gates.mpsSignal} regime`,
+    5000
+  );
 }
+
 function rescan() { state.loading=true; render(); loadData(); }
 
 // ═══ BOOT ═══
