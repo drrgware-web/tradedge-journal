@@ -6,6 +6,94 @@
 <title>TradEdge — Trade Execution</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/tradedge.css">
+<style>
+/* ═══ Edge Pilot Inline Styles ═══ */
+.ep-lifecycle { display:flex; gap:2px; align-items:center; margin:6px 0; }
+.ep-lc-step { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; border:1.5px solid var(--b1); color:var(--t4); background:var(--bg3); transition:all .3s; }
+.ep-lc-step.done { background:rgba(0,229,160,.15); border-color:var(--g); color:var(--g); }
+.ep-lc-step.active { background:rgba(0,187,255,.15); border-color:var(--c); color:var(--c); animation:ep-pulse 1.5s ease infinite; }
+.ep-lc-step.pending { opacity:.4; }
+.ep-lc-line { width:10px; height:1.5px; background:var(--b1); }
+.ep-lc-line.done { background:var(--g); }
+@keyframes ep-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,187,255,.3)} 50%{box-shadow:0 0 0 4px rgba(0,187,255,0)} }
+
+/* SL Ladder Bar */
+.ep-sl-track { position:relative; height:24px; border-radius:6px; overflow:hidden; background:var(--bg3); margin:6px 0; }
+.ep-sl-fill { position:absolute; top:0; left:0; height:100%; transition:width .4s; }
+.ep-sl-marker { position:absolute; top:0; height:100%; width:2px; z-index:2; }
+.ep-sl-label { position:absolute; bottom:-14px; font-size:8px; white-space:nowrap; transform:translateX(-50%); color:var(--t4); font-family:'IBM Plex Mono',monospace; }
+.ep-sl-cmp { background:var(--c); width:3px; z-index:3; }
+.ep-sl-cmp::after { content:'▼'; position:absolute; top:-11px; left:50%; transform:translateX(-50%); font-size:8px; color:var(--c); }
+
+/* ATR Meter */
+.ep-atr-wrap { margin:6px 0; }
+.ep-atr-bar { height:14px; border-radius:7px; background:var(--bg3); overflow:hidden; position:relative; }
+.ep-atr-fill { height:100%; border-radius:7px; transition:width .5s ease, background .5s; }
+.ep-atr-marks { display:flex; justify-content:space-between; margin-top:2px; }
+.ep-atr-marks span { font-size:8px; color:var(--t4); font-family:'IBM Plex Mono',monospace; }
+.ep-atr-sell-tag { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:6px; }
+
+/* Pyramid Indicator */
+.ep-pyr-row { display:flex; align-items:center; gap:6px; margin:4px 0; }
+.ep-pyr-block { width:20px; height:14px; border-radius:3px; border:1.5px solid var(--b1); background:var(--bg3); transition:all .3s; }
+.ep-pyr-block.filled { background:rgba(0,187,255,.2); border-color:var(--c); }
+.ep-pyr-block.active { background:var(--c); border-color:var(--c); box-shadow:0 0 6px rgba(0,187,255,.3); }
+.ep-pyr-label { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; }
+
+/* Enhanced Position Card */
+.ep-pos-card { position:relative; background:var(--bg2); border:1px solid var(--b1); border-radius:12px; padding:0; overflow:hidden; transition:border-color .2s, box-shadow .2s; }
+.ep-pos-card:hover { border-color:rgba(0,187,255,.3); box-shadow:0 0 20px rgba(0,187,255,.06); }
+.ep-pos-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px 6px; gap:8px; flex-wrap:wrap; }
+.ep-pos-sym { font-size:15px; font-weight:800; color:var(--t1); letter-spacing:.3px; }
+.ep-pos-badges { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+.ep-badge { font-size:8.5px; font-weight:700; padding:2px 7px; border-radius:10px; white-space:nowrap; }
+.ep-badge-rs { background:rgba(0,229,160,.1); color:var(--g); }
+.ep-badge-pyr { background:rgba(0,187,255,.1); color:var(--c); }
+.ep-badge-sector { background:rgba(168,85,247,.1); color:var(--p); }
+.ep-badge-grade { font-size:11px; font-weight:800; min-width:24px; text-align:center; }
+
+.ep-pos-metrics-row { display:grid; grid-template-columns:repeat(5,1fr); gap:2px; padding:4px 14px 8px; }
+.ep-metric { text-align:center; }
+.ep-metric-label { font-size:8px; color:var(--t4); text-transform:uppercase; letter-spacing:.5px; }
+.ep-metric-val { font-size:12px; font-weight:700; font-family:'IBM Plex Mono',monospace; }
+
+.ep-pos-section { padding:4px 14px; border-top:1px solid rgba(255,255,255,.03); }
+.ep-section-label { font-size:8.5px; font-weight:700; color:var(--t4); text-transform:uppercase; letter-spacing:.8px; margin-bottom:3px; }
+
+.ep-pos-actions { display:flex; gap:4px; padding:8px 14px 10px; border-top:1px solid var(--b1); flex-wrap:wrap; }
+.ep-act-btn { padding:5px 10px; font-size:10px; font-weight:700; border:1px solid var(--b1); border-radius:6px; background:var(--bg3); color:var(--t2); cursor:pointer; font-family:'Outfit',sans-serif; transition:all .15s; }
+.ep-act-btn:hover { background:var(--bg4,rgba(255,255,255,.08)); border-color:var(--c); color:var(--c); }
+.ep-act-btn.close { border-color:rgba(255,69,96,.3); color:var(--r); }
+.ep-act-btn.close:hover { background:rgba(255,69,96,.1); }
+.ep-act-btn.chart { border-color:rgba(168,85,247,.3); color:var(--p); }
+.ep-act-btn.sl { border-color:rgba(255,193,7,.3); color:var(--y); }
+
+/* SL Move Modal */
+.ep-sl-history { max-height:150px; overflow-y:auto; margin-top:8px; }
+.ep-sl-row { display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,.03); font-size:10px; }
+.ep-sl-row .sl-date { color:var(--t4); min-width:65px; font-family:'IBM Plex Mono',monospace; }
+.ep-sl-row .sl-from { color:var(--r); }
+.ep-sl-row .sl-to { color:var(--g); }
+.ep-sl-row .sl-reason { color:var(--t3); margin-left:auto; font-style:italic; }
+
+/* Order Builder Modal Tabs */
+.ep-ob-tabs { display:flex; gap:0; border:1px solid var(--b1); border-radius:8px; overflow:hidden; margin-bottom:12px; }
+.ep-ob-tab { flex:1; padding:8px; font-size:11px; font-weight:700; border:none; cursor:pointer; background:var(--bg3); color:var(--t4); font-family:'Outfit',sans-serif; transition:all .15s; }
+.ep-ob-tab.active { background:rgba(0,187,255,.1); color:var(--c); }
+
+/* Capital Bar */
+.ep-cap-bar { display:flex; gap:10px; align-items:center; padding:8px 14px; background:var(--bg2); border:1px solid var(--b1); border-radius:10px; margin-bottom:14px; flex-wrap:wrap; }
+.ep-cap-item { text-align:center; }
+.ep-cap-label { font-size:8px; color:var(--t4); text-transform:uppercase; letter-spacing:.5px; }
+.ep-cap-val { font-size:13px; font-weight:700; font-family:'IBM Plex Mono',monospace; }
+
+/* Pyramid warning banner */
+.ep-pyr-warn { padding:8px 12px; border-radius:8px; border:1px solid rgba(255,69,96,.3); background:rgba(255,69,96,.06); margin:8px 0; display:none; }
+.ep-pyr-warn.show { display:block; }
+
+/* Position grid */
+.ep-pos-grid { display:flex; flex-direction:column; gap:10px; }
+</style>
 </head>
 <body>
 
@@ -27,6 +115,19 @@
   <button class="exec-broker-pill active" id="br-zerodha" onclick="setBroker('zerodha')">🟢 Zerodha</button>
   <button class="exec-broker-pill" id="br-dhan" onclick="setBroker('dhan')">🔵 Dhan</button>
   <button class="exec-broker-pill" id="br-definedge" onclick="setBroker('definedge')">🟣 Definedge</button>
+</div>
+
+<!-- Capital Bar (NEW) -->
+<div class="ep-cap-bar" id="capital-bar">
+  <div class="ep-cap-item"><div class="ep-cap-label">Starting Capital</div><div class="ep-cap-val" id="cap-start" style="color:var(--t2)">₹50.0L</div></div>
+  <div style="width:1px;height:24px;background:var(--b1)"></div>
+  <div class="ep-cap-item"><div class="ep-cap-label">Current Capital</div><div class="ep-cap-val" id="cap-current" style="color:var(--c)">—</div></div>
+  <div style="width:1px;height:24px;background:var(--b1)"></div>
+  <div class="ep-cap-item"><div class="ep-cap-label">Realized P&L</div><div class="ep-cap-val" id="cap-realized" style="color:var(--t3)">—</div></div>
+  <div style="width:1px;height:24px;background:var(--b1)"></div>
+  <div class="ep-cap-item"><div class="ep-cap-label">Deployed</div><div class="ep-cap-val" id="cap-deployed" style="color:var(--y)">—</div></div>
+  <div style="width:1px;height:24px;background:var(--b1)"></div>
+  <div class="ep-cap-item"><div class="ep-cap-label">Cash Free</div><div class="ep-cap-val" id="cap-free" style="color:var(--g)">—</div></div>
 </div>
 
 <!-- P&L Ticker -->
@@ -70,6 +171,12 @@
           <div class="sym-dropdown" id="exec-sym-drop"></div>
         </div>
         <div id="exec-price-status" style="font-size:10px;color:var(--t3);margin-top:3px;min-height:14px"></div>
+      </div>
+
+      <!-- Pyramid Detection Banner (NEW) -->
+      <div class="ep-pyr-warn" id="pyramid-warn">
+        <div style="font-size:10px;font-weight:700;color:var(--r);margin-bottom:3px">🔺 Pyramid Detection</div>
+        <div id="pyramid-warn-text" style="font-size:10px;color:var(--t2)"></div>
       </div>
 
       <!-- Side Toggle -->
@@ -163,7 +270,7 @@
           <button class="exec-sort-pill" onclick="sortPos('symbol',this)">A→Z</button>
         </div>
       </div>
-      <div id="positions" style="max-height:500px;overflow-y:auto;padding:8px">
+      <div id="positions" style="max-height:none;overflow-y:auto;padding:8px">
         <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Select broker → Refresh</div>
       </div>
     </div>
@@ -205,12 +312,101 @@
   </div>
 </div>
 
+<!-- ═══ SETTINGS PANEL ═══ -->
+<div style="margin-top:20px">
+  <div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">⚙️</span>
+        <span style="font-size:12px;font-weight:700;color:var(--t1)">API Settings</span>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="toggleSettingsPanel()" id="settings-toggle-btn">▼</button>
+    </div>
+    
+    <!-- Collapsible Settings -->
+    <div id="settings-content" style="display:none">
+      <div style="display:grid;gap:12px">
+        
+        <!-- Groq API Key -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">🤖</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Groq AI Key</span>
+            <span id="groq-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="groq-key-input" placeholder="gsk_xxxxx..." style="flex:1;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:11px">
+            <button class="btn btn-ghost btn-xs" onclick="toggleGroqKeyVisibility()" id="groq-eye-btn" style="padding:8px">👁️</button>
+            <button class="btn btn-xs" onclick="saveGroqKey()" style="background:var(--g);color:#000;font-weight:600;padding:8px 12px">Save</button>
+          </div>
+          <div style="font-size:9px;color:var(--t4);margin-top:6px">
+            Get free key from <a href="https://console.groq.com/keys" target="_blank" style="color:var(--b)">console.groq.com/keys</a>
+          </div>
+        </div>
+        
+        <!-- Telegram Settings -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">📱</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Telegram Alerts</span>
+            <span id="telegram-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Bot Token</label>
+              <input type="password" id="tg-bot-input" placeholder="123456:ABC..." style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Chat ID</label>
+              <input type="text" id="tg-chat-input" placeholder="183752078" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-xs" onclick="testTelegram()" style="flex:1">🧪 Test</button>
+            <button class="btn btn-xs" onclick="saveTelegramSettings()" style="background:var(--g);color:#000;font-weight:600;flex:1">Save</button>
+          </div>
+        </div>
+        
+        <!-- Dhan API Settings -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">📊</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Dhan API</span>
+            <span id="dhan-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Client ID</label>
+              <input type="text" id="dhan-id-input" placeholder="1234567890" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Access Token</label>
+              <input type="password" id="dhan-token-input" placeholder="eyJ..." style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+          </div>
+          <button class="btn btn-xs" onclick="saveDhanSettings()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save Dhan Settings</button>
+        </div>
+        
+        <!-- Worker URL -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">🌐</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Cloudflare Worker URL</span>
+          </div>
+          <input type="text" id="worker-url-input" placeholder="https://xxx.workers.dev" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px;margin-bottom:8px">
+          <button class="btn btn-xs" onclick="saveWorkerUrl()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save Worker URL</button>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- GTT Modal -->
 <div class="overlay" id="m-gtt" onclick="if(event.target===this)closeM('m-gtt')">
   <div class="modal" style="max-width:480px">
     <div class="m-head"><div class="m-title">🎯 Place GTT Order</div><button class="m-x" onclick="closeM('m-gtt')">✕</button></div>
     <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
-      <!-- Type toggle -->
       <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
         <button id="gtt-m-single" onclick="setGttMode('single')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--yd);color:var(--y)">Single Trigger</button>
         <button id="gtt-m-oco" onclick="setGttMode('oco')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--bg3);color:var(--t3)">OCO (SL + Target)</button>
@@ -223,7 +419,6 @@
         <div class="fg"><label class="fl">Exchange</label><select class="fi" id="gtt-exchange"><option>NSE</option><option>BSE</option></select></div>
         <div class="fg"><label class="fl">Product</label><select class="fi" id="gtt-product"><option value="CNC">CNC</option><option value="MIS">MIS</option></select></div>
       </div>
-      <!-- Single fields -->
       <div id="gtt-single-fields">
         <div class="fg2">
           <div class="fg"><label class="fl">Trigger ₹</label><input type="number" class="fi" id="gtt-trigger1" step="0.05"></div>
@@ -234,7 +429,6 @@
           <div class="fg"><label class="fl">Qty</label><input type="number" class="fi" id="gtt-qty1" min="1"></div>
         </div>
       </div>
-      <!-- OCO fields -->
       <div id="gtt-oco-fields" style="display:none">
         <div class="fg2">
           <div class="fg"><label class="fl">Side</label><select class="fi" id="gtt-oco-side"><option value="SELL">SELL (Exit Long)</option><option value="BUY">BUY (Exit Short)</option></select></div>
@@ -264,6 +458,149 @@
   </div>
 </div>
 
+<!-- ═══ SL MOVE MODAL (NEW) ═══ -->
+<div class="overlay" id="m-sl-move" onclick="if(event.target===this)closeM('m-sl-move')">
+  <div class="modal" style="max-width:420px">
+    <div class="m-head"><div class="m-title">🛡️ Move Stop Loss</div><button class="m-x" onclick="closeM('m-sl-move')">✕</button></div>
+    <div class="m-body" style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--c)" id="sl-move-sym">—</div>
+      <div class="fg2">
+        <div class="fg">
+          <label class="fl">Current SL</label>
+          <input type="number" class="fi" id="sl-move-current" readonly style="opacity:.6">
+        </div>
+        <div class="fg">
+          <label class="fl">New SL ₹</label>
+          <input type="number" class="fi" id="sl-move-new" step="0.05">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Reason</label>
+        <select class="fi" id="sl-move-reason">
+          <option value="breakeven">Move to Breakeven</option>
+          <option value="tsl_daylow">TSL — Day Low</option>
+          <option value="tsl_vwap">TSL — VWAP</option>
+          <option value="tsl_ema">TSL — 8/21 EMA</option>
+          <option value="pyramid_add">Pyramid Add — Tighten SL</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="fg" id="sl-custom-wrap" style="display:none">
+        <label class="fl">Custom Reason</label>
+        <input class="fi" id="sl-move-custom" placeholder="e.g. Below swing low…">
+      </div>
+      <!-- SL History -->
+      <div>
+        <div class="ep-section-label" style="margin-top:4px">SL Move History</div>
+        <div class="ep-sl-history" id="sl-move-history">
+          <div style="color:var(--t4);font-size:10px;padding:4px 0">No history</div>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('m-sl-move')">Cancel</button>
+      <button class="btn btn-y" onclick="confirmSLMove()">✅ Update SL</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PARTIAL SELL MODAL (NEW) ═══ -->
+<div class="overlay" id="m-partial" onclick="if(event.target===this)closeM('m-partial')">
+  <div class="modal" style="max-width:420px">
+    <div class="m-head"><div class="m-title">📤 Partial Exit</div><button class="m-x" onclick="closeM('m-partial')">✕</button></div>
+    <div class="m-body" style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--c)" id="partial-sym">—</div>
+      <div class="fg2">
+        <div class="fg">
+          <label class="fl">Total Qty</label>
+          <input type="number" class="fi" id="partial-total-qty" readonly style="opacity:.6">
+        </div>
+        <div class="fg">
+          <label class="fl">Exit Qty</label>
+          <input type="number" class="fi" id="partial-exit-qty" min="1">
+        </div>
+      </div>
+      <div>
+        <label class="fl">Quick %</label>
+        <div style="display:flex;gap:4px;margin-top:4px">
+          <button class="ep-act-btn" onclick="setPartialPct(25)">25%</button>
+          <button class="ep-act-btn" onclick="setPartialPct(33)">33%</button>
+          <button class="ep-act-btn" onclick="setPartialPct(50)">50%</button>
+          <button class="ep-act-btn" onclick="setPartialPct(75)">75%</button>
+          <button class="ep-act-btn close" onclick="setPartialPct(100)">100%</button>
+        </div>
+      </div>
+      <div class="fg2">
+        <div class="fg">
+          <label class="fl">Exit Price ₹</label>
+          <input type="number" class="fi" id="partial-price" step="0.05">
+        </div>
+        <div class="fg">
+          <label class="fl">R-Multiple</label>
+          <input type="text" class="fi" id="partial-r" readonly style="font-weight:700;opacity:.7">
+        </div>
+      </div>
+      <div class="fg2">
+        <div class="fg">
+          <label class="fl">ATR Multiple</label>
+          <input type="text" class="fi" id="partial-atr" readonly style="font-weight:700;opacity:.7">
+        </div>
+        <div class="fg">
+          <label class="fl">Reason</label>
+          <select class="fi" id="partial-reason">
+            <option value="atr_5x">ATR 5× — Sell 25%</option>
+            <option value="atr_6x">ATR 6× — Sell 50%</option>
+            <option value="atr_7x">ATR 7× — Blow-off</option>
+            <option value="target_hit">Target Hit</option>
+            <option value="risk_reduce">Risk Reduction</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+      </div>
+      <!-- P&L Summary -->
+      <div style="background:var(--bg3);border-radius:8px;padding:10px;font-size:11px" id="partial-summary">
+        <div style="color:var(--t4)">Fill details to see P&L impact</div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('m-partial')">Cancel</button>
+      <button class="btn" style="background:var(--r);color:#fff" onclick="confirmPartialSell()">⚡ Execute Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ORDER BUILDER MODAL (NEW) ═══ -->
+<div class="overlay" id="m-order-builder" onclick="if(event.target===this)closeM('m-order-builder')">
+  <div class="modal" style="max-width:520px">
+    <div class="m-head"><div class="m-title">📋 Order Builder</div><button class="m-x" onclick="closeM('m-order-builder')">✕</button></div>
+    <div class="m-body" style="display:flex;flex-direction:column;gap:12px">
+      <div class="ep-ob-tabs">
+        <button class="ep-ob-tab active" onclick="setObTab('clipboard',this)">📋 Clipboard</button>
+        <button class="ep-ob-tab" onclick="setObTab('deeplink',this)">🔗 DeepLink</button>
+        <button class="ep-ob-tab" onclick="setObTab('api',this)">⚡ API</button>
+      </div>
+      <div id="ob-clipboard" style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:10px;color:var(--t3)">Copy order text for manual entry in broker terminal</div>
+        <div style="background:var(--bg3);border-radius:8px;padding:12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t1);white-space:pre-wrap" id="ob-clip-text">—</div>
+        <button class="btn btn-sm" style="background:var(--c);color:#000;font-weight:700" onclick="copyObClipboard()">📋 Copy to Clipboard</button>
+      </div>
+      <div id="ob-deeplink" style="display:none;flex-direction:column;gap:8px">
+        <div style="font-size:10px;color:var(--t3)">Open order directly in broker app/web</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <a class="btn btn-sm" style="background:var(--g);color:#000;font-weight:700;text-decoration:none" id="ob-link-zerodha" href="#" target="_blank">🟢 Zerodha Kite</a>
+          <a class="btn btn-sm" style="background:var(--b);color:#fff;font-weight:700;text-decoration:none" id="ob-link-dhan" href="#" target="_blank">🔵 Dhan Web</a>
+          <a class="btn btn-sm" style="background:var(--p);color:#fff;font-weight:700;text-decoration:none" id="ob-link-tv" href="#" target="_blank">📊 TradingView</a>
+        </div>
+      </div>
+      <div id="ob-api" style="display:none;flex-direction:column;gap:8px">
+        <div style="font-size:10px;color:var(--t3)">Place via API (requires broker auth)</div>
+        <button class="btn btn-sm" style="background:var(--g);color:#000;font-weight:700" onclick="obPlaceApi()">⚡ Place via <span id="ob-broker">Dhan</span> API</button>
+        <div id="ob-api-status" style="font-size:10px;color:var(--t3);min-height:14px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Scripts -->
 <script src="js/core.js"></script>
 <script src="js/supabase.js"></script>
@@ -276,10 +613,711 @@
 <script>
 'use strict';
 
+// ═══════════════════════════════════════════════════════════════
+// EDGE PILOT CONFIG
+// ═══════════════════════════════════════════════════════════════
+
+const EP_CONFIG = {
+  supabaseUrl: 'https://urnrdpyhncezljirpnmy.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVybnJkcHlobmNlemxqaXJwbm15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzY5MDIsImV4cCI6MjA4ODM1MjkwMn0.eExEFw1XGAlYBGECqCpl928UvXv5Jchuyr1YYkcrbdw',
+  startingCapital: 5000000,
+  tvLayout: '8RFOgQZr',
+  rsRankTiers: {
+    top10: { label: 'RS TOP 10%', sizeMultiplier: 1.5, color: 'var(--g)', bg: 'rgba(0,229,160,.1)' },
+    top25: { label: 'RS TOP 25%', sizeMultiplier: 1.0, color: 'var(--c)', bg: 'rgba(0,187,255,.1)' },
+    top50: { label: 'RS TOP 50%', sizeMultiplier: 0.5, color: 'var(--y)', bg: 'rgba(255,193,7,.1)' },
+  },
+  pyramid: {
+    p1: { trigger: 'Initial entry', sizePercent: 50, label: 'P1 — INITIAL' },
+    p2: { trigger: '+5-8% from entry', sizePercent: 30, label: 'P2 — ADD' },
+    p3: { trigger: '+10-15% from entry', sizePercent: 20, label: 'P3 — TOP-UP' },
+  },
+  atrSell: {
+    x5: { threshold: 5, pct: 25, action: 'Sell 25%', note: 'Tighten TSL to low of day', color: 'var(--y)' },
+    x6: { threshold: 6, pct: 50, action: 'Sell 50%', note: 'TSL to intraday VWAP', color: '#ff9800' },
+    x7: { threshold: 7, pct: 75, action: 'Sell 75-100%', note: 'Blow-off exhaustion', color: 'var(--r)' },
+  },
+  lifecycle: ['ENTRY', 'INITIAL SL', 'B/E', 'PYRAMID', 'TSL', 'SELL'],
+};
+
 let _gttMode = 'single';
 let _gttTab = 'active';
+let _slMoveTradeId = null;
+let _partialTradeId = null;
+let _partialPosIdx = null;
+let _obData = null;
 
-// ── Init ──
+// ═══════════════════════════════════════════════════════════════
+// TRADE NORMALIZATION (Journal-Compatible)
+// ═══════════════════════════════════════════════════════════════
+
+function normalizeTrade(t) {
+  if (!t) return null;
+  const entries = t.entries || [];
+  const exits = t.exits || [];
+  const totalEntryQty = entries.reduce((s, e) => s + (+e.qty || 0), 0);
+  const totalExitQty = exits.reduce((s, e) => s + (+e.qty || 0), 0);
+  const remainingQty = totalEntryQty - totalExitQty;
+  const avgEntry = totalEntryQty > 0 ? entries.reduce((s, e) => s + (+e.price || 0) * (+e.qty || 0), 0) / totalEntryQty : 0;
+  const avgExit = totalExitQty > 0 ? exits.reduce((s, e) => s + (+e.price || 0) * (+e.qty || 0), 0) / totalExitQty : 0;
+  const riskPerShare = avgEntry > 0 && t.sl ? Math.abs(avgEntry - (+t.sl || 0)) : 0;
+  const totalRisk = riskPerShare * totalEntryQty;
+  return {
+    ...t,
+    _n: {
+      totalEntryQty, totalExitQty, remainingQty,
+      avgEntry, avgExit, riskPerShare, totalRisk,
+      isOpen: remainingQty > 0 && t.status !== 'Closed',
+      entryCount: entries.length,
+      daysSinceEntry: entries.length ? Math.floor((Date.now() - new Date(entries[0].date).getTime()) / 86400000) : 0,
+    }
+  };
+}
+
+function getOpenPositions(symbol) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  return trades.filter(t => t.symbol === symbol && t.status === 'Open').map(normalizeTrade).filter(Boolean);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PYRAMID DETECTION
+// ═══════════════════════════════════════════════════════════════
+
+function detectPyramidLevel(symbol) {
+  const positions = getOpenPositions(symbol);
+  if (!positions.length) return { level: 'p1', existing: [], blocked: false, message: 'No existing position — P1 entry' };
+  const entryCount = positions.reduce((s, p) => s + (p._n?.entryCount || 0), 0);
+  if (entryCount >= 3) return { level: null, existing: positions, blocked: true, message: `⛔ Max pyramid reached (${entryCount} entries). No more adds.` };
+  const avgEntry = positions[0]._n?.avgEntry || 0;
+  const level = entryCount === 1 ? 'p2' : 'p3';
+  const cfg = EP_CONFIG.pyramid[level];
+  return { level, existing: positions, blocked: false, message: `${cfg.label} — ${cfg.trigger} (avg ₹${avgEntry.toFixed(2)})`, avgEntry };
+}
+
+function updatePyramidWarn(sym) {
+  const warn = document.getElementById('pyramid-warn');
+  const txt = document.getElementById('pyramid-warn-text');
+  if (!sym) { warn.classList.remove('show'); return; }
+  const pyr = detectPyramidLevel(sym);
+  if (pyr.level === 'p1' && !pyr.existing.length) { warn.classList.remove('show'); return; }
+  warn.classList.add('show');
+  txt.textContent = pyr.message;
+  if (pyr.blocked) {
+    warn.style.borderColor = 'rgba(255,69,96,.5)';
+    document.getElementById('place-btn').disabled = true;
+  } else {
+    warn.style.borderColor = 'rgba(0,187,255,.3)';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POSITION LIFECYCLE
+// ═══════════════════════════════════════════════════════════════
+
+function getLifecyclePhase(trade) {
+  const t = normalizeTrade(trade);
+  if (!t || !t._n) return 0;
+  const phases = [];
+  // Phase 0: ENTRY — always done if entries exist
+  phases.push(t._n.entryCount > 0);
+  // Phase 1: INITIAL SL — has SL set
+  phases.push(!!t.sl);
+  // Phase 2: B/E — SL moved to >= avgEntry
+  const slMoves = t._epSlMoves || [];
+  const currentSL = slMoves.length ? slMoves[slMoves.length - 1].to : (+t.sl || 0);
+  phases.push(t._n.avgEntry > 0 && currentSL >= t._n.avgEntry);
+  // Phase 3: PYRAMID — has >1 entry
+  phases.push(t._n.entryCount > 1);
+  // Phase 4: TSL — has SL moves with TSL reason
+  phases.push(slMoves.some(m => (m.reason || '').includes('tsl')));
+  // Phase 5: SELL — has exits
+  phases.push(t._n.totalExitQty > 0);
+  return phases;
+}
+
+function renderLifecycle(phases) {
+  const labels = EP_CONFIG.lifecycle;
+  let html = '';
+  let activeFound = false;
+  for (let i = 0; i < labels.length; i++) {
+    const done = phases[i];
+    let cls = 'pending';
+    if (done) cls = 'done';
+    else if (!activeFound) { cls = 'active'; activeFound = true; }
+    const icon = done ? '✓' : (cls === 'active' ? '●' : (i + 1));
+    html += `<div class="ep-lc-step ${cls}" title="${labels[i]}">${icon}</div>`;
+    if (i < labels.length - 1) html += `<div class="ep-lc-line ${done ? 'done' : ''}"></div>`;
+  }
+  return html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SL LADDER VISUALIZATION
+// ═══════════════════════════════════════════════════════════════
+
+function renderSLLadder(trade, cmp) {
+  const t = normalizeTrade(trade);
+  if (!t || !t._n || !t._n.avgEntry) return '<div style="font-size:9px;color:var(--t4)">No SL data</div>';
+  const avg = t._n.avgEntry;
+  const sl = +t.sl || avg * 0.95;
+  const slMoves = t._epSlMoves || [];
+  const currentSL = slMoves.length ? +slMoves[slMoves.length - 1].to : sl;
+  const target = +t.target || avg * 1.15;
+  const rangeMin = Math.min(currentSL, avg) * 0.98;
+  const rangeMax = Math.max(target, cmp || avg) * 1.02;
+  const range = rangeMax - rangeMin || 1;
+  const pct = v => Math.max(0, Math.min(100, ((v - rangeMin) / range) * 100));
+
+  const slPct = pct(currentSL);
+  const avgPct = pct(avg);
+  const cmpPct = cmp ? pct(cmp) : avgPct;
+  const tgtPct = pct(target);
+
+  // Color zones
+  const lossWidth = avgPct;
+  const profitWidth = 100 - avgPct;
+  const inProfit = cmp && cmp >= avg;
+
+  return `<div class="ep-sl-track">
+    <div class="ep-sl-fill" style="width:${avgPct}%;background:rgba(255,69,96,.08)"></div>
+    <div class="ep-sl-fill" style="left:${avgPct}%;width:${profitWidth}%;background:rgba(0,229,160,.06)"></div>
+    <div class="ep-sl-marker" style="left:${slPct}%;background:var(--r)"><div class="ep-sl-label">SL ₹${currentSL.toFixed(0)}</div></div>
+    <div class="ep-sl-marker" style="left:${avgPct}%;background:var(--t4);width:1px"><div class="ep-sl-label">Avg ₹${avg.toFixed(0)}</div></div>
+    ${cmp ? `<div class="ep-sl-marker ep-sl-cmp" style="left:${cmpPct}%"></div>` : ''}
+    <div class="ep-sl-marker" style="left:${tgtPct}%;background:var(--g)"><div class="ep-sl-label">Tgt ₹${target.toFixed(0)}</div></div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ATR SELL-INTO-STRENGTH METER
+// ═══════════════════════════════════════════════════════════════
+
+function renderATRMeter(trade, cmp) {
+  const t = normalizeTrade(trade);
+  if (!t || !t._n || !t._n.avgEntry || !cmp) return '';
+  const atr = +t._epAtr14 || (t._n.avgEntry * 0.02); // Fallback 2% ATR
+  if (!atr) return '';
+  const moveFromEntry = cmp - t._n.avgEntry;
+  const atrMultiple = moveFromEntry / atr;
+  const maxDisplay = 8;
+  const fillPct = Math.min(Math.max(atrMultiple / maxDisplay * 100, 0), 100);
+
+  let barColor = 'var(--c)';
+  let sellTag = '';
+  if (atrMultiple >= 7) { barColor = 'var(--r)'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,69,96,.15);color:var(--r)">SELL 75-100%</span>`; }
+  else if (atrMultiple >= 6) { barColor = '#ff9800'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,152,0,.15);color:#ff9800">SELL 50%</span>`; }
+  else if (atrMultiple >= 5) { barColor = 'var(--y)'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,193,7,.15);color:var(--y)">SELL 25%</span>`; }
+
+  return `<div class="ep-atr-wrap">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+      <span style="font-size:9px;font-weight:700;color:var(--t3)">ATR ${atrMultiple.toFixed(1)}×</span>
+      ${sellTag}
+    </div>
+    <div class="ep-atr-bar">
+      <div class="ep-atr-fill" style="width:${fillPct}%;background:linear-gradient(90deg,var(--c),${barColor})"></div>
+    </div>
+    <div class="ep-atr-marks"><span>0×</span><span>5×</span><span>6×</span><span>7×</span><span>8×</span></div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PYRAMID INDICATOR
+// ═══════════════════════════════════════════════════════════════
+
+function renderPyramidIndicator(trade) {
+  const t = normalizeTrade(trade);
+  if (!t || !t._n) return '';
+  const entryCount = t._n.entryCount;
+  const pyrLevel = t._epPyramid || (entryCount >= 3 ? 'p3' : entryCount >= 2 ? 'p2' : 'p1');
+  const cfg = EP_CONFIG.pyramid[pyrLevel];
+  const filledPct = entryCount === 1 ? 33 : entryCount === 2 ? 66 : 100;
+
+  let blocks = '';
+  for (let i = 1; i <= 3; i++) {
+    const cls = i <= entryCount ? (i === entryCount ? 'active' : 'filled') : '';
+    blocks += `<div class="ep-pyr-block ${cls}"></div>`;
+  }
+
+  return `<div class="ep-pyr-row">
+    <span class="ep-pyr-label" style="background:rgba(0,187,255,.1);color:var(--c)">${cfg?.label || 'P1'}</span>
+    ${blocks}
+    <span style="font-size:9px;color:var(--t4)">${filledPct}% filled</span>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CAPITAL COMPUTATION
+// ═══════════════════════════════════════════════════════════════
+
+function computeCurrentCapital() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  let realizedPnl = 0;
+  let deployed = 0;
+
+  trades.forEach(t => {
+    const nt = normalizeTrade(t);
+    if (!nt || !nt._n) return;
+    // Realized from closed exits
+    nt.exits?.forEach(ex => {
+      const entryAvg = nt._n.avgEntry;
+      realizedPnl += ((+ex.price || 0) - entryAvg) * (+ex.qty || 0);
+    });
+    // Deployed capital (open positions)
+    if (nt._n.isOpen) {
+      deployed += nt._n.avgEntry * nt._n.remainingQty;
+    }
+  });
+
+  // Fund additions/withdrawals
+  const fundData = JSON.parse(localStorage.getItem('te_fund') || '{}');
+  let fundAdj = 0;
+  Object.values(fundData).forEach(yearObj => {
+    Object.entries(yearObj).forEach(([key, val]) => {
+      if (key.endsWith('_add')) fundAdj += +val || 0;
+      if (key.endsWith('_wdr')) fundAdj -= +val || 0;
+    });
+  });
+
+  const startCap = EP_CONFIG.startingCapital + fundAdj;
+  const current = startCap + realizedPnl;
+  const free = current - deployed;
+
+  return { startCap, current, realizedPnl, deployed, free };
+}
+
+function renderCapitalBar() {
+  const cap = computeCurrentCapital();
+  const fmt = v => (v >= 0 ? '' : '-') + '₹' + (Math.abs(v) / 100000).toFixed(2) + 'L';
+  document.getElementById('cap-start').textContent = fmt(cap.startCap);
+  const ce = document.getElementById('cap-current');
+  ce.textContent = fmt(cap.current); ce.style.color = cap.current >= cap.startCap ? 'var(--g)' : 'var(--r)';
+  const re = document.getElementById('cap-realized');
+  re.textContent = (cap.realizedPnl >= 0 ? '+' : '') + fmt(cap.realizedPnl); re.style.color = cap.realizedPnl >= 0 ? 'var(--g)' : 'var(--r)';
+  document.getElementById('cap-deployed').textContent = fmt(cap.deployed);
+  const fe = document.getElementById('cap-free');
+  fe.textContent = fmt(cap.free); fe.style.color = cap.free > 0 ? 'var(--g)' : 'var(--r)';
+  // Cache
+  localStorage.setItem('te_current_capital', JSON.stringify(cap));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPABASE SYNC
+// ═══════════════════════════════════════════════════════════════
+
+async function supabaseUpsert(table, data) {
+  try {
+    const res = await fetch(`${EP_CONFIG.supabaseUrl}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EP_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${EP_CONFIG.supabaseKey}`,
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(data)
+    });
+    return res.ok;
+  } catch (e) { console.error('Supabase upsert error:', e); return false; }
+}
+
+async function supabaseUpdate(table, matchCol, matchVal, data) {
+  try {
+    const res = await fetch(`${EP_CONFIG.supabaseUrl}/rest/v1/${table}?${matchCol}=eq.${matchVal}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EP_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${EP_CONFIG.supabaseKey}`,
+      },
+      body: JSON.stringify(data)
+    });
+    return res.ok;
+  } catch (e) { console.error('Supabase update error:', e); return false; }
+}
+
+async function syncTradeToSupabase(trade) {
+  const nt = normalizeTrade(trade);
+  if (!nt) return;
+  await supabaseUpsert('tradedge_trades', {
+    id: trade.id,
+    symbol: trade.symbol,
+    side: trade.side,
+    status: trade.status,
+    entries: JSON.stringify(trade.entries),
+    exits: JSON.stringify(trade.exits),
+    sl: trade.sl,
+    target: trade.target,
+    sector: trade.sector,
+    source: trade.source,
+    _ep_pyramid: trade._epPyramid,
+    _ep_atr14: trade._epAtr14,
+    _ep_sl_moves: JSON.stringify(trade._epSlMoves || []),
+    updated_at: new Date().toISOString()
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PARTIAL EXIT SYSTEM
+// ═══════════════════════════════════════════════════════════════
+
+function openPartialSell(tradeId, posIdx) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.id === tradeId);
+  if (!trade) return;
+  _partialTradeId = tradeId;
+  _partialPosIdx = posIdx;
+  const nt = normalizeTrade(trade);
+  document.getElementById('partial-sym').textContent = trade.symbol;
+  document.getElementById('partial-total-qty').value = nt._n.remainingQty;
+  document.getElementById('partial-exit-qty').value = '';
+  const p = TE.exec.positions[posIdx];
+  const cmp = p ? (p.last_price || p.lastPrice || p.ltp || 0) : 0;
+  document.getElementById('partial-price').value = cmp ? cmp.toFixed(2) : '';
+  updatePartialSummary();
+  openM('m-partial');
+}
+
+function setPartialPct(pct) {
+  const total = +document.getElementById('partial-total-qty').value || 0;
+  document.getElementById('partial-exit-qty').value = Math.max(1, Math.floor(total * pct / 100));
+  updatePartialSummary();
+}
+
+function updatePartialSummary() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.id === _partialTradeId);
+  if (!trade) return;
+  const nt = normalizeTrade(trade);
+  const exitQty = +document.getElementById('partial-exit-qty').value || 0;
+  const exitPrice = +document.getElementById('partial-price').value || 0;
+  if (!exitQty || !exitPrice) {
+    document.getElementById('partial-summary').innerHTML = '<div style="color:var(--t4)">Fill details to see P&L impact</div>';
+    return;
+  }
+  const avgEntry = nt._n.avgEntry;
+  const pnl = (exitPrice - avgEntry) * exitQty;
+  const riskPerShare = nt._n.riskPerShare || 1;
+  const rMultiple = riskPerShare > 0 ? (exitPrice - avgEntry) / riskPerShare : 0;
+  const atr = +trade._epAtr14 || (avgEntry * 0.02);
+  const atrMult = atr > 0 ? (exitPrice - avgEntry) / atr : 0;
+
+  document.getElementById('partial-r').value = rMultiple.toFixed(2) + 'R';
+  document.getElementById('partial-atr').value = atrMult.toFixed(1) + '× ATR';
+
+  const pnlColor = pnl >= 0 ? 'var(--g)' : 'var(--r)';
+  document.getElementById('partial-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+      <div><div style="font-size:8px;color:var(--t4)">Exit P&L</div><div style="font-size:13px;font-weight:700;color:${pnlColor}">${pnl >= 0 ? '+' : ''}₹${Math.abs(pnl).toFixed(0)}</div></div>
+      <div><div style="font-size:8px;color:var(--t4)">R-Multiple</div><div style="font-size:13px;font-weight:700;color:${rMultiple >= 0 ? 'var(--g)' : 'var(--r)'}">${rMultiple.toFixed(2)}R</div></div>
+      <div><div style="font-size:8px;color:var(--t4)">Remaining</div><div style="font-size:13px;font-weight:700;color:var(--c)">${nt._n.remainingQty - exitQty}</div></div>
+    </div>`;
+}
+
+async function confirmPartialSell() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const idx = trades.findIndex(t => t.id === _partialTradeId);
+  if (idx < 0) return;
+  const trade = trades[idx];
+  const exitQty = +document.getElementById('partial-exit-qty').value || 0;
+  const exitPrice = +document.getElementById('partial-price').value || 0;
+  const reason = document.getElementById('partial-reason').value;
+  if (!exitQty || !exitPrice) { toast('Fill qty and price', '⚠️'); return; }
+
+  // Record exit in journal
+  trade.exits = trade.exits || [];
+  trade.exits.push({
+    date: new Date().toISOString().slice(0, 10),
+    price: exitPrice,
+    qty: exitQty,
+    reason: reason,
+    rMultiple: document.getElementById('partial-r').value,
+    atrMultiple: document.getElementById('partial-atr').value,
+  });
+
+  // Check if fully closed
+  const nt = normalizeTrade(trade);
+  if (nt._n.remainingQty <= 0) trade.status = 'Closed';
+
+  trades[idx] = trade;
+  localStorage.setItem('te_trades', JSON.stringify(trades));
+
+  // Supabase sync
+  syncTradeToSupabase(trade);
+
+  // Send broker order
+  if (_partialPosIdx !== null) {
+    const p = TE.exec.positions[_partialPosIdx];
+    if (p) {
+      const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
+      const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
+      await TE.exec.sendOrder(sym, side, 'MARKET', exitQty, 0, 0, p.product || 'CNC', 'DAY');
+    }
+  }
+
+  // Telegram alert
+  sendTelegramAlert(`📤 Partial Exit: ${trade.symbol}\nQty: ${exitQty} @ ₹${exitPrice}\n${document.getElementById('partial-r').value} | ${document.getElementById('partial-atr').value}\nReason: ${reason}`);
+
+  closeM('m-partial');
+  toast(`Exited ${exitQty} ${trade.symbol}`, '✅');
+  setTimeout(refreshAll, 2000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SL MOVE LOGGING
+// ═══════════════════════════════════════════════════════════════
+
+function openSLMove(tradeId) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.id === tradeId);
+  if (!trade) return;
+  _slMoveTradeId = tradeId;
+  document.getElementById('sl-move-sym').textContent = trade.symbol;
+  const slMoves = trade._epSlMoves || [];
+  const currentSL = slMoves.length ? slMoves[slMoves.length - 1].to : (+trade.sl || 0);
+  document.getElementById('sl-move-current').value = currentSL.toFixed(2);
+  document.getElementById('sl-move-new').value = '';
+
+  // Render history
+  const hist = document.getElementById('sl-move-history');
+  if (!slMoves.length) {
+    hist.innerHTML = `<div style="color:var(--t4);font-size:10px;padding:4px 0">Initial SL: ₹${(+trade.sl || 0).toFixed(2)}</div>`;
+  } else {
+    hist.innerHTML = slMoves.map(m => `<div class="ep-sl-row">
+      <span class="sl-date">${m.date || '—'}</span>
+      <span class="sl-from">₹${(+m.from || 0).toFixed(0)}</span>
+      <span style="color:var(--t4)">→</span>
+      <span class="sl-to">₹${(+m.to || 0).toFixed(0)}</span>
+      <span class="sl-reason">${m.reason || ''}</span>
+    </div>`).join('');
+  }
+
+  document.getElementById('sl-move-reason').onchange = function() {
+    document.getElementById('sl-custom-wrap').style.display = this.value === 'custom' ? '' : 'none';
+    // Auto-fill common SL values
+    if (this.value === 'breakeven') {
+      const nt = normalizeTrade(trade);
+      document.getElementById('sl-move-new').value = nt._n.avgEntry.toFixed(2);
+    }
+  };
+
+  openM('m-sl-move');
+}
+
+async function confirmSLMove() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const idx = trades.findIndex(t => t.id === _slMoveTradeId);
+  if (idx < 0) return;
+  const trade = trades[idx];
+  const newSL = +document.getElementById('sl-move-new').value;
+  if (!newSL) { toast('Enter new SL', '⚠️'); return; }
+
+  const reasonSel = document.getElementById('sl-move-reason').value;
+  const reason = reasonSel === 'custom' ? document.getElementById('sl-move-custom').value : reasonSel;
+  const oldSL = +document.getElementById('sl-move-current').value || +trade.sl || 0;
+
+  trade._epSlMoves = trade._epSlMoves || [];
+  trade._epSlMoves.push({
+    date: new Date().toISOString().slice(0, 10),
+    from: oldSL,
+    to: newSL,
+    reason: reason
+  });
+  trade.sl = newSL;
+
+  trades[idx] = trade;
+  localStorage.setItem('te_trades', JSON.stringify(trades));
+
+  // Supabase sync
+  syncTradeToSupabase(trade);
+
+  // Telegram
+  sendTelegramAlert(`🛡️ SL Moved: ${trade.symbol}\n₹${oldSL.toFixed(2)} → ₹${newSL.toFixed(2)}\nReason: ${reason}`);
+
+  closeM('m-sl-move');
+  toast(`SL updated: ${trade.symbol} → ₹${newSL.toFixed(2)}`, '✅');
+  renderPositions();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ORDER BUILDER MODAL
+// ═══════════════════════════════════════════════════════════════
+
+function openOrderBuilder(sym, side, qty, price, sl) {
+  _obData = { sym, side, qty, price, sl };
+  // Clipboard
+  const clip = `${side} ${sym}\nQty: ${qty}\nPrice: ₹${(+price).toFixed(2)}\nSL: ₹${(+sl).toFixed(2)}\nProduct: CNC\n---\nTradEdge`;
+  document.getElementById('ob-clip-text').textContent = clip;
+  // DeepLinks
+  document.getElementById('ob-link-zerodha').href = `https://kite.zerodha.com/chart/web/ciq/NSE/${sym}`;
+  document.getElementById('ob-link-dhan').href = `https://web.dhan.co/charts/${sym}`;
+  document.getElementById('ob-link-tv').href = `https://www.tradingview.com/chart/${EP_CONFIG.tvLayout}/?symbol=NSE:${sym}`;
+  // API tab
+  document.getElementById('ob-broker').textContent = TE.exec.broker || 'Dhan';
+  document.getElementById('ob-api-status').textContent = '';
+  setObTab('clipboard', document.querySelector('.ep-ob-tab'));
+  openM('m-order-builder');
+}
+
+function setObTab(tab, el) {
+  document.querySelectorAll('.ep-ob-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('ob-clipboard').style.display = tab === 'clipboard' ? 'flex' : 'none';
+  document.getElementById('ob-deeplink').style.display = tab === 'deeplink' ? 'flex' : 'none';
+  document.getElementById('ob-api').style.display = tab === 'api' ? 'flex' : 'none';
+}
+
+function copyObClipboard() {
+  const text = document.getElementById('ob-clip-text').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('Copied!', '📋')).catch(() => toast('Copy failed', '❌'));
+}
+
+async function obPlaceApi() {
+  if (!_obData) return;
+  const statusEl = document.getElementById('ob-api-status');
+  statusEl.innerHTML = '<span style="color:var(--y)">⏳ Placing…</span>';
+  try {
+    const result = await TE.exec.sendOrder(_obData.sym, _obData.side, 'MARKET', _obData.qty, _obData.price, 0, 'CNC', 'DAY');
+    if (result.ok) {
+      statusEl.innerHTML = `<span style="color:var(--g)">✅ Placed — ID: ${result.orderId}</span>`;
+      toast(`Order placed: ${_obData.sym}`, '✅');
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--r)">❌ ${result.error}</span>`;
+    }
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color:var(--r)">❌ ${e.message}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TELEGRAM HELPER
+// ═══════════════════════════════════════════════════════════════
+
+async function sendTelegramAlert(msg) {
+  const bot = localStorage.getItem('te_tg_bot');
+  const chat = localStorage.getItem('te_tg_chat');
+  if (!bot || !chat) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text: msg, parse_mode: 'HTML' })
+    });
+  } catch (e) { console.error('Telegram error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS (PRESERVED FROM ORIGINAL)
+// ═══════════════════════════════════════════════════════════════
+
+function toggleSettingsPanel() {
+  const content = document.getElementById('settings-content');
+  const btn = document.getElementById('settings-toggle-btn');
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    btn.textContent = '▲';
+    loadSettingsValues();
+  } else {
+    content.style.display = 'none';
+    btn.textContent = '▼';
+  }
+}
+
+function loadSettingsValues() {
+  const groqKey = localStorage.getItem('groq_key') || '';
+  document.getElementById('groq-key-input').value = groqKey;
+  updateGroqStatus();
+  const tgBot = localStorage.getItem('te_tg_bot') || '';
+  const tgChat = localStorage.getItem('te_tg_chat') || '';
+  document.getElementById('tg-bot-input').value = tgBot;
+  document.getElementById('tg-chat-input').value = tgChat;
+  updateTelegramStatus();
+  const dhanId = localStorage.getItem('dhan_id') || '';
+  const dhanToken = localStorage.getItem('dhan_tk') || '';
+  document.getElementById('dhan-id-input').value = dhanId;
+  document.getElementById('dhan-token-input').value = dhanToken;
+  updateDhanStatus();
+  const workerUrl = localStorage.getItem('zd_worker_url') || '';
+  document.getElementById('worker-url-input').value = workerUrl;
+}
+
+function updateGroqStatus() {
+  const status = document.getElementById('groq-status');
+  const key = localStorage.getItem('groq_key');
+  if (key && key.startsWith('gsk_')) { status.textContent = '✓ Connected'; status.style.background = 'rgba(0,229,160,0.15)'; status.style.color = '#00E5A0'; }
+  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t4)'; }
+}
+
+function updateTelegramStatus() {
+  const status = document.getElementById('telegram-status');
+  const bot = localStorage.getItem('te_tg_bot');
+  const chat = localStorage.getItem('te_tg_chat');
+  if (bot && chat) { status.textContent = '✓ Configured'; status.style.background = 'rgba(0,229,160,0.15)'; status.style.color = '#00E5A0'; }
+  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t4)'; }
+}
+
+function updateDhanStatus() {
+  const status = document.getElementById('dhan-status');
+  const id = localStorage.getItem('dhan_id');
+  const token = localStorage.getItem('dhan_tk');
+  if (id && token) { status.textContent = '✓ Connected'; status.style.background = 'rgba(0,229,160,0.15)'; status.style.color = '#00E5A0'; }
+  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t4)'; }
+}
+
+function toggleGroqKeyVisibility() {
+  const input = document.getElementById('groq-key-input');
+  const btn = document.getElementById('groq-eye-btn');
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+  else { input.type = 'password'; btn.textContent = '👁️'; }
+}
+
+function saveGroqKey() {
+  const key = document.getElementById('groq-key-input').value.trim();
+  if (key) { localStorage.setItem('groq_key', key); updateGroqStatus(); if (typeof toast === 'function') toast('Groq API key saved!', '✅'); }
+  else { localStorage.removeItem('groq_key'); updateGroqStatus(); if (typeof toast === 'function') toast('Groq API key removed', '🗑️'); }
+}
+
+function saveTelegramSettings() {
+  const bot = document.getElementById('tg-bot-input').value.trim();
+  const chat = document.getElementById('tg-chat-input').value.trim();
+  if (bot) localStorage.setItem('te_tg_bot', bot); else localStorage.removeItem('te_tg_bot');
+  if (chat) localStorage.setItem('te_tg_chat', chat); else localStorage.removeItem('te_tg_chat');
+  updateTelegramStatus();
+  if (typeof toast === 'function') toast('Telegram settings saved!', '✅');
+}
+
+async function testTelegram() {
+  const bot = document.getElementById('tg-bot-input').value.trim() || localStorage.getItem('te_tg_bot');
+  const chat = document.getElementById('tg-chat-input').value.trim() || localStorage.getItem('te_tg_chat');
+  if (!bot || !chat) { if (typeof toast === 'function') toast('Enter bot token and chat ID first', '⚠️'); return; }
+  try {
+    const msg = `🧪 TradEdge Test Alert\n\nTime: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n✅ Telegram alerts are working!`;
+    const res = await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text: msg, parse_mode: 'HTML' }) });
+    if (res.ok) { if (typeof toast === 'function') toast('Test message sent!', '✅'); }
+    else { const err = await res.json(); if (typeof toast === 'function') toast(`Error: ${err.description}`, '❌'); }
+  } catch (err) { if (typeof toast === 'function') toast(`Error: ${err.message}`, '❌'); }
+}
+
+function saveDhanSettings() {
+  const id = document.getElementById('dhan-id-input').value.trim();
+  const token = document.getElementById('dhan-token-input').value.trim();
+  if (id) localStorage.setItem('dhan_id', id); else localStorage.removeItem('dhan_id');
+  if (token) localStorage.setItem('dhan_tk', token); else localStorage.removeItem('dhan_tk');
+  updateDhanStatus();
+  if (typeof toast === 'function') toast('Dhan settings saved!', '✅');
+  checkBrokerStatus();
+}
+
+function saveWorkerUrl() {
+  const url = document.getElementById('worker-url-input').value.trim();
+  if (url) { localStorage.setItem('zd_worker_url', url); if (typeof toast === 'function') toast('Worker URL saved!', '✅'); }
+  else { localStorage.removeItem('zd_worker_url'); if (typeof toast === 'function') toast('Worker URL removed', '🗑️'); }
+  checkBrokerStatus();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT + AUTOCOMPLETE (PRESERVED)
+// ═══════════════════════════════════════════════════════════════
+
 setTimeout(() => {
   TE.createAutocomplete({
     inputId: 'exec-sym', dropId: 'exec-sym-drop',
@@ -292,11 +1330,14 @@ setTimeout(() => {
         if (pe && !pe.value) pe.value = price.toFixed(2);
         el.innerHTML = `<span style="color:var(--g)">₹${price.toFixed(2)}</span>`;
       } else el.textContent = 'Unavailable';
+      // Update pyramid detection on symbol change
+      updatePyramidWarn(sym);
     }
   });
   TE.createAutocomplete({ inputId: 'gtt-sym', dropId: 'gtt-sym-drop' });
   populateJournalDropdown();
   checkBrokerStatus();
+  renderCapitalBar();
 }, 100);
 
 // ── Broker Selection ──
@@ -310,7 +1351,7 @@ function setBroker(b) {
 function checkBrokerStatus() {
   const st = document.getElementById('broker-status');
   const w = TE.getWorkerUrl();
-  if (!w) { st.innerHTML = '<span style="color:var(--r)">⚠ Set Worker URL</span>'; return; }
+  if (!w) { st.innerHTML = '<span style="color:var(--r)">⚠ Set Worker URL in Settings</span>'; return; }
   let ok = false;
   if (TE.exec.broker === 'zerodha') ok = !!(localStorage.getItem('zd_key') && localStorage.getItem('zd_tk'));
   else if (TE.exec.broker === 'dhan') ok = !!localStorage.getItem('dhan_tk');
@@ -361,7 +1402,10 @@ function runNudges() {
   document.getElementById('place-btn').disabled = score < 30;
 }
 
-// ── Place Order ──
+// ═══════════════════════════════════════════════════════════════
+// PLACE ORDER (ENHANCED WITH PYRAMID + JOURNAL)
+// ═══════════════════════════════════════════════════════════════
+
 async function placeOrder() {
   const sym = (document.getElementById('exec-sym').value || '').trim().toUpperCase();
   const qty = +document.getElementById('exec-qty').value || 0;
@@ -371,6 +1415,10 @@ async function placeOrder() {
   const validity = document.getElementById('exec-validity').value;
   if (!sym) { toast('Enter symbol', '⚠️'); return; }
   if (!qty) { toast('Enter quantity', '⚠️'); return; }
+
+  // Pyramid check
+  const pyr = detectPyramidLevel(sym);
+  if (pyr.blocked) { toast(pyr.message, '⛔'); return; }
 
   const btn = document.getElementById('place-btn');
   const statusEl = document.getElementById('order-status');
@@ -401,10 +1449,43 @@ async function placeOrder() {
         }
       }
 
-      // Auto-journal
+      // Journal entry with Edge Pilot metadata
+      const bktSL = +document.getElementById('bkt-sl').value || 0;
+      const bktTgt = +document.getElementById('bkt-tgt').value || 0;
       if (document.getElementById('bkt-autojournal')?.checked || document.getElementById('bracket-cb').checked) {
-        TE.exec.autoJournal(sym, TE.exec.side, qty, price || 0, +document.getElementById('bkt-sl').value || 0, +document.getElementById('bkt-tgt').value || 0);
+        // Enhanced journal: check if pyramid add
+        if (pyr.level !== 'p1' && pyr.existing.length) {
+          // Add to existing trade
+          const existingTrade = pyr.existing[0];
+          const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+          const tIdx = trades.findIndex(t => t.id === existingTrade.id);
+          if (tIdx >= 0) {
+            trades[tIdx].entries.push({ date: new Date().toISOString().slice(0, 10), price: price || 0, qty });
+            trades[tIdx]._epPyramid = pyr.level;
+            if (bktSL) trades[tIdx].sl = bktSL;
+            if (bktTgt) trades[tIdx].target = bktTgt;
+            localStorage.setItem('te_trades', JSON.stringify(trades));
+            syncTradeToSupabase(trades[tIdx]);
+            toast(`Pyramid ${pyr.level.toUpperCase()}: Added to ${sym}`, '🔺');
+          }
+        } else {
+          // New P1 entry
+          TE.exec.autoJournal(sym, TE.exec.side, qty, price || 0, bktSL, bktTgt);
+          // Tag with EP metadata
+          const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+          const latest = trades[trades.length - 1];
+          if (latest && latest.symbol === sym) {
+            latest._epPyramid = 'p1';
+            latest._epSlMoves = [];
+            localStorage.setItem('te_trades', JSON.stringify(trades));
+            syncTradeToSupabase(latest);
+          }
+        }
       }
+
+      // Telegram alert
+      sendTelegramAlert(`⚡ Order Placed: ${TE.exec.side} ${sym}\nQty: ${qty} @ ₹${price || 'MKT'}\nPyramid: ${(pyr.level || 'p1').toUpperCase()}\nSL: ₹${bktSL || '—'}`);
+
     } else {
       statusEl.innerHTML = `<span style="color:var(--r)">❌ ${result.error}</span>`;
       TE.exec.playSound('error');
@@ -414,21 +1495,29 @@ async function placeOrder() {
     TE.exec.playSound('error');
   }
   btn.disabled = false;
+  renderCapitalBar();
   setTimeout(refreshAll, 2000);
 }
 
-// ── Refresh All ──
+// ═══════════════════════════════════════════════════════════════
+// REFRESH ALL (ENHANCED)
+// ═══════════════════════════════════════════════════════════════
+
 async function refreshAll() {
   await TE.exec.refreshPositions();
   renderPositions();
   renderPnlBar();
   renderHeatmap();
   renderSquareOffBar();
+  renderCapitalBar();
   populateJournalDropdown();
   await refreshOrders();
 }
 
-// ── Render Positions ──
+// ═══════════════════════════════════════════════════════════════
+// RENDER ENHANCED POSITIONS
+// ═══════════════════════════════════════════════════════════════
+
 function renderPositions() {
   const positions = [...TE.exec.positions];
   document.getElementById('pos-badge').textContent = positions.length;
@@ -441,7 +1530,10 @@ function renderPositions() {
     return ((a.tradingsymbol || a.symbol || '') + '').localeCompare((b.tradingsymbol || b.symbol || '') + '');
   });
 
-  container.innerHTML = '<div class="exec-pos-grid">' + positions.map((p, i) => {
+  // Match positions to journal trades
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+
+  container.innerHTML = '<div class="ep-pos-grid">' + positions.map((p, i) => {
     const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
     const qty = p.quantity || p.netQty || 0;
     const avg = p.average_price || p.averagePrice || 0;
@@ -450,27 +1542,89 @@ function renderPositions() {
     const pnlPct = avg > 0 ? ((ltp - avg) / avg * 100) : 0;
     const isLong = qty > 0;
     const pnlColor = pnl >= 0 ? 'var(--g)' : 'var(--r)';
-    const barWidth = Math.min(Math.abs(pnlPct) * 5, 100);
 
-    return `<div class="exec-pos-card">
-      <div class="pos-pnl-bar" style="width:${barWidth}%;background:${pnl>=0?'#22c55e':'#ff4560'}"></div>
-      <div class="exec-pos-top">
-        <div class="exec-pos-sym">${sym}</div>
-        <div class="exec-pos-side ${isLong ? 'long' : 'short'}">${isLong ? 'LONG' : 'SHORT'}</div>
-        <div style="text-align:right">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pnlColor}">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div>
-          <div style="font-size:10px;color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</div>
+    // Find matching journal trade
+    const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
+    const nt = trade ? normalizeTrade(trade) : null;
+    const phases = trade ? getLifecyclePhase(trade) : [true, false, false, false, false, false];
+    const pyrLevel = trade?._epPyramid || 'p1';
+    const sector = trade?.sector || '';
+    const days = nt?._n?.daysSinceEntry || 0;
+
+    // RS rank (from trade metadata or mock)
+    const rsRank = trade?._epRsRank || null;
+    let rsBadge = '';
+    if (rsRank && rsRank <= 10) rsBadge = `<span class="ep-badge ep-badge-rs">RS TOP 10%</span>`;
+    else if (rsRank && rsRank <= 25) rsBadge = `<span class="ep-badge" style="background:rgba(0,187,255,.1);color:var(--c)">RS TOP 25%</span>`;
+
+    // Grade
+    const grade = trade?._epGrade || (pnlPct > 10 ? 'A+' : pnlPct > 5 ? 'A' : pnlPct > 0 ? 'B' : 'C');
+    const gradeColor = grade.startsWith('A') ? 'var(--g)' : grade === 'B' ? 'var(--y)' : 'var(--r)';
+
+    // Risk % of capital
+    const cap = computeCurrentCapital();
+    const posValue = Math.abs(qty * avg);
+    const riskPct = cap.current > 0 ? (posValue / cap.current * 100) : 0;
+
+    return `<div class="ep-pos-card">
+      <!-- Header -->
+      <div class="ep-pos-header">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="ep-pos-sym">${sym}</span>
+          ${rsBadge}
+          <span class="ep-badge ep-badge-pyr">${(EP_CONFIG.pyramid[pyrLevel]?.label || 'P1').split('—')[0].trim()}</span>
+          ${sector ? `<span class="ep-badge ep-badge-sector">${sector}</span>` : ''}
+          ${days ? `<span style="font-size:9px;color:var(--t4)">Day ${days}</span>` : ''}
+        </div>
+        <div>
+          <span class="ep-badge ep-badge-grade" style="color:${gradeColor}">${grade}</span>
+          <div style="text-align:right;margin-top:2px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pnlColor}">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div>
+            <div style="font-size:10px;color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</div>
+          </div>
         </div>
       </div>
-      <div class="exec-pos-metrics">
-        <div>Qty: <span class="pm-val">${Math.abs(qty)}</span></div>
-        <div>Avg: <span class="pm-val">₹${(+avg).toFixed(2)}</span></div>
-        <div>CMP: <span class="pm-val" style="color:var(--c)">₹${(+ltp).toFixed(2)}</span></div>
+
+      <!-- Metrics Row -->
+      <div class="ep-pos-metrics-row">
+        <div class="ep-metric"><div class="ep-metric-label">CMP</div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">P&L%</div><div class="ep-metric-val" style="color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">SL</div><div class="ep-metric-val" style="color:var(--r)">₹${trade?.sl ? (+trade.sl).toFixed(0) : '—'}</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">Risk%</div><div class="ep-metric-val" style="color:${riskPct > 10 ? 'var(--r)' : riskPct > 5 ? 'var(--y)' : 'var(--t2)'}">${riskPct.toFixed(1)}%</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">Qty</div><div class="ep-metric-val" style="color:var(--t2)">${Math.abs(qty)}</div></div>
       </div>
-      <div class="exec-pos-actions">
-        <button class="pa-btn" onclick="quickPartial('${sym}',${i},25)">25%</button>
-        <button class="pa-btn" onclick="quickPartial('${sym}',${i},50)">50%</button>
-        <button class="pa-btn pa-close" onclick="quickClose('${sym}',${i})">✕ Close</button>
+
+      <!-- Lifecycle -->
+      <div class="ep-pos-section">
+        <div class="ep-section-label">Lifecycle</div>
+        <div class="ep-lifecycle">${renderLifecycle(phases)}</div>
+        <div style="display:flex;gap:4px;font-size:8px;color:var(--t4)">${EP_CONFIG.lifecycle.map((l,j) => `<span style="flex:1;text-align:center;${phases[j] ? 'color:var(--g)' : ''}">${l}</span>`).join('')}</div>
+      </div>
+
+      <!-- SL Ladder -->
+      ${trade?.sl ? `<div class="ep-pos-section">
+        <div class="ep-section-label">SL Ladder</div>
+        ${renderSLLadder(trade, ltp)}
+      </div>` : ''}
+
+      <!-- ATR Meter -->
+      ${trade?._epAtr14 || trade ? `<div class="ep-pos-section">${renderATRMeter(trade, ltp)}</div>` : ''}
+
+      <!-- Pyramid -->
+      <div class="ep-pos-section">
+        <div class="ep-section-label">Pyramid</div>
+        ${renderPyramidIndicator(trade || { entries: [{ date: '', price: avg, qty: Math.abs(qty) }] })}
+      </div>
+
+      <!-- Actions -->
+      <div class="ep-pos-actions">
+        <button class="ep-act-btn" onclick="quickPartial('${sym}',${i},25)">25%</button>
+        <button class="ep-act-btn" onclick="quickPartial('${sym}',${i},50)">50%</button>
+        <button class="ep-act-btn close" onclick="quickClose('${sym}',${i})">✕ Close</button>
+        ${trade ? `<button class="ep-act-btn sl" onclick="openSLMove('${trade.id}')">🛡 SL</button>` : ''}
+        ${trade ? `<button class="ep-act-btn" onclick="openPartialSell('${trade.id}',${i})">📤 Exit</button>` : ''}
+        <button class="ep-act-btn chart" onclick="window.open('https://www.tradingview.com/chart/${EP_CONFIG.tvLayout}/?symbol=NSE:${sym}','_blank')">📊</button>
+        ${trade ? `<button class="ep-act-btn" onclick="openOrderBuilder('${sym}','${isLong ? 'SELL' : 'BUY'}',${Math.abs(qty)},${ltp},${trade?.sl || 0})">📋</button>` : ''}
       </div>
     </div>`;
   }).join('') + '</div>';
@@ -483,15 +1637,33 @@ function sortPos(by, el) {
   renderPositions();
 }
 
-// ── Quick Actions ──
+// ═══════════════════════════════════════════════════════════════
+// QUICK ACTIONS (PRESERVED + ENHANCED)
+// ═══════════════════════════════════════════════════════════════
+
 async function quickClose(sym, idx) {
   const p = TE.exec.positions[idx]; if (!p) return;
   const qty = Math.abs(p.quantity || p.netQty || 0);
   const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
   if (!confirm(`Close ${sym}: ${side} ${qty} at MARKET?`)) return;
   const result = await TE.exec.sendOrder(sym, side, 'MARKET', qty, 0, 0, p.product || 'CNC', 'DAY');
-  if (result.ok) { toast(`Closed ${sym}`, '✅'); TE.exec.playSound('fill'); setTimeout(refreshAll, 2000); }
-  else toast('Failed: ' + result.error, '❌');
+  if (result.ok) {
+    toast(`Closed ${sym}`, '✅');
+    TE.exec.playSound('fill');
+    // Update journal
+    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+    const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
+    if (trade) {
+      const ltp = p.last_price || p.lastPrice || p.ltp || 0;
+      trade.exits = trade.exits || [];
+      trade.exits.push({ date: new Date().toISOString().slice(0, 10), price: ltp, qty, reason: 'full_close' });
+      trade.status = 'Closed';
+      localStorage.setItem('te_trades', JSON.stringify(trades));
+      syncTradeToSupabase(trade);
+    }
+    sendTelegramAlert(`🔴 Closed: ${sym}\nQty: ${qty} at MARKET`);
+    setTimeout(refreshAll, 2000);
+  } else toast('Failed: ' + result.error, '❌');
 }
 
 async function quickPartial(sym, idx, pct) {
@@ -500,8 +1672,22 @@ async function quickPartial(sym, idx, pct) {
   const exitQty = Math.max(1, Math.floor(totalQty * pct / 100));
   const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
   const result = await TE.exec.sendOrder(sym, side, 'MARKET', exitQty, 0, 0, p.product || 'CNC', 'DAY');
-  if (result.ok) { toast(`${pct}%: ${side} ${exitQty} ${sym}`, '✅'); setTimeout(refreshAll, 2000); }
-  else toast('Failed: ' + result.error, '❌');
+  if (result.ok) {
+    toast(`${pct}%: ${side} ${exitQty} ${sym}`, '✅');
+    // Journal update
+    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+    const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
+    if (trade) {
+      const ltp = p.last_price || p.lastPrice || p.ltp || 0;
+      trade.exits = trade.exits || [];
+      trade.exits.push({ date: new Date().toISOString().slice(0, 10), price: ltp, qty: exitQty, reason: `quick_${pct}pct` });
+      const nt = normalizeTrade(trade);
+      if (nt._n.remainingQty <= 0) trade.status = 'Closed';
+      localStorage.setItem('te_trades', JSON.stringify(trades));
+      syncTradeToSupabase(trade);
+    }
+    setTimeout(refreshAll, 2000);
+  } else toast('Failed: ' + result.error, '❌');
 }
 
 // ── Square Off All ──
@@ -526,6 +1712,7 @@ async function squareOffAll() {
     if (r.ok) ok++; else fail++;
   }
   toast(`Square off: ${ok} closed · ${fail} failed`, '🔴');
+  sendTelegramAlert(`🔴 SQUARE OFF ALL: ${ok} closed, ${fail} failed`);
   setTimeout(refreshAll, 3000);
 }
 
@@ -599,7 +1786,8 @@ function populateJournalDropdown() {
   sel.innerHTML = '<option value="">— Select open trade —</option>';
   TE.getOpenTrades().forEach(t => {
     const avg = t.entries?.length ? t.entries.reduce((s, e) => s + e.price * e.qty, 0) / t.entries.reduce((s, e) => s + e.qty, 0) : 0;
-    sel.innerHTML += `<option value="${t.id}">${t.symbol} · ${t.side} · ₹${avg.toFixed(2)}</option>`;
+    const pyr = t._epPyramid ? ` · ${t._epPyramid.toUpperCase()}` : '';
+    sel.innerHTML += `<option value="${t.id}">${t.symbol} · ${t.side} · ₹${avg.toFixed(2)}${pyr}</option>`;
   });
 }
 
@@ -615,9 +1803,10 @@ function fillFromJournal() {
   document.getElementById('exec-qty').value = tQty - eQty;
   if (t.sl) { document.getElementById('bkt-sl').value = (+t.sl).toFixed(2); document.getElementById('bracket-cb').checked = true; toggleBracket(); }
   if (t.target) document.getElementById('bkt-tgt').value = (+t.target).toFixed(2);
+  updatePyramidWarn(t.symbol);
 }
 
-// ═══ GTT UI ═══
+// ═══ GTT UI (PRESERVED) ═══
 
 function setGttMode(mode) {
   _gttMode = mode;
@@ -633,7 +1822,6 @@ function placeGTT() {
   const exchange = document.getElementById('gtt-exchange').value;
   const product = document.getElementById('gtt-product').value;
   const note = document.getElementById('gtt-note').value.trim();
-
   let gtt;
   if (_gttMode === 'single') {
     const trigger = +document.getElementById('gtt-trigger1').value || 0;
@@ -652,7 +1840,6 @@ function placeGTT() {
     if (!qty || (!slT && !tgtT)) { toast('Set qty and at least one trigger', '⚠️'); return; }
     gtt = { type: 'oco', symbol: sym, exchange, product, side, qty, slTrigger: slT, slLimit: slL || slT, tgtTrigger: tgtT, tgtLimit: tgtL || tgtT, note, source: 'local', status: 'active', brokerId: null, createdAt: Date.now(), updatedAt: Date.now() };
   }
-
   gtt.id = 'gtt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   TE.exec.gttOrders.push(gtt);
   TE.exec.saveGTTs();
@@ -696,16 +1883,13 @@ function renderGTTList() {
   if (_gttTab === 'active') filtered = filtered.filter(g => g.status === 'active');
   else if (_gttTab === 'triggered') filtered = filtered.filter(g => g.status === 'triggered');
   filtered.sort((a, b) => b.createdAt - a.createdAt);
-
   const activeCount = TE.exec.gttOrders.filter(g => g.status === 'active').length;
   document.getElementById('gtt-badge').textContent = activeCount + ' active';
-
   const container = document.getElementById('gtt-list');
   if (!filtered.length) {
     container.innerHTML = `<div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">🎯 No GTTs in this tab</div>`;
     return;
   }
-
   container.innerHTML = filtered.map(g => {
     const isOCO = g.type === 'oco';
     const stLabel = { active: 'Active', triggered: 'Triggered', cancelled: 'Cancelled' }[g.status] || g.status;
@@ -714,7 +1898,6 @@ function renderGTTList() {
     let levels = '';
     if (isOCO) levels = `<span style="color:var(--r)">SL ₹${(+g.slTrigger).toFixed(2)}</span> | <span style="color:var(--g)">Tgt ₹${(+g.tgtTrigger).toFixed(2)}</span>`;
     else levels = `Trigger ₹${(+g.trigger1).toFixed(2)}${g.limit1 && g.limit1 !== g.trigger1 ? ' → ₹' + (+g.limit1).toFixed(2) : ''}`;
-
     return `<div class="gtt-card" style="display:flex;align-items:center;gap:12px;${g.status !== 'active' ? 'opacity:.5' : ''}">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
@@ -733,6 +1916,10 @@ function renderGTTList() {
     </div>`;
   }).join('');
 }
+
+// ── Partial exit qty input watcher ──
+document.getElementById('partial-exit-qty')?.addEventListener('input', updatePartialSummary);
+document.getElementById('partial-price')?.addEventListener('input', updatePartialSummary);
 
 // ── Live Refresh (30s during market hours) ──
 let _liveTimer = null;
