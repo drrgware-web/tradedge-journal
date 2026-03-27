@@ -1010,17 +1010,9 @@ async function refreshCorpActions() {
   const btn = document.getElementById('corp-refresh-btn');
   const listEl = document.getElementById('corp-actions-list');
   const countEl = document.getElementById('corp-actions-count');
-  const groqNotice = document.getElementById('groq-key-notice');
   
   btn.textContent = '⏳ Loading...';
   btn.disabled = true;
-  
-  // Check for Groq key
-  if (!localStorage.getItem('groq_key')) {
-    groqNotice.style.display = 'block';
-  } else {
-    groqNotice.style.display = 'none';
-  }
   
   listEl.innerHTML = `
     <div style="text-align:center;padding:20px;color:var(--t3)">
@@ -1028,6 +1020,21 @@ async function refreshCorpActions() {
       <div>Fetching corporate actions...</div>
     </div>
   `;
+  
+  // Show notice if no Groq key
+  if (!localStorage.getItem('groq_key')) {
+    listEl.innerHTML = `
+      <div style="padding:12px;background:rgba(245,197,66,0.08);border:1px solid rgba(245,197,66,0.2);border-radius:8px;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--y)">
+          ⚠️ Set Groq API key in <strong>Settings</strong> panel below for AI sentiment analysis
+        </div>
+      </div>
+      <div style="text-align:center;padding:20px;color:var(--t3)">
+        <div class="spinner" style="margin:0 auto 12px"></div>
+        <div>Fetching announcements...</div>
+      </div>
+    `;
+  }
   
   try {
     if (typeof CorpActions !== 'undefined') {
