@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — RRM Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+<style>
+.rrg-canvas-wrap{background:var(--bg2);border:1px solid var(--b1);border-radius:14px;overflow:hidden;position:relative}
+.rrg-quadrant{position:absolute;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.25}
+.rrm-card{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;transition:border-color .2s}
+.rrm-card:hover{border-color:var(--b3)}
+.rrm-quad{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.rrm-leading{background:rgba(0,229,160,.15);color:#00E5A0}
+.rrm-improving{background:rgba(59,139,255,.15);color:#3B8BFF}
+.rrm-weakening{background:rgba(245,197,66,.15);color:#F5C542}
+.rrm-lagging{background:rgba(255,69,96,.15);color:#FF4560}
+.conf-matrix{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
+.conf-cell{text-align:center;border-radius:10px;padding:14px 8px;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+</style>
+</head>
+<body>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-size:18px;font-weight:700;color:var(--t1)">🎯 RRM Position Intelligence</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:3px">JdK RS analysis for your open positions against NIFTY 50</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="rrm-status" style="font-size:11px;color:var(--t3)"></span>
+    <button class="btn btn-ghost btn-sm" onclick="loadRRMData()">↻ Refresh</button>
+  </div>
+</div>
+
+<!-- Confluence Matrix -->
+<div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Confluence Matrix</div>
+<div class="conf-matrix" id="conf-matrix" style="margin-bottom:20px">
+  <div class="conf-cell" style="background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2)">
+    <div style="font-size:10px;font-weight:800;color:var(--g)">LEADING ↗</div>
+    <div id="cm-leading" style="font-size:28px;font-weight:800;color:var(--g)">0</div>
+    <div id="cm-leading-syms" style="font-size:9px;color:var(--t3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+  </div>
+  <div class="conf-cell" style="background:rgba(245,197,66,.08);border:1px solid rgba(245,197,66,.2)">
+    <div style="font-size:10px;font-weight:800;color:var(--y)">WEAKENING ↘</div>
+    <div id="cm-weakening" style="font-size:28px;font-weight:800;color:var(--y)">0</div>
+    <div id="cm-weakening-syms" style="font-size:9px;color:var(--t3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+  </div>
+  <div class="conf-cell" style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2)">
+    <div style="font-size:10px;font-weight:800;color:var(--r)">LAGGING ↙</div>
+    <div id="cm-lagging" style="font-size:28px;font-weight:800;color:var(--r)">0</div>
+    <div id="cm-lagging-syms" style="font-size:9px;color:var(--t3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+  </div>
+  <div class="conf-cell" style="background:rgba(59,139,255,.08);border:1px solid rgba(59,139,255,.2)">
+    <div style="font-size:10px;font-weight:800;color:var(--b)">IMPROVING ↖</div>
+    <div id="cm-improving" style="font-size:28px;font-weight:800;color:var(--b)">0</div>
+    <div id="cm-improving-syms" style="font-size:9px;color:var(--t3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+  </div>
+</div>
+
+<!-- RRG Canvas -->
+<div class="rrg-canvas-wrap" style="margin-bottom:20px">
+  <div class="card-head" style="border-bottom:1px solid var(--b1)">
+    <span class="card-title">📈 Relative Rotation Graph — Open Positions</span>
+    <span style="font-size:10px;color:var(--t4)">JdK RS-Ratio vs RS-Momentum · Benchmark: NIFTY 50</span>
+  </div>
+  <div style="position:relative;overflow:hidden;padding:0">
+    <canvas id="rrg-canvas" width="700" height="480"></canvas>
+    <div class="rrg-quadrant" style="top:30px;right:30px;color:var(--g)">Leading</div>
+    <div class="rrg-quadrant" style="top:30px;left:30px;color:var(--b)">Improving</div>
+    <div class="rrg-quadrant" style="bottom:30px;left:30px;color:var(--r)">Lagging</div>
+    <div class="rrg-quadrant" style="bottom:30px;right:30px;color:var(--y)">Weakening</div>
+  </div>
+</div>
+
+<!-- Position Cards -->
+<div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Position RRM Analysis</div>
+<div id="rrm-cards" style="display:flex;flex-direction:column;gap:8px"></div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+let rrmData = null;
+let positionRS = [];
+
+// ── Load RRM data from backend-generated JSON ──
+async function loadRRMData() {
+  document.getElementById('rrm-status').textContent = 'Loading…';
+  try {
+    const res = await fetch('data/rrm_data.json?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    rrmData = await res.json();
+    document.getElementById('rrm-status').textContent = 'Data: ' + (rrmData?.generated || 'unknown');
+    computePositionRS();
+    renderAll();
+  } catch (e) {
+    document.getElementById('rrm-status').innerHTML = '<span style="color:var(--r)">❌ ' + e.message + '</span>';
+    // Fallback: compute RS locally from Yahoo prices
+    computeLocalRS();
+  }
+}
+
+// ── Compute JdK RS-Ratio & Momentum for positions ──
+function computePositionRS() {
+  const openTrades = TE.getOpenTrades();
+  positionRS = [];
+
+  if (!rrmData?.sectors) { computeLocalRS(); return; }
+
+  // Try to match position symbols against RRM sectors/constituents
+  const allEntries = {};
+  Object.values(rrmData.sectors || {}).forEach(sec => {
+    if (sec.constituents) {
+      Object.entries(sec.constituents).forEach(([sym, data]) => { allEntries[sym.toUpperCase()] = data; });
+    }
+  });
+
+  openTrades.forEach(t => {
+    const sym = t.symbol.toUpperCase();
+    const ct = TE.calc({ ...t });
+    const entry = allEntries[sym];
+
+    if (entry && entry.rs_ratio !== undefined) {
+      positionRS.push({
+        symbol: sym, side: t.side, avgEntry: ct.avgEntry, cmp: ct.cmp || ct.avgEntry,
+        unrealPL: ct.unrealisedPL, holdDays: ct.holdDays, openQty: ct.openQty,
+        rsRatio: +entry.rs_ratio, rsMomentum: +entry.rs_momentum,
+        quadrant: getQuadrant(+entry.rs_ratio, +entry.rs_momentum),
+        trend: entry.trend || '—', sector: entry.sector || '—',
+        source: 'rrm_data'
+      });
+    } else {
+      // Placeholder — no RRM data for this stock
+      positionRS.push({
+        symbol: sym, side: t.side, avgEntry: ct.avgEntry, cmp: ct.cmp || ct.avgEntry,
+        unrealPL: ct.unrealisedPL, holdDays: ct.holdDays, openQty: ct.openQty,
+        rsRatio: 100, rsMomentum: 100, quadrant: 'unknown', trend: '—', sector: '—',
+        source: 'none'
+      });
+    }
+  });
+}
+
+// ── Fallback: compute simplified RS from CMP vs Nifty ──
+async function computeLocalRS() {
+  const openTrades = TE.getOpenTrades();
+  positionRS = [];
+  openTrades.forEach(t => {
+    const ct = TE.calc({ ...t });
+    const pctChange = ct.avgEntry > 0 ? ((ct.cmp || ct.avgEntry) - ct.avgEntry) / ct.avgEntry * 100 : 0;
+    // Simplified: RS-Ratio ~ 100 + pctChange, Momentum ~ recent direction
+    positionRS.push({
+      symbol: t.symbol.toUpperCase(), side: t.side, avgEntry: ct.avgEntry, cmp: ct.cmp || ct.avgEntry,
+      unrealPL: ct.unrealisedPL, holdDays: ct.holdDays, openQty: ct.openQty,
+      rsRatio: 100 + pctChange * 2, rsMomentum: 100 + pctChange,
+      quadrant: getQuadrant(100 + pctChange * 2, 100 + pctChange), trend: '—', sector: '—',
+      source: 'local'
+    });
+  });
+  renderAll();
+}
+
+function getQuadrant(ratio, momentum) {
+  if (ratio >= 100 && momentum >= 100) return 'leading';
+  if (ratio >= 100 && momentum < 100) return 'weakening';
+  if (ratio < 100 && momentum >= 100) return 'improving';
+  return 'lagging';
+}
+
+const QUAD_COLORS = { leading: '#00E5A0', weakening: '#F5C542', lagging: '#FF4560', improving: '#3B8BFF', unknown: '#4A6882' };
+const QUAD_LABELS = { leading: 'Leading', weakening: 'Weakening', lagging: 'Lagging', improving: 'Improving', unknown: '—' };
+
+// ── Render Everything ──
+function renderAll() {
+  renderConfluence();
+  renderRRG();
+  renderCards();
+}
+
+// ── Confluence Matrix ──
+function renderConfluence() {
+  const quads = { leading: [], weakening: [], lagging: [], improving: [] };
+  positionRS.forEach(p => { if (quads[p.quadrant]) quads[p.quadrant].push(p.symbol); });
+  ['leading', 'weakening', 'lagging', 'improving'].forEach(q => {
+    document.getElementById('cm-' + q).textContent = quads[q].length;
+    document.getElementById('cm-' + q + '-syms').textContent = quads[q].join(', ') || '—';
+  });
+}
+
+// ── RRG Canvas ──
+function renderRRG() {
+  const canvas = document.getElementById('rrg-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.parentElement.clientWidth || 700;
+  const H = canvas.height = 480;
+  const cx = W / 2, cy = H / 2;
+
+  // Clear
+  ctx.fillStyle = '#0C1219';
+  ctx.fillRect(0, 0, W, H);
+
+  // Quadrant fills
+  ctx.fillStyle = 'rgba(0,229,160,.03)'; ctx.fillRect(cx, 0, cx, cy);
+  ctx.fillStyle = 'rgba(59,139,255,.03)'; ctx.fillRect(0, 0, cx, cy);
+  ctx.fillStyle = 'rgba(255,69,96,.03)'; ctx.fillRect(0, cy, cx, cy);
+  ctx.fillStyle = 'rgba(245,197,66,.03)'; ctx.fillRect(cx, cy, cx, cy);
+
+  // Grid lines
+  ctx.strokeStyle = '#1C2A3A';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#4A6882';
+  ctx.font = '10px IBM Plex Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('JdK RS-Ratio →', cx, H - 8);
+  ctx.save(); ctx.translate(12, cy); ctx.rotate(-Math.PI / 2); ctx.fillText('JdK RS-Momentum →', 0, 0); ctx.restore();
+
+  // "100" crosshair labels
+  ctx.fillStyle = '#2C4058';
+  ctx.font = '9px IBM Plex Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('100', cx, cy + 12);
+
+  if (!positionRS.length) {
+    ctx.fillStyle = '#4A6882';
+    ctx.font = '14px Outfit';
+    ctx.textAlign = 'center';
+    ctx.fillText('No open positions', cx, cy);
+    return;
+  }
+
+  // Scale: find range of RS values
+  const allR = positionRS.map(p => p.rsRatio);
+  const allM = positionRS.map(p => p.rsMomentum);
+  const rMin = Math.min(...allR, 90), rMax = Math.max(...allR, 110);
+  const mMin = Math.min(...allM, 90), mMax = Math.max(...allM, 110);
+  const rRange = Math.max(rMax - rMin, 10), mRange = Math.max(mMax - mMin, 10);
+  const pad = 40;
+
+  function toX(r) { return pad + (r - rMin) / rRange * (W - pad * 2); }
+  function toY(m) { return H - pad - (m - mMin) / mRange * (H - pad * 2); }
+
+  // Plot dots
+  positionRS.forEach(p => {
+    const x = toX(p.rsRatio), y = toY(p.rsMomentum);
+    const color = QUAD_COLORS[p.quadrant] || '#4A6882';
+    const radius = Math.min(Math.max(Math.abs(p.unrealPL) / 5000 + 5, 5), 18);
+
+    // Glow
+    ctx.beginPath();
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+    grad.addColorStop(0, color + '40');
+    grad.addColorStop(1, color + '00');
+    ctx.fillStyle = grad;
+    ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dot
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = '#EDF2F7';
+    ctx.font = 'bold 10px Outfit';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.symbol, x, y - radius - 6);
+
+    // P&L label
+    ctx.fillStyle = p.unrealPL >= 0 ? '#00E5A0' : '#FF4560';
+    ctx.font = '9px IBM Plex Mono';
+    ctx.fillText((p.unrealPL >= 0 ? '+' : '') + '₹' + Math.abs(p.unrealPL).toFixed(0), x, y + radius + 12);
+  });
+}
+
+// ── Position Cards ──
+function renderCards() {
+  const el = document.getElementById('rrm-cards');
+  if (!positionRS.length) {
+    el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--t3)">No open positions to analyze</div>';
+    return;
+  }
+
+  // Sort: leading first, then improving, weakening, lagging
+  const order = { leading: 0, improving: 1, weakening: 2, lagging: 3, unknown: 4 };
+  const sorted = [...positionRS].sort((a, b) => (order[a.quadrant] ?? 4) - (order[b.quadrant] ?? 4));
+
+  el.innerHTML = sorted.map(p => {
+    const quadClass = 'rrm-' + p.quadrant;
+    const pnlColor = p.unrealPL >= 0 ? 'var(--g)' : 'var(--r)';
+    const actionHint = {
+      leading: '✅ Hold — strength confirmed',
+      improving: '👀 Watch — gaining momentum',
+      weakening: '⚠️ Tighten SL — losing momentum',
+      lagging: '🔴 Review exit — underperforming',
+      unknown: 'No RS data available'
+    }[p.quadrant];
+
+    return `<div class="rrm-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="font-weight:800;font-size:15px;color:var(--t1);flex:1">${p.symbol}</div>
+        <span class="rrm-quad ${quadClass}">${QUAD_LABELS[p.quadrant]}</span>
+        <span class="bdg bdg-${p.side.toLowerCase()}">${p.side}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:11px;margin-bottom:8px">
+        <div><div style="color:var(--t4);font-size:9px;text-transform:uppercase;margin-bottom:2px">RS-Ratio</div><div style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--c)">${p.rsRatio.toFixed(1)}</div></div>
+        <div><div style="color:var(--t4);font-size:9px;text-transform:uppercase;margin-bottom:2px">RS-Mom</div><div style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--p)">${p.rsMomentum.toFixed(1)}</div></div>
+        <div><div style="color:var(--t4);font-size:9px;text-transform:uppercase;margin-bottom:2px">Unreal P&L</div><div style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:${pnlColor}">${TE.fmt(p.unrealPL)}</div></div>
+        <div><div style="color:var(--t4);font-size:9px;text-transform:uppercase;margin-bottom:2px">Hold</div><div style="font-family:'IBM Plex Mono',monospace">${p.holdDays}d</div></div>
+        <div><div style="color:var(--t4);font-size:9px;text-transform:uppercase;margin-bottom:2px">Sector</div><div style="color:var(--t2)">${p.sector}</div></div>
+      </div>
+      <div style="font-size:11px;color:${QUAD_COLORS[p.quadrant]};padding:6px 10px;background:${QUAD_COLORS[p.quadrant]}0a;border-radius:6px;border:1px solid ${QUAD_COLORS[p.quadrant]}22">${actionHint}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Resize handler ──
+window.addEventListener('resize', () => { if (positionRS.length) renderRRG(); });
+
+// ── Boot ──
+loadRRMData();
+</script>
+</body>
+</html>

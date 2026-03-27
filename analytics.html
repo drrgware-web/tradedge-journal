@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Core Metrics -->
+<div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Core Metrics</div>
+<div class="kpi-row" id="ana-core" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px"></div>
+
+<div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Risk & Performance</div>
+<div class="kpi-row" id="ana-adv" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px"></div>
+
+<!-- Equity Curve -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><span class="card-title">Equity Curve</span><span style="font-size:11px;color:var(--t3)" id="eq-sub"></span></div>
+  <div class="card-body"><div class="chart-h200"><canvas id="equityChart"></canvas></div></div>
+</div>
+
+<!-- Monthly P&L + Setup -->
+<div class="chart-row chart-row-2b" style="margin-bottom:16px">
+  <div class="card">
+    <div class="card-head"><span class="card-title">Monthly P&L</span></div>
+    <div class="card-body"><div class="chart-h200"><canvas id="monthlyChart"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Setup Breakdown</span></div>
+    <div class="card-body"><div class="chart-h200"><canvas id="setupChart"></canvas></div></div>
+  </div>
+</div>
+
+<!-- Hold Days + Symbol Perf -->
+<div class="chart-row chart-row-2b" style="margin-bottom:16px">
+  <div class="card">
+    <div class="card-head"><span class="card-title">Holding Days</span></div>
+    <div class="card-body"><div class="chart-h200"><canvas id="holdChart"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Top Symbols</span></div>
+    <div class="card-body" style="overflow-x:auto"><div id="sym-perf"></div></div>
+  </div>
+</div>
+
+<!-- Heatmap -->
+<div class="card">
+  <div class="card-head"><span class="card-title">Daily P&L Heatmap</span></div>
+  <div class="card-body"><div id="hmap"></div></div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+let charts = {};
+const CO={responsive:true,maintainAspectRatio:false,animation:{duration:300},
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#111820',borderColor:'#2E4055',borderWidth:1,titleColor:'#8BA0B8',bodyColor:'#EDF2F7',padding:10}},
+  scales:{x:{grid:{color:'#162130'},ticks:{color:'#4A6882',font:{size:10}},border:{display:false}},y:{grid:{color:'#162130'},ticks:{color:'#4A6882',font:{size:10}},border:{display:false}}}};
+function dChart(id,cfg){if(charts[id]){charts[id].destroy();}const c=document.getElementById(id);if(!c)return;charts[id]=new Chart(c,cfg);}
+
+function renderAna(){
+  const all=TE.trades.map(t=>TE.calc({...t}));
+  const closed=all.filter(t=>t.status==='Closed');
+  const wins=closed.filter(t=>t.realisedPL>0),losses=closed.filter(t=>t.realisedPL<0);
+  const wr=closed.length?wins.length/closed.length*100:0;
+  const avgW=wins.length?wins.reduce((s,t)=>s+t.realisedPL,0)/wins.length:0;
+  const avgL=losses.length?losses.reduce((s,t)=>s+t.realisedPL,0)/losses.length:0;
+  const pf=losses.length&&avgL?Math.abs(wins.reduce((s,t)=>s+t.realisedPL,0)/losses.reduce((s,t)=>s+t.realisedPL,0)):0;
+  const avgR=closed.length?closed.reduce((s,t)=>s+t.rr,0)/closed.length:0;
+  const expectancy=avgW*(wr/100)+avgL*(1-wr/100);
+  const totalPL=closed.reduce((s,t)=>s+t.realisedPL,0);
+  const avgHold=closed.length?closed.reduce((s,t)=>s+(t.holdDays||0),0)/closed.length:0;
+
+  // Streaks
+  let maxWS=0,cWS=0,maxLS=0,cLS=0;
+  closed.forEach(t=>{if(t.realisedPL>0){cWS++;maxWS=Math.max(maxWS,cWS);cLS=0;}else{cLS++;maxLS=Math.max(maxLS,cLS);cWS=0;}});
+
+  // Equity curve + drawdown
+  const sorted=[...closed].filter(t=>(t.exits||[]).length).sort((a,b)=>((a.exits[a.exits.length-1]||{}).date||'').localeCompare((b.exits[b.exits.length-1]||{}).date||''));
+  let eq=0;const curve=sorted.map(t=>{eq+=t.realisedPL;return{date:(t.exits[t.exits.length-1]||{}).date,equity:eq};});
+  let peak=-Infinity,maxDD=0;curve.forEach(p=>{if(p.equity>peak)peak=p.equity;const dd=peak-p.equity;if(dd>maxDD)maxDD=dd;});
+
+  // Sharpe
+  const returns=closed.map(t=>t.realisedPL);
+  const mean=returns.length?returns.reduce((s,r)=>s+r,0)/returns.length:0;
+  const variance=returns.length?returns.reduce((s,r)=>s+Math.pow(r-mean,2),0)/returns.length:0;
+  const sharpe=Math.sqrt(variance)>0?(mean/Math.sqrt(variance))*Math.sqrt(252):0;
+  const calmar=maxDD>0?totalPL/maxDD:0;
+
+  // Core KPIs
+  const core=[
+    {l:'Total Closed',v:closed.length,c:'col-t',s:'trades'},
+    {l:'Win Rate',v:wr.toFixed(1)+'%',c:'col-y',s:`${wins.length}W / ${losses.length}L`},
+    {l:'Profit Factor',v:pf.toFixed(2)+'x',c:pf>=1.5?'col-g':'col-r',s:'> 1.5 good'},
+    {l:'Expectancy',v:TE.fmt(expectancy),c:expectancy>=0?'col-g':'col-r',s:'per trade'},
+    {l:'Avg R-Multiple',v:avgR.toFixed(2)+'R',c:avgR>=0.5?'col-g':'col-t',s:'target > 0.5R'},
+    {l:'Win Streak',v:maxWS,c:'col-g',s:`Loss streak: ${maxLS}`},
+    {l:'Avg Win',v:TE.fmt(avgW),c:'col-g',s:'vs loss below'},
+    {l:'Avg Loss',v:TE.fmt(avgL),c:'col-r',s:'keep smaller than win'},
+    {l:'Avg Hold',v:avgHold.toFixed(1)+'d',c:'col-t',s:'days'},
+  ];
+  document.getElementById('ana-core').innerHTML=core.map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+
+  // Advanced KPIs
+  const adv=[
+    {l:'Max Drawdown',v:TE.fmt(maxDD),c:maxDD>50000?'col-r':'col-y',s:'peak-to-trough'},
+    {l:'Sharpe Ratio',v:sharpe.toFixed(2),c:sharpe>=1?'col-g':'col-y',s:sharpe>=1?'Good':'Target > 1.0'},
+    {l:'Calmar Ratio',v:calmar.toFixed(2),c:calmar>=1?'col-g':'col-y',s:'P&L ÷ drawdown'},
+    {l:'Total Net P&L',v:TE.fmt(totalPL),c:totalPL>=0?'col-g':'col-r',s:'closed trades'},
+    {l:'Payoff Ratio',v:avgL?Math.abs(avgW/avgL).toFixed(2)+'x':'—',c:'col-t',s:'win ÷ loss'},
+    {l:'Recovery Factor',v:maxDD>0?(totalPL/maxDD).toFixed(2):'—',c:'col-t',s:'P&L ÷ DD'},
+  ];
+  document.getElementById('ana-adv').innerHTML=adv.map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+
+  // Equity Curve Chart
+  if(curve.length>1){
+    document.getElementById('eq-sub').textContent=`${curve.length} trades · Net ${TE.fmt(totalPL)}`;
+    dChart('equityChart',{type:'line',data:{labels:curve.map(p=>p.date),datasets:[{data:curve.map(p=>p.equity),borderColor:totalPL>=0?'#00E5A0':'#FF4560',backgroundColor:totalPL>=0?'rgba(0,229,160,.08)':'rgba(255,69,96,.08)',fill:true,tension:.3,pointRadius:curve.length>30?0:3,borderWidth:2}]},options:{...CO,scales:{...CO.scales,y:{...CO.scales.y,ticks:{...CO.scales.y.ticks,callback:v=>'₹'+v.toLocaleString('en-IN')}}}}});
+  }
+
+  // Monthly P&L
+  const monthMap={};closed.forEach(t=>{const d=(t.exits||[]).map(e=>e.date).filter(Boolean).sort().pop();if(!d)return;const k=d.slice(0,7);monthMap[k]=(monthMap[k]||0)+t.realisedPL;});
+  const months=Object.keys(monthMap).sort();
+  dChart('monthlyChart',{type:'bar',data:{labels:months.map(m=>{const[y,mo]=m.split('-');return new Date(+y,+mo-1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});}),datasets:[{data:months.map(m=>monthMap[m]),backgroundColor:months.map(m=>monthMap[m]>=0?'rgba(0,229,160,.7)':'rgba(255,69,96,.7)'),borderRadius:4}]},options:CO});
+
+  // Setup Breakdown
+  const setupMap={};closed.forEach(t=>{const s=t.setup||'Untagged';if(!setupMap[s])setupMap[s]={pl:0};setupMap[s].pl+=t.realisedPL;});
+  const sortedSetups=Object.entries(setupMap).sort((a,b)=>b[1].pl-a[1].pl).slice(0,8);
+  dChart('setupChart',{type:'bar',data:{labels:sortedSetups.map(([k])=>k),datasets:[{data:sortedSetups.map(([,v])=>v.pl),backgroundColor:sortedSetups.map(([,v])=>v.pl>=0?'#00E5A033':'#FF456033'),borderColor:sortedSetups.map(([,v])=>v.pl>=0?'#00E5A0':'#FF4560'),borderWidth:1,borderRadius:4}]},options:{...CO,indexAxis:'y'}});
+
+  // Hold Days
+  const holdBins={'1d':0,'2-5d':0,'6-14d':0,'15-28d':0,'1-3m':0,'>3m':0};
+  closed.forEach(t=>{const d=t.holdDays||0;if(d<=1)holdBins['1d']++;else if(d<=5)holdBins['2-5d']++;else if(d<=14)holdBins['6-14d']++;else if(d<=28)holdBins['15-28d']++;else if(d<=90)holdBins['1-3m']++;else holdBins['>3m']++;});
+  dChart('holdChart',{type:'bar',data:{labels:Object.keys(holdBins),datasets:[{data:Object.values(holdBins),backgroundColor:'#3B8BFF33',borderColor:'#3B8BFF',borderWidth:1,borderRadius:4}]},options:CO});
+
+  // Symbol Performance
+  const symMap={};closed.forEach(t=>{if(!t.symbol)return;if(!symMap[t.symbol])symMap[t.symbol]={n:0,pl:0,w:0};symMap[t.symbol].n++;symMap[t.symbol].pl+=t.realisedPL;if(t.realisedPL>0)symMap[t.symbol].w++;});
+  const symRows=Object.entries(symMap).sort((a,b)=>b[1].pl-a[1].pl).slice(0,10);
+  document.getElementById('sym-perf').innerHTML=symRows.length?`<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:var(--t3);font-size:10px;border-bottom:1px solid var(--b1)"><th style="text-align:left;padding:4px 8px">Symbol</th><th style="text-align:right;padding:4px 8px">Trades</th><th style="text-align:right;padding:4px 8px">Win%</th><th style="text-align:right;padding:4px 8px">P&L</th></tr></thead><tbody>${symRows.map(([sym,s])=>`<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 8px;font-weight:600;color:var(--t1)">${sym}</td><td style="text-align:right;padding:5px 8px">${s.n}</td><td style="text-align:right;color:var(--y)">${(s.w/s.n*100).toFixed(0)}%</td><td style="text-align:right;font-weight:600;color:${s.pl>=0?'var(--g)':'var(--r)'}">${TE.fmt(s.pl)}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--t4);text-align:center;padding:20px">No data</div>';
+
+  // Heatmap
+  const dayPL={};all.forEach(t=>{const dates=[...(t.exits||[]).map(e=>e.date),(t.entries?.[0]?.date)||''].filter(Boolean);dates.forEach(d=>{if(d)dayPL[d]=(dayPL[d]||0)+t.realisedPL;});});
+  const allDates=Object.keys(dayPL).sort();
+  if(!allDates.length){document.getElementById('hmap').innerHTML='<div style="color:var(--t3);text-align:center;padding:20px">No data</div>';return;}
+  const maxAbs=Math.max(...Object.values(dayPL).map(Math.abs),1);
+  const hmMonths={};allDates.forEach(d=>{const[y,m]=d.split('-');const k=`${y}-${m}`;if(!hmMonths[k])hmMonths[k]={};hmMonths[k][+d.split('-')[2]]=dayPL[d];});
+  let hmHtml='<div style="display:flex;flex-wrap:wrap;gap:16px">';
+  Object.entries(hmMonths).sort((a,b)=>a[0].localeCompare(b[0])).slice(-9).forEach(([key,days])=>{
+    const[y,m]=key.split('-');const label=new Date(+y,+m-1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
+    const dIM=new Date(+y,+m,0).getDate(),fDay=new Date(+y,+m-1,1).getDay();
+    hmHtml+=`<div><div style="font-size:10px;color:var(--t3);margin-bottom:5px;text-align:center">${label}</div><div style="display:grid;grid-template-columns:repeat(7,14px);gap:2px">`;
+    for(let i=0;i<fDay;i++)hmHtml+='<div></div>';
+    for(let d=1;d<=dIM;d++){
+      const pl=days[d];let bg='var(--bg4)';
+      if(pl!==undefined){const int=Math.min(Math.abs(pl)/maxAbs,1);bg=pl>0?`rgba(0,229,160,${.12+int*.7})`:`rgba(255,69,96,${.12+int*.7})`;}
+      hmHtml+=`<div style="width:14px;height:14px;border-radius:3px;background:${bg};cursor:pointer" title="${pl!==undefined?TE.fmt(pl):'—'}"></div>`;
+    }
+    hmHtml+='</div></div>';
+  });
+  hmHtml+='</div>';
+  document.getElementById('hmap').innerHTML=hmHtml;
+}
+
+window.addEventListener('te:trades-changed',renderAna);
+renderAna();
+</script>
+</body>
+</html>

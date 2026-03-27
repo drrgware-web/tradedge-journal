@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Content injected inside shell by sidebar.js -->
+<div class="kpi-row" id="kpi-row"></div>
+
+<div class="chart-row chart-row-2">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Equity Curve</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-xs btn-ghost" onclick="setEqMode('pct')" id="eq-pct" style="color:var(--y)">%</button>
+        <button class="btn btn-xs btn-ghost" onclick="setEqMode('abs')" id="eq-abs">₹</button>
+      </div>
+    </div>
+    <div class="card-body"><div class="chart-h200"><canvas id="eqChart"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Win / Loss</span></div>
+    <div class="card-body"><div class="chart-h200"><canvas id="wlChart"></canvas></div></div>
+  </div>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+  <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Open Positions</div>
+  <button class="btn btn-ghost btn-xs" onclick="nav('trades')">View All →</button>
+</div>
+<div class="tbl-wrap" id="open-tbl"></div>
+
+<!-- Capital Sync Status -->
+<div id="capital-sync" style="margin-top:16px">
+  <div class="card" style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">💰 Capital Status</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:var(--g)" id="cap-current">—</div>
+      <div style="font-size:10px;color:var(--t4);margin-top:2px" id="cap-detail"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-xs" onclick="refreshCapital()">↻ Refresh</button>
+      <span id="ep-sync-status" style="font-size:10px;color:var(--t4)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Launch Links -->
+<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+  <a href="autopilot.html" style="flex:1;min-width:160px;text-decoration:none">
+    <div class="card" style="padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--g)'" onmouseout="this.style.borderColor='var(--b1)'">
+      <div style="width:32px;height:32px;border-radius:8px;background:rgba(0,229,160,.15);display:flex;align-items:center;justify-content:center;font-size:16px">⚡</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1)">Edge Pilot</div>
+        <div style="font-size:10px;color:var(--t4)">Auto Trading Engine ↗</div>
+      </div>
+    </div>
+  </a>
+  <a href="matrix.html" style="flex:1;min-width:160px;text-decoration:none">
+    <div class="card" style="padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--c)'" onmouseout="this.style.borderColor='var(--b1)'">
+      <div style="width:32px;height:32px;border-radius:8px;background:rgba(34,211,238,.15);display:flex;align-items:center;justify-content:center;font-size:16px">🔮</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1)">MATRIX</div>
+        <div style="font-size:10px;color:var(--t4)">Multi-Asset Signals ↗</div>
+      </div>
+    </div>
+  </a>
+  <a href="mps.html" style="flex:1;min-width:160px;text-decoration:none">
+    <div class="card" style="padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--y)'" onmouseout="this.style.borderColor='var(--b1)'">
+      <div style="width:32px;height:32px;border-radius:8px;background:rgba(234,179,8,.15);display:flex;align-items:center;justify-content:center;font-size:16px">📡</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1)">MPS Dashboard</div>
+        <div style="font-size:10px;color:var(--t4)">Market Pulse Score ↗</div>
+      </div>
+    </div>
+  </a>
+  <a href="rrm-intel.html" style="flex:1;min-width:160px;text-decoration:none">
+    <div class="card" style="padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--b)'" onmouseout="this.style.borderColor='var(--b1)'">
+      <div style="width:32px;height:32px;border-radius:8px;background:rgba(96,165,250,.15);display:flex;align-items:center;justify-content:center;font-size:16px">🎯</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1)">RRM Intel</div>
+        <div style="font-size:10px;color:var(--t4)">Position Intelligence ↗</div>
+      </div>
+    </div>
+  </a>
+</div>
+
+<!-- Core Scripts -->
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<!-- Dashboard Logic -->
+<script>
+'use strict';
+
+let eqMode = 'pct';
+let charts = {};
+
+function setEqMode(m) {
+  eqMode = m;
+  document.getElementById('eq-pct').style.color = m === 'pct' ? 'var(--y)' : '';
+  document.getElementById('eq-abs').style.color = m === 'abs' ? 'var(--y)' : '';
+  renderDash();
+}
+
+// ── Chart helper ──
+const CO = {
+  responsive:true, maintainAspectRatio:false, animation:{duration:300},
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#111820',borderColor:'#2E4055',borderWidth:1,
+    titleColor:'#8BA0B8',bodyColor:'#EDF2F7',padding:10,
+    titleFont:{family:'Outfit'},bodyFont:{family:'IBM Plex Mono',size:11}}},
+  scales:{
+    x:{grid:{color:'#162130',drawBorder:false},ticks:{color:'#4A6882',font:{family:'Outfit',size:10}},border:{display:false}},
+    y:{grid:{color:'#162130',drawBorder:false},ticks:{color:'#4A6882',font:{family:'IBM Plex Mono',size:10}},border:{display:false}}
+  }
+};
+
+function dChart(id, cfg) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  const c = document.getElementById(id);
+  if (!c) return;
+  charts[id] = new Chart(c, cfg);
+}
+
+// ── Render Dashboard ──
+function renderDash() {
+  const all    = TE.trades.map(t => TE.calc({...t}));
+  const closed = all.filter(t => t.status === 'Closed');
+  const open   = all.filter(t => t.status !== 'Closed');
+  const wins   = closed.filter(t => t.realisedPL > 0);
+  const losses = closed.filter(t => t.realisedPL < 0);
+
+  const wr = closed.length ? wins.length / closed.length * 100 : 0;
+  const avgW = wins.length ? wins.reduce((s,t) => s + t.realisedPL, 0) / wins.length : 0;
+  const avgL = losses.length ? losses.reduce((s,t) => s + t.realisedPL, 0) / losses.length : 0;
+  const pf = losses.length && avgL ? Math.abs(wins.reduce((s,t) => s + t.realisedPL, 0) / losses.reduce((s,t) => s + t.realisedPL, 0)) : 0;
+  const avgR = closed.length ? closed.reduce((s,t) => s + t.rr, 0) / closed.length : 0;
+  const totalPL = all.reduce((s,t) => s + t.totalPL, 0);
+
+  // KPIs
+  const kpis = [
+    {l:'Total P&L', v:TE.fmt(totalPL), c:totalPL>=0?'col-g':'col-r', ac:'var(--g)', s:`Realised: ${TE.fmt(closed.reduce((s,t)=>s+t.realisedPL,0))}`},
+    {l:'Unrealised P&L', v:TE.fmt(open.reduce((s,t)=>s+t.unrealisedPL,0)), c:open.reduce((s,t)=>s+t.unrealisedPL,0)>=0?'col-g':'col-r', ac:'var(--b)', s:`${open.length} open positions`},
+    {l:'Win Rate', v:wr.toFixed(1)+'%', c:'col-y', ac:'var(--y)', s:`${wins.length}W / ${losses.length}L`},
+    {l:'Profit Factor', v:pf.toFixed(2)+'x', c:pf>=1?'col-g':'col-r', ac:'var(--p)', s:`Avg Win: ${TE.fmt(avgW)}`},
+    {l:'Avg R-Multiple', v:avgR.toFixed(2)+'R', c:avgR>=0?'col-g':'col-r', ac:'var(--c)', s:`${closed.length} closed trades`},
+    {l:'Capital', v:TE.fmtShort(TE.cfg.cap||5000000), c:'col-t', ac:'var(--t3)', s:`Risk/trade: ${TE.cfg.risk||0.5}%`},
+  ];
+
+  document.getElementById('kpi-row').innerHTML = kpis.map(k => {
+    const info = TE.kpiInfoMap[k.l];
+    const ibtn = info ? `<i class="info-btn" onmouseenter="showInfoTip(this,'${info[0]}','${info[1]}','${info[2]}')" onmouseleave="hideInfoTip()">i</i>` : '';
+    return `<div class="kpi">
+      <div class="kpi-accent" style="background:${k.ac}"></div>
+      <div class="kpi-label">${k.l}${ibtn}</div>
+      <div class="kpi-val ${k.c}">${k.v}</div>
+      <div class="kpi-sub">${k.s}</div>
+    </div>`;
+  }).join('');
+
+  // Equity Curve
+  const sorted = [...closed].sort((a,b) => (a.entries?.[0]?.date||'').localeCompare(b.entries?.[0]?.date||''));
+  let cum = 0;
+  const cap = TE.cfg.cap || 5000000;
+  const eqData = sorted.map(t => { cum += t.realisedPL; return eqMode === 'pct' ? +(cum/cap*100).toFixed(2) : +cum.toFixed(0); });
+  const eqLabels = sorted.map(t => t.entries?.[0]?.date || '');
+  const eqCol = (!eqData.length || eqData[eqData.length-1] >= 0) ? '#00E5A0' : '#FF4560';
+
+  dChart('eqChart', {
+    type:'line',
+    data:{labels:eqLabels, datasets:[{data:eqData, borderColor:eqCol, backgroundColor:eqCol+'18', borderWidth:2, fill:true, tension:.4, pointRadius:2, pointHoverRadius:5}]},
+    options:{...CO, scales:{...CO.scales, y:{...CO.scales.y, ticks:{...CO.scales.y.ticks, callback:v=> eqMode==='pct'?v.toFixed(1)+'%':'₹'+Math.round(v/1000)+'k'}}}}
+  });
+
+  // Win/Loss Donut
+  dChart('wlChart', {
+    type:'doughnut',
+    data:{labels:['Wins','Losses','Open'], datasets:[{data:[wins.length,losses.length,open.length], backgroundColor:['#00E5A022','#FF456022','#3B8BFF22'], borderColor:['#00E5A0','#FF4560','#3B8BFF'], borderWidth:2}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true, position:'bottom', labels:{color:'#8BA0B8',font:{family:'Outfit',size:11}}}}}
+  });
+
+  // Open Positions Table
+  const el = document.getElementById('open-tbl');
+  if (!open.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No open positions</div></div>';
+    return;
+  }
+
+  // Group by symbol
+  const symMap = {};
+  open.forEach(t => {
+    const sym = t.symbol.toUpperCase();
+    if (!symMap[sym]) symMap[sym] = { symbol:t.symbol, side:t.side, trades:[t], totalQty:0, totalUnreal:0, totalEntryVal:0, setup:t.setup, id:t.id, cmp:t.cmp, holdDays:t.holdDays };
+    else { symMap[sym].trades.push(t); if (t.cmp) symMap[sym].cmp = t.cmp; if (t.holdDays > symMap[sym].holdDays) symMap[sym].holdDays = t.holdDays; }
+    symMap[sym].totalQty += (t.openQty || 0);
+    symMap[sym].totalUnreal += (t.unrealisedPL || 0);
+    symMap[sym].totalEntryVal += (t.avgEntry || 0) * (t.openQty || 0);
+  });
+
+  const grouped = Object.values(symMap).map(g => {
+    g.avgEntry = g.totalQty ? g.totalEntryVal / g.totalQty : 0;
+    g.tradeCount = g.trades.length;
+    g.avgRR = g.trades.reduce((s,t) => s + (t.rr||0), 0) / g.trades.length;
+    // Show EP metadata if present
+    g.epPyramid = g.trades[0]?._epPyramid || null;
+    g.epSource = g.trades[0]?.source || 'manual';
+    return g;
+  }).sort((a,b) => Math.abs(b.totalUnreal) - Math.abs(a.totalUnreal));
+
+  el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Side</th><th>Avg Entry</th><th>CMP</th><th>Open Qty</th><th>Unrealised P&L</th><th>R:R</th><th>Days</th><th>Source</th></tr></thead><tbody>` +
+    grouped.map(g => {
+      const epBadge = g.epSource === 'edgepilot' ? '<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(0,229,160,.12);color:var(--g);font-weight:700;margin-left:4px">EP</span>' : '';
+      return `<tr>
+        <td><div class="sym-cell"><div class="sym-icon">${g.symbol.slice(0,3)}</div><div><div class="sym-name">${g.symbol}${g.tradeCount>1?` <span style="font-size:9px;color:var(--t4)">(${g.tradeCount})</span>`:''}${epBadge}</div><div class="sym-date">${g.setup||'—'}</div></div></div></td>
+        <td><span class="bdg bdg-${g.side.toLowerCase()}">${g.side}</span></td>
+        <td class="mono">₹${g.avgEntry.toFixed(2)}</td>
+        <td class="mono">${g.cmp?'<span style="color:var(--y)">₹'+g.cmp.toFixed(2)+'</span>':'<span style="color:var(--t4)">—</span>'}</td>
+        <td class="mono">${g.totalQty}</td>
+        <td class="${g.totalUnreal>=0?'col-g':'col-r'} mono">${TE.fmt(g.totalUnreal)}</td>
+        <td><span class="rbdg ${g.avgRR>0?'pos':g.avgRR<0?'neg':'neu'}">${g.avgRR.toFixed(2)}R</span></td>
+        <td class="mono">${g.holdDays}d</td>
+        <td style="font-size:10px;color:var(--t4)">${g.epSource}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+// ── Capital Sync Display ──
+function refreshCapital() {
+  const cap = TE.sync.computeCurrentCapital();
+  document.getElementById('cap-current').textContent = TE.fmtShort(cap.currentCapital);
+  document.getElementById('cap-detail').textContent =
+    `Start: ${TE.fmtShort(cap.startCap)} · Added: ${TE.fmtShort(cap.totalAdded)} · P&L: ${TE.fmt(cap.totalPL)}`;
+
+  // Check if Edge Pilot is reading from same capital
+  const epCap = localStorage.getItem('te_current_capital');
+  const epEl = document.getElementById('ep-sync-status');
+  if (epCap && Math.abs(+epCap - cap.currentCapital) < 1000) {
+    epEl.innerHTML = '<span style="color:var(--g)">✓ Edge Pilot synced</span>';
+  } else if (epCap) {
+    epEl.innerHTML = '<span style="color:var(--y)">⚠ EP capital differs: ₹' + (+epCap).toLocaleString('en-IN') + '</span>';
+  }
+}
+
+// ── Listen for trade changes (cross-tab from Edge Pilot) ──
+window.addEventListener('te:trades-changed', () => {
+  renderDash();
+  refreshCapital();
+});
+
+// ── Boot ──
+renderDash();
+refreshCapital();
+
+// Deferred: auto-pull from cloud if empty
+setTimeout(() => {
+  if (TE.trades.length === 0 && localStorage.getItem('sb_auto')) {
+    TE.sbPull().then(() => { renderDash(); refreshCapital(); });
+  }
+}, 2000);
+</script>
+</body>
+</html>

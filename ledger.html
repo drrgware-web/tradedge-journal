@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Broker Ledger</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+</head>
+<body>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-size:18px;font-weight:700;color:var(--t1)">📒 Broker Ledger</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:3px">Track deposits, withdrawals, charges, and dividends</div>
+  </div>
+  <button class="btn btn-y" onclick="openM('m-ledger')">+ Add Entry</button>
+</div>
+
+<!-- Summary -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+  <div class="kpi"><div class="kpi-label">Total Deposited</div><div class="kpi-val col-g" id="led-dep" style="font-size:16px">₹0</div></div>
+  <div class="kpi"><div class="kpi-label">Total Withdrawn</div><div class="kpi-val col-r" id="led-wdr" style="font-size:16px">₹0</div></div>
+  <div class="kpi"><div class="kpi-label">Total Charges</div><div class="kpi-val col-y" id="led-chg" style="font-size:16px">₹0</div></div>
+  <div class="kpi"><div class="kpi-label">Net Balance</div><div class="kpi-val col-t" id="led-net" style="font-size:16px">₹0</div></div>
+</div>
+
+<!-- Filter -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+  <div class="pill on" onclick="filterCat('all',this)">All</div>
+  <div class="pill" onclick="filterCat('deposit',this)">Deposits</div>
+  <div class="pill" onclick="filterCat('withdrawal',this)">Withdrawals</div>
+  <div class="pill" onclick="filterCat('charges',this)">Charges</div>
+  <div class="pill" onclick="filterCat('dividend',this)">Dividends</div>
+</div>
+
+<!-- Ledger Table -->
+<div class="tbl-wrap" id="ledger-tbl"></div>
+
+<!-- Add Ledger Entry Modal -->
+<div class="overlay" id="m-ledger" onclick="if(event.target===this)closeM('m-ledger')">
+  <div class="modal" style="max-width:420px">
+    <div class="m-head"><div class="m-title">📒 Add Ledger Entry</div><button class="m-x" onclick="closeM('m-ledger')">✕</button></div>
+    <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="fg"><label class="fl">Date</label><input type="date" class="fi" id="le-date"></div>
+      <div class="fg"><label class="fl">Category</label>
+        <select class="fi" id="le-cat">
+          <option value="deposit">Deposit</option>
+          <option value="withdrawal">Withdrawal</option>
+          <option value="charges">Charges (Brokerage/STT/GST)</option>
+          <option value="dividend">Dividend</option>
+          <option value="interest">Interest</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Amount (₹)</label><input type="number" class="fi" id="le-amount" placeholder="0.00" step="0.01"></div>
+      <div class="fg"><label class="fl">Broker</label>
+        <select class="fi" id="le-broker"><option value="zerodha">Zerodha</option><option value="dhan">Dhan</option><option value="definedge">Definedge</option><option value="other">Other</option></select>
+      </div>
+      <div class="fg"><label class="fl">Note</label><input class="fi" id="le-note" placeholder="Optional note…"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('m-ledger')">Cancel</button>
+      <button class="btn btn-y" onclick="saveLedgerEntry()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+let ledger = TE.getLedger();
+let catFilter = 'all';
+
+document.getElementById('le-date').value = new Date().toISOString().slice(0, 10);
+
+function filterCat(cat, el) {
+  catFilter = cat;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+  if (el) el.classList.add('on');
+  render();
+}
+
+function saveLedgerEntry() {
+  const date = document.getElementById('le-date').value;
+  const cat = document.getElementById('le-cat').value;
+  const amount = +document.getElementById('le-amount').value || 0;
+  const broker = document.getElementById('le-broker').value;
+  const note = document.getElementById('le-note').value.trim();
+  if (!amount) { toast('Enter amount', '⚠️'); return; }
+  ledger.push({ id: Date.now() + '' + Math.random().toString(36).slice(2), date, cat, amount, broker, note, createdAt: Date.now() });
+  TE.saveLedger(ledger);
+  closeM('m-ledger');
+  render();
+  toast('Entry added', '✅');
+  // Clear
+  document.getElementById('le-amount').value = '';
+  document.getElementById('le-note').value = '';
+}
+
+function deleteEntry(id) {
+  if (!confirm('Delete this entry?')) return;
+  ledger = ledger.filter(e => e.id !== id);
+  TE.saveLedger(ledger);
+  render();
+  toast('Deleted', '🗑');
+}
+
+function render() {
+  let filtered = ledger;
+  if (catFilter !== 'all') filtered = filtered.filter(e => e.cat === catFilter);
+  filtered.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  // Summary
+  const dep = ledger.filter(e => e.cat === 'deposit').reduce((s, e) => s + e.amount, 0);
+  const wdr = ledger.filter(e => e.cat === 'withdrawal').reduce((s, e) => s + e.amount, 0);
+  const chg = ledger.filter(e => e.cat === 'charges').reduce((s, e) => s + e.amount, 0);
+  const div = ledger.filter(e => e.cat === 'dividend').reduce((s, e) => s + e.amount, 0);
+  document.getElementById('led-dep').textContent = TE.fmtINR(dep);
+  document.getElementById('led-wdr').textContent = TE.fmtINR(wdr);
+  document.getElementById('led-chg').textContent = TE.fmtINR(chg);
+  document.getElementById('led-net').textContent = TE.fmtINR(dep - wdr - chg + div);
+
+  const catColors = { deposit: 'var(--g)', withdrawal: 'var(--r)', charges: 'var(--y)', dividend: 'var(--c)', interest: 'var(--b)', other: 'var(--t3)' };
+  const catIcons = { deposit: '⬆', withdrawal: '⬇', charges: '💸', dividend: '💰', interest: '🏦', other: '📌' };
+
+  const el = document.getElementById('ledger-tbl');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📒</div><div class="empty-title">No ledger entries</div></div>';
+    return;
+  }
+
+  el.innerHTML = `<table><thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Broker</th><th>Note</th><th></th></tr></thead><tbody>` +
+    filtered.map(e => `<tr>
+      <td class="mono" style="font-size:12px">${e.date || '—'}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:${catColors[e.cat] || 'var(--t3)'}">${catIcons[e.cat] || '📌'} ${e.cat}</span></td>
+      <td class="mono" style="font-weight:700;color:${e.cat === 'deposit' || e.cat === 'dividend' ? 'var(--g)' : 'var(--r)'}">${TE.fmtINR(e.amount)}</td>
+      <td style="font-size:12px;color:var(--t3)">${e.broker || '—'}</td>
+      <td style="font-size:12px;color:var(--t3)">${e.note || '—'}</td>
+      <td><button class="ab dl" onclick="deleteEntry('${e.id}')" title="Delete">✕</button></td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+render();
+</script>
+</body>
+</html>

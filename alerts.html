@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Price Alerts</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+</head>
+<body>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+  <div>
+    <div style="font-size:18px;font-weight:700;color:var(--t1)">🔔 Price Alerts</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:3px">Get notified when stocks hit key levels. Prices refresh every 15 minutes.</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="refresh-status" style="font-size:11px;color:var(--t3)"></span>
+    <button class="btn btn-ghost btn-sm" id="notif-btn" onclick="requestNotifPerm()" style="display:none">🔔 Enable Notifications</button>
+    <button class="btn btn-ghost" onclick="manualRefresh()">↻ Refresh Now</button>
+    <button class="btn btn-y" onclick="openM('m-add-alert')">+ Add Alert</button>
+  </div>
+</div>
+
+<!-- Trade Auto-Alerts -->
+<div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Auto-Alerts from Open Trades</div>
+<div id="trade-alerts" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px"></div>
+
+<!-- GTT Active Summary -->
+<div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">🎯 Active GTT Orders</div>
+<div id="gtt-alerts" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px"></div>
+
+<!-- Custom Alerts -->
+<div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Custom Alerts</div>
+<div id="custom-alerts" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px"></div>
+
+<!-- Triggered Log -->
+<div style="margin-top:24px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Recent Triggers</div>
+    <button class="btn btn-ghost btn-xs" onclick="clearLog()">Clear</button>
+  </div>
+  <div id="alert-log" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto"></div>
+</div>
+
+<!-- Add Alert Modal -->
+<div class="overlay" id="m-add-alert" onclick="if(event.target===this)closeM('m-add-alert')">
+  <div class="modal" style="max-width:420px">
+    <div class="m-head"><div class="m-title">🔔 New Price Alert</div><button class="m-x" onclick="closeM('m-add-alert')">✕</button></div>
+    <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="fg f-full">
+        <label class="fl">Stock Symbol</label>
+        <div class="sym-wrap">
+          <input class="fi" id="al-symbol" placeholder="Type e.g. RELI, INFY…" autocomplete="off" style="text-transform:uppercase">
+          <div class="sym-dropdown" id="al-sym-drop"></div>
+        </div>
+        <div id="al-cmp" style="font-size:10px;color:var(--t3);margin-top:3px;min-height:14px"></div>
+      </div>
+      <div class="fg f-full">
+        <label class="fl">Alert Type</label>
+        <select class="fi" id="al-type" onchange="updateHint()">
+          <option value="above">Price rises ABOVE</option>
+          <option value="below">Price falls BELOW</option>
+        </select>
+      </div>
+      <div class="fg f-full"><label class="fl">Target Price (₹)</label><input class="fi" id="al-price" type="number" placeholder="0.00"></div>
+      <div class="fg f-full"><label class="fl">Note (optional)</label><input class="fi" id="al-note" placeholder="e.g. Breakout level…"></div>
+      <div id="al-hint" style="font-size:11px;color:var(--t3);padding:8px 10px;background:var(--bg3);border-radius:6px">Alert triggers when price <b style="color:var(--t1)">rises above</b> target.</div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('m-add-alert')">Cancel</button>
+      <button class="btn btn-y" onclick="saveAlert()">🔔 Set Alert</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/alerts-engine.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+// ── Init autocomplete ──
+setTimeout(() => {
+  TE.createAutocomplete({
+    inputId: 'al-symbol', dropId: 'al-sym-drop',
+    fetchPrice: async sym => {
+      const el = document.getElementById('al-cmp');
+      el.textContent = '⏳ Fetching…';
+      const price = await TE.fetchCMP(sym);
+      if (price) {
+        const pe = document.getElementById('al-price');
+        if (pe && !pe.value) pe.value = price.toFixed(2);
+        el.innerHTML = `<span style="color:var(--g)">CMP: ₹${price.toFixed(2)}</span>`;
+      } else el.textContent = 'Unavailable';
+    }
+  });
+  checkNotifPerm();
+}, 100);
+
+function updateHint() {
+  const t = document.getElementById('al-type').value;
+  document.getElementById('al-hint').innerHTML = t === 'above'
+    ? 'Alert triggers when price <b style="color:var(--g)">rises above</b> target.'
+    : 'Alert triggers when price <b style="color:var(--r)">falls below</b> target.';
+}
+
+function checkNotifPerm() {
+  const btn = document.getElementById('notif-btn');
+  if (!('Notification' in window)) { btn.style.display = 'none'; return; }
+  btn.style.display = Notification.permission === 'default' ? '' : 'none';
+}
+
+async function requestNotifPerm() {
+  if ('Notification' in window) {
+    const perm = await Notification.requestPermission();
+    toast(perm === 'granted' ? 'Notifications enabled!' : 'Permission denied', perm === 'granted' ? '✅' : '⚠️');
+    checkNotifPerm();
+  }
+}
+
+function saveAlert() {
+  const sym = (document.getElementById('al-symbol').value || '').trim().toUpperCase();
+  const price = +document.getElementById('al-price').value || 0;
+  const type = document.getElementById('al-type').value;
+  const note = document.getElementById('al-note').value.trim();
+  if (!sym) { toast('Enter symbol', '⚠️'); return; }
+  if (!price) { toast('Enter price', '⚠️'); return; }
+  TE.alerts.addCustom(sym, price, type, type === 'above' ? 'Above ₹' + price : 'Below ₹' + price, note);
+  closeM('m-add-alert');
+  render();
+  toast(`Alert set: ${sym} ${type === 'above' ? '▲' : '▼'} ₹${price}`, '🔔');
+}
+
+async function manualRefresh() {
+  document.getElementById('refresh-status').textContent = 'Checking…';
+  await TE.alerts.runCheck();
+  document.getElementById('refresh-status').textContent = 'Last: ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  render();
+  toast('Alert check complete', '✅');
+}
+
+function clearLog() {
+  TE.alerts.clearLog();
+  render();
+}
+
+// ── Render ──
+function render() {
+  // Trade alerts
+  const tradeAlerts = TE.alerts.getTradeAlertLevels();
+  const taEl = document.getElementById('trade-alerts');
+  if (!tradeAlerts.length) {
+    taEl.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:10px 0">No open trades with SL/Target set.</div>';
+  } else {
+    taEl.innerHTML = tradeAlerts.map(a => {
+      const key = `${a.symbol}_${a.label}_${a.level}`;
+      const fired = TE.alerts.triggered.has(key);
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${a.color};border-radius:8px;${fired ? 'opacity:.5' : ''}">
+        <div style="flex:1">
+          <span style="font-weight:700;color:var(--t1)">${a.symbol}</span>
+          <span style="font-size:11px;color:${a.color};margin-left:6px">${a.label}</span>
+          <span style="font-size:11px;color:var(--t3);margin-left:6px">${a.type === 'above' ? '▲' : '▼'} ₹${a.level.toFixed(2)}</span>
+        </div>
+        ${fired ? `<button class="btn btn-ghost btn-xs" onclick="TE.alerts.reset('${a.symbol}','${a.label}');render()">🔁 Re-arm</button>` : '<span style="font-size:11px;color:var(--g)">Armed</span>'}
+      </div>`;
+    }).join('');
+  }
+
+  // GTT alerts
+  const gtts = TE.getGTTs().filter(g => g.status === 'active');
+  const gttEl = document.getElementById('gtt-alerts');
+  if (!gtts.length) {
+    gttEl.innerHTML = '<div style="color:var(--t4);font-size:12px;padding:10px 0">No active GTT orders.</div>';
+  } else {
+    gttEl.innerHTML = gtts.map(g => {
+      const isOCO = g.type === 'oco';
+      const color = isOCO ? 'var(--p)' : 'var(--b)';
+      const levels = isOCO ? `SL ₹${(+g.slTrigger).toFixed(2)} | Tgt ₹${(+g.tgtTrigger).toFixed(2)}` : `Trigger ₹${(+g.trigger1).toFixed(2)}`;
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${color};border-radius:8px">
+        <div style="flex:1">
+          <span style="font-weight:700;color:var(--t1)">${g.symbol}</span>
+          <span style="font-size:10px;background:${color}1a;color:${color};padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">${isOCO ? 'OCO' : 'Single'} GTT</span>
+          <span style="font-size:11px;color:var(--t2);font-family:'IBM Plex Mono',monospace;margin-left:6px">${levels}</span>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="nav('execute')">Manage →</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Custom alerts
+  const customEl = document.getElementById('custom-alerts');
+  if (!TE.alerts.custom.length) {
+    customEl.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:16px;text-align:center;border:1px dashed var(--b2);border-radius:10px">No custom alerts. Click <b>Add Alert</b> to create one.</div>';
+  } else {
+    customEl.innerHTML = TE.alerts.custom.map(a => {
+      const key = `${a.symbol}_${a.label}_${a.level}`;
+      const fired = TE.alerts.triggered.has(key);
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${a.color};border-radius:8px;${fired ? 'opacity:.5' : ''}">
+        <div style="flex:1">
+          <span style="font-weight:700;color:var(--t1)">${a.symbol}</span>
+          <span style="font-size:11px;color:${a.color};margin-left:6px">${a.label}</span>
+          <span style="font-size:11px;color:var(--t3);margin-left:6px">${a.type === 'above' ? '▲' : '▼'} ₹${a.level.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${fired ? `<button class="btn btn-ghost btn-xs" onclick="TE.alerts.reset('${a.symbol}','${a.label}');render()">🔁</button>` : '<span style="font-size:11px;color:var(--g)">Armed</span>'}
+          <button class="btn btn-ghost btn-xs" onclick="TE.alerts.deleteCustom('${a.id}');render()" style="color:var(--r)">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Alert log
+  const logEl = document.getElementById('alert-log');
+  if (!TE.alerts.log.length) {
+    logEl.innerHTML = '<div style="color:var(--t3);font-size:12px;text-align:center;padding:16px">No alerts triggered yet</div>';
+  } else {
+    logEl.innerHTML = TE.alerts.log.slice(0, 20).map(e => {
+      const t = new Date(e.ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      const d = new Date(e.ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--bg2);border-radius:7px;border:1px solid var(--b1)">
+        <span style="font-size:16px">🔔</span>
+        <span style="font-weight:600;color:${e.color || 'var(--y)'}">${e.symbol}</span>
+        <span style="color:var(--t2);font-size:12px;flex:1">${e.label} at ₹${(+e.price).toFixed(2)}</span>
+        <span style="font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace">${d} ${t}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

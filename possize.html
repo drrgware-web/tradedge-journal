@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Position Sizing</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+</head>
+<body>
+
+<div style="margin-bottom:20px">
+  <div style="font-size:18px;font-weight:700;color:var(--t1)">📐 Position Sizing Calculator</div>
+  <div style="font-size:12px;color:var(--t3);margin-top:3px">Calculate exact position size based on risk parameters and account equity.</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <!-- Inputs -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Risk Parameters</span></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="fg">
+        <label class="fl">Symbol (auto-fetches price)</label>
+        <div class="sym-wrap">
+          <input class="fi" id="ps-symbol" placeholder="Type e.g. RELI, INFY…" autocomplete="off" style="text-transform:uppercase">
+          <div class="sym-dropdown" id="ps-sym-drop"></div>
+        </div>
+        <div id="ps-price-status" style="font-size:10px;color:var(--t3);margin-top:4px;min-height:14px"></div>
+      </div>
+      <div class="fg"><label class="fl">Account Capital (₹)</label><input type="number" class="fi" id="ps-capital" oninput="calc()"></div>
+      <div class="fg">
+        <label class="fl">Risk per Trade (%)</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="range" id="ps-risk-slider" min="0.1" max="5" step="0.1" value="0.5" oninput="document.getElementById('ps-risk').value=this.value;calc()" style="flex:1;accent-color:var(--y)">
+          <input type="number" class="fi" id="ps-risk" value="0.5" step="0.1" style="width:80px" oninput="document.getElementById('ps-risk-slider').value=this.value;calc()">
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Entry Price (₹)</label><input type="number" class="fi" id="ps-entry" step="0.01" oninput="calc()"></div>
+      <div class="fg"><label class="fl">Stop Loss (₹)</label><input type="number" class="fi" id="ps-sl" step="0.01" oninput="calc()"></div>
+      <div class="fg"><label class="fl">Target (₹)</label><input type="number" class="fi" id="ps-target" step="0.01" oninput="calc()"></div>
+      <div class="fg"><label class="fl">Brokerage Model</label>
+        <select class="fi" id="ps-brok" onchange="calc()">
+          <option value="zerodha">Zerodha (₹20 flat + 0.1%)</option><option value="dhan">Dhan (₹20 flat + 0.1%)</option><option value="none">No charges</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Position Size</span></div>
+      <div class="card-body">
+        <div style="text-align:center;padding:12px 0">
+          <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Recommended Qty</div>
+          <div id="ps-qty" style="font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:700;color:var(--y)">–</div>
+          <div id="ps-note" style="font-size:11px;color:var(--t3);margin-top:6px">Enter parameters</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Capital at Risk</div><div id="ps-risk-amt" class="mono" style="color:var(--r)">–</div></div>
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Position Value</div><div id="ps-pos-val" class="mono" style="color:var(--b)">–</div></div>
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Max Loss</div><div id="ps-max-loss" class="mono" style="color:var(--r)">–</div></div>
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Potential Gain</div><div id="ps-max-gain" class="mono" style="color:var(--g)">–</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Risk/Reward</span></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b1)"><span style="font-size:12px;color:var(--t3)">R:R</span><span id="ps-rr" class="mono" style="color:var(--y);font-weight:700">–</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b1)"><span style="font-size:12px;color:var(--t3)">SL Distance</span><span id="ps-sl-dist" class="mono">–</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--b1)"><span style="font-size:12px;color:var(--t3)">Charges (est)</span><span id="ps-charges" class="mono" style="color:var(--r)">–</span></div>
+        <div style="display:flex;justify-content:space-between;padding:7px 0"><span style="font-size:12px;color:var(--t3)">% Capital</span><span id="ps-cap-pct" class="mono" style="color:var(--c)">–</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Pyramid Plan (60/40)</span></div>
+      <div class="card-body"><div id="ps-pyramid" style="font-size:12px;color:var(--t3)">Enter valid parameters.</div></div>
+    </div>
+
+    <button class="btn btn-y" style="width:100%;justify-content:center" onclick="addToLog()">+ Add to Trade Log</button>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+// Init
+document.getElementById('ps-capital').value = TE.cfg.cap || 5000000;
+document.getElementById('ps-risk').value = TE.cfg.risk || 0.5;
+document.getElementById('ps-risk-slider').value = TE.cfg.risk || 0.5;
+
+setTimeout(() => {
+  TE.createAutocomplete({
+    inputId: 'ps-symbol', dropId: 'ps-sym-drop',
+    fetchPrice: async sym => {
+      const el = document.getElementById('ps-price-status');
+      el.textContent = '⏳ Fetching…';
+      const price = await TE.fetchCMP(sym);
+      if (price) {
+        const e = document.getElementById('ps-entry');
+        if (e && !e.value) { e.value = price.toFixed(2); calc(); }
+        el.innerHTML = `<span style="color:var(--g)">✓ ₹${price.toFixed(2)}</span>`;
+      } else el.textContent = 'Price unavailable';
+    }
+  });
+}, 100);
+
+function calc() {
+  const capital = +document.getElementById('ps-capital').value || 0;
+  const riskPct = +document.getElementById('ps-risk').value || 0.5;
+  const entry = +document.getElementById('ps-entry').value || 0;
+  const sl = +document.getElementById('ps-sl').value || 0;
+  const target = +document.getElementById('ps-target').value || 0;
+
+  if (!capital || !entry || !sl || sl >= entry) {
+    document.getElementById('ps-qty').textContent = '–';
+    document.getElementById('ps-note').textContent = sl >= entry && entry > 0 ? 'SL must be below entry' : 'Enter parameters';
+    return;
+  }
+
+  const riskAmt = capital * riskPct / 100;
+  const slDist = entry - sl;
+  const slPct = slDist / entry * 100;
+  let qty = Math.floor(riskAmt / slDist);
+  if (qty < 1) qty = 1;
+  const posVal = qty * entry;
+  const maxLoss = qty * slDist;
+  const brok = document.getElementById('ps-brok').value;
+  const chargesAmt = brok === 'none' ? 0 : (40 + posVal * 0.001);
+  const capPct = posVal / capital * 100;
+
+  let rr = '–', maxGain = 0;
+  if (target > entry) { maxGain = qty * (target - entry); rr = '1 : ' + (maxGain / maxLoss).toFixed(2); }
+
+  document.getElementById('ps-qty').textContent = qty.toLocaleString('en-IN');
+  document.getElementById('ps-note').textContent = `${slPct.toFixed(2)}% SL · ${riskPct}% risk`;
+  document.getElementById('ps-risk-amt').textContent = TE.fmtINR(riskAmt);
+  document.getElementById('ps-pos-val').textContent = TE.fmtINR(posVal);
+  document.getElementById('ps-max-loss').textContent = TE.fmtINR(maxLoss);
+  document.getElementById('ps-max-gain').textContent = target > entry ? TE.fmtINR(maxGain) : '–';
+  document.getElementById('ps-rr').textContent = rr;
+  document.getElementById('ps-sl-dist').textContent = `₹${slDist.toFixed(2)} (${slPct.toFixed(2)}%)`;
+  document.getElementById('ps-charges').textContent = TE.fmtINR(chargesAmt);
+  document.getElementById('ps-cap-pct').textContent = capPct.toFixed(2) + '%';
+
+  const q1 = Math.floor(qty * 0.6), q2 = qty - q1;
+  document.getElementById('ps-pyramid').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Entry 1 (60%)</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--g)">${q1} shares</div>
+        <div style="font-size:11px;color:var(--t3)">@ ₹${entry.toFixed(2)}</div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--t3);margin-bottom:4px">Entry 2 (40%)</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--b)">${q2} shares</div>
+        <div style="font-size:11px;color:var(--t3)">After confirmation</div>
+      </div>
+    </div>`;
+}
+
+function addToLog() {
+  const sym = (document.getElementById('ps-symbol').value || '').trim().toUpperCase();
+  const entry = +document.getElementById('ps-entry').value || 0;
+  const sl = +document.getElementById('ps-sl').value || 0;
+  const target = +document.getElementById('ps-target').value || 0;
+  const qtyText = document.getElementById('ps-qty').textContent;
+  const qty = parseInt(qtyText.replace(/,/g, '')) || 0;
+  if (!sym || !entry || !qty) { toast('Fill parameters first', '⚠️'); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  TE.trades.push({
+    id: Date.now() + '' + Math.random().toString(36).slice(2),
+    symbol: sym, setup: '', side: 'Buy', status: 'Open',
+    sl, target, plan: '', exitTrigger: '', notes: 'From Position Sizing',
+    source: 'manual', entries: [{ date: today, price: entry, qty }], exits: [], cmp: 0
+  });
+  TE.save();
+  toast(`Added ${sym} · ${qty} qty @ ₹${entry}`, '✅');
+}
+
+calc();
+</script>
+</body>
+</html>

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Trade Execution</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+</head>
+<body>
+
+<!-- Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-size:18px;font-weight:800;color:var(--t1)">⚡ Trade Execution & Management</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:3px">Place orders · manage positions · auto-trail · iceberg · bracket · live P&L</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div id="broker-status" style="font-size:11px;color:var(--t3)"></div>
+    <div id="live-indicator" style="font-size:10px;color:var(--t4);display:none"><span class="exec-live-dot"></span>Live</div>
+    <button class="btn btn-ghost btn-sm" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+</div>
+
+<!-- Broker Selector -->
+<div class="exec-broker-row" style="margin-bottom:14px">
+  <button class="exec-broker-pill active" id="br-zerodha" onclick="setBroker('zerodha')">🟢 Zerodha</button>
+  <button class="exec-broker-pill" id="br-dhan" onclick="setBroker('dhan')">🔵 Dhan</button>
+  <button class="exec-broker-pill" id="br-definedge" onclick="setBroker('definedge')">🟣 Definedge</button>
+</div>
+
+<!-- P&L Ticker -->
+<div class="exec-pnl-bar" id="pnl-bar">
+  <div class="exec-pnl-card"><div class="pnl-label">Total P&L</div><div class="pnl-value" id="total-pnl" style="color:var(--t3)">—</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">Open Positions</div><div class="pnl-value" id="pos-count" style="color:var(--c)">0</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">Day P&L</div><div class="pnl-value" id="day-pnl" style="color:var(--t3)">—</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">Margin Used</div><div class="pnl-value" id="margin" style="color:var(--y)">—</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">Capital Risk %</div><div class="pnl-value" id="risk-pct" style="color:var(--t3)">—</div></div>
+</div>
+
+<!-- Heatmap -->
+<div class="card" style="padding:0;margin-bottom:14px;overflow:hidden">
+  <div style="padding:8px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:11px;font-weight:700;color:var(--t2)">📊 Exposure Heatmap</div>
+  </div>
+  <div style="padding:8px" id="heatmap"><div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">Load positions to see heatmap</div></div>
+</div>
+
+<!-- Square Off All -->
+<div class="exec-sqoff-bar" id="sqoff-bar" style="display:none">
+  <div>
+    <div style="font-size:12px;font-weight:700;color:var(--r)">⚠ Square Off All</div>
+    <div style="font-size:10px;color:var(--t3)"><span id="sqoff-count">0</span> positions · <span id="sqoff-value">₹0</span></div>
+  </div>
+  <button class="sq-btn" onclick="squareOffAll()">🔴 SQUARE OFF ALL</button>
+</div>
+
+<!-- Main 2-col layout -->
+<div class="exec-grid">
+
+  <!-- LEFT: Place Order Panel -->
+  <div class="exec-order-panel">
+    <div class="exec-order-head">📤 Place Order</div>
+    <div class="exec-order-body">
+      <!-- Symbol -->
+      <div class="fg">
+        <label class="fl">Symbol</label>
+        <div class="sym-wrap">
+          <input class="fi" id="exec-sym" placeholder="Type symbol…" autocomplete="off" style="text-transform:uppercase">
+          <div class="sym-dropdown" id="exec-sym-drop"></div>
+        </div>
+        <div id="exec-price-status" style="font-size:10px;color:var(--t3);margin-top:3px;min-height:14px"></div>
+      </div>
+
+      <!-- Side Toggle -->
+      <div style="display:flex;gap:0;border:1.5px solid var(--b1);border-radius:10px;overflow:hidden">
+        <button id="side-buy" onclick="setSide('BUY')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--gd);color:var(--g);font-family:'Outfit',sans-serif">BUY</button>
+        <button id="side-sell" onclick="setSide('SELL')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t4);font-family:'Outfit',sans-serif">SELL</button>
+      </div>
+
+      <!-- Order Type -->
+      <div>
+        <label class="fl">Order Type</label>
+        <div class="exec-otype-row">
+          <button class="exec-otype-chip active" onclick="setOtype('MARKET',this)">Market</button>
+          <button class="exec-otype-chip" onclick="setOtype('LIMIT',this)">Limit</button>
+          <button class="exec-otype-chip" onclick="setOtype('SL',this)">SL</button>
+          <button class="exec-otype-chip" onclick="setOtype('SL-M',this)">SL-M</button>
+        </div>
+      </div>
+
+      <!-- Qty + Price -->
+      <div class="fg2">
+        <div class="fg"><label class="fl">Quantity</label><input type="number" class="fi" id="exec-qty" placeholder="0" min="1" oninput="onQtyChange()"></div>
+        <div class="fg" id="price-wrap"><label class="fl">Price (₹)</label><input type="number" class="fi" id="exec-price" placeholder="0.00" step="0.05"></div>
+      </div>
+
+      <!-- Trigger (SL/SL-M) -->
+      <div class="fg" id="trigger-wrap" style="display:none">
+        <label class="fl">Trigger Price (₹)</label>
+        <input type="number" class="fi" id="exec-trigger" placeholder="0.00" step="0.05">
+      </div>
+
+      <!-- Product + Validity -->
+      <div class="fg2">
+        <div class="fg"><label class="fl">Product</label><select class="fi" id="exec-product"><option value="CNC">CNC (Delivery)</option><option value="MIS">MIS (Intraday)</option><option value="NRML">NRML</option></select></div>
+        <div class="fg"><label class="fl">Validity</label><select class="fi" id="exec-validity"><option value="DAY">Day</option><option value="IOC">IOC</option></select></div>
+      </div>
+
+      <!-- Bracket Order -->
+      <div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="bracket-cb" onchange="toggleBracket()" style="accent-color:var(--p)">
+          <span style="font-size:11px;font-weight:700;color:var(--p)">🔲 Bracket (Entry + SL + Target)</span>
+        </label>
+        <div id="bracket-box" style="display:none;background:var(--bg3);border:1px solid rgba(168,85,247,.2);border-radius:10px;padding:10px 12px;margin-top:6px">
+          <div class="fg2">
+            <div class="fg"><label class="fl">Stop Loss ₹</label><input type="number" class="fi" id="bkt-sl" placeholder="0.00" step="0.05"></div>
+            <div class="fg"><label class="fl">Target ₹</label><input type="number" class="fi" id="bkt-tgt" placeholder="0.00" step="0.05"></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10px;color:var(--t3);cursor:pointer">
+            <input type="checkbox" id="bkt-autojournal" checked style="accent-color:var(--g)"> Auto-log to Journal
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:10px;color:var(--t3);cursor:pointer">
+            <input type="checkbox" id="bkt-autogtt" checked style="accent-color:var(--y)"> Auto-create GTT after fill
+          </label>
+        </div>
+      </div>
+
+      <!-- Nudges -->
+      <div class="exec-nudge" id="nudge-panel" style="display:none">
+        <div class="nv-head"><span>🛡️</span> Pre-Trade Checks <span id="nudge-score" style="margin-left:auto;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px"></span></div>
+        <div class="nv-body" id="nudge-list"></div>
+      </div>
+
+      <!-- PLACE ORDER -->
+      <button class="exec-place-btn buy" id="place-btn" onclick="placeOrder()">⚡ Place BUY Order</button>
+      <div id="order-status" style="font-size:11px;color:var(--t3);min-height:16px;text-align:center"></div>
+
+      <!-- Quick fill from journal -->
+      <div style="border-top:1px solid var(--b1);padding-top:10px">
+        <label class="fl">Quick Fill from Journal</label>
+        <select class="fi" id="from-journal" onchange="fillFromJournal()" style="font-size:11px">
+          <option value="">— Select open trade —</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Positions + Orders -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+
+    <!-- Positions -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;font-weight:700;color:var(--t2)">📊 Positions</span>
+          <span id="pos-badge" style="font-size:10px;background:var(--bd);color:var(--b);padding:1px 8px;border-radius:10px;font-weight:700">0</span>
+        </div>
+        <div class="exec-sort-row">
+          <button class="exec-sort-pill active" onclick="sortPos('pnl',this)">P&L</button>
+          <button class="exec-sort-pill" onclick="sortPos('value',this)">Value</button>
+          <button class="exec-sort-pill" onclick="sortPos('symbol',this)">A→Z</button>
+        </div>
+      </div>
+      <div id="positions" style="max-height:500px;overflow-y:auto;padding:8px">
+        <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Select broker → Refresh</div>
+      </div>
+    </div>
+
+    <!-- Orders -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;font-weight:700;color:var(--t2)">📋 Today's Orders</span>
+        <button class="btn btn-ghost btn-xs" onclick="refreshOrders()">↻</button>
+      </div>
+      <div id="orders" style="max-height:300px;overflow-y:auto">
+        <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">No orders</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GTT ORDERS SECTION ═══ -->
+<div style="margin-top:20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:15px;font-weight:700;color:var(--t1)">🎯 GTT Orders</div>
+      <span id="gtt-badge" style="font-size:10px;background:rgba(59,139,255,.12);color:var(--b);padding:2px 8px;border-radius:20px;font-weight:700">0 active</span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="gttAutoFromJournal()">⬆ Auto from Journal</button>
+      <button class="btn btn-y btn-sm" onclick="openM('m-gtt')">+ Place GTT</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px 8px 0 0;overflow:hidden;background:var(--bg3)">
+    <button class="gtt-tab active" id="gtab-active" onclick="gttTab('active')">🟢 Active</button>
+    <button class="gtt-tab" id="gtab-triggered" onclick="gttTab('triggered')">🔔 Triggered</button>
+    <button class="gtt-tab" id="gtab-all" onclick="gttTab('all')">All</button>
+  </div>
+  <div class="card" style="border-radius:0 0 10px 10px;border-top:none">
+    <div id="gtt-list" style="min-height:60px;max-height:450px;overflow-y:auto">
+      <div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">🎯 No GTT orders</div>
+    </div>
+  </div>
+</div>
+
+<!-- GTT Modal -->
+<div class="overlay" id="m-gtt" onclick="if(event.target===this)closeM('m-gtt')">
+  <div class="modal" style="max-width:480px">
+    <div class="m-head"><div class="m-title">🎯 Place GTT Order</div><button class="m-x" onclick="closeM('m-gtt')">✕</button></div>
+    <div class="m-body" style="display:flex;flex-direction:column;gap:14px">
+      <!-- Type toggle -->
+      <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
+        <button id="gtt-m-single" onclick="setGttMode('single')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--yd);color:var(--y)">Single Trigger</button>
+        <button id="gtt-m-oco" onclick="setGttMode('oco')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--bg3);color:var(--t3)">OCO (SL + Target)</button>
+      </div>
+      <div class="fg f-full">
+        <label class="fl">Symbol</label>
+        <div class="sym-wrap"><input class="fi" id="gtt-sym" placeholder="Type symbol…" autocomplete="off" style="text-transform:uppercase"><div class="sym-dropdown" id="gtt-sym-drop"></div></div>
+      </div>
+      <div class="fg2">
+        <div class="fg"><label class="fl">Exchange</label><select class="fi" id="gtt-exchange"><option>NSE</option><option>BSE</option></select></div>
+        <div class="fg"><label class="fl">Product</label><select class="fi" id="gtt-product"><option value="CNC">CNC</option><option value="MIS">MIS</option></select></div>
+      </div>
+      <!-- Single fields -->
+      <div id="gtt-single-fields">
+        <div class="fg2">
+          <div class="fg"><label class="fl">Trigger ₹</label><input type="number" class="fi" id="gtt-trigger1" step="0.05"></div>
+          <div class="fg"><label class="fl">Limit ₹</label><input type="number" class="fi" id="gtt-limit1" step="0.05"></div>
+        </div>
+        <div class="fg2" style="margin-top:10px">
+          <div class="fg"><label class="fl">Side</label><select class="fi" id="gtt-side1"><option value="SELL">SELL</option><option value="BUY">BUY</option></select></div>
+          <div class="fg"><label class="fl">Qty</label><input type="number" class="fi" id="gtt-qty1" min="1"></div>
+        </div>
+      </div>
+      <!-- OCO fields -->
+      <div id="gtt-oco-fields" style="display:none">
+        <div class="fg2">
+          <div class="fg"><label class="fl">Side</label><select class="fi" id="gtt-oco-side"><option value="SELL">SELL (Exit Long)</option><option value="BUY">BUY (Exit Short)</option></select></div>
+          <div class="fg"><label class="fl">Qty</label><input type="number" class="fi" id="gtt-oco-qty" min="1"></div>
+        </div>
+        <div style="margin-top:12px;padding:10px;border:1px solid rgba(255,69,96,.25);border-radius:8px;background:rgba(255,69,96,.04)">
+          <div style="font-size:10px;font-weight:700;color:var(--r);margin-bottom:8px">🔻 Stop Loss Leg</div>
+          <div class="fg2">
+            <div class="fg"><label class="fl">Trigger ₹</label><input type="number" class="fi" id="gtt-oco-sl-trigger" step="0.05"></div>
+            <div class="fg"><label class="fl">Limit ₹</label><input type="number" class="fi" id="gtt-oco-sl-limit" step="0.05"></div>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:10px;border:1px solid rgba(0,229,160,.25);border-radius:8px;background:rgba(0,229,160,.04)">
+          <div style="font-size:10px;font-weight:700;color:var(--g);margin-bottom:8px">🔺 Target Leg</div>
+          <div class="fg2">
+            <div class="fg"><label class="fl">Trigger ₹</label><input type="number" class="fi" id="gtt-oco-tgt-trigger" step="0.05"></div>
+            <div class="fg"><label class="fl">Limit ₹</label><input type="number" class="fi" id="gtt-oco-tgt-limit" step="0.05"></div>
+          </div>
+        </div>
+      </div>
+      <div class="fg f-full"><label class="fl">Note</label><input class="fi" id="gtt-note" placeholder="e.g. Trailing SL update…"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('m-gtt')">Cancel</button>
+      <button class="btn btn-y" onclick="placeGTT()">⚡ Place GTT</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/execution.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+let _gttMode = 'single';
+let _gttTab = 'active';
+
+// ── Init ──
+setTimeout(() => {
+  TE.createAutocomplete({
+    inputId: 'exec-sym', dropId: 'exec-sym-drop',
+    fetchPrice: async sym => {
+      const el = document.getElementById('exec-price-status');
+      el.textContent = '⏳ Fetching…';
+      const price = await TE.fetchCMP(sym);
+      if (price) {
+        const pe = document.getElementById('exec-price');
+        if (pe && !pe.value) pe.value = price.toFixed(2);
+        el.innerHTML = `<span style="color:var(--g)">₹${price.toFixed(2)}</span>`;
+      } else el.textContent = 'Unavailable';
+    }
+  });
+  TE.createAutocomplete({ inputId: 'gtt-sym', dropId: 'gtt-sym-drop' });
+  populateJournalDropdown();
+  checkBrokerStatus();
+}, 100);
+
+// ── Broker Selection ──
+function setBroker(b) {
+  TE.exec.broker = b;
+  document.querySelectorAll('.exec-broker-pill').forEach(p => p.classList.remove('active'));
+  document.getElementById('br-' + b)?.classList.add('active');
+  checkBrokerStatus();
+}
+
+function checkBrokerStatus() {
+  const st = document.getElementById('broker-status');
+  const w = TE.getWorkerUrl();
+  if (!w) { st.innerHTML = '<span style="color:var(--r)">⚠ Set Worker URL</span>'; return; }
+  let ok = false;
+  if (TE.exec.broker === 'zerodha') ok = !!(localStorage.getItem('zd_key') && localStorage.getItem('zd_tk'));
+  else if (TE.exec.broker === 'dhan') ok = !!localStorage.getItem('dhan_tk');
+  else ok = !!localStorage.getItem('de_session');
+  st.innerHTML = ok ? '<span style="color:var(--g)">● Connected</span>' : '<span style="color:var(--r)">● Not authenticated</span>';
+}
+
+// ── Side Toggle ──
+function setSide(side) {
+  TE.exec.side = side;
+  const buy = document.getElementById('side-buy'), sell = document.getElementById('side-sell');
+  if (side === 'BUY') { buy.style.cssText = 'flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--gd);color:var(--g);font-family:Outfit'; sell.style.cssText = 'flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t4);font-family:Outfit'; }
+  else { sell.style.cssText = 'flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--rd);color:var(--r);font-family:Outfit'; buy.style.cssText = 'flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t4);font-family:Outfit'; }
+  const btn = document.getElementById('place-btn');
+  btn.className = 'exec-place-btn ' + (side === 'BUY' ? 'buy' : 'sell');
+  btn.innerHTML = `⚡ Place ${side} Order`;
+}
+
+function setOtype(ot, el) {
+  TE.exec.otype = ot;
+  document.querySelectorAll('.exec-otype-chip').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('trigger-wrap').style.display = (ot === 'SL' || ot === 'SL-M') ? '' : 'none';
+}
+
+function toggleBracket() {
+  const on = document.getElementById('bracket-cb').checked;
+  document.getElementById('bracket-box').style.display = on ? '' : 'none';
+}
+
+function onQtyChange() { runNudges(); }
+
+// ── Pre-Trade Nudges ──
+function runNudges() {
+  const sym = (document.getElementById('exec-sym').value || '').trim().toUpperCase();
+  const panel = document.getElementById('nudge-panel');
+  if (!sym) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const qty = +document.getElementById('exec-qty').value || 0;
+  const price = +document.getElementById('exec-price').value || 0;
+  const { score, nudges } = TE.exec.runNudges(sym, qty, price);
+  const sc = score >= 70 ? 'var(--g)' : score >= 40 ? 'var(--y)' : 'var(--r)';
+  document.getElementById('nudge-score').textContent = score + '/100';
+  document.getElementById('nudge-score').style.cssText = `color:${sc};background:${sc}1a;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px`;
+  document.getElementById('nudge-list').innerHTML = nudges.map(n =>
+    `<div class="nv-item" style="display:flex;gap:5px;font-size:10.5px;padding:2px 0"><span>${n.icon}</span><span style="color:${n.level==='fail'?'var(--r)':n.level==='warn'?'var(--y)':'var(--t3)'}">${n.text}</span></div>`
+  ).join('');
+  document.getElementById('place-btn').disabled = score < 30;
+}
+
+// ── Place Order ──
+async function placeOrder() {
+  const sym = (document.getElementById('exec-sym').value || '').trim().toUpperCase();
+  const qty = +document.getElementById('exec-qty').value || 0;
+  const price = +document.getElementById('exec-price').value || 0;
+  const trigger = +document.getElementById('exec-trigger').value || 0;
+  const product = document.getElementById('exec-product').value;
+  const validity = document.getElementById('exec-validity').value;
+  if (!sym) { toast('Enter symbol', '⚠️'); return; }
+  if (!qty) { toast('Enter quantity', '⚠️'); return; }
+
+  const btn = document.getElementById('place-btn');
+  const statusEl = document.getElementById('order-status');
+  btn.disabled = true;
+  statusEl.innerHTML = '<span style="color:var(--y)">⏳ Placing…</span>';
+
+  try {
+    const result = await TE.exec.sendOrder(sym, TE.exec.side, TE.exec.otype, qty, price, trigger, product, validity);
+    if (result.ok) {
+      statusEl.innerHTML = `<span style="color:var(--g)">✅ Order placed — ID: ${result.orderId}</span>`;
+      TE.exec.playSound('fill');
+
+      // Bracket: place SL + Target
+      if (document.getElementById('bracket-cb').checked) {
+        const bktSL = +document.getElementById('bkt-sl').value || 0;
+        const bktTgt = +document.getElementById('bkt-tgt').value || 0;
+        const exitSide = TE.exec.side === 'BUY' ? 'SELL' : 'BUY';
+        if (bktSL > 0) { await TE.exec.sendOrder(sym, exitSide, 'SL-M', qty, 0, bktSL, product, 'DAY'); statusEl.innerHTML += ' · SL placed'; }
+        if (bktTgt > 0) { await TE.exec.sendOrder(sym, exitSide, 'LIMIT', qty, bktTgt, 0, product, 'DAY'); statusEl.innerHTML += ' · Target placed'; }
+        // Auto-GTT
+        if (document.getElementById('bkt-autogtt').checked && (bktSL > 0 || bktTgt > 0)) {
+          const side = TE.exec.side === 'BUY' ? 'SELL' : 'BUY';
+          if (bktSL > 0 && bktTgt > 0) {
+            TE.exec.gttOrders.push({ id: 'gtt_' + Date.now(), type: 'oco', symbol: sym, exchange: 'NSE', product, side, qty, slTrigger: bktSL, slLimit: bktSL, tgtTrigger: bktTgt, tgtLimit: bktTgt, note: 'Auto from bracket', source: 'local', status: 'active', createdAt: Date.now(), updatedAt: Date.now() });
+          }
+          TE.exec.saveGTTs();
+          renderGTTList();
+        }
+      }
+
+      // Auto-journal
+      if (document.getElementById('bkt-autojournal')?.checked || document.getElementById('bracket-cb').checked) {
+        TE.exec.autoJournal(sym, TE.exec.side, qty, price || 0, +document.getElementById('bkt-sl').value || 0, +document.getElementById('bkt-tgt').value || 0);
+      }
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--r)">❌ ${result.error}</span>`;
+      TE.exec.playSound('error');
+    }
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color:var(--r)">❌ ${e.message}</span>`;
+    TE.exec.playSound('error');
+  }
+  btn.disabled = false;
+  setTimeout(refreshAll, 2000);
+}
+
+// ── Refresh All ──
+async function refreshAll() {
+  await TE.exec.refreshPositions();
+  renderPositions();
+  renderPnlBar();
+  renderHeatmap();
+  renderSquareOffBar();
+  populateJournalDropdown();
+  await refreshOrders();
+}
+
+// ── Render Positions ──
+function renderPositions() {
+  const positions = [...TE.exec.positions];
+  document.getElementById('pos-badge').textContent = positions.length;
+  const container = document.getElementById('positions');
+  if (!positions.length) { container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">No positions</div>'; return; }
+
+  positions.sort((a, b) => {
+    if (TE.exec.sortBy === 'pnl') return Math.abs(b.pnl || 0) - Math.abs(a.pnl || 0);
+    if (TE.exec.sortBy === 'value') return Math.abs((b.quantity || 0) * (b.last_price || 0)) - Math.abs((a.quantity || 0) * (a.last_price || 0));
+    return ((a.tradingsymbol || a.symbol || '') + '').localeCompare((b.tradingsymbol || b.symbol || '') + '');
+  });
+
+  container.innerHTML = '<div class="exec-pos-grid">' + positions.map((p, i) => {
+    const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
+    const qty = p.quantity || p.netQty || 0;
+    const avg = p.average_price || p.averagePrice || 0;
+    const ltp = p.last_price || p.lastPrice || p.ltp || 0;
+    const pnl = p.pnl || ((ltp - avg) * qty) || 0;
+    const pnlPct = avg > 0 ? ((ltp - avg) / avg * 100) : 0;
+    const isLong = qty > 0;
+    const pnlColor = pnl >= 0 ? 'var(--g)' : 'var(--r)';
+    const barWidth = Math.min(Math.abs(pnlPct) * 5, 100);
+
+    return `<div class="exec-pos-card">
+      <div class="pos-pnl-bar" style="width:${barWidth}%;background:${pnl>=0?'#22c55e':'#ff4560'}"></div>
+      <div class="exec-pos-top">
+        <div class="exec-pos-sym">${sym}</div>
+        <div class="exec-pos-side ${isLong ? 'long' : 'short'}">${isLong ? 'LONG' : 'SHORT'}</div>
+        <div style="text-align:right">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pnlColor}">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div>
+          <div style="font-size:10px;color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="exec-pos-metrics">
+        <div>Qty: <span class="pm-val">${Math.abs(qty)}</span></div>
+        <div>Avg: <span class="pm-val">₹${(+avg).toFixed(2)}</span></div>
+        <div>CMP: <span class="pm-val" style="color:var(--c)">₹${(+ltp).toFixed(2)}</span></div>
+      </div>
+      <div class="exec-pos-actions">
+        <button class="pa-btn" onclick="quickPartial('${sym}',${i},25)">25%</button>
+        <button class="pa-btn" onclick="quickPartial('${sym}',${i},50)">50%</button>
+        <button class="pa-btn pa-close" onclick="quickClose('${sym}',${i})">✕ Close</button>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function sortPos(by, el) {
+  TE.exec.sortBy = by;
+  document.querySelectorAll('.exec-sort-pill').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderPositions();
+}
+
+// ── Quick Actions ──
+async function quickClose(sym, idx) {
+  const p = TE.exec.positions[idx]; if (!p) return;
+  const qty = Math.abs(p.quantity || p.netQty || 0);
+  const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
+  if (!confirm(`Close ${sym}: ${side} ${qty} at MARKET?`)) return;
+  const result = await TE.exec.sendOrder(sym, side, 'MARKET', qty, 0, 0, p.product || 'CNC', 'DAY');
+  if (result.ok) { toast(`Closed ${sym}`, '✅'); TE.exec.playSound('fill'); setTimeout(refreshAll, 2000); }
+  else toast('Failed: ' + result.error, '❌');
+}
+
+async function quickPartial(sym, idx, pct) {
+  const p = TE.exec.positions[idx]; if (!p) return;
+  const totalQty = Math.abs(p.quantity || p.netQty || 0);
+  const exitQty = Math.max(1, Math.floor(totalQty * pct / 100));
+  const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
+  const result = await TE.exec.sendOrder(sym, side, 'MARKET', exitQty, 0, 0, p.product || 'CNC', 'DAY');
+  if (result.ok) { toast(`${pct}%: ${side} ${exitQty} ${sym}`, '✅'); setTimeout(refreshAll, 2000); }
+  else toast('Failed: ' + result.error, '❌');
+}
+
+// ── Square Off All ──
+function renderSquareOffBar() {
+  const bar = document.getElementById('sqoff-bar');
+  if (!TE.exec.positions.length) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const pnl = TE.exec.computePnl();
+  document.getElementById('sqoff-count').textContent = pnl.count;
+  document.getElementById('sqoff-value').textContent = '₹' + (pnl.totalValue / 1000).toFixed(1) + 'K';
+}
+
+async function squareOffAll() {
+  if (!confirm(`⚠️ SQUARE OFF ALL ${TE.exec.positions.length} positions at MARKET?`)) return;
+  TE.exec.playSound('squareOff');
+  let ok = 0, fail = 0;
+  for (const p of TE.exec.positions) {
+    const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
+    const qty = Math.abs(p.quantity || p.netQty || 0);
+    const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
+    const r = await TE.exec.sendOrder(sym, side, 'MARKET', qty, 0, 0, p.product || 'CNC', 'DAY');
+    if (r.ok) ok++; else fail++;
+  }
+  toast(`Square off: ${ok} closed · ${fail} failed`, '🔴');
+  setTimeout(refreshAll, 3000);
+}
+
+// ── P&L Bar ──
+function renderPnlBar() {
+  const pnl = TE.exec.computePnl();
+  const f = n => (n >= 0 ? '+' : '-') + '₹' + Math.abs(n).toFixed(0);
+  const el1 = document.getElementById('total-pnl'); el1.textContent = f(pnl.totalPnl); el1.style.color = pnl.totalPnl >= 0 ? 'var(--g)' : 'var(--r)';
+  document.getElementById('pos-count').textContent = pnl.count;
+  const el3 = document.getElementById('day-pnl'); el3.textContent = f(pnl.dayPnl); el3.style.color = pnl.dayPnl >= 0 ? 'var(--g)' : 'var(--r)';
+  document.getElementById('margin').textContent = '₹' + (pnl.totalValue / 1000).toFixed(1) + 'K';
+  const rEl = document.getElementById('risk-pct'); rEl.textContent = pnl.riskPct.toFixed(1) + '%'; rEl.style.color = pnl.riskPct > 20 ? 'var(--r)' : pnl.riskPct > 10 ? 'var(--y)' : 'var(--g)';
+}
+
+// ── Heatmap ──
+function renderHeatmap() {
+  const c = document.getElementById('heatmap');
+  if (!TE.exec.positions.length) { c.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">No positions</div>'; return; }
+  const total = TE.exec.positions.reduce((s, p) => s + Math.abs((p.quantity || p.netQty || 0) * (p.last_price || p.lastPrice || 0)), 0);
+  c.innerHTML = '<div class="exec-heatmap">' + TE.exec.positions.map(p => {
+    const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
+    const qty = Math.abs(p.quantity || p.netQty || 0);
+    const ltp = p.last_price || p.lastPrice || 0;
+    const avg = p.average_price || p.averagePrice || 0;
+    const value = qty * ltp;
+    const pnl = (ltp - avg) * qty;
+    const pnlPct = avg > 0 ? ((ltp - avg) / avg * 100) : 0;
+    const pctTotal = total > 0 ? value / total * 100 : 0;
+    const width = Math.max(pctTotal, 8);
+    const bg = pnl >= 0 ? `hsl(${145 + Math.min(pnlPct * 3, 30)},70%,${25 + Math.min(pnlPct * 2, 20)}%)` : `hsl(0,${60 + Math.min(Math.abs(pnlPct) * 3, 30)}%,${25 + Math.min(Math.abs(pnlPct), 15)}%)`;
+    return `<div class="exec-hm-block" style="flex:${width};background:${bg}" title="${sym}: ${TE.fmt(pnl)} (${pnlPct.toFixed(1)}%)">
+      <div class="hm-sym">${sym}</div><div class="hm-pnl">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div></div>`;
+  }).join('') + '</div>';
+}
+
+// ── Orders Table ──
+async function refreshOrders() {
+  const orders = await TE.exec.refreshOrders();
+  const c = document.getElementById('orders');
+  if (!orders.length) { c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:12px">No orders</div>'; return; }
+  c.innerHTML = `<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr>
+    <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1)">Time</th>
+    <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1)">Symbol</th>
+    <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1)">Side</th>
+    <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1);text-align:right">Qty</th>
+    <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1);text-align:right">Price</th>
+    <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1);text-align:right">Status</th>
+  </tr></thead><tbody>` +
+  orders.slice(0, 30).map(o => {
+    const sym = o.tradingsymbol || o.tradingSymbol || o.symbol || '';
+    const side = o.transaction_type || o.transactionType || o.side || '';
+    const price = o.average_price || o.price || 0;
+    const status = o.status || o.orderStatus || '';
+    const time = o.order_timestamp || o.exchange_timestamp || '';
+    const sC = side.includes('BUY') ? 'var(--g)' : 'var(--r)';
+    const stC = status === 'COMPLETE' || status === 'TRADED' ? 'var(--g)' : status === 'REJECTED' ? 'var(--r)' : 'var(--y)';
+    return `<tr style="border-bottom:1px solid var(--b1)">
+      <td style="padding:6px 10px;font-size:10px;color:var(--t3)">${time ? new Date(time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+      <td style="padding:6px 10px;font-weight:700;color:var(--t1)">${sym}</td>
+      <td style="padding:6px 10px;color:${sC};font-weight:700">${side}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'IBM Plex Mono'">${o.quantity || o.qty || 0}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'IBM Plex Mono'">₹${(+price).toFixed(2)}</td>
+      <td style="padding:6px 10px;text-align:right;color:${stC};font-weight:700;font-size:10px">${status}</td>
+    </tr>`;
+  }).join('') + '</tbody></table>';
+}
+
+// ── Journal Dropdown ──
+function populateJournalDropdown() {
+  const sel = document.getElementById('from-journal');
+  sel.innerHTML = '<option value="">— Select open trade —</option>';
+  TE.getOpenTrades().forEach(t => {
+    const avg = t.entries?.length ? t.entries.reduce((s, e) => s + e.price * e.qty, 0) / t.entries.reduce((s, e) => s + e.qty, 0) : 0;
+    sel.innerHTML += `<option value="${t.id}">${t.symbol} · ${t.side} · ₹${avg.toFixed(2)}</option>`;
+  });
+}
+
+function fillFromJournal() {
+  const id = document.getElementById('from-journal').value; if (!id) return;
+  const t = TE.trades.find(x => x.id === id); if (!t) return;
+  document.getElementById('exec-sym').value = t.symbol || '';
+  setSide(t.side === 'Buy' ? 'BUY' : 'SELL');
+  const avg = t.entries?.length ? t.entries.reduce((s, e) => s + e.price * e.qty, 0) / t.entries.reduce((s, e) => s + e.qty, 0) : 0;
+  document.getElementById('exec-price').value = avg.toFixed(2);
+  const tQty = (t.entries || []).reduce((s, e) => s + (+e.qty || 0), 0);
+  const eQty = (t.exits || []).reduce((s, e) => s + (+e.qty || 0), 0);
+  document.getElementById('exec-qty').value = tQty - eQty;
+  if (t.sl) { document.getElementById('bkt-sl').value = (+t.sl).toFixed(2); document.getElementById('bracket-cb').checked = true; toggleBracket(); }
+  if (t.target) document.getElementById('bkt-tgt').value = (+t.target).toFixed(2);
+}
+
+// ═══ GTT UI ═══
+
+function setGttMode(mode) {
+  _gttMode = mode;
+  document.getElementById('gtt-m-single').style.cssText = `flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:${mode === 'single' ? 'var(--yd)' : 'var(--bg3)'};color:${mode === 'single' ? 'var(--y)' : 'var(--t3)'}`;
+  document.getElementById('gtt-m-oco').style.cssText = `flex:1;padding:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:${mode === 'oco' ? 'var(--yd)' : 'var(--bg3)'};color:${mode === 'oco' ? 'var(--y)' : 'var(--t3)'}`;
+  document.getElementById('gtt-single-fields').style.display = mode === 'single' ? '' : 'none';
+  document.getElementById('gtt-oco-fields').style.display = mode === 'oco' ? '' : 'none';
+}
+
+function placeGTT() {
+  const sym = (document.getElementById('gtt-sym').value || '').trim().toUpperCase();
+  if (!sym) { toast('Enter symbol', '⚠️'); return; }
+  const exchange = document.getElementById('gtt-exchange').value;
+  const product = document.getElementById('gtt-product').value;
+  const note = document.getElementById('gtt-note').value.trim();
+
+  let gtt;
+  if (_gttMode === 'single') {
+    const trigger = +document.getElementById('gtt-trigger1').value || 0;
+    const limit = +document.getElementById('gtt-limit1').value || 0;
+    const side = document.getElementById('gtt-side1').value;
+    const qty = +document.getElementById('gtt-qty1').value || 0;
+    if (!trigger || !qty) { toast('Set trigger and qty', '⚠️'); return; }
+    gtt = { type: 'single', symbol: sym, exchange, product, side, qty, trigger1: trigger, limit1: limit || trigger, note, source: 'local', status: 'active', brokerId: null, createdAt: Date.now(), updatedAt: Date.now() };
+  } else {
+    const side = document.getElementById('gtt-oco-side').value;
+    const qty = +document.getElementById('gtt-oco-qty').value || 0;
+    const slT = +document.getElementById('gtt-oco-sl-trigger').value || 0;
+    const slL = +document.getElementById('gtt-oco-sl-limit').value || 0;
+    const tgtT = +document.getElementById('gtt-oco-tgt-trigger').value || 0;
+    const tgtL = +document.getElementById('gtt-oco-tgt-limit').value || 0;
+    if (!qty || (!slT && !tgtT)) { toast('Set qty and at least one trigger', '⚠️'); return; }
+    gtt = { type: 'oco', symbol: sym, exchange, product, side, qty, slTrigger: slT, slLimit: slL || slT, tgtTrigger: tgtT, tgtLimit: tgtL || tgtT, note, source: 'local', status: 'active', brokerId: null, createdAt: Date.now(), updatedAt: Date.now() };
+  }
+
+  gtt.id = 'gtt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  TE.exec.gttOrders.push(gtt);
+  TE.exec.saveGTTs();
+  closeM('m-gtt');
+  renderGTTList();
+  toast(`🎯 GTT placed: ${sym} (${_gttMode === 'oco' ? 'OCO' : 'Single'})`, '🎯');
+}
+
+function gttAutoFromJournal() {
+  const created = TE.exec.gttAutoFromJournal();
+  renderGTTList();
+  toast(created ? `🎯 ${created} GTTs created` : 'No new GTTs needed', '🎯');
+}
+
+function gttTab(tab) {
+  _gttTab = tab;
+  ['active', 'triggered', 'all'].forEach(t => {
+    const btn = document.getElementById('gtab-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  renderGTTList();
+}
+
+function gttCancel(id) {
+  const g = TE.exec.gttOrders.find(x => x.id === id);
+  if (g) { g.status = 'cancelled'; g.updatedAt = Date.now(); }
+  TE.exec.saveGTTs();
+  renderGTTList();
+  toast('GTT cancelled', '🗑');
+}
+
+function gttDelete(id) {
+  TE.exec.gttOrders = TE.exec.gttOrders.filter(x => x.id !== id);
+  TE.exec.saveGTTs();
+  renderGTTList();
+  toast('GTT removed', '🗑');
+}
+
+function renderGTTList() {
+  let filtered = TE.exec.gttOrders;
+  if (_gttTab === 'active') filtered = filtered.filter(g => g.status === 'active');
+  else if (_gttTab === 'triggered') filtered = filtered.filter(g => g.status === 'triggered');
+  filtered.sort((a, b) => b.createdAt - a.createdAt);
+
+  const activeCount = TE.exec.gttOrders.filter(g => g.status === 'active').length;
+  document.getElementById('gtt-badge').textContent = activeCount + ' active';
+
+  const container = document.getElementById('gtt-list');
+  if (!filtered.length) {
+    container.innerHTML = `<div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">🎯 No GTTs in this tab</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(g => {
+    const isOCO = g.type === 'oco';
+    const stLabel = { active: 'Active', triggered: 'Triggered', cancelled: 'Cancelled' }[g.status] || g.status;
+    const stClass = 'gtt-st-' + g.status;
+    const date = new Date(g.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    let levels = '';
+    if (isOCO) levels = `<span style="color:var(--r)">SL ₹${(+g.slTrigger).toFixed(2)}</span> | <span style="color:var(--g)">Tgt ₹${(+g.tgtTrigger).toFixed(2)}</span>`;
+    else levels = `Trigger ₹${(+g.trigger1).toFixed(2)}${g.limit1 && g.limit1 !== g.trigger1 ? ' → ₹' + (+g.limit1).toFixed(2) : ''}`;
+
+    return `<div class="gtt-card" style="display:flex;align-items:center;gap:12px;${g.status !== 'active' ? 'opacity:.5' : ''}">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+          <span class="gtt-sym">${g.symbol}</span>
+          <span class="gtt-type ${isOCO ? 'gtt-type-oco' : 'gtt-type-single'}">${isOCO ? 'OCO' : 'Single'}</span>
+          <span class="gtt-status ${stClass}">${g.source === 'local' ? '📌' : '⚡'} ${stLabel}</span>
+          <span style="font-size:10px;color:var(--t4)">${g.side} × ${g.qty}</span>
+        </div>
+        <div class="gtt-level">${levels}</div>
+        ${g.note ? `<div style="font-size:10px;color:var(--t4);margin-top:3px">${g.note}</div>` : ''}
+        <div style="font-size:9px;color:var(--t4);margin-top:2px">${date}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        ${g.status === 'active' ? `<button class="btn btn-ghost btn-xs" onclick="gttCancel('${g.id}')" style="color:var(--r)">✕</button>` : `<button class="btn btn-ghost btn-xs" onclick="gttDelete('${g.id}')" style="color:var(--r)">🗑</button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Live Refresh (30s during market hours) ──
+let _liveTimer = null;
+function startLive() {
+  if (_liveTimer) clearInterval(_liveTimer);
+  _liveTimer = setInterval(() => {
+    if (TE.isMarketOpen() && TE.exec.positions.length) {
+      document.getElementById('live-indicator').style.display = '';
+      refreshAll();
+    } else {
+      document.getElementById('live-indicator').style.display = 'none';
+    }
+  }, 30000);
+}
+
+// ── Boot ──
+renderGTTList();
+startLive();
+</script>
+</body>
+</html>

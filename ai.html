@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — AI Trade Review</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+</head>
+<body>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-size:18px;font-weight:700;color:var(--t1)">🤖 AI Trade Review</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:3px">Get AI analysis of your trading performance and patterns</div>
+  </div>
+</div>
+
+<!-- API Config -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><span class="card-title">⚙ AI Provider</span></div>
+  <div class="card-body">
+    <div style="display:flex;gap:0;border:1px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:12px">
+      <button class="exec-broker-pill active" id="ai-groq" onclick="setProvider('groq')">🟣 Groq (Free)</button>
+      <button class="exec-broker-pill" id="ai-gemini" onclick="setProvider('gemini')">🔵 Gemini</button>
+      <button class="exec-broker-pill" id="ai-claude" onclick="setProvider('claude')">🟠 Claude</button>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">API Key</label><input class="fi" id="ai-key" type="password" placeholder="Paste API key…"></div>
+      <div class="fg"><label class="fl">Model</label><input class="fi" id="ai-model" placeholder="llama-3.3-70b-versatile"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="saveAIConfig()" style="margin-top:10px">💾 Save</button>
+  </div>
+</div>
+
+<!-- Review Controls -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><span class="card-title">📊 Review Scope</span></div>
+  <div class="card-body">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <div class="pill on" onclick="setScope('all',this)">All Trades</div>
+      <div class="pill" onclick="setScope('open',this)">Open Only</div>
+      <div class="pill" onclick="setScope('closed',this)">Closed Only</div>
+      <div class="pill" onclick="setScope('recent',this)">Last 30 Days</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-y" onclick="runReview()">🤖 Run AI Review</button>
+      <button class="btn btn-ghost" onclick="runQuickReview('patterns')">🧩 Pattern Check</button>
+      <button class="btn btn-ghost" onclick="runQuickReview('risk')">🛡 Risk Audit</button>
+      <button class="btn btn-ghost" onclick="runQuickReview('journal')">📝 Journal Quality</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI Output -->
+<div class="card" id="ai-output-card">
+  <div class="card-head">
+    <span class="card-title">🤖 AI Analysis</span>
+    <span id="ai-status" style="font-size:11px;color:var(--t3)"></span>
+  </div>
+  <div class="card-body">
+    <div id="ai-output" style="font-size:13px;color:var(--t2);line-height:1.8;min-height:80px;white-space:pre-wrap">
+      <div style="text-align:center;padding:32px;color:var(--t4)">Configure API key and click Run AI Review to get analysis of your trades.</div>
+    </div>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+let aiProvider = localStorage.getItem('ai_provider') || 'groq';
+let aiScope = 'all';
+
+const MODELS = { groq: 'llama-3.3-70b-versatile', gemini: 'gemini-1.5-flash', claude: 'claude-sonnet-4-20250514' };
+const ENDPOINTS = {
+  groq: 'https://api.groq.com/openai/v1/chat/completions',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+  claude: 'https://api.anthropic.com/v1/messages'
+};
+
+function setProvider(p) {
+  aiProvider = p;
+  document.querySelectorAll('.exec-broker-pill').forEach(b => b.classList.remove('active'));
+  document.getElementById('ai-' + p)?.classList.add('active');
+  document.getElementById('ai-model').value = localStorage.getItem('ai_model_' + p) || MODELS[p] || '';
+  document.getElementById('ai-key').value = localStorage.getItem('ai_key_' + p) || '';
+}
+
+function saveAIConfig() {
+  localStorage.setItem('ai_provider', aiProvider);
+  localStorage.setItem('ai_key_' + aiProvider, document.getElementById('ai-key').value.trim());
+  localStorage.setItem('ai_model_' + aiProvider, document.getElementById('ai-model').value.trim());
+  toast('AI config saved', '✅');
+}
+
+function setScope(s, el) {
+  aiScope = s;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+  if (el) el.classList.add('on');
+}
+
+function getScopedTrades() {
+  let trades = TE.trades.map(t => TE.calc({ ...t }));
+  if (aiScope === 'open') trades = trades.filter(t => t.status !== 'Closed');
+  else if (aiScope === 'closed') trades = trades.filter(t => t.status === 'Closed');
+  else if (aiScope === 'recent') {
+    const cutoff = Date.now() - 30 * 86400000;
+    trades = trades.filter(t => t.entries?.[0]?.date && new Date(t.entries[0].date).getTime() >= cutoff);
+  }
+  return trades;
+}
+
+function buildPrompt(mode) {
+  const trades = getScopedTrades();
+  const closed = trades.filter(t => t.status === 'Closed');
+  const open = trades.filter(t => t.status !== 'Closed');
+  const wins = closed.filter(t => t.realisedPL > 0);
+  const losses = closed.filter(t => t.realisedPL < 0);
+  const wr = closed.length ? (wins.length / closed.length * 100).toFixed(1) : 0;
+  const totalPL = closed.reduce((s, t) => s + t.realisedPL, 0);
+  const avgR = closed.length ? (closed.reduce((s, t) => s + t.rr, 0) / closed.length).toFixed(2) : 0;
+
+  const tradeList = trades.slice(0, 50).map(t => `${t.symbol} ${t.side} ${t.status} Entry:₹${t.avgEntry?.toFixed(0)} ${t.avgExit ? 'Exit:₹' + t.avgExit.toFixed(0) : ''} PL:₹${t.realisedPL?.toFixed(0)} R:${t.rr?.toFixed(2)} ${t.holdDays}d Setup:${t.setup || '—'} SL:${t.sl || '—'} Notes:${t.notes || '—'}`).join('\n');
+
+  const context = `NSE Indian stock trader. Capital ₹${TE.fmtShort(TE.cfg.cap || 5000000)}. ${closed.length} closed trades, ${open.length} open. Win rate ${wr}%. Total P&L ₹${totalPL.toFixed(0)}. Avg R-Multiple ${avgR}R.\n\nTrades:\n${tradeList}`;
+
+  if (mode === 'patterns') return `${context}\n\nAnalyze patterns: Which setups work best? Any time-of-day or holding period patterns? Which symbols should I avoid? Keep it actionable, 5-7 bullet points.`;
+  if (mode === 'risk') return `${context}\n\nRisk audit: Am I sizing correctly? Any trades with excessive risk? SL discipline check. Position concentration issues? Max drawdown periods? Keep it actionable.`;
+  if (mode === 'journal') return `${context}\n\nJournal quality check: How many trades have notes/setup tagged? Which trades are missing journal entries? Suggest improvements for trade documentation. Rate my journaling 1-10.`;
+  return `${context}\n\nGive a comprehensive trading review: strengths, weaknesses, patterns, risk management, actionable suggestions for improvement. Be specific, reference actual trades. Format with clear sections.`;
+}
+
+async function callAI(prompt) {
+  const key = localStorage.getItem('ai_key_' + aiProvider) || document.getElementById('ai-key').value.trim();
+  const model = localStorage.getItem('ai_model_' + aiProvider) || document.getElementById('ai-model').value.trim() || MODELS[aiProvider];
+  if (!key) throw new Error('Set API key first');
+
+  if (aiProvider === 'groq') {
+    const res = await fetch(ENDPOINTS.groq, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: 'You are a professional Indian stock market trading coach. Be specific, actionable, and reference actual trade data.' }, { role: 'user', content: prompt }], max_tokens: 2000, temperature: 0.7 })
+    });
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error.message || 'Groq error');
+    return data?.choices?.[0]?.message?.content || 'No response';
+  }
+
+  if (aiProvider === 'gemini') {
+    const url = ENDPOINTS.gemini.replace('{model}', model) + '?key=' + key;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 2000, temperature: 0.7 } })
+    });
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error.message || 'Gemini error');
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
+  }
+
+  if (aiProvider === 'claude') {
+    const res = await fetch(ENDPOINTS.claude, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error.message || 'Claude error');
+    return data?.content?.[0]?.text || 'No response';
+  }
+
+  throw new Error('Unknown provider');
+}
+
+async function runReview() { await doReview('full'); }
+async function runQuickReview(mode) { await doReview(mode); }
+
+async function doReview(mode) {
+  const statusEl = document.getElementById('ai-status');
+  const outEl = document.getElementById('ai-output');
+  statusEl.textContent = '⏳ Analyzing…';
+  outEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--y)">🔄 Thinking…</div>';
+
+  try {
+    const prompt = buildPrompt(mode);
+    const result = await callAI(prompt);
+    outEl.textContent = result;
+    statusEl.textContent = `✅ ${aiProvider} · ${new Date().toLocaleTimeString('en-IN')}`;
+  } catch (e) {
+    outEl.innerHTML = `<div style="color:var(--r);padding:16px">❌ ${e.message}</div>`;
+    statusEl.textContent = 'Failed';
+  }
+}
+
+// Boot
+setProvider(aiProvider);
+</script>
+</body>
+</html>

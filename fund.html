@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Fund Management</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+<style>
+.fund-table-wrap{background:var(--bg2);border:1px solid var(--b1);border-radius:14px;overflow:hidden}
+.fund-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.fund-table thead{background:var(--bg3)}
+.fund-table th{padding:11px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--b1)}
+.fund-table td{padding:13px 14px;border-bottom:1px solid var(--b1);color:var(--t2)}
+.fund-table tbody tr:last-child td{border-bottom:none}
+.fund-table tfoot td{padding:12px 14px;background:var(--bg3);font-size:11.5px;border-top:2px solid var(--b2)}
+.fund-editable{background:none;border:none;outline:none;color:var(--g);font-family:'IBM Plex Mono',monospace;font-size:12px;width:110px;cursor:pointer;border-bottom:1px dashed var(--b2);padding:2px 0}
+.fund-editable:focus{border-bottom-color:var(--y);color:var(--y)}
+</style>
+</head>
+<body>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+  <div>
+    <div style="font-size:22px;font-weight:800;color:var(--t1)">Fund Management</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:4px">Track month-over-month portfolio growth and attribution</div>
+  </div>
+  <select style="background:var(--bg3);border:1px solid var(--b2);border-radius:7px;padding:5px 10px;color:var(--t1);font-size:12px;outline:none;cursor:pointer" id="fund-yr-sel" onchange="renderFund()"></select>
+</div>
+
+<div class="fund-table-wrap">
+  <table class="fund-table">
+    <thead>
+      <tr><th>Month</th><th>Added (₹) ✏</th><th>Withdrawn (₹) ✏</th><th>Starting Capital</th><th>Net P/L</th><th>% P/L</th><th>Final Capital</th><th>Trades</th><th>% Win</th></tr>
+    </thead>
+    <tbody id="fund-tbody"></tbody>
+    <tfoot id="fund-tfoot"></tfoot>
+  </table>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+function renderFund(){
+  const sel=document.getElementById('fund-yr-sel');
+  const curY=new Date().getFullYear();
+  const tradeYears=[...new Set(TE.trades.map(t=>t.entries?.[0]?.date?.slice(0,4)).filter(Boolean).map(Number))];
+  const years=[...new Set([curY,curY-1,...tradeYears])].sort((a,b)=>b-a);
+  const selY=+(sel.value||curY);
+  sel.innerHTML=years.map(y=>`<option value="${y}" ${y===selY?'selected':''}>${y}</option>`).join('');
+
+  const fundData=TE.getFundData();
+  if(!fundData[selY])fundData[selY]={};
+  const allCalc=TE.trades.map(t=>TE.calc({...t}));
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let runningCap=TE.cfg.cap||5000000;
+  const rows=[];
+
+  months.forEach((mon,mi)=>{
+    const mKey=`${selY}-${String(mi+1).padStart(2,'0')}`;
+    const added=+(fundData[selY][mKey+'_add']||0);
+    const withdrawn=+(fundData[selY][mKey+'_wdr']||0);
+    const startCap=mi===0?runningCap:rows[mi-1].finalCap;
+    const adjStart=startCap+added-withdrawn;
+    const mTrades=allCalc.filter(t=>{const d=t.entries?.[0]?.date||'';return d.startsWith(mKey);});
+    const closedM=mTrades.filter(t=>t.status==='Closed');
+    const netPL=mTrades.reduce((s,t)=>s+t.realisedPL,0);
+    const pctPL=adjStart>0?netPL/adjStart*100:0;
+    const finalCap=adjStart+netPL;
+    const wins=closedM.filter(t=>t.realisedPL>0);
+    const winRate=closedM.length?wins.length/closedM.length*100:null;
+    rows.push({mon,mKey,added,withdrawn,startCap:adjStart,netPL,pctPL,finalCap,tradeCount:mTrades.length,winRate,hasTrades:mTrades.length>0});
+    runningCap=finalCap;
+  });
+
+  const fmtM=n=>`<span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--t2)">${TE.fmtINR(n)}</span>`;
+  const fmtPL=n=>n===0?'<span style="color:var(--t4)">–</span>':`<span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${n>0?'var(--g)':'var(--r)'}">${TE.fmt(n)}</span>`;
+  const fmtPct=n=>n===null||n===0?'–':`<span style="font-weight:700;color:${n>0?'var(--g)':n<0?'var(--r)':'var(--t3)'}">${n>0?'+':''}${n.toFixed(2)}%</span>`;
+
+  document.getElementById('fund-tbody').innerHTML=rows.map(r=>`<tr>
+    <td style="font-weight:700;color:var(--t1)">${r.mon}</td>
+    <td><input class="fund-editable" type="number" placeholder="0" value="${r.added||''}" onchange="setFundVal(${selY},'${r.mKey}_add',this.value)" style="color:${r.added>0?'var(--g)':'var(--t4)'}"></td>
+    <td><input class="fund-editable" type="number" placeholder="0" value="${r.withdrawn||''}" onchange="setFundVal(${selY},'${r.mKey}_wdr',this.value)" style="color:${r.withdrawn>0?'var(--r)':'var(--t4)'}"></td>
+    <td>${fmtM(r.startCap)}</td>
+    <td>${r.hasTrades?fmtPL(r.netPL):'–'}</td>
+    <td>${r.hasTrades?fmtPct(r.pctPL):'–'}</td>
+    <td>${fmtM(r.finalCap)}</td>
+    <td style="font-family:'IBM Plex Mono',monospace">${r.tradeCount||'–'}</td>
+    <td>${r.winRate!==null?`<span style="color:var(--y);font-weight:700">${r.winRate.toFixed(0)}%</span>`:'–'}</td>
+  </tr>`).join('');
+
+  const totalPL=rows.reduce((s,r)=>s+r.netPL,0);
+  const monthlyAvg=rows.reduce((s,r)=>s+r.pctPL,0)/12;
+  let compound=1;rows.forEach(r=>{if(r.hasTrades)compound*=(1+r.pctPL/100);});
+  const compoundPct=(compound-1)*100;
+
+  document.getElementById('fund-tfoot').innerHTML=`<tr>
+    <td style="font-weight:700;color:var(--t1)">TOTAL</td><td></td><td></td><td></td>
+    <td>${fmtPL(totalPL)}</td>
+    <td colspan="4" style="font-size:11px;color:var(--t3)">
+      Monthly: <b style="color:var(--y)">${monthlyAvg>=0?'+':''}${monthlyAvg.toFixed(2)}%</b> ·
+      Compounded: <b style="color:${compoundPct>=0?'var(--g)':'var(--r)'}">${compoundPct>=0?'+':''}${compoundPct.toFixed(2)}%</b>
+    </td>
+  </tr>`;
+}
+
+function setFundVal(yr,mKey,val){
+  const d=TE.getFundData();
+  if(!d[yr])d[yr]={};
+  d[yr][mKey]=+val||0;
+  TE.saveFundData(d);
+  TE.sync.computeCurrentCapital();
+  renderFund();
+}
+
+renderFund();
+</script>
+</body>
+</html>

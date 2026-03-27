@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Trade Log</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+<!-- Trade Table -->
+<div class="tbl-wrap">
+  <div class="tbl-bar">
+    <input class="search" placeholder="Search symbol…" oninput="fSearch(this.value)" id="t-search">
+    <div style="display:flex;gap:5px;flex-wrap:wrap">
+      <div class="pill on" onclick="fStatus('all',this)">All</div>
+      <div class="pill" onclick="fStatus('Open',this)">Open</div>
+      <div class="pill" onclick="fStatus('Partial',this)">Partial</div>
+      <div class="pill" onclick="fStatus('Closed',this)">Closed</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="mergeTrades()">🔀 Auto-Merge</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export</button>
+    </div>
+  </div>
+  <div id="trades-tbl"></div>
+</div>
+
+<!-- ADD/EDIT TRADE MODAL -->
+<div class="overlay" id="m-trade">
+  <div class="modal">
+    <div class="m-head">
+      <div class="m-title" id="m-trade-title">Add Trade</div>
+      <button class="m-x" onclick="closeM('m-trade')">✕</button>
+    </div>
+    <div class="m-body">
+      <div class="fsec">
+        <div class="fsec-title">🎯 Trade Info</div>
+        <div class="fg2">
+          <div class="fg">
+            <label class="fl">Symbol *</label>
+            <div class="sym-wrap">
+              <input class="fi" id="f-sym" placeholder="Type e.g. RELI, INFY, TCS…" autocomplete="off" style="text-transform:uppercase">
+              <div class="sym-dropdown" id="f-sym-drop"></div>
+            </div>
+            <div id="f-sym-price" style="font-size:10px;color:var(--t3);margin-top:4px;min-height:14px"></div>
+          </div>
+          <div class="fg"><label class="fl">Setup</label><input class="fi" id="f-setup" placeholder="Breakout, DTB, Flag…"></div>
+          <div class="fg"><label class="fl">Side *</label>
+            <select class="fi" id="f-side"><option value="Buy">Buy (Long)</option><option value="Sell">Sell (Short)</option></select>
+          </div>
+          <div class="fg"><label class="fl">Source</label>
+            <select class="fi" id="f-source"><option value="manual">Manual</option><option value="zerodha">Zerodha</option><option value="dhan">Dhan</option><option value="definedge">Definedge</option><option value="edgepilot">Edge Pilot</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="fsec">
+        <div class="fsec-title">📈 Entries (up to 5)</div>
+        <div id="entry-rows"></div>
+        <button class="btn btn-ghost btn-sm" onclick="addEntryRow()" id="btn-add-entry" style="margin-top:4px">+ Add Pyramid</button>
+      </div>
+      <div class="fsec">
+        <div class="fsec-title">🚪 Exits (up to 5)</div>
+        <div id="exit-rows"></div>
+        <button class="btn btn-ghost btn-sm" onclick="addExitRow()" id="btn-add-exit" style="margin-top:4px">+ Add Exit</button>
+      </div>
+      <div class="fsec">
+        <div class="fsec-title">🛡 Risk & Journal</div>
+        <div class="fg2">
+          <div class="fg"><label class="fl">Stop Loss (₹)</label><input type="number" class="fi" id="f-sl" placeholder="0.00" step="0.01"></div>
+          <div class="fg"><label class="fl">Target (₹)</label><input type="number" class="fi" id="f-target" placeholder="0.00" step="0.01"></div>
+          <div class="fg"><label class="fl">Plan Followed?</label><select class="fi" id="f-plan"><option value="">—</option><option>Yes</option><option>No</option><option>Partial</option></select></div>
+          <div class="fg"><label class="fl">Exit Trigger</label><input class="fi" id="f-trigger" placeholder="SL hit, Target reached…"></div>
+          <div class="fg f-full"><label class="fl">Notes</label><input class="fi" id="f-notes" placeholder="Reasoning, observations…"></div>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('m-trade')">Cancel</button>
+      <button class="btn btn-y" onclick="saveTrade()">Save Trade</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHART MODAL -->
+<div class="overlay" id="m-chart">
+  <div class="modal" style="max-width:1100px">
+    <div class="m-head">
+      <div class="m-title" id="m-chart-title">Chart</div>
+      <button class="m-x" onclick="closeM('m-chart')">✕</button>
+    </div>
+    <div class="m-body">
+      <div id="tv-chart-container" style="height:500px;background:#0C1219;border-radius:10px;overflow:hidden;border:1px solid var(--b1)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Core Scripts -->
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+let curFilter = 'all', curSearch = '';
+let editId = null, entryCount = 1, exitCount = 0;
+let _lwChart = null;
+
+// ── Override Add Trade button in topbar ──
+TE.openAddTrade = openAdd;
+
+// ── Symbol Autocomplete for trade modal ──
+setTimeout(() => {
+  TE.createAutocomplete({
+    inputId: 'f-sym', dropId: 'f-sym-drop',
+    onSelect: sym => {},
+    fetchPrice: async sym => {
+      const el = document.getElementById('f-sym-price');
+      if (el) el.textContent = '⏳ Fetching…';
+      const price = await TE.fetchCMP(sym);
+      if (price) {
+        const e0 = document.getElementById('e-price-0');
+        if (e0 && !e0.value) e0.value = price.toFixed(2);
+        if (el) el.innerHTML = `<span style="color:var(--g)">✓ CMP: ₹${price.toFixed(2)}</span>`;
+      } else if (el) el.innerHTML = '<span style="color:var(--t4)">Price unavailable</span>';
+    }
+  });
+}, 100);
+
+// ── Entry/Exit Row Builders ──
+function buildEntryRow(i, data) {
+  const color = TE.ENTRY_COLORS[i] || TE.ENTRY_COLORS[0];
+  const label = i === 0 ? 'Entry 1 (Initial)' : `Entry ${i+1} (Pyramid ${i})`;
+  return `<div class="prow" id="er-${i}" style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px;margin-bottom:8px">
+    <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};margin-right:6px"></span>${label}</span>
+      ${i > 0 ? `<button class="btn btn-xs btn-red" onclick="removeEntryRow(${i})">✕</button>` : ''}
+    </div>
+    <div class="fg3">
+      <div class="fg"><label class="fl">Date</label><input type="date" class="fi" id="e-date-${i}" value="${data?.date || ''}"></div>
+      <div class="fg"><label class="fl">Price (₹)</label><input type="number" class="fi" id="e-price-${i}" step="0.01" value="${data?.price || ''}"></div>
+      <div class="fg"><label class="fl">Qty</label><input type="number" class="fi" id="e-qty-${i}" value="${data?.qty || ''}"></div>
+    </div>
+  </div>`;
+}
+
+function buildExitRow(i, data) {
+  return `<div class="prow" id="xr-${i}" style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px;margin-bottom:8px">
+    <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${TE.EXIT_COLORS[i]||'#FF4560'};margin-right:6px"></span>Exit ${i+1}</span>
+      <button class="btn btn-xs btn-red" onclick="removeExitRow(${i})">✕</button>
+    </div>
+    <div class="fg3">
+      <div class="fg"><label class="fl">Date</label><input type="date" class="fi" id="x-date-${i}" value="${data?.date || ''}"></div>
+      <div class="fg"><label class="fl">Price (₹)</label><input type="number" class="fi" id="x-price-${i}" step="0.01" value="${data?.price || ''}"></div>
+      <div class="fg"><label class="fl">Qty</label><input type="number" class="fi" id="x-qty-${i}" value="${data?.qty || ''}"></div>
+    </div>
+  </div>`;
+}
+
+function addEntryRow() {
+  if (entryCount >= 5) { toast('Max 5 entries', '⚠️'); return; }
+  document.getElementById('entry-rows').insertAdjacentHTML('beforeend', buildEntryRow(entryCount, null));
+  entryCount++;
+}
+function removeEntryRow(i) { document.getElementById('er-' + i)?.remove(); entryCount = Math.max(1, entryCount - 1); }
+function addExitRow() {
+  if (exitCount >= 5) { toast('Max 5 exits', '⚠️'); return; }
+  document.getElementById('exit-rows').insertAdjacentHTML('beforeend', buildExitRow(exitCount, null));
+  exitCount++;
+}
+function removeExitRow(i) { document.getElementById('xr-' + i)?.remove(); exitCount = Math.max(0, exitCount - 1); }
+
+// ── Open Add Modal ──
+function openAdd() {
+  editId = null; entryCount = 1; exitCount = 0;
+  document.getElementById('m-trade-title').textContent = 'Add Trade';
+  ['f-sym','f-setup','f-sl','f-target','f-plan','f-trigger','f-notes'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('f-side').value = 'Buy';
+  document.getElementById('f-source').value = 'manual';
+  document.getElementById('f-sym-price').textContent = '';
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('entry-rows').innerHTML = buildEntryRow(0, { date: today });
+  document.getElementById('exit-rows').innerHTML = '';
+  openM('m-trade');
+}
+
+// ── Edit Trade ──
+function editTrade(id) {
+  const t = TE.trades.find(x => x.id === id);
+  if (!t) return;
+  editId = id; entryCount = 0; exitCount = 0;
+  document.getElementById('m-trade-title').textContent = 'Edit — ' + t.symbol;
+  document.getElementById('f-sym').value = t.symbol || '';
+  document.getElementById('f-setup').value = t.setup || '';
+  document.getElementById('f-side').value = t.side || 'Buy';
+  document.getElementById('f-source').value = t.source || 'manual';
+  document.getElementById('f-sl').value = t.sl || '';
+  document.getElementById('f-target').value = t.target || '';
+  document.getElementById('f-plan').value = t.plan || '';
+  document.getElementById('f-trigger').value = t.exitTrigger || '';
+  document.getElementById('f-notes').value = t.notes || '';
+  let eHtml = '';
+  (t.entries || [{ date: '', price: 0, qty: 0 }]).forEach((e, i) => { eHtml += buildEntryRow(i, e); entryCount = i + 1; });
+  document.getElementById('entry-rows').innerHTML = eHtml || buildEntryRow(0, {});
+  if (!eHtml) entryCount = 1;
+  let xHtml = '';
+  (t.exits || []).forEach((x, i) => { xHtml += buildExitRow(i, x); exitCount = i + 1; });
+  document.getElementById('exit-rows').innerHTML = xHtml;
+  openM('m-trade');
+}
+
+// ── Save Trade ──
+function saveTrade() {
+  const sym = document.getElementById('f-sym').value.trim().toUpperCase();
+  if (!sym) { toast('Symbol required', '⚠️'); return; }
+  const entries = [];
+  for (let i = 0; i < entryCount; i++) {
+    const d = document.getElementById(`e-date-${i}`)?.value;
+    const p = +document.getElementById(`e-price-${i}`)?.value || 0;
+    const q = +document.getElementById(`e-qty-${i}`)?.value || 0;
+    if (p && q) entries.push({ date: d, price: p, qty: q });
+  }
+  if (!entries.length) { toast('At least one entry required', '⚠️'); return; }
+  const exits = [];
+  for (let i = 0; i < exitCount; i++) {
+    const d = document.getElementById(`x-date-${i}`)?.value;
+    const p = +document.getElementById(`x-price-${i}`)?.value || 0;
+    const q = +document.getElementById(`x-qty-${i}`)?.value || 0;
+    if (p && q) exits.push({ date: d, price: p, qty: q });
+  }
+  const t = {
+    id: editId || Date.now() + '' + Math.random().toString(36).slice(2),
+    symbol: sym, setup: document.getElementById('f-setup').value.trim(),
+    side: document.getElementById('f-side').value,
+    source: document.getElementById('f-source').value,
+    sl: +document.getElementById('f-sl').value || 0,
+    target: +document.getElementById('f-target').value || 0,
+    plan: document.getElementById('f-plan').value,
+    exitTrigger: document.getElementById('f-trigger').value,
+    notes: document.getElementById('f-notes').value,
+    entries, exits, cmp: 0, status: 'Open'
+  };
+  // Preserve EP fields on edit
+  if (editId) {
+    const old = TE.trades.find(x => x.id === editId);
+    if (old) Object.keys(old).forEach(k => { if (k.startsWith('_ep')) t[k] = old[k]; });
+    const idx = TE.trades.findIndex(x => x.id === editId);
+    if (idx >= 0) TE.trades[idx] = t;
+  } else TE.trades.push(t);
+  TE.save();
+  closeM('m-trade');
+  toast(editId ? 'Trade updated!' : 'Trade added!', '✅');
+  renderTrades();
+}
+
+// ── Delete Trade ──
+function deleteTrade(id) {
+  if (!confirm('Delete this trade?')) return;
+  TE.trades = TE.trades.filter(t => t.id !== id);
+  TE.save();
+  renderTrades();
+  toast('Deleted', '🗑');
+}
+
+// ── Render Trade Table ──
+function renderTrades() {
+  let rows = TE.trades.map(t => TE.calc({ ...t }));
+  if (curFilter !== 'all') rows = rows.filter(t => t.status === curFilter);
+  if (curSearch) rows = rows.filter(t => t.symbol.includes(curSearch.toUpperCase()) || (t.setup || '').toLowerCase().includes(curSearch.toLowerCase()));
+
+  const el = document.getElementById('trades-tbl');
+  if (!rows.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No trades found</div></div>'; return; }
+
+  el.innerHTML = `<table><thead><tr>
+    <th></th><th>Symbol</th><th>Side</th><th>Entries</th><th>Avg Entry</th><th>Exits</th><th>Avg Exit</th><th>Qty</th><th>Status</th><th>Realised P&L</th><th>Unreal P&L</th><th>R:R</th><th>Days</th><th></th>
+  </tr></thead><tbody>` +
+  rows.map(t => {
+    const epBadge = t.source === 'edgepilot' ? '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:rgba(0,229,160,.12);color:var(--g);font-weight:700;margin-left:3px">EP</span>' : '';
+    return `<tr onclick="toggleExp('${t.id}')">
+      <td id="ei-${t.id}" style="color:var(--t3);font-size:10px;width:20px">▶</td>
+      <td><div class="sym-cell"><div class="sym-icon">${t.symbol.slice(0,3)}</div><div><div class="sym-name">${t.symbol}${epBadge}</div><div class="sym-date">${t.entries?.[0]?.date || '—'}</div></div></div></td>
+      <td><span class="bdg bdg-${t.side.toLowerCase()}">${t.side}</span></td>
+      <td style="font-size:10.5px;color:var(--t3)">${(t.entries||[]).map((e,i)=>`E${i+1}:${e.qty}@₹${(+e.price).toFixed(0)}`).join('<br>')}</td>
+      <td class="mono">₹${t.avgEntry.toFixed(2)}</td>
+      <td style="font-size:10.5px;color:var(--t3)">${(t.exits||[]).map((e,i)=>`X${i+1}:${e.qty}@₹${(+e.price).toFixed(0)}`).join('<br>')||'—'}</td>
+      <td class="mono">${t.avgExit?'₹'+t.avgExit.toFixed(2):'—'}</td>
+      <td class="mono">${t.totalQty}</td>
+      <td><span class="dot dot-${t.status.toLowerCase()}"></span>${t.status}</td>
+      <td class="${t.realisedPL>0?'col-g':t.realisedPL<0?'col-r':'col-t'} mono">${TE.fmt(t.realisedPL)}</td>
+      <td class="${t.unrealisedPL>0?'col-g':t.unrealisedPL<0?'col-r':'col-t'} mono">${t.status!=='Closed'?TE.fmt(t.unrealisedPL):'—'}</td>
+      <td><span class="rbdg ${t.rr>0?'pos':t.rr<0?'neg':'neu'}">${t.rr.toFixed(2)}R</span></td>
+      <td class="mono">${t.holdDays}d</td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <button class="ab" onclick="openChart('${t.id}')" title="Chart">📈</button>
+        <button class="ab ed" onclick="editTrade('${t.id}')" title="Edit"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="ab dl" onclick="deleteTrade('${t.id}')" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+      </td>
+    </tr>
+    <tr><td colspan="14" style="padding:0"><div class="exp-content" id="ec-${t.id}">
+      <div class="exp-grid">
+        <div><div class="exp-lbl">Setup</div><div class="exp-val">${t.setup||'—'}</div></div>
+        <div><div class="exp-lbl">Source</div><div class="exp-val">${t.source||'manual'}</div></div>
+        <div><div class="exp-lbl">Plan</div><div class="exp-val">${t.plan||'—'}</div></div>
+        <div><div class="exp-lbl">Exit Trigger</div><div class="exp-val">${t.exitTrigger||'—'}</div></div>
+        <div style="grid-column:1/-1"><div class="exp-lbl">Notes</div><div class="exp-val">${t.notes||'—'}</div></div>
+        ${t._epPyramid?`<div><div class="exp-lbl">EP Pyramid</div><div class="exp-val">${t._epPyramid}</div></div>`:''}
+        ${t._epRsTier?`<div><div class="exp-lbl">EP RS Tier</div><div class="exp-val">${t._epRsTier}</div></div>`:''}
+      </div>
+    </div></td></tr>`;
+  }).join('') + '</tbody></table>';
+}
+
+function toggleExp(id) {
+  const el = document.getElementById('ec-' + id), ic = document.getElementById('ei-' + id);
+  const was = el.classList.contains('open');
+  document.querySelectorAll('.exp-content.open').forEach(x => x.classList.remove('open'));
+  document.querySelectorAll('[id^=ei-]').forEach(x => x.textContent = '▶');
+  if (!was) { el.classList.add('open'); ic.textContent = '▼'; }
+}
+
+function fSearch(v) { curSearch = v; renderTrades(); }
+function fStatus(f, el) { curFilter = f; document.querySelectorAll('.pill').forEach(p => p.classList.remove('on')); el.classList.add('on'); renderTrades(); }
+
+// ── Merge Trades ──
+function mergeTrades() {
+  const groups = {};
+  TE.trades.forEach(t => {
+    const first = t.entries?.[0];
+    if (!first) return;
+    const key = `${first.date}__${t.symbol}__${t.side}__${t.source||'manual'}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+  let merged = 0;
+  TE.trades = Object.values(groups).map(grp => {
+    if (grp.length === 1) return grp[0];
+    merged++;
+    const base = { ...grp[0] };
+    let tQty = 0, tVal = 0;
+    grp.forEach(t => (t.entries || []).forEach(e => { tQty += +e.qty; tVal += +e.price * +e.qty; }));
+    base.entries = [{ date: grp[0].entries?.[0]?.date || '', price: +(tVal/tQty).toFixed(2), qty: tQty }];
+    base.notes = `Merged ${grp.length} fills. ${base.notes || ''}`.trim();
+    return base;
+  });
+  TE.save(); renderTrades();
+  toast(`Merged ${merged} groups`, '🔀');
+}
+
+// ── Export CSV ──
+function exportCSV() {
+  const rows = TE.trades.map(t => {
+    const c = TE.calc({...t});
+    return [t.symbol, t.side, t.setup || '', t.status, c.avgEntry.toFixed(2), c.avgExit.toFixed(2), c.totalQty, c.realisedPL.toFixed(2), c.rr.toFixed(2), t.source || ''].join(',');
+  });
+  const csv = ['Symbol,Side,Setup,Status,AvgEntry,AvgExit,Qty,PL,RR,Source', ...rows].join('\n');
+  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = 'te_trades.csv'; a.click();
+}
+
+// ── Chart Modal (TradingView Lightweight) ──
+function openChart(id) {
+  const raw = TE.trades.find(t => t.id === id); if (!raw) return;
+  const t = TE.calc({...raw});
+  document.getElementById('m-chart-title').textContent = 'Chart — ' + t.symbol;
+  openM('m-chart');
+  loadChart(t);
+}
+
+async function loadChart(t) {
+  const container = document.getElementById('tv-chart-container');
+  if (_lwChart) { try { _lwChart.remove(); } catch (e) {} _lwChart = null; }
+  container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3)">⏳ Loading…</div>';
+
+  const yfSym = t.symbol.includes('.') ? t.symbol : t.symbol + '.NS';
+  const entryDates = (t.entries || []).filter(e => e.date).map(e => new Date(e.date));
+  const exitDates = (t.exits || []).filter(e => e.date).map(e => new Date(e.date));
+  const allDates = [...entryDates, ...exitDates];
+  let rangeStart, rangeEnd;
+  if (allDates.length) {
+    rangeStart = new Date(Math.min(...allDates)); rangeStart.setDate(rangeStart.getDate() - 30);
+    rangeEnd = new Date(Math.max(...allDates)); rangeEnd.setDate(rangeEnd.getDate() + 20);
+    if (rangeEnd > new Date()) rangeEnd = new Date();
+  } else { rangeEnd = new Date(); rangeStart = new Date(); rangeStart.setMonth(rangeStart.getMonth() - 3); }
+
+  const p1 = Math.floor(rangeStart.getTime() / 1000), p2 = Math.floor(rangeEnd.getTime() / 1000);
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yfSym}?period1=${p1}&period2=${p2}&interval=1d`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const r = data?.chart?.result?.[0];
+    if (!r) throw new Error('No data');
+    const ts = r.timestamp || [], ohlc = r.indicators?.quote?.[0] || {};
+    const candles = ts.map((t, i) => ohlc.close?.[i] ? { time: t, open: +(ohlc.open[i]||ohlc.close[i]).toFixed(2), high: +(ohlc.high[i]||ohlc.close[i]).toFixed(2), low: +(ohlc.low[i]||ohlc.close[i]).toFixed(2), close: +ohlc.close[i].toFixed(2) } : null).filter(Boolean);
+    if (!candles.length) throw new Error('Empty');
+    renderLWChart(t, candles);
+  } catch (e) {
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t4)">Chart data unavailable</div>';
+  }
+}
+
+function renderLWChart(t, candles) {
+  const container = document.getElementById('tv-chart-container');
+  container.innerHTML = '';
+  _lwChart = LightweightCharts.createChart(container, {
+    width: container.clientWidth, height: container.clientHeight,
+    layout: { background: { color: '#0C1219' }, textColor: '#8BA0B8' },
+    grid: { vertLines: { color: '#162130' }, horzLines: { color: '#162130' } },
+    rightPriceScale: { borderColor: '#243548' }, timeScale: { borderColor: '#243548' }
+  });
+  const series = _lwChart.addCandlestickSeries({ upColor: '#00E5A0', downColor: '#FF4560', borderUpColor: '#00E5A0', borderDownColor: '#FF4560', wickUpColor: '#00E5A0', wickDownColor: '#FF4560' });
+  series.setData(candles);
+  if (t.sl > 0) series.createPriceLine({ price: t.sl, color: '#F5C542', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'SL' });
+  if (t.avgEntry > 0) series.createPriceLine({ price: t.avgEntry, color: '#A855F7', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'Avg' });
+  if (t.target > 0) series.createPriceLine({ price: t.target, color: '#22D3EE', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'Tgt' });
+  const markers = [];
+  (t.entries || []).forEach((e, i) => { if (e.date && e.price) markers.push({ time: Math.floor(new Date(e.date).getTime()/1000), position: 'belowBar', color: TE.ENTRY_COLORS[i], shape: 'arrowUp', text: `E${i+1} ₹${e.price}` }); });
+  (t.exits || []).forEach((e, i) => { if (e.date && e.price) markers.push({ time: Math.floor(new Date(e.date).getTime()/1000), position: 'aboveBar', color: TE.EXIT_COLORS[i], shape: 'arrowDown', text: `X${i+1} ₹${e.price}` }); });
+  markers.sort((a, b) => a.time - b.time);
+  if (markers.length) series.setMarkers(markers);
+  _lwChart.timeScale().fitContent();
+  new ResizeObserver(() => { if (_lwChart) _lwChart.applyOptions({ width: container.clientWidth }); }).observe(container);
+}
+
+// ── Cross-tab sync: re-render when Edge Pilot adds trades ──
+window.addEventListener('te:trades-changed', () => renderTrades());
+
+// ── Boot ──
+renderTrades();
+</script>
+</body>
+</html>

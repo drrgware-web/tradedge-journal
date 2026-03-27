@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — News Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+</head>
+<body>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-size:18px;font-weight:700;color:var(--t1)">📰 News Intelligence</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:3px">Sentiment-scored news for your portfolio stocks</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="news-status" style="font-size:11px;color:var(--t3)"></span>
+    <button class="btn btn-ghost btn-sm" onclick="fetchAllNews()">↻ Refresh</button>
+  </div>
+</div>
+
+<!-- Sentiment Summary -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+  <div class="kpi" style="text-align:center"><div class="kpi-label">Total</div><div class="kpi-val col-t" id="ns-total" style="font-size:22px">0</div></div>
+  <div class="kpi" style="text-align:center"><div class="kpi-label">Bullish</div><div class="kpi-val col-g" id="ns-bull" style="font-size:22px">0</div></div>
+  <div class="kpi" style="text-align:center"><div class="kpi-label">Bearish</div><div class="kpi-val col-r" id="ns-bear" style="font-size:22px">0</div></div>
+  <div class="kpi" style="text-align:center"><div class="kpi-label">Neutral</div><div class="kpi-val col-t" id="ns-neut" style="font-size:22px">0</div></div>
+</div>
+
+<!-- Filter -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+  <div class="pill on" onclick="filterSym('all',this)">All</div>
+  <div id="sym-pills"></div>
+  <select class="search" style="width:auto;min-width:150px" id="sent-filter" onchange="renderNews()">
+    <option value="all">All Sentiment</option>
+    <option value="bullish">Bullish Only</option>
+    <option value="bearish">Bearish Only</option>
+  </select>
+</div>
+
+<!-- News Feed -->
+<div id="news-feed" style="display:flex;flex-direction:column;gap:8px"></div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+let newsItems = [];
+let curSymFilter = 'all';
+
+const BULL_WORDS = ['surge','rally','breakout','strong','bullish','upgrade','buy','outperform','profit','growth','beat','raise','record','high','positive','jump','momentum','expand','dividend','acquisition','deal'];
+const BEAR_WORDS = ['crash','fall','sell','bearish','downgrade','loss','miss','weak','risk','decline','warning','cut','layoff','negative','fraud','debt','concern','plunge','drop','overvalue','penalty'];
+
+function scoreSentiment(title) {
+  const lower = title.toLowerCase();
+  let bull = 0, bear = 0;
+  BULL_WORDS.forEach(w => { if (lower.includes(w)) bull++; });
+  BEAR_WORDS.forEach(w => { if (lower.includes(w)) bear++; });
+  if (bull > bear) return { label: 'Bullish', color: 'var(--g)', icon: '🟢', score: bull - bear };
+  if (bear > bull) return { label: 'Bearish', color: 'var(--r)', icon: '🔴', score: bear - bull };
+  return { label: 'Neutral', color: 'var(--t3)', icon: '⚪', score: 0 };
+}
+
+function playBearBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [440, 330].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = f; o.type = 'sawtooth';
+      const t = ctx.currentTime + i * 0.2;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.15, t + 0.03);
+      g.gain.linearRampToValueAtTime(0, t + 0.2);
+      o.start(t); o.stop(t + 0.25);
+    });
+  } catch (e) {}
+}
+
+async function fetchNewsForSymbol(sym) {
+  const proxies = [
+    q => `https://api.allorigins.win/get?url=${encodeURIComponent(q)}`,
+    q => `https://corsproxy.io/?${encodeURIComponent(q)}`,
+  ];
+  const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(sym + ' NSE India stock')}&hl=en-IN&gl=IN&ceid=IN:en`;
+
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy(rssUrl), { signal: AbortSignal.timeout(10000) });
+      let text;
+      const json = await res.json().catch(() => null);
+      text = json?.contents || (await res.text());
+      if (!text) continue;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/xml');
+      const items = doc.querySelectorAll('item');
+      const results = [];
+
+      items.forEach((item, i) => {
+        if (i >= 5) return;
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+        const pubDate = item.querySelector('pubDate')?.textContent || '';
+        const source = item.querySelector('source')?.textContent || '';
+        const sentiment = scoreSentiment(title);
+        results.push({ symbol: sym, title, link, pubDate, source, ...sentiment, fetchedAt: Date.now() });
+      });
+      return results;
+    } catch (e) { continue; }
+  }
+  return [];
+}
+
+async function fetchAllNews() {
+  const symbols = [...new Set(TE.getOpenTrades().map(t => t.symbol.toUpperCase()))];
+  if (!symbols.length) {
+    document.getElementById('news-status').textContent = 'No open positions';
+    newsItems = [];
+    renderNews();
+    return;
+  }
+
+  document.getElementById('news-status').textContent = `Fetching ${symbols.length} symbols…`;
+  newsItems = [];
+  let bearCount = 0;
+
+  for (const sym of symbols) {
+    const items = await fetchNewsForSymbol(sym);
+    items.forEach(item => {
+      if (item.label === 'Bearish') bearCount++;
+    });
+    newsItems.push(...items);
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  newsItems.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+  // Build symbol pills
+  const symSet = [...new Set(newsItems.map(n => n.symbol))];
+  document.getElementById('sym-pills').innerHTML = symSet.map(s => `<div class="pill" onclick="filterSym('${s}',this)">${s}</div>`).join('');
+
+  document.getElementById('news-status').textContent = `${newsItems.length} articles · ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+  if (bearCount > 0) playBearBeep();
+  renderNews();
+}
+
+function filterSym(sym, el) {
+  curSymFilter = sym;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+  if (el) el.classList.add('on');
+  renderNews();
+}
+
+function renderNews() {
+  let filtered = newsItems;
+  if (curSymFilter !== 'all') filtered = filtered.filter(n => n.symbol === curSymFilter);
+  const sentFilter = document.getElementById('sent-filter').value;
+  if (sentFilter !== 'all') filtered = filtered.filter(n => n.label.toLowerCase() === sentFilter);
+
+  const bull = filtered.filter(n => n.label === 'Bullish').length;
+  const bear = filtered.filter(n => n.label === 'Bearish').length;
+  document.getElementById('ns-total').textContent = filtered.length;
+  document.getElementById('ns-bull').textContent = bull;
+  document.getElementById('ns-bear').textContent = bear;
+  document.getElementById('ns-neut').textContent = filtered.length - bull - bear;
+
+  const el = document.getElementById('news-feed');
+  if (!filtered.length) {
+    el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--t3)">No news found. Click Refresh to fetch.</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(n => {
+    const ago = timeAgo(n.pubDate);
+    return `<a href="${n.link}" target="_blank" rel="noopener" style="text-decoration:none;display:block">
+      <div style="display:flex;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--b1);border-left:3px solid ${n.color};border-radius:8px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--b3)'" onmouseout="this.style.borderColor='var(--b1)'">
+        <div style="font-size:20px;flex-shrink:0;margin-top:2px">${n.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;line-height:1.5">${n.title}</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;background:${n.color}12;color:${n.color}">${n.label}</span>
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--bd);color:var(--b)">${n.symbol}</span>
+            <span style="font-size:10px;color:var(--t3)">${n.source || 'Unknown'}</span>
+            <span style="font-size:10px;color:var(--t4);font-family:'IBM Plex Mono',monospace">${ago}</span>
+          </div>
+        </div>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.floor(hrs / 24) + 'd ago';
+}
+
+fetchAllNews();
+</script>
+</body>
+</html>

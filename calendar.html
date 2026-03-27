@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Calendar</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+<style>
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-hdr{text-align:center;font-size:10px;color:var(--t3);padding:6px 0;text-transform:uppercase;letter-spacing:.06em}
+.cal-day{
+  aspect-ratio:1;border-radius:7px;display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;border:1px solid transparent;transition:all .12s;
+}
+.cal-day:hover{border-color:var(--b2)}
+.cal-day.profit{background:rgba(0,229,160,.15);color:var(--g)}
+.cal-day.loss{background:rgba(255,69,96,.15);color:var(--r)}
+.cal-day.today{border-color:var(--y);color:var(--y)}
+.cal-day.empty{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+  <button class="btn btn-ghost btn-sm" onclick="calShift(-1)">←</button>
+  <div id="cal-label" style="font-size:18px;font-weight:800;flex:1;text-align:center"></div>
+  <button class="btn btn-ghost btn-sm" onclick="calShift(1)">→</button>
+</div>
+<div class="card" style="margin-bottom:14px">
+  <div class="card-body"><div class="cal-grid" id="cal-grid"></div></div>
+</div>
+<div id="cal-detail"></div>
+
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+let calM=new Date().getMonth(),calY=new Date().getFullYear();
+
+function renderCal(){
+  document.getElementById('cal-label').textContent=new Date(calY,calM).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dIM=new Date(calY,calM+1,0).getDate(),fDay=new Date(calY,calM,1).getDay();
+  const today=new Date();
+  const dayPL={};
+  TE.trades.map(t=>TE.calc({...t})).forEach(t=>{
+    const dates=[...(t.exits||[]).map(e=>e.date),(t.entries?.[0]?.date)||''].filter(Boolean);
+    dates.forEach(d=>{const[y,m,day]=d.split('-').map(Number);if(y===calY&&m===calM+1)dayPL[day]=(dayPL[day]||0)+t.realisedPL;});
+  });
+  let html=DAYS.map(d=>`<div class="cal-hdr">${d}</div>`).join('');
+  for(let i=0;i<fDay;i++)html+='<div class="cal-day empty"></div>';
+  for(let d=1;d<=dIM;d++){
+    const pl=dayPL[d];
+    const isToday=today.getDate()===d&&today.getMonth()===calM&&today.getFullYear()===calY;
+    const cls=isToday?'today':pl>0?'profit':pl<0?'loss':'';
+    html+=`<div class="cal-day ${cls}" onclick="showDay(${d})" title="${pl!==undefined?TE.fmt(pl):'No trades'}">${d}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML=html;
+}
+
+function calShift(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
+
+function showDay(d){
+  const dayTs=TE.trades.map(t=>TE.calc({...t})).filter(t=>{
+    const allD=[...(t.exits||[]).map(e=>e.date),(t.entries?.[0]?.date)||''].filter(Boolean);
+    return allD.some(dt=>{const[y,m,da]=dt.split('-').map(Number);return y===calY&&m===calM+1&&da===d;});
+  });
+  const el=document.getElementById('cal-detail');
+  if(!dayTs.length){el.innerHTML='';return;}
+  el.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:8px">${new Date(calY,calM,d).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'})}</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>Side</th><th>P&L</th><th>R:R</th><th>Notes</th></tr></thead><tbody>`+
+  dayTs.map(t=>`<tr><td><b style="color:var(--t1)">${t.symbol}</b></td><td><span class="bdg bdg-${t.side.toLowerCase()}">${t.side}</span></td><td class="${t.realisedPL>=0?'col-g':'col-r'} mono">${TE.fmt(t.realisedPL)}</td><td><span class="rbdg ${t.rr>0?'pos':t.rr<0?'neg':'neu'}">${t.rr.toFixed(2)}R</span></td><td style="color:var(--t3);font-size:11.5px">${t.notes||'—'}</td></tr>`).join('')+'</tbody></table></div>';
+}
+
+renderCal();
+</script>
+</body>
+</html>

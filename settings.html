@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge — Settings & Sync</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tradedge.css">
+</head>
+<body>
+
+<div class="settings-wrap" style="max-width:700px;display:flex;flex-direction:column;gap:16px">
+
+  <!-- ═══ PORTFOLIO ═══ -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Portfolio</span></div>
+    <div class="card-body">
+      <div class="fg2" style="margin-bottom:14px">
+        <div class="fg"><label class="fl">Total Capital (₹)</label><input class="fi" id="s-cap" type="number" placeholder="5000000"></div>
+        <div class="fg"><label class="fl">Risk per Trade (%)</label><input class="fi" id="s-risk" type="number" step="0.1" placeholder="0.5"></div>
+      </div>
+      <button class="btn btn-y btn-sm" onclick="savePortfolio()">Save</button>
+    </div>
+  </div>
+
+  <!-- ═══ DHAN ═══ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Dhan API</span>
+      <span class="sync-dot" id="dhan-dot"></span>
+    </div>
+    <div class="card-body">
+      <div class="fg2" style="margin-bottom:14px">
+        <div class="fg"><label class="fl">Client ID</label><input class="fi" id="s-dhan-id" placeholder="1000XXXXXX"></div>
+        <div class="fg"><label class="fl">Access Token</label><input class="fi" id="s-dhan-tk" type="password" placeholder="eyJ…"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-green btn-sm" onclick="saveDhanCreds()">💾 Save</button>
+        <button class="btn btn-ghost btn-sm" onclick="syncDhan()">↻ Sync Now</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3);cursor:pointer">
+          <input type="checkbox" id="dhan-auto" onchange="toggleAuto('dhan',this.checked)" style="accent-color:var(--y)"> Auto-sync 15 min
+        </label>
+      </div>
+      <div id="dhan-log" style="font-size:11px;color:var(--t3);margin-top:10px;min-height:14px"></div>
+      <!-- Dhan CSV Import -->
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--b1)">
+        <div style="font-size:11px;font-weight:700;color:var(--y);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📥 Import from Dhan Tradebook</div>
+        <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.6">
+          Dhan App → Reports → Tradebook → Download CSV → Upload below
+        </div>
+        <button class="btn btn-y btn-sm" onclick="openCSVImport('dhan')">Upload Dhan CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ZERODHA ═══ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Zerodha KiteConnect</span>
+      <span class="sync-dot" id="zd-dot"></span>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:22px;height:22px;border-radius:50%;background:var(--y);color:var(--bg0);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">1</div>
+        <div style="font-size:12px;font-weight:700;color:var(--t2)">API Key & Secret</div>
+      </div>
+      <div class="fg2" style="margin-bottom:14px">
+        <div class="fg"><label class="fl">API Key</label><input class="fi" id="s-zd-key" placeholder="e.g. mndbx5rbi016aptp"></div>
+        <div class="fg"><label class="fl">API Secret</label><input class="fi" id="s-zd-sec" type="password" placeholder="From app settings"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:22px;height:22px;border-radius:50%;background:var(--y);color:var(--bg0);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">2</div>
+        <div style="font-size:12px;font-weight:700;color:var(--t2)">Login & Token</div>
+      </div>
+      <button class="btn btn-y btn-sm" onclick="openZdLogin()" style="margin-bottom:8px">🔗 Open Zerodha Login</button>
+      <div style="font-size:11px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.7">
+        After login you'll see a "This site can't be reached" page — that's normal.<br>
+        Copy the <b style="color:var(--y)">full URL</b> from the address bar and paste below.
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label class="fl">Paste redirect URL</label>
+        <input class="fi" id="zd-redirect-url" placeholder="http://127.0.0.1/?request_token=…" oninput="onZdUrlPaste(this.value)">
+      </div>
+      <div id="zd-token-preview" style="display:none;margin-bottom:14px;padding:10px 14px;background:var(--gd);border:1px solid rgba(0,229,160,.3);border-radius:8px;font-size:12px"></div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:22px;height:22px;border-radius:50%;background:var(--bg4);border:1px solid var(--b2);color:var(--t3);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">3</div>
+        <div style="font-size:12px;font-weight:600;color:var(--t3)">Or paste Access Token directly</div>
+      </div>
+      <div class="fg" style="margin-bottom:14px">
+        <label class="fl">Access Token <span style="color:var(--y);font-size:10px">(renew daily)</span></label>
+        <input class="fi" id="s-zd-tk" placeholder="Paste access token here…">
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-y btn-sm" onclick="saveZdCreds()">💾 Save & Sync</button>
+        <button class="btn btn-ghost btn-sm" onclick="syncZerodha()">↻ Sync Now</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3);cursor:pointer">
+          <input type="checkbox" id="zd-auto" onchange="toggleAuto('zd',this.checked)" style="accent-color:var(--y)"> Auto-sync daily
+        </label>
+      </div>
+      <div id="zd-log" style="font-size:11px;color:var(--t3);margin-top:10px;min-height:14px"></div>
+    </div>
+  </div>
+
+  <!-- ═══ CLOUDFLARE WORKER ═══ -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">⚡ Cloudflare Worker URL</span></div>
+    <div class="card-body">
+      <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.6">
+        Required for all broker sync. Deploy the free worker at <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--y)">workers.cloudflare.com</a>.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="fi" id="s-worker-url" placeholder="https://your-worker.workers.dev" style="flex:1;font-size:11.5px">
+        <button class="btn btn-ghost btn-sm" onclick="saveWorkerUrl()">💾 Save</button>
+      </div>
+      <div id="worker-status" style="font-size:11px;color:var(--t3);margin-top:6px"></div>
+    </div>
+  </div>
+
+  <!-- ═══ DEFINEDGE ═══ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Definedge (RZone)</span>
+      <span class="sync-dot" id="de-dot"></span>
+    </div>
+    <div class="card-body">
+      <div class="fg2" style="margin-bottom:10px">
+        <div class="fg"><label class="fl">API Token</label><input class="fi" id="s-de-tk" placeholder="616f60ac-92d7-…"></div>
+        <div class="fg"><label class="fl">API Secret</label><input class="fi" id="s-de-sec" type="password" placeholder="glABMCFjrOH…"></div>
+      </div>
+      <button class="btn btn-green btn-sm" onclick="saveDefinedgeCreds()" style="margin-bottom:14px">💾 Save Credentials</button>
+      <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--y);margin-bottom:8px">🔐 Daily Session Key</div>
+        <div style="font-size:11.5px;color:var(--t3);margin-bottom:10px;line-height:1.8">
+          Open Definedge login → After login click "Regenerate Token" → Paste api_session_key below
+        </div>
+        <button class="btn btn-y btn-sm" onclick="window.open('https://myaccount.definedgesecurities.com','_blank')" style="margin-bottom:12px">🔗 Open Definedge Login</button>
+        <div class="fg" style="margin-bottom:8px">
+          <label class="fl">Paste api_session_key here (renew daily)</label>
+          <input class="fi" id="s-de-session" placeholder="Paste your api_session_key…">
+        </div>
+        <button class="btn btn-green btn-sm" onclick="deManualSession()">💾 Save & Sync</button>
+      </div>
+      <div id="de-session-box" style="display:none;background:var(--gd);border:1px solid rgba(0,229,160,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">
+        ✅ Session key active — <span id="de-session-time"></span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-ghost btn-sm" onclick="syncDefinedge()">↻ Sync Now</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3);cursor:pointer">
+          <input type="checkbox" id="de-auto" onchange="toggleAuto('de',this.checked)" style="accent-color:var(--y)"> Auto-sync 15 min
+        </label>
+      </div>
+      <div id="de-log" style="font-size:11px;color:var(--t3);margin-top:10px;min-height:14px"></div>
+    </div>
+  </div>
+
+  <!-- ═══ LIVE PRICES ═══ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Live Prices</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="live-status" style="font-size:10.5px;color:var(--t3)">Not refreshed</span>
+        <span class="sync-dot" id="live-dot"></span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="font-size:11.5px;color:var(--t3);margin-bottom:14px">📡 CMP via Yahoo Finance (NSE). No API key needed.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-y btn-sm" onclick="refreshLivePrices()">↻ Refresh Now</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3);cursor:pointer">
+          <input type="checkbox" id="live-auto" onchange="toggleLiveAuto(this.checked)" style="accent-color:var(--y)"> Auto-refresh 3 min (market hours)
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SUPABASE CLOUD SYNC ═══ -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">☁️ Cloud Sync (Supabase)</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="sb-status-txt" style="font-size:10.5px;color:var(--t3)">Not configured</span>
+        <span class="sync-dot" id="sb-dot"></span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="font-size:11.5px;color:var(--t3);background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.7">
+        🔐 Sync trades across devices via your own <b style="color:var(--y)">Supabase</b> project.<br>
+        <span style="font-size:10.5px">Get URL &amp; key from <b style="color:var(--t1)">supabase.com → Project → Settings → API</b></span>
+      </div>
+      <div class="fg2" style="margin-bottom:14px">
+        <div class="fg f-full"><label class="fl">Supabase Project URL</label><input class="fi" id="s-sb-url" placeholder="https://xxxx.supabase.co"></div>
+        <div class="fg f-full"><label class="fl">Anon / Public Key</label><input class="fi" id="s-sb-key" type="password" placeholder="eyJ…"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <button class="btn btn-green btn-sm" onclick="saveSbCreds()">💾 Save</button>
+        <button class="btn btn-y btn-sm" onclick="TE.sbPush()">⬆ Push</button>
+        <button class="btn btn-ghost btn-sm" onclick="TE.sbPull()">⬇ Pull</button>
+        <button class="btn btn-sm" style="background:rgba(255,69,96,.15);border:1px solid rgba(255,69,96,.4);color:#FF4560" onclick="TE.sbPull(true)">⚡ Force Pull</button>
+        <button class="btn btn-ghost btn-sm" onclick="testSbConnection()">🔌 Test</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t3);cursor:pointer">
+          <input type="checkbox" id="sb-auto" onchange="toggleSbAuto(this.checked)" style="accent-color:var(--y)"> Auto-sync on save
+        </label>
+      </div>
+      <div id="sb-log" style="font-size:11px;color:var(--t3);min-height:16px"></div>
+      <div id="sb-diag" style="font-size:11px;color:var(--t3);margin-top:6px;padding:6px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--b1)">
+        📦 localStorage: <b id="sb-ls-count">—</b> | 🧠 Memory: <b id="sb-mem-count">—</b>
+        <button onclick="sbDiagRefresh()" style="background:none;border:none;color:var(--y);cursor:pointer;font-size:11px;padding:0;margin-left:6px">🔄</button>
+      </div>
+      <!-- SQL Setup -->
+      <details style="margin-top:14px">
+        <summary style="font-size:10.5px;color:var(--t4);cursor:pointer">📋 SQL Setup (run once in Supabase)</summary>
+        <pre style="background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:10px;font-size:10px;color:var(--y);overflow-x:auto;margin-top:8px;line-height:1.7">CREATE TABLE IF NOT EXISTS tradedge_trades (
+  device_id   TEXT PRIMARY KEY,
+  trades_json TEXT,
+  ledger_json TEXT,
+  cfg_json    TEXT,
+  fund_json   TEXT,
+  alerts_json TEXT,
+  gtt_json    TEXT,
+  prefs_json  TEXT,
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE tradedge_trades ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON tradedge_trades
+  FOR ALL USING (true) WITH CHECK (true);</pre>
+      </details>
+    </div>
+  </div>
+
+  <!-- ═══ NSE SYMBOLS ═══ -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">NSE Symbol Database</span></div>
+    <div class="card-body">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:10px">Update stock symbols from NSE (~2200+). Auto-updates on refresh.</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-y btn-sm" onclick="fetchNSESymbols()">↻ Refresh NSE Symbols</button>
+        <span id="nse-db-status" style="font-size:11px;color:var(--t3)"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DATA ═══ -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Data Management</span></div>
+    <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+      <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All Trades</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- CSV Import Modal -->
+<div class="overlay" id="m-import">
+  <div class="modal" style="max-width:540px">
+    <div class="m-head"><div class="m-title">📥 Import CSV</div><button class="m-x" onclick="closeM('m-import')">✕</button></div>
+    <div class="m-body">
+      <div class="fg" style="margin-bottom:16px">
+        <label class="fl">Broker</label>
+        <select class="fi" id="imp-broker">
+          <option value="zerodha">Zerodha</option>
+          <option value="dhan">Dhan</option>
+          <option value="definedge">Definedge</option>
+          <option value="other">Generic / Other</option>
+        </select>
+      </div>
+      <div id="imp-dropzone" onclick="document.getElementById('imp-file').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--y)'"
+        ondragleave="this.style.borderColor='var(--b2)'"
+        ondrop="handleCsvDrop(event)"
+        style="border:2px dashed var(--b2);border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;background:var(--bg3)">
+        <div style="font-size:32px;margin-bottom:10px">📂</div>
+        <div style="font-size:13px;font-weight:700;color:var(--t1)">Click or drag CSV file</div>
+        <input type="file" id="imp-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleCsvFile(this)">
+      </div>
+      <div id="imp-file-info" style="display:none;margin-top:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--b2);border-radius:8px;font-size:12px;color:var(--t2)"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" onclick="closeM('m-import')">Cancel</button>
+      <button class="btn btn-y" onclick="doImport()">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Core Scripts -->
+<script src="js/core.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/journal-sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sidebar.js"></script>
+
+<script>
+'use strict';
+
+let autoTimers = {};
+
+// ── Load Settings ──
+function loadSettings() {
+  document.getElementById('s-cap').value = TE.cfg.cap || 5000000;
+  document.getElementById('s-risk').value = TE.cfg.risk || 0.5;
+  document.getElementById('s-dhan-id').value = localStorage.getItem('dhan_id') || '';
+  document.getElementById('s-dhan-tk').value = localStorage.getItem('dhan_tk') || '';
+  document.getElementById('s-zd-key').value = localStorage.getItem('zd_key') || '';
+  document.getElementById('s-zd-sec').value = localStorage.getItem('zd_sec') || '';
+  document.getElementById('s-zd-tk').value = localStorage.getItem('zd_tk') || '';
+  document.getElementById('s-de-tk').value = localStorage.getItem('de_tk') || '';
+  document.getElementById('s-de-sec').value = localStorage.getItem('de_sec') || '';
+  document.getElementById('s-worker-url').value = TE.getWorkerUrl();
+  document.getElementById('s-sb-url').value = localStorage.getItem('sb_url') || TE.SUPABASE_URL;
+  document.getElementById('s-sb-key').value = localStorage.getItem('sb_key') || '';
+  document.getElementById('sb-auto').checked = !!localStorage.getItem('sb_auto');
+  document.getElementById('dhan-auto').checked = !!localStorage.getItem('auto_dhan');
+  document.getElementById('zd-auto').checked = !!localStorage.getItem('auto_zd');
+  document.getElementById('de-auto').checked = !!localStorage.getItem('auto_de');
+  document.getElementById('live-auto').checked = !!localStorage.getItem('live_auto');
+  // Definedge session
+  const sk = localStorage.getItem('de_session') || '';
+  if (sk) {
+    document.getElementById('de-session-box').style.display = 'block';
+    document.getElementById('de-session-time').textContent = 'Generated at ' + (localStorage.getItem('de_session_time') || 'unknown');
+    document.getElementById('s-de-session').value = sk;
+  }
+  updateSyncDots();
+  sbDiagRefresh();
+}
+
+function updateSyncDots() {
+  const dhan = !!(localStorage.getItem('dhan_id') && localStorage.getItem('dhan_tk'));
+  const zd = !!(localStorage.getItem('zd_key') && localStorage.getItem('zd_tk'));
+  const de = !!(localStorage.getItem('de_tk') && localStorage.getItem('de_session'));
+  const sb = !!(localStorage.getItem('sb_url') && localStorage.getItem('sb_key'));
+  setDot('dhan-dot', dhan ? 'connected' : '');
+  setDot('zd-dot', zd ? 'connected' : '');
+  setDot('de-dot', de ? 'connected' : '');
+  setDot('sb-dot', sb ? 'connected' : '');
+}
+
+function setDot(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'sync-dot' + (state === 'connected' ? ' connected' : state === 'syncing' ? ' syncing' : '');
+}
+
+function setLog(id, msg) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = msg;
+}
+
+// ── Save Portfolio ──
+function savePortfolio() {
+  TE.cfg.cap = +document.getElementById('s-cap').value || 5000000;
+  TE.cfg.risk = +document.getElementById('s-risk').value || 0.5;
+  localStorage.setItem('te_cfg', JSON.stringify(TE.cfg));
+  TE.sync.computeCurrentCapital();
+  toast('Portfolio saved', '✅');
+}
+
+// ── Save Broker Credentials ──
+function saveDhanCreds() {
+  localStorage.setItem('dhan_id', document.getElementById('s-dhan-id').value.trim());
+  localStorage.setItem('dhan_tk', document.getElementById('s-dhan-tk').value.trim());
+  toast('Dhan saved', '✅');
+  updateSyncDots();
+}
+
+function saveZdCreds() {
+  const key = document.getElementById('s-zd-key').value.trim();
+  const sec = document.getElementById('s-zd-sec').value.trim();
+  const tk = document.getElementById('s-zd-tk').value.trim();
+  if (!key) { toast('Enter API Key', '⚠️'); return; }
+  localStorage.setItem('zd_key', key);
+  if (sec) localStorage.setItem('zd_sec', sec);
+  if (tk) localStorage.setItem('zd_tk', tk);
+  toast('Zerodha saved', '✅');
+  updateSyncDots();
+  if (tk) setTimeout(syncZerodha, 400);
+}
+
+function saveDefinedgeCreds() {
+  localStorage.setItem('de_tk', document.getElementById('s-de-tk').value.trim());
+  localStorage.setItem('de_sec', document.getElementById('s-de-sec').value.trim());
+  toast('Definedge saved', '✅');
+  updateSyncDots();
+}
+
+function saveWorkerUrl() {
+  const url = document.getElementById('s-worker-url').value.trim();
+  localStorage.setItem('zd_worker_url', url);
+  document.getElementById('worker-status').textContent = url ? '✅ Saved' : 'Cleared';
+  if (url) toast('Worker URL saved', '✅');
+}
+
+function saveSbCreds() {
+  const url = document.getElementById('s-sb-url').value.trim();
+  const key = document.getElementById('s-sb-key').value.trim();
+  if (!url || !key) { toast('Enter both URL and Key', '⚠️'); return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  toast('Cloud credentials saved ☁️', '☁️');
+  updateSyncDots();
+}
+
+function toggleSbAuto(on) {
+  if (on) { localStorage.setItem('sb_auto', '1'); toast('Auto cloud sync enabled', '☁️'); }
+  else localStorage.removeItem('sb_auto');
+}
+
+async function testSbConnection() {
+  const result = await TE.sbTestConnection();
+  const logEl = document.getElementById('sb-log');
+  if (result.ok) { logEl.textContent = '✅ ' + result.msg; toast('Connection OK', '✅'); }
+  else { logEl.textContent = '❌ ' + result.msg; toast(result.msg, '❌'); }
+}
+
+function sbDiagRefresh() {
+  try {
+    const raw = localStorage.getItem('te_trades') || '[]';
+    const lsCount = JSON.parse(raw).length;
+    const memCount = TE.trades.length;
+    const lsEl = document.getElementById('sb-ls-count');
+    const memEl = document.getElementById('sb-mem-count');
+    if (lsEl) lsEl.textContent = lsCount;
+    if (memEl) memEl.textContent = memCount;
+    const ok = lsCount === memCount;
+    if (lsEl) lsEl.style.color = ok ? 'var(--g)' : 'var(--r)';
+    if (memEl) memEl.style.color = ok ? 'var(--g)' : 'var(--r)';
+    if (!ok && lsCount > memCount) {
+      TE.trades = JSON.parse(raw);
+      if (lsEl) lsEl.style.color = 'var(--g)';
+      if (memEl) { memEl.textContent = TE.trades.length; memEl.style.color = 'var(--g)'; }
+      toast('Fixed: reloaded ' + TE.trades.length + ' trades', '✅');
+    }
+  } catch (e) {}
+}
+
+// ── Zerodha Login ──
+function openZdLogin() {
+  const key = document.getElementById('s-zd-key').value.trim() || localStorage.getItem('zd_key') || '';
+  if (!key) { toast('Enter API Key first', '⚠️'); return; }
+  localStorage.setItem('zd_key', key);
+  window.open(`https://kite.trade/connect/login?api_key=${key}&v=3`, '_blank');
+}
+
+function onZdUrlPaste(val) {
+  const m = val.match(/[?&]request_token=([^&]+)/);
+  const preview = document.getElementById('zd-token-preview');
+  if (m && m[1]) {
+    preview.innerHTML = '✅ Request token found: <b style="color:var(--g)">' + m[1] + '</b>';
+    preview.style.display = 'block';
+    const sec = localStorage.getItem('zd_sec') || document.getElementById('s-zd-sec').value.trim();
+    const key = localStorage.getItem('zd_key') || document.getElementById('s-zd-key').value.trim();
+    if (sec && key) attemptTokenExchange(key, m[1], sec);
+  } else preview.style.display = 'none';
+}
+
+async function attemptTokenExchange(apiKey, requestToken, apiSecret) {
+  setLog('zd-log', 'Attempting token exchange…');
+  try {
+    const input = apiKey + requestToken + apiSecret;
+    const enc = new TextEncoder().encode(input);
+    const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+    const checksum = Array.from(new Uint8Array(hashBuf)).map(b => ('0' + b.toString(16)).slice(-2)).join('');
+    const body = `api_key=${apiKey}&request_token=${requestToken}&checksum=${checksum}`;
+    const workerUrl = TE.getWorkerUrl();
+    if (!workerUrl) { setLog('zd-log', 'Set Worker URL first'); return; }
+    const res = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Kite-Action': 'zd-session' },
+      body
+    });
+    const data = await res.json();
+    if (data?.data?.access_token) {
+      localStorage.setItem('zd_tk', data.data.access_token);
+      document.getElementById('s-zd-tk').value = data.data.access_token;
+      setLog('zd-log', '✅ Token generated!');
+      setDot('zd-dot', 'connected');
+      toast('Zerodha token ready — syncing…', '✅');
+      setTimeout(syncZerodha, 600);
+    } else {
+      setLog('zd-log', 'Auto-exchange failed. Paste token manually in Step 3.');
+    }
+  } catch (e) { setLog('zd-log', 'Token exchange error: ' + e.message); }
+}
+
+// ── Definedge Manual Session ──
+function deManualSession() {
+  const sk = document.getElementById('s-de-session').value.trim();
+  if (!sk) { toast('Paste session key first', '⚠️'); return; }
+  localStorage.setItem('de_session', sk);
+  localStorage.setItem('de_session_time', new Date().toLocaleTimeString('en-IN'));
+  document.getElementById('de-session-box').style.display = 'block';
+  document.getElementById('de-session-time').textContent = 'Generated at ' + new Date().toLocaleTimeString('en-IN');
+  setDot('de-dot', 'connected');
+  toast('Session key saved — syncing…', '✅');
+  setTimeout(syncDefinedge, 400);
+}
+
+// ── Broker Sync Engines ──
+async function syncDhan() {
+  const id = localStorage.getItem('dhan_id'), tk = localStorage.getItem('dhan_tk');
+  if (!id || !tk) { toast('Configure Dhan first', '⚠️'); return; }
+  const workerUrl = TE.getWorkerUrl();
+  if (!workerUrl) { toast('Set Worker URL', '⚠️'); return; }
+  setDot('dhan-dot', 'syncing'); setLog('dhan-log', 'Syncing…');
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    const res = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'dhan-tradebook', 'X-Dhan-Token': tk, 'X-Dhan-ID': String(id) },
+      body: JSON.stringify({ dhanClientId: String(id), fromDate: from, toDate: today })
+    });
+    const data = await res.json();
+    if (data?.status === 'FAILURE' || data?.errorCode) throw new Error(data?.message || 'Auth failed');
+    const orders = (Array.isArray(data) ? data : (data?.data || [])).filter(o =>
+      (o.orderStatus === 'TRADED' || o.tradeStatus === 'TRADED') && (o.exchangeSegment === 'NSE_EQ' || o.exchange === 'NSE')
+    );
+    if (!orders.length) { toast('No trades found', 'ℹ️'); setDot('dhan-dot', 'connected'); setLog('dhan-log', 'No trades.'); return; }
+    const result = mergeApiOrders(orders, 'dhan');
+    TE.save();
+    setDot('dhan-dot', 'connected');
+    setLog('dhan-log', `✓ ${result.added} added · ${result.skipped} skipped · ${new Date().toLocaleTimeString('en-IN')}`);
+    toast('Dhan synced!', '✅');
+  } catch (e) {
+    setDot('dhan-dot', ''); setLog('dhan-log', '❌ ' + e.message);
+    toast('Dhan error: ' + e.message, '❌');
+  }
+}
+
+async function syncZerodha() {
+  const key = localStorage.getItem('zd_key'), tk = localStorage.getItem('zd_tk');
+  if (!key || !tk) { toast('Configure Zerodha first', '⚠️'); return; }
+  const workerUrl = TE.getWorkerUrl();
+  if (!workerUrl) { toast('Set Worker URL', '⚠️'); return; }
+  setDot('zd-dot', 'syncing'); setLog('zd-log', 'Syncing…');
+  try {
+    const res = await fetch(workerUrl, {
+      method: 'GET',
+      headers: { 'X-Kite-Version': '3', 'Authorization': `token ${key}:${tk}`, 'X-Kite-Action': 'zd-trades' }
+    });
+    const raw = await res.json();
+    if (raw?.status === 'error') throw new Error(raw.message || 'Zerodha API error');
+    const data = raw?.data !== undefined ? raw : { data: Array.isArray(raw) ? raw : [] };
+    const trds = (data?.data || []).filter(t => t.exchange === 'NSE' || t.exchange === 'BSE');
+    if (!trds.length) { toast('No trades today', 'ℹ️'); setDot('zd-dot', 'connected'); setLog('zd-log', 'No trades.'); return; }
+    const result = mergeApiOrders(trds, 'zerodha');
+    TE.save();
+    setDot('zd-dot', 'connected');
+    setLog('zd-log', `✓ ${result.added} new · ${result.matched} exits · ${result.pyramided} pyramids · ${new Date().toLocaleTimeString('en-IN')}`);
+    toast('Zerodha synced!', '✅');
+  } catch (e) {
+    setDot('zd-dot', ''); setLog('zd-log', '❌ ' + e.message);
+    toast('Zerodha error: ' + e.message, '❌');
+  }
+}
+
+async function syncDefinedge() {
+  const tk = localStorage.getItem('de_tk'), session = localStorage.getItem('de_session');
+  if (!tk || !session) { toast('Configure Definedge first', '⚠️'); return; }
+  const workerUrl = TE.getWorkerUrl();
+  if (!workerUrl) { toast('Set Worker URL', '⚠️'); return; }
+  setDot('de-dot', 'syncing'); setLog('de-log', 'Syncing…');
+  try {
+    const res = await fetch(workerUrl, {
+      method: 'GET',
+      headers: { 'X-Kite-Action': 'de-tradebook', 'X-DE-Session': session }
+    });
+    const raw = await res.json();
+    if (raw?.status === 'error') throw new Error(raw.message || 'Definedge error');
+    const data = Array.isArray(raw) ? raw : (raw?.data || raw?.tradebook || []);
+    if (!data.length) { toast('No trades', 'ℹ️'); setDot('de-dot', 'connected'); return; }
+    const result = mergeApiOrders(data, 'definedge');
+    TE.save();
+    setDot('de-dot', 'connected');
+    setLog('de-log', `✓ ${result.added} added · ${result.skipped} skipped · ${new Date().toLocaleTimeString('en-IN')}`);
+    toast('Definedge synced!', '✅');
+  } catch (e) {
+    setDot('de-dot', ''); setLog('de-log', '❌ ' + e.message);
+  }
+}
+
+// ── Smart Merge Engine (shared by all brokers) ──
+function mergeApiOrders(orders, source) {
+  const groups = {};
+  orders.forEach(o => {
+    let sym, rawDate, side, price, qty;
+    if (source === 'dhan') {
+      sym = TE.cleanSym(o.tradingSymbol || o.customSymbol || o.scrip || '');
+      rawDate = o.exchangeTime || o.createTime || o.tradingDate || '';
+      side = (o.transactionType || '').toUpperCase().includes('BUY') ? 'Buy' : 'Sell';
+      price = +(o.tradedPrice || o.averageTradedPrice || 0);
+      qty = +(o.tradedQuantity || o.filledQty || 0);
+    } else if (source === 'zerodha') {
+      sym = TE.cleanSym(o.tradingsymbol || '');
+      rawDate = o.fill_timestamp || o.order_timestamp || '';
+      side = o.transaction_type === 'BUY' ? 'Buy' : 'Sell';
+      price = +(o.average_price || o.price || 0);
+      qty = +(o.quantity || o.filled_quantity || 0);
+    } else {
+      sym = TE.cleanSym(o.tradingSymbol || o.symbol || o.scrip || '');
+      rawDate = o.tradeDate || o.orderDate || '';
+      side = (o.transactionType || o.side || '').toUpperCase().includes('BUY') ? 'Buy' : 'Sell';
+      price = +(o.averagePrice || o.tradePrice || o.price || 0);
+      qty = +(o.tradedQty || o.quantity || 0);
+    }
+    const date = rawDate ? new Date(rawDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    if (!sym || !price || !qty) return;
+    const key = `${date}_${sym}_${side}`;
+    if (!groups[key]) groups[key] = { sym, date, side, fills: [], source };
+    groups[key].fills.push({ price, qty });
+  });
+
+  let added = 0, skipped = 0, matched = 0, pyramided = 0;
+  Object.values(groups).forEach(g => {
+    const totalQty = g.fills.reduce((s, f) => s + f.qty, 0);
+    const totalVal = g.fills.reduce((s, f) => s + f.price * f.qty, 0);
+    const avgPrice = +(totalVal / totalQty).toFixed(2);
+    const oppSide = g.side === 'Sell' ? 'Buy' : 'Sell';
+
+    // Exit match
+    const openOpp = TE.trades.find(t => t.symbol === g.sym && t.side === oppSide && (t.status === 'Open' || t.status === 'Partial'));
+    if (openOpp) {
+      const dup = (openOpp.exits || []).some(e => e.date === g.date && Math.abs(e.price - avgPrice) < 0.5 && e.qty === totalQty);
+      if (dup) { skipped++; return; }
+      if (!openOpp.exits) openOpp.exits = [];
+      openOpp.exits.push({ date: g.date, price: avgPrice, qty: totalQty });
+      const eQty = (openOpp.entries || []).reduce((s, e) => s + (+e.qty || 0), 0);
+      const xQty = openOpp.exits.reduce((s, e) => s + (+e.qty || 0), 0);
+      openOpp.status = xQty >= eQty ? 'Closed' : xQty > 0 ? 'Partial' : 'Open';
+      matched++; return;
+    }
+
+    // Pyramid match
+    const openSame = TE.trades.find(t => t.symbol === g.sym && t.side === g.side && (t.status === 'Open' || t.status === 'Partial'));
+    if (openSame) {
+      const dup = (openSame.entries || []).some(e => e.date === g.date && Math.abs(e.price - avgPrice) < 0.5 && e.qty === totalQty);
+      if (dup) { skipped++; return; }
+      openSame.entries.push({ date: g.date, price: avgPrice, qty: totalQty });
+      pyramided++; return;
+    }
+
+    // Duplicate check
+    const exists = TE.trades.some(t => t.symbol === g.sym && t.side === g.side && t.entries?.[0]?.date === g.date && Math.abs((t.entries?.[0]?.price || 0) - avgPrice) < 0.5);
+    if (exists) { skipped++; return; }
+
+    // New trade
+    TE.trades.push({
+      id: Date.now() + '' + Math.random(), symbol: g.sym, setup: '', side: g.side,
+      status: 'Open', sl: 0, plan: '', exitTrigger: '', growth: '', notes: '',
+      source: g.source, entries: [{ date: g.date, price: avgPrice, qty: totalQty }], exits: [], cmp: 0
+    });
+    added++;
+  });
+  return { added, skipped, matched, pyramided };
+}
+
+// ── Auto-sync Toggle ──
+function toggleAuto(broker, on) {
+  if (autoTimers[broker]) clearInterval(autoTimers[broker]);
+  if (!on) { localStorage.removeItem('auto_' + broker); return; }
+  localStorage.setItem('auto_' + broker, '1');
+  const fn = broker === 'dhan' ? syncDhan : broker === 'zd' ? syncZerodha : syncDefinedge;
+  autoTimers[broker] = setInterval(fn, 15 * 60 * 1000);
+  fn();
+}
+
+// ── Live Prices ──
+let liveTimer = null;
+async function refreshLivePrices() {
+  const open = TE.getOpenTrades();
+  if (!open.length) { toast('No open positions', 'ℹ️'); return; }
+  setDot('live-dot', 'syncing');
+  const symbols = [...new Set(open.map(t => t.symbol))];
+  let updated = 0;
+  for (const sym of symbols) {
+    try {
+      const ticker = sym + '.NS';
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`;
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+      const data = await res.json();
+      const parsed = JSON.parse(data.contents);
+      const price = parsed?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (price) { TE.trades.forEach(t => { if (t.symbol === sym && t.status !== 'Closed') t.cmp = +price; }); updated++; }
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, 300));
+  }
+  TE.save();
+  setDot('live-dot', updated > 0 ? 'connected' : '');
+  document.getElementById('live-status').textContent = `${updated}/${symbols.length} updated · ${new Date().toLocaleTimeString('en-IN')}`;
+  toast(`Live: ${updated}/${symbols.length} updated`, '📡');
+}
+
+function toggleLiveAuto(on) {
+  if (liveTimer) clearInterval(liveTimer);
+  localStorage.setItem('live_auto', on ? '1' : '');
+  if (!on) return;
+  refreshLivePrices();
+  liveTimer = setInterval(() => { if (TE.isMarketOpen()) refreshLivePrices(); }, 3 * 60 * 1000);
+}
+
+// ── NSE Symbol Refresh ──
+async function fetchNSESymbols() {
+  const st = document.getElementById('nse-db-status');
+  st.textContent = '⏳ Fetching…';
+  const workerUrl = TE.getWorkerUrl();
+  try {
+    if (workerUrl) {
+      const r = await fetch(workerUrl, { headers: { 'X-Kite-Action': 'nse-symbols' }, signal: AbortSignal.timeout(15000) });
+      if (r.ok) {
+        const text = await r.text();
+        let parsed; try { parsed = JSON.parse(text); } catch { parsed = null; }
+        if (Array.isArray(parsed) && parsed.length > 100) {
+          localStorage.setItem('te_nse_ext', JSON.stringify(parsed));
+          st.innerHTML = `<span style="color:var(--g)">✅ ${parsed.length} symbols loaded</span>`;
+          toast('NSE DB updated: ' + parsed.length, '✅');
+          return;
+        }
+      }
+    }
+    // Fallback proxy
+    const proxies = [
+      u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+      u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    ];
+    const csvUrl = 'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv';
+    for (const p of proxies) {
+      try {
+        const r = await fetch(p(csvUrl), { signal: AbortSignal.timeout(12000) });
+        const text = await r.text();
+        const lines = text.trim().split('\n');
+        const syms = [];
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(',');
+          const sym = parts[0]?.trim().replace(/"/g, '');
+          const name = parts[1]?.trim().replace(/"/g, '');
+          if (sym && name && /^[A-Z0-9&\-\.]+$/.test(sym)) syms.push([sym, name, '']);
+        }
+        if (syms.length > 100) {
+          localStorage.setItem('te_nse_ext', JSON.stringify(syms));
+          st.innerHTML = `<span style="color:var(--g)">✅ ${syms.length} symbols</span>`;
+          toast('NSE DB: ' + syms.length + ' symbols', '✅');
+          return;
+        }
+      } catch (e) {}
+    }
+    st.innerHTML = '<span style="color:var(--r)">❌ Auto-fetch failed</span>';
+  } catch (e) { st.innerHTML = '<span style="color:var(--r)">❌ ' + e.message + '</span>'; }
+}
+
+// ── CSV Import ──
+let impCsvContent = '';
+function openCSVImport(broker) {
+  impCsvContent = '';
+  document.getElementById('imp-file').value = '';
+  document.getElementById('imp-file-info').style.display = 'none';
+  document.getElementById('imp-dropzone').style.display = '';
+  if (broker) document.getElementById('imp-broker').value = broker;
+  openM('m-import');
+}
+
+function handleCsvFile(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    impCsvContent = e.target.result;
+    document.getElementById('imp-file-info').innerHTML = `✅ ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+    document.getElementById('imp-file-info').style.display = 'block';
+    document.getElementById('imp-dropzone').style.display = 'none';
+  };
+  reader.readAsText(file);
+}
+
+function handleCsvDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const dt = new DataTransfer(); dt.items.add(file);
+  document.getElementById('imp-file').files = dt.files;
+  handleCsvFile(document.getElementById('imp-file'));
+}
+
+function doImport() {
+  const broker = document.getElementById('imp-broker').value;
+  const raw = impCsvContent.trim();
+  if (!raw) { toast('Upload a file first', '⚠️'); return; }
+  // Parse based on broker — reuse mergeApiOrders format
+  const fills = [];
+  const lines = raw.split(/\r?\n/).filter(l => l.trim());
+  const headers = lines[0].split(',').map(h => h.replace(/"/g, '').toLowerCase().trim());
+
+  // Generic column detection
+  function fc(kws) { return headers.findIndex(h => kws.some(k => h.includes(k))); }
+  const ci = {
+    sym:   fc(['symbol', 'tradingsymbol', 'scrip_name', 'scrip']),
+    date:  fc(['trade_date', 'date', 'order_date']),
+    side:  fc(['trade_type', 'transaction_type', 'side', 'buy_sell', 'type']),
+    price: fc(['price', 'average_price', 'trade_price', 'avg_price', 'rate']),
+    qty:   fc(['quantity', 'qty', 'filled_qty']),
+  };
+
+  if (ci.sym < 0 || ci.price < 0 || ci.qty < 0) { toast('Cannot detect columns', '❌'); return; }
+
+  lines.slice(1).forEach(line => {
+    const c = line.split(',').map(x => x.replace(/"/g, '').trim());
+    const sym = TE.cleanSym(c[ci.sym]);
+    const date = TE.parseDate(c[ci.date]);
+    const side = ci.side >= 0 ? (c[ci.side].toLowerCase().includes('sell') ? 'Sell' : 'Buy') : 'Buy';
+    const price = TE.cleanNum(c[ci.price]);
+    const qty = TE.cleanNum(c[ci.qty]);
+    if (sym && price && qty) fills.push({ tradingsymbol: sym, fill_timestamp: date, transaction_type: side === 'Buy' ? 'BUY' : 'SELL', average_price: price, quantity: qty, exchange: 'NSE' });
+  });
+
+  if (!fills.length) { toast('No valid rows', '⚠️'); return; }
+  const result = mergeApiOrders(fills, broker);
+  TE.save();
+  closeM('m-import');
+  toast(`✅ ${result.added} new · ${result.matched} exits · ${result.pyramided} pyramids · ${result.skipped} skipped`, '✅');
+}
+
+// ── Export CSV ──
+function exportCSV() {
+  const rows = TE.trades.map(t => {
+    const c = TE.calc({ ...t });
+    return [t.symbol, t.side, t.setup || '', t.status,
+      (t.entries || []).map((e, i) => `E${i+1}:${e.date}:${e.price}:${e.qty}`).join('|'),
+      (t.exits || []).map((e, i) => `X${i+1}:${e.date}:${e.price}:${e.qty}`).join('|'),
+      c.avgEntry.toFixed(2), c.avgExit.toFixed(2), c.totalQty, c.exitQty,
+      c.realisedPL.toFixed(2), c.unrealisedPL.toFixed(2), c.rr.toFixed(2), c.holdDays,
+      t.source || ''].join(',');
+  });
+  const csv = ['Symbol,Side,Setup,Status,Entries,Exits,AvgEntry,AvgExit,TotalQty,ExitQty,RealisedPL,UnrealisedPL,RR,HoldDays,Source', ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'te_trades_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+  toast('CSV exported', '⬇');
+}
+
+// ── Clear All ──
+function clearAll() {
+  if (!confirm('Delete ALL trades? Cannot be undone.')) return;
+  TE.trades = [];
+  TE.save();
+  toast('All trades cleared', '🗑');
+}
+
+// ── Boot ──
+loadSettings();
+if (localStorage.getItem('auto_dhan')) toggleAuto('dhan', true);
+if (localStorage.getItem('auto_zd')) toggleAuto('zd', true);
+if (localStorage.getItem('auto_de')) toggleAuto('de', true);
+if (localStorage.getItem('live_auto')) toggleLiveAuto(true);
+
+// Detect Zerodha callback redirect
+(function() {
+  const params = new URLSearchParams(location.search);
+  const rt = params.get('request_token');
+  if (rt && params.get('status') === 'success') {
+    history.replaceState({}, document.title, location.pathname);
+    const key = localStorage.getItem('zd_key') || '';
+    if (key) {
+      toast('Zerodha login detected — exchanging token…', '🔑');
+      setTimeout(() => onZdUrlPaste('?request_token=' + rt + '&status=success'), 400);
+    }
+  }
+})();
+</script>
+</body>
+</html>
