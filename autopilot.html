@@ -2764,11 +2764,6 @@ const pick = state.topPicks.find(p => p.symbol === symbol);
 }
 
 
-// ─────────────────────────────────────────────────
-// CHANGE 3: REPLACE renderAPIOrder() FUNCTION
-// ─────────────────────────────────────────────────
-// FIND the existing renderAPIOrder function and REPLACE with:
-
 function renderAPIOrder(o) {
   const dhanReady = window.DhanOrders && DhanOrders.isReady();
   const isDhan = selectedBroker === 'dhan';
@@ -2844,7 +2839,11 @@ setTimeout(() => {
     }
   }
 }, 3000);
-
+// ═══ BOOT — CLOUD SYNC FIRST ═══
+async function boot() {
+  await syncTradesFromCloud();
+  await loadData();
+}
 boot();
 </script>
 <script src="js/dhan-live.js"></script> <script src="js/dhan-orders.js"></script>
