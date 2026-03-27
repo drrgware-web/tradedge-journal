@@ -2568,30 +2568,6 @@ function renderDeepLink(o) {
   `;
 }
 
-function renderAPIOrder(o) {
-  const isSupported = selectedBroker === 'dhan';
-  return `
-    <div style="text-align:center;padding:16px 0">
-      ${isSupported ? `
-        <div style="font-size:11px;color:var(--green);margin-bottom:8px;font-weight:700">✅ Dhan API Bracket Order</div>
-        <div style="font-size:10px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
-          Places a <strong>bracket order</strong> via Dhan API:<br>
-          BUY ${o.adjQty} × ${o.symbol} @ ₹${o.entry} · SL ₹${o.sl} · Target ₹${o.target1}<br>
-          <span style="color:var(--amber)">Requires DHAN_API_KEY in config</span>
-        </div>
-        <button class="btn btn-primary" onclick="placeDhanOrder('${o.symbol}')" style="padding:12px 32px;font-size:13px;font-weight:800">
-          ⚡ PLACE BRACKET ORDER VIA API
-        </button>
-      ` : `
-        <div style="font-size:11px;color:var(--amber);margin-bottom:8px;font-weight:700">⚠️ API not available for ${BROKERS[selectedBroker]?.name}</div>
-        <div style="font-size:10px;color:var(--text-dim);line-height:1.6">
-          API execution is currently supported only for <strong style="color:var(--green)">Dhan</strong>.<br>
-          For ${BROKERS[selectedBroker]?.name}, use Deep Link (L2) or Clipboard (L1).
-        </div>
-      `}
-    </div>
-  `;
-}
 
 function selectBroker(key) {
   selectedBroker = key;
@@ -2735,24 +2711,152 @@ async function executeOrder(symbol) {
   );
 }
 
-async function placeDhanOrder(symbol) {
-  // Dhan API bracket order — requires DHAN_API_KEY
-  showToast('⚠️', 'Dhan API Key Required',
-    'Set DHAN_API_KEY in config to enable auto bracket orders. For now, use Deep Link (L2) to open pre-filled order.',
-    5000
-  );
+
+
+    return;
+  }
+
+  const pick = state.topPicks.find(p => p.symbol === symbol);
+  if (!pick) return;
+
+  const pyramidInfo = detectPyramidLevel(symbol, pick);
+  const o = calcOrderDetails(pick, pyramidInfo);
+
+  if (!confirm(`⚡ DHAN API ORDER\n\nBUY ${o.adjQty} × ${o.symbol} @ ₹${o.entry}\nSL: ₹${o.sl}\nTarget: ₹${o.target1}\n\nProceed?`)) return;
+
+  showToast('⏳', `Placing ${o.symbol} order via Dhan API...`, 'Sending to broker...', 10000);
+
+  try {
+    const result = await DhanOrders.executeFromEdgePilot({
+      symbol: o.symbol,
+      qty: o.adjQty,
+      price: o.entry,
+      sl: o.sl,
+      target: o.target1,
+      product: 'CNC',
+      pyramidLevel: o.pyLevel !== 'p1' ? o.pyLevel : null
+    });
+
+    if (result.errors && result.errors.length > 0) {
+      showToast('⚠️', `${o.symbol} — Order placed with warnings`,
+        `Entry: #${result.entry?.orderId || 'N/A'} · ${result.errors.join(', ')}`,
+        6000
+      );
+    } else {
+      showToast('✅', `${o.symbol} — Dhan bracket order placed!`,
+        `Entry: #${result.entry?.orderId} · SL: #${result.stopLoss?.orderId || 'N/A'} · Telegram notified`,
+        6000
+      );
+    }
+
+    // Also log to journal (same as executeOrder flow)
+    await executeOrder(symbol);
+
+  } catch (err) {
+    showToast('❌', `${o.symbol} — Dhan order FAILED`, err.message, 8000);
+    console.error('[EdgePilot] Dhan order error:', err);
+  }
 }
 
-// ═══ BOOT — CLOUD SYNC FIRST ═══
-async function boot() {
-  // 1. Sync trades from Supabase (source of truth)
-  await syncTradesFromCloud();
-  // 2. Load market data
-  await loadData();
+
+// ─────────────────────────────────────────────────
+// CHANGE 3: REPLACE renderAPIOrder() FUNCTION
+// ─────────────────────────────────────────────────
+// FIND the existing renderAPIOrder function and REPLACE with:
+
+function renderAPIOrder(o) {
+  const dhanReady = window.DhanOrders && DhanOrders.isReady();
+  const isDhan = selectedBroker === 'dhan';
+
+  return `
+    <div style="text-align:center;padding:16px 0">
+      ${isDhan ? `
+        <div style="font-size:11px;color:${dhanReady ? 'var(--green)' : 'var(--amber)'};margin-bottom:8px;font-weight:700">
+          ${dhanReady ? '✅ Dhan API Ready — Bracket Order' : '⚠️ Dhan Credentials Not Set'}
+        </div>
+        <div style="font-size:10px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
+          ${dhanReady ?
+            `Places via <strong>Dhan API</strong>: BUY ${o.adjQty} × ${o.symbol} @ ₹${o.entry} · SL-M ₹${o.sl} · Target ₹${o.target1}<br>
+             <span style="color:var(--green)">Entry + SL + Target = 3 separate orders (CNC delivery)</span>` :
+            `Set <code>dhan_id</code> and <code>dhan_tk</code> in localStorage to enable.<br>
+             <span style="color:var(--text-dim)">Go to Settings page or run in console:</span><br>
+             <code style="font-size:9px;color:var(--cyan)">localStorage.setItem('dhan_id','YOUR_CLIENT_ID'); localStorage.setItem('dhan_tk','YOUR_TOKEN');</code>`
+          }
+        </div>
+        <button class="btn btn-primary" onclick="placeDhanOrder('${o.symbol}')"
+          style="padding:12px 32px;font-size:13px;font-weight:800;${dhanReady ? '' : 'opacity:0.5;cursor:not-allowed'}"
+          ${dhanReady ? '' : 'disabled'}>
+          ⚡ PLACE BRACKET ORDER VIA DHAN API
+        </button>
+        ${dhanReady ? `<div style="font-size:8px;color:var(--text-dim);margin-top:6px">
+          Source: ${window.DhanLive?.isDhanActive() ? 'Dhan LTP (30s)' : 'Yahoo fallback'} · Telegram: ✓
+        </div>` : ''}
+      ` : `
+        <div style="font-size:11px;color:var(--amber);margin-bottom:8px;font-weight:700">⚠️ API not available for ${BROKERS[selectedBroker]?.name}</div>
+        <div style="font-size:10px;color:var(--text-dim);line-height:1.6">
+          API execution supported for <strong style="color:var(--green)">Dhan</strong> only.<br>
+          For ${BROKERS[selectedBroker]?.name}, use Deep Link (L2) or Clipboard (L1).
+        </div>
+      `}
+    </div>
+  `;
 }
+
+
+// ─────────────────────────────────────────────────
+// CHANGE 4: ADD LIVE CMP REFRESH (after boot())
+// ─────────────────────────────────────────────────
+// FIND:
+//
+//   boot();
+//   </script>
+//
+// REPLACE with:
+
+// boot();
+
+// ── LIVE CMP REFRESH — Update exec cards when DhanLive pushes new prices ──
+window.addEventListener('dhan-cmp-update', (e) => {
+  const prices = e.detail?.prices || {};
+  if (!state.topPicks || state.topPicks.length === 0) return;
+
+  let changed = false;
+  state.topPicks.forEach(pick => {
+    if (prices[pick.symbol] != null && prices[pick.symbol] !== pick.cmp) {
+      pick.cmp = prices[pick.symbol];
+      changed = true;
+    }
+  });
+
+  // Only re-render Stage 6 exec cards (not full page) to avoid flicker
+  if (changed) {
+    const stage6Body = document.querySelectorAll('.stage')[5]?.querySelector('.stage-body');
+    if (stage6Body && !stage6Body.closest('.stage.locked')) {
+      const gates = computeGates(state);
+      if (gates.stage6.pass) {
+        stage6Body.innerHTML = renderExec(state.topPicks);
+      }
+    }
+  }
+});
+
+// ── MARKET STATUS INDICATOR ──
+// Add data source badge to hero area after DhanLive initializes
+setTimeout(() => {
+  if (window.DhanLive) {
+    const heroSub = document.querySelector('.hero-subtitle');
+    if (heroSub) {
+      const src = DhanLive.isDhanActive() ? '🟢 DHAN LIVE' : '🟡 YAHOO';
+      const mkt = DhanLive.isMarketOpen() ? '● MARKET OPEN' : '○ CLOSED';
+      heroSub.innerHTML += ` <span style="font-size:9px;color:var(--text-dim);margin-left:12px">${src} · ${mkt}</span>`;
+    }
+  }
+}, 3000);
+
 boot();
 </script>
-  <!-- Journal ↔ Edge Pilot Sync Bridge -->
+<script src="js/dhan-live.js"></script> <script src="js/dhan-orders.js"></script>
+<!-- Journal ↔ Edge Pilot Sync Bridge -->
 <script src="js/core.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/journal-sync.js"></script>
