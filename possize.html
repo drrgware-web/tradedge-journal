@@ -134,26 +134,87 @@ function updateMarketBadge() {
     dot.className = 'market-dot yahoo';
     source.textContent = 'YAHOO';
     source.style.color = 'var(--y)';
-    status.textContent = 'Fallback';
+    status.textContent = 'Ready';
+  }
+}
+
+// Direct Yahoo fetch via worker (for single symbols not in DhanLive cache)
+async function fetchYahooDirect(sym) {
+  const url = localStorage.getItem('zd_worker_url');
+  if (!url) return null;
+  
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+      body: JSON.stringify({ ticker: sym + '.NS', range: '1d', interval: '1d' })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.chart?.result?.[0]?.meta?.regularMarketPrice || null;
+  } catch (e) {
+    console.warn('[PosSize] Yahoo fetch failed:', e);
+    return null;
+  }
+}
+
+// Direct Dhan LTP fetch via worker (for single symbol)
+async function fetchDhanDirect(sym) {
+  const url = localStorage.getItem('zd_worker_url');
+  const tk = localStorage.getItem('dhan_tk');
+  const id = localStorage.getItem('dhan_id');
+  
+  if (!url || !tk || !id) return null;
+  
+  // Get secId from DhanLive's symbol map
+  if (typeof DhanLive === 'undefined') return null;
+  const info = DhanLive.getSymbolInfo(sym);
+  if (!info?.secId) return null;
+  
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'X-Kite-Action': 'dhan-ltp',
+        'X-Dhan-Token': tk,
+        'X-Dhan-ID': id
+      },
+      body: JSON.stringify({ NSE_EQ: [info.secId] })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const entry = data?.data?.[String(info.secId)] || data?.data?.[info.secId];
+    return entry?.last_price ?? null;
+  } catch (e) {
+    console.warn('[PosSize] Dhan LTP fetch failed:', e);
+    return null;
   }
 }
 
 async function fetchPriceWithDhan(sym) {
-  // Try Dhan first if available and market is open
-  if (typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen()) {
-    const dhanPrice = DhanLive.getCMP(sym);
-    if (dhanPrice) return { price: dhanPrice, source: 'dhan' };
-    
-    // Try fetching via DhanLive
-    await DhanLive.refresh();
-    const refreshedPrice = DhanLive.getCMP(sym);
-    if (refreshedPrice) return { price: refreshedPrice, source: 'dhan' };
+  // 1. Check DhanLive cache first
+  if (typeof DhanLive !== 'undefined') {
+    const cached = DhanLive.getCMP(sym);
+    if (cached) return { price: cached, source: 'dhan' };
   }
   
-  // Fallback to TE.fetchCMP (Yahoo via worker)
+  // 2. If market open, try direct Dhan LTP
+  if (typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen()) {
+    const dhanPrice = await fetchDhanDirect(sym);
+    if (dhanPrice) return { price: dhanPrice, source: 'dhan' };
+  }
+  
+  // 3. Fallback to Yahoo via worker
+  const yahooPrice = await fetchYahooDirect(sym);
+  if (yahooPrice) return { price: yahooPrice, source: 'yahoo' };
+  
+  // 4. Last resort: try TE.fetchCMP if available
   if (typeof TE !== 'undefined' && TE.fetchCMP) {
-    const price = await TE.fetchCMP(sym);
-    if (price) return { price, source: 'yahoo' };
+    try {
+      const price = await TE.fetchCMP(sym);
+      if (price) return { price, source: 'yahoo' };
+    } catch {}
   }
   
   return null;
@@ -166,39 +227,32 @@ function refreshPrice() {
   const el = document.getElementById('ps-price-status');
   el.textContent = '⏳ Refreshing…';
   
-  // Trigger Dhan refresh
-  if (typeof DhanLive !== 'undefined') {
-    DhanLive.refresh();
-  }
-  
-  // Re-fetch price
   fetchPriceWithDhan(sym).then(result => {
     if (result) {
       const e = document.getElementById('ps-entry');
       e.value = result.price.toFixed(2);
+      e.dataset.source = result.source;
       calc();
       el.innerHTML = `<span style="color:var(--g)">✓ ₹${result.price.toFixed(2)}</span> <span style="font-size:9px;color:var(--t3)">(${result.source.toUpperCase()})</span>`;
       updateMarketBadge();
     } else {
-      el.textContent = 'Price unavailable';
+      el.innerHTML = '<span style="color:var(--r)">Price unavailable</span>';
     }
   });
 }
 
-// Listen for Dhan CMP updates
+// Listen for Dhan CMP updates (for open positions)
 window.addEventListener('dhan-cmp-update', (e) => {
   updateMarketBadge();
   
-  // Auto-update entry price if symbol matches
+  // Auto-update entry price if symbol matches and was from Dhan
   if (currentSymbol && e.detail?.prices?.[currentSymbol]) {
     const price = e.detail.prices[currentSymbol];
     const el = document.getElementById('ps-price-status');
     const entry = document.getElementById('ps-entry');
     
-    // Only auto-update if entry is empty or matches previous Dhan price
-    if (!entry.value || entry.dataset.source === 'dhan') {
+    if (entry.dataset.source === 'dhan') {
       entry.value = price.toFixed(2);
-      entry.dataset.source = 'dhan';
       calc();
       el.innerHTML = `<span style="color:var(--g)">✓ ₹${price.toFixed(2)}</span> <span style="font-size:9px;color:var(--t3)">(DHAN LIVE)</span>`;
     }
@@ -240,7 +294,7 @@ setTimeout(() => {
         el.innerHTML = `<span style="color:var(--g)">✓ ₹${result.price.toFixed(2)}</span> <span style="font-size:9px;color:var(--t3)">(${result.source.toUpperCase()})</span>`;
         updateMarketBadge();
       } else {
-        el.textContent = 'Price unavailable';
+        el.innerHTML = '<span style="color:var(--r)">Price unavailable</span>';
       }
     }
   });
