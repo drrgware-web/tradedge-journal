@@ -7,6 +7,15 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/tradedge.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Toggle Switch */
+.toggle-switch { position:relative;display:inline-block;width:36px;height:20px }
+.toggle-switch input { opacity:0;width:0;height:0 }
+.toggle-slider { position:absolute;cursor:pointer;inset:0;background:var(--bg3);border:1px solid var(--b2);border-radius:20px;transition:.2s }
+.toggle-slider:before { position:absolute;content:"";height:14px;width:14px;left:2px;bottom:2px;background:var(--t3);border-radius:50%;transition:.2s }
+.toggle-switch input:checked + .toggle-slider { background:rgba(0,229,160,0.2);border-color:var(--g) }
+.toggle-switch input:checked + .toggle-slider:before { transform:translateX(16px);background:var(--g) }
+</style>
 </head>
 <body>
 
@@ -53,6 +62,108 @@
     <div style="display:flex;gap:8px">
       <button class="btn btn-ghost btn-xs" onclick="refreshCapital()">↻ Refresh</button>
       <span id="ep-sync-status" style="font-size:10px;color:var(--t4)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Alerts Settings Panel -->
+<div id="alerts-panel" style="margin-top:16px">
+  <div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">🔔</span>
+        <span style="font-size:12px;font-weight:700;color:var(--t1)">Intraday Alerts</span>
+        <span id="alerts-status-dot" style="width:8px;height:8px;border-radius:50%;background:var(--g)"></span>
+        <span id="alerts-status-text" style="font-size:10px;color:var(--t3)">Active</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-ghost btn-xs" onclick="DhanAlerts.testAlert('sl_hit')" title="Send test alert">🧪 Test</button>
+        <button class="btn btn-ghost btn-xs" onclick="toggleAlertsPanel()" id="alerts-toggle-btn">⚙️</button>
+      </div>
+    </div>
+    
+    <!-- Collapsible Settings -->
+    <div id="alerts-settings" style="display:none;border-top:1px solid var(--b1);padding-top:12px;margin-top:8px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px">
+        
+        <!-- Master Toggle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Alerts Enabled</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-enabled" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- SL Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">🔴 SL Hit Alert</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-sl" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Target Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">🎯 Target Hit Alert</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-target" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Near SL Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">⚠️ Near SL Warning</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-nearsl" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Near SL % -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Near SL Threshold</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="alert-nearsl-pct" min="0.5" max="10" step="0.5" style="width:50px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:11px;text-align:center" onchange="updateAlertConfig()">
+            <span style="font-size:10px;color:var(--t3)">%</span>
+          </div>
+        </div>
+        
+        <!-- Trailing Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">📈 Trailing Alert</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-trailing" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Trailing % -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Trailing Threshold</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="alert-trailing-pct" min="1" max="20" step="1" style="width:50px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:11px;text-align:center" onchange="updateAlertConfig()">
+            <span style="font-size:10px;color:var(--t3)">%</span>
+          </div>
+        </div>
+        
+        <!-- Clear Triggered -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Reset Cooldowns</span>
+          <button class="btn btn-ghost btn-xs" onclick="clearAlertCooldowns()" style="font-size:10px">Clear</button>
+        </div>
+        
+      </div>
+      
+      <!-- Info -->
+      <div style="margin-top:12px;padding:8px 12px;background:rgba(59,139,255,0.08);border:1px solid rgba(59,139,255,0.2);border-radius:8px">
+        <div style="font-size:10px;color:var(--b)">
+          ℹ️ Alerts are checked every 60s during market hours (9:15 AM - 3:30 PM). 
+          Each alert has a 5-min cooldown per symbol to prevent spam.
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -348,6 +459,95 @@ window.addEventListener('te:alert-triggered', (e) => {
   }
 });
 
+// ── Alerts Panel Functions ──
+function toggleAlertsPanel() {
+  const panel = document.getElementById('alerts-settings');
+  const btn = document.getElementById('alerts-toggle-btn');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    btn.textContent = '▲';
+    loadAlertSettings();
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = '⚙️';
+  }
+}
+
+function loadAlertSettings() {
+  if (typeof DhanAlerts === 'undefined') return;
+  const cfg = DhanAlerts.getConfig();
+  
+  document.getElementById('alert-enabled').checked = cfg.enabled;
+  document.getElementById('alert-sl').checked = cfg.slAlert;
+  document.getElementById('alert-target').checked = cfg.targetAlert;
+  document.getElementById('alert-nearsl').checked = cfg.nearSlAlert;
+  document.getElementById('alert-nearsl-pct').value = cfg.nearSlPct || 1.5;
+  document.getElementById('alert-trailing').checked = cfg.trailingAlert;
+  document.getElementById('alert-trailing-pct').value = cfg.trailingPct || 5;
+  
+  updateAlertStatusIndicator();
+}
+
+function updateAlertConfig() {
+  if (typeof DhanAlerts === 'undefined') return;
+  
+  const cfg = {
+    enabled: document.getElementById('alert-enabled').checked,
+    slAlert: document.getElementById('alert-sl').checked,
+    targetAlert: document.getElementById('alert-target').checked,
+    nearSlAlert: document.getElementById('alert-nearsl').checked,
+    nearSlPct: parseFloat(document.getElementById('alert-nearsl-pct').value) || 1.5,
+    trailingAlert: document.getElementById('alert-trailing').checked,
+    trailingPct: parseFloat(document.getElementById('alert-trailing-pct').value) || 5
+  };
+  
+  DhanAlerts.setConfig(cfg);
+  updateAlertStatusIndicator();
+  
+  // Restart if enabled changed
+  if (cfg.enabled && !DhanAlerts.isRunning()) {
+    DhanAlerts.start();
+  } else if (!cfg.enabled && DhanAlerts.isRunning()) {
+    DhanAlerts.stop();
+  }
+}
+
+function updateAlertStatusIndicator() {
+  const dot = document.getElementById('alerts-status-dot');
+  const text = document.getElementById('alerts-status-text');
+  
+  if (typeof DhanAlerts === 'undefined') {
+    dot.style.background = 'var(--t4)';
+    text.textContent = 'Not loaded';
+    return;
+  }
+  
+  const cfg = DhanAlerts.getConfig();
+  const running = DhanAlerts.isRunning();
+  
+  if (!cfg.enabled) {
+    dot.style.background = 'var(--t4)';
+    text.textContent = 'Disabled';
+  } else if (running) {
+    dot.style.background = 'var(--g)';
+    dot.style.boxShadow = '0 0 6px var(--g)';
+    text.textContent = 'Active';
+  } else {
+    dot.style.background = 'var(--y)';
+    dot.style.boxShadow = 'none';
+    text.textContent = 'Paused';
+  }
+}
+
+function clearAlertCooldowns() {
+  if (typeof DhanAlerts !== 'undefined') {
+    DhanAlerts.clearTriggered();
+    if (typeof toast === 'function') {
+      toast('Alert cooldowns cleared', '✅');
+    }
+  }
+}
+
 // ── Boot — defer until sidebar has injected shell ──
 // sidebar.js rewrites body.innerHTML, destroying original canvas refs.
 // Must render AFTER that completes.
@@ -364,6 +564,7 @@ setTimeout(() => {
     DhanLive.refresh();
   }
   updateMarketStatusBadge();
+  updateAlertStatusIndicator();
 }, 500);
 
 // Deferred: auto-pull from cloud if empty
