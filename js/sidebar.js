@@ -9,6 +9,9 @@ TE.injectShell = function() {
   // ── SIDEBAR ──
   const sidebarHTML = `
   <nav class="sidebar">
+    <div class="sb-item" id="nav-commandcenter" data-tip="Command Center" onclick="nav('commandcenter')">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
     <div class="sb-item" id="nav-dashboard" data-tip="Dashboard" onclick="nav('dashboard')">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
     </div>

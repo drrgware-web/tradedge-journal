@@ -9,6 +9,7 @@
 // In modular mode, each page is its own HTML file.
 // nav() redirects to the appropriate page.
 TE.PAGE_MAP = {
+  commandcenter: 'dashboard.html',
   dashboard:  'index.html',
   trades:     'trades.html',
   analytics:  'analytics.html',
@@ -27,7 +28,7 @@ TE.PAGE_MAP = {
 };
 
 TE.PAGE_NAMES = {
-  dashboard:'Dashboard', trades:'Trade Log', analytics:'Analytics',
+  commandcenter:'Command Center', dashboard:'Dashboard', trades:'Trade Log', analytics:'Analytics',
   calendar:'Calendar', fund:'Fund Management', ai:'AI Trade Review',
   edgepilot:'Edge Pilot',
   news:'News Intelligence', alerts:'Price Alerts', ledger:'Broker Ledger',
