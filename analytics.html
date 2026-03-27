@@ -7,8 +7,35 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/tradedge.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Toggle Switch */
+.toggle-switch { position:relative;display:inline-block;width:36px;height:20px }
+.toggle-switch input { opacity:0;width:0;height:0 }
+.toggle-slider { position:absolute;cursor:pointer;inset:0;background:var(--bg3);border:1px solid var(--b2);border-radius:20px;transition:.2s }
+.toggle-slider:before { position:absolute;content:"";height:14px;width:14px;left:2px;bottom:2px;background:var(--t3);border-radius:50%;transition:.2s }
+.toggle-switch input:checked + .toggle-slider { background:rgba(0,229,160,0.2);border-color:var(--g) }
+.toggle-switch input:checked + .toggle-slider:before { transform:translateX(16px);background:var(--g) }
+.market-badge{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 10px;border-radius:12px;background:rgba(0,0,0,0.3);border:1px solid var(--b1)}
+.market-dot{width:8px;height:8px;border-radius:50%}
+.market-dot.live{background:var(--g);box-shadow:0 0 8px var(--g)}
+.market-dot.yahoo{background:var(--y)}
+</style>
 </head>
 <body>
+
+<!-- Header with Market Status -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="font-size:18px;font-weight:700;color:var(--t1)">📊 Analytics</div>
+    <div class="market-badge" id="market-badge">
+      <span class="market-dot yahoo" id="market-dot"></span>
+      <span id="market-source" style="color:var(--y)">YAHOO</span>
+      <span style="color:var(--t3)">•</span>
+      <span id="market-status">Checking...</span>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--t3)" id="data-summary"></div>
+</div>
 
 <!-- Core Metrics -->
 <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Core Metrics</div>
@@ -48,130 +75,579 @@
 </div>
 
 <!-- Heatmap -->
-<div class="card">
+<div class="card" style="margin-bottom:16px">
   <div class="card-head"><span class="card-title">Daily P&L Heatmap</span></div>
   <div class="card-body"><div id="hmap"></div></div>
 </div>
 
+<!-- Alerts Settings Panel -->
+<div id="alerts-panel">
+  <div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">🔔</span>
+        <span style="font-size:12px;font-weight:700;color:var(--t1)">Intraday Alerts</span>
+        <span id="alerts-status-dot" style="width:8px;height:8px;border-radius:50%;background:var(--g)"></span>
+        <span id="alerts-status-text" style="font-size:10px;color:var(--t3)">Active</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-ghost btn-xs" onclick="DhanAlerts.testAlert('sl_hit')" title="Send test alert">🧪 Test</button>
+        <button class="btn btn-ghost btn-xs" onclick="toggleAlertsPanel()" id="alerts-toggle-btn">⚙️</button>
+      </div>
+    </div>
+    
+    <!-- Collapsible Settings -->
+    <div id="alerts-settings" style="display:none;border-top:1px solid var(--b1);padding-top:12px;margin-top:8px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px">
+        
+        <!-- Master Toggle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Alerts Enabled</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-enabled" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- SL Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">🔴 SL Hit Alert</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-sl" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Target Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">🎯 Target Hit Alert</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-target" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Near SL Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">⚠️ Near SL Warning</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-nearsl" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Near SL % -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Near SL Threshold</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="alert-nearsl-pct" min="0.5" max="10" step="0.5" style="width:50px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:11px;text-align:center" onchange="updateAlertConfig()">
+            <span style="font-size:10px;color:var(--t3)">%</span>
+          </div>
+        </div>
+        
+        <!-- Trailing Alert -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">📈 Trailing Alert</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="alert-trailing" onchange="updateAlertConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Trailing % -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Trailing Threshold</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="alert-trailing-pct" min="1" max="20" step="1" style="width:50px;padding:4px 6px;background:var(--bg2);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:11px;text-align:center" onchange="updateAlertConfig()">
+            <span style="font-size:10px;color:var(--t3)">%</span>
+          </div>
+        </div>
+        
+        <!-- Clear Triggered -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px">
+          <span style="font-size:11px;color:var(--t2)">Reset Cooldowns</span>
+          <button class="btn btn-ghost btn-xs" onclick="clearAlertCooldowns()" style="font-size:10px">Clear</button>
+        </div>
+        
+      </div>
+      
+      <!-- Info -->
+      <div style="margin-top:12px;padding:8px 12px;background:rgba(59,139,255,0.08);border:1px solid rgba(59,139,255,0.2);border-radius:8px">
+        <div style="font-size:10px;color:var(--b)">
+          ℹ️ Alerts are checked every 60s during market hours (9:15 AM - 3:30 PM). 
+          Each alert has a 5-min cooldown per symbol to prevent spam.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dhan Live CMP -->
+<script src="js/dhan-live.js"></script>
+
+<!-- Core Scripts -->
 <script src="js/core.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/journal-sync.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/sidebar.js"></script>
 
+<!-- Dhan Alerts -->
+<script src="js/dhan-alerts.js"></script>
+
 <script>
 'use strict';
 let charts = {};
+
 const CO={responsive:true,maintainAspectRatio:false,animation:{duration:300},
   plugins:{legend:{display:false},tooltip:{backgroundColor:'#111820',borderColor:'#2E4055',borderWidth:1,titleColor:'#8BA0B8',bodyColor:'#EDF2F7',padding:10}},
   scales:{x:{grid:{color:'#162130'},ticks:{color:'#4A6882',font:{size:10}},border:{display:false}},y:{grid:{color:'#162130'},ticks:{color:'#4A6882',font:{size:10}},border:{display:false}}}};
+
 function dChart(id,cfg){if(charts[id]){charts[id].destroy();}const c=document.getElementById(id);if(!c)return;charts[id]=new Chart(c,cfg);}
 
-function renderAna(){
-  const all=TE.trades.map(t=>TE.calc({...t}));
-  const closed=all.filter(t=>t.status==='Closed');
-  const wins=closed.filter(t=>t.realisedPL>0),losses=closed.filter(t=>t.realisedPL<0);
-  const wr=closed.length?wins.length/closed.length*100:0;
-  const avgW=wins.length?wins.reduce((s,t)=>s+t.realisedPL,0)/wins.length:0;
-  const avgL=losses.length?losses.reduce((s,t)=>s+t.realisedPL,0)/losses.length:0;
-  const pf=losses.length&&avgL?Math.abs(wins.reduce((s,t)=>s+t.realisedPL,0)/losses.reduce((s,t)=>s+t.realisedPL,0)):0;
-  const avgR=closed.length?closed.reduce((s,t)=>s+t.rr,0)/closed.length:0;
-  const expectancy=avgW*(wr/100)+avgL*(1-wr/100);
-  const totalPL=closed.reduce((s,t)=>s+t.realisedPL,0);
-  const avgHold=closed.length?closed.reduce((s,t)=>s+(t.holdDays||0),0)/closed.length:0;
-
-  // Streaks
-  let maxWS=0,cWS=0,maxLS=0,cLS=0;
-  closed.forEach(t=>{if(t.realisedPL>0){cWS++;maxWS=Math.max(maxWS,cWS);cLS=0;}else{cLS++;maxLS=Math.max(maxLS,cLS);cWS=0;}});
-
-  // Equity curve + drawdown
-  const sorted=[...closed].filter(t=>(t.exits||[]).length).sort((a,b)=>((a.exits[a.exits.length-1]||{}).date||'').localeCompare((b.exits[b.exits.length-1]||{}).date||''));
-  let eq=0;const curve=sorted.map(t=>{eq+=t.realisedPL;return{date:(t.exits[t.exits.length-1]||{}).date,equity:eq};});
-  let peak=-Infinity,maxDD=0;curve.forEach(p=>{if(p.equity>peak)peak=p.equity;const dd=peak-p.equity;if(dd>maxDD)maxDD=dd;});
-
-  // Sharpe
-  const returns=closed.map(t=>t.realisedPL);
-  const mean=returns.length?returns.reduce((s,r)=>s+r,0)/returns.length:0;
-  const variance=returns.length?returns.reduce((s,r)=>s+Math.pow(r-mean,2),0)/returns.length:0;
-  const sharpe=Math.sqrt(variance)>0?(mean/Math.sqrt(variance))*Math.sqrt(252):0;
-  const calmar=maxDD>0?totalPL/maxDD:0;
-
-  // Core KPIs
-  const core=[
-    {l:'Total Closed',v:closed.length,c:'col-t',s:'trades'},
-    {l:'Win Rate',v:wr.toFixed(1)+'%',c:'col-y',s:`${wins.length}W / ${losses.length}L`},
-    {l:'Profit Factor',v:pf.toFixed(2)+'x',c:pf>=1.5?'col-g':'col-r',s:'> 1.5 good'},
-    {l:'Expectancy',v:TE.fmt(expectancy),c:expectancy>=0?'col-g':'col-r',s:'per trade'},
-    {l:'Avg R-Multiple',v:avgR.toFixed(2)+'R',c:avgR>=0.5?'col-g':'col-t',s:'target > 0.5R'},
-    {l:'Win Streak',v:maxWS,c:'col-g',s:`Loss streak: ${maxLS}`},
-    {l:'Avg Win',v:TE.fmt(avgW),c:'col-g',s:'vs loss below'},
-    {l:'Avg Loss',v:TE.fmt(avgL),c:'col-r',s:'keep smaller than win'},
-    {l:'Avg Hold',v:avgHold.toFixed(1)+'d',c:'col-t',s:'days'},
-  ];
-  document.getElementById('ana-core').innerHTML=core.map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
-
-  // Advanced KPIs
-  const adv=[
-    {l:'Max Drawdown',v:TE.fmt(maxDD),c:maxDD>50000?'col-r':'col-y',s:'peak-to-trough'},
-    {l:'Sharpe Ratio',v:sharpe.toFixed(2),c:sharpe>=1?'col-g':'col-y',s:sharpe>=1?'Good':'Target > 1.0'},
-    {l:'Calmar Ratio',v:calmar.toFixed(2),c:calmar>=1?'col-g':'col-y',s:'P&L ÷ drawdown'},
-    {l:'Total Net P&L',v:TE.fmt(totalPL),c:totalPL>=0?'col-g':'col-r',s:'closed trades'},
-    {l:'Payoff Ratio',v:avgL?Math.abs(avgW/avgL).toFixed(2)+'x':'—',c:'col-t',s:'win ÷ loss'},
-    {l:'Recovery Factor',v:maxDD>0?(totalPL/maxDD).toFixed(2):'—',c:'col-t',s:'P&L ÷ DD'},
-  ];
-  document.getElementById('ana-adv').innerHTML=adv.map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
-
-  // Equity Curve Chart
-  if(curve.length>1){
-    document.getElementById('eq-sub').textContent=`${curve.length} trades · Net ${TE.fmt(totalPL)}`;
-    dChart('equityChart',{type:'line',data:{labels:curve.map(p=>p.date),datasets:[{data:curve.map(p=>p.equity),borderColor:totalPL>=0?'#00E5A0':'#FF4560',backgroundColor:totalPL>=0?'rgba(0,229,160,.08)':'rgba(255,69,96,.08)',fill:true,tension:.3,pointRadius:curve.length>30?0:3,borderWidth:2}]},options:{...CO,scales:{...CO.scales,y:{...CO.scales.y,ticks:{...CO.scales.y.ticks,callback:v=>'₹'+v.toLocaleString('en-IN')}}}}});
+// ── Market Status Badge ──
+function updateMarketBadge() {
+  const dot = document.getElementById('market-dot');
+  const source = document.getElementById('market-source');
+  const status = document.getElementById('market-status');
+  
+  if (typeof DhanLive !== 'undefined') {
+    const isDhanActive = DhanLive.isDhanActive();
+    const isMarketOpen = DhanLive.isMarketOpen();
+    
+    dot.className = 'market-dot ' + (isDhanActive ? 'live' : 'yahoo');
+    source.textContent = isDhanActive ? 'DHAN LIVE' : 'YAHOO';
+    source.style.color = isDhanActive ? 'var(--g)' : 'var(--y)';
+    status.textContent = isMarketOpen ? 'Market Open' : 'Market Closed';
   }
-
-  // Monthly P&L
-  const monthMap={};closed.forEach(t=>{const d=(t.exits||[]).map(e=>e.date).filter(Boolean).sort().pop();if(!d)return;const k=d.slice(0,7);monthMap[k]=(monthMap[k]||0)+t.realisedPL;});
-  const months=Object.keys(monthMap).sort();
-  dChart('monthlyChart',{type:'bar',data:{labels:months.map(m=>{const[y,mo]=m.split('-');return new Date(+y,+mo-1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});}),datasets:[{data:months.map(m=>monthMap[m]),backgroundColor:months.map(m=>monthMap[m]>=0?'rgba(0,229,160,.7)':'rgba(255,69,96,.7)'),borderRadius:4}]},options:CO});
-
-  // Setup Breakdown
-  const setupMap={};closed.forEach(t=>{const s=t.setup||'Untagged';if(!setupMap[s])setupMap[s]={pl:0};setupMap[s].pl+=t.realisedPL;});
-  const sortedSetups=Object.entries(setupMap).sort((a,b)=>b[1].pl-a[1].pl).slice(0,8);
-  dChart('setupChart',{type:'bar',data:{labels:sortedSetups.map(([k])=>k),datasets:[{data:sortedSetups.map(([,v])=>v.pl),backgroundColor:sortedSetups.map(([,v])=>v.pl>=0?'#00E5A033':'#FF456033'),borderColor:sortedSetups.map(([,v])=>v.pl>=0?'#00E5A0':'#FF4560'),borderWidth:1,borderRadius:4}]},options:{...CO,indexAxis:'y'}});
-
-  // Hold Days
-  const holdBins={'1d':0,'2-5d':0,'6-14d':0,'15-28d':0,'1-3m':0,'>3m':0};
-  closed.forEach(t=>{const d=t.holdDays||0;if(d<=1)holdBins['1d']++;else if(d<=5)holdBins['2-5d']++;else if(d<=14)holdBins['6-14d']++;else if(d<=28)holdBins['15-28d']++;else if(d<=90)holdBins['1-3m']++;else holdBins['>3m']++;});
-  dChart('holdChart',{type:'bar',data:{labels:Object.keys(holdBins),datasets:[{data:Object.values(holdBins),backgroundColor:'#3B8BFF33',borderColor:'#3B8BFF',borderWidth:1,borderRadius:4}]},options:CO});
-
-  // Symbol Performance
-  const symMap={};closed.forEach(t=>{if(!t.symbol)return;if(!symMap[t.symbol])symMap[t.symbol]={n:0,pl:0,w:0};symMap[t.symbol].n++;symMap[t.symbol].pl+=t.realisedPL;if(t.realisedPL>0)symMap[t.symbol].w++;});
-  const symRows=Object.entries(symMap).sort((a,b)=>b[1].pl-a[1].pl).slice(0,10);
-  document.getElementById('sym-perf').innerHTML=symRows.length?`<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:var(--t3);font-size:10px;border-bottom:1px solid var(--b1)"><th style="text-align:left;padding:4px 8px">Symbol</th><th style="text-align:right;padding:4px 8px">Trades</th><th style="text-align:right;padding:4px 8px">Win%</th><th style="text-align:right;padding:4px 8px">P&L</th></tr></thead><tbody>${symRows.map(([sym,s])=>`<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 8px;font-weight:600;color:var(--t1)">${sym}</td><td style="text-align:right;padding:5px 8px">${s.n}</td><td style="text-align:right;color:var(--y)">${(s.w/s.n*100).toFixed(0)}%</td><td style="text-align:right;font-weight:600;color:${s.pl>=0?'var(--g)':'var(--r)'}">${TE.fmt(s.pl)}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--t4);text-align:center;padding:20px">No data</div>';
-
-  // Heatmap
-  const dayPL={};all.forEach(t=>{const dates=[...(t.exits||[]).map(e=>e.date),(t.entries?.[0]?.date)||''].filter(Boolean);dates.forEach(d=>{if(d)dayPL[d]=(dayPL[d]||0)+t.realisedPL;});});
-  const allDates=Object.keys(dayPL).sort();
-  if(!allDates.length){document.getElementById('hmap').innerHTML='<div style="color:var(--t3);text-align:center;padding:20px">No data</div>';return;}
-  const maxAbs=Math.max(...Object.values(dayPL).map(Math.abs),1);
-  const hmMonths={};allDates.forEach(d=>{const[y,m]=d.split('-');const k=`${y}-${m}`;if(!hmMonths[k])hmMonths[k]={};hmMonths[k][+d.split('-')[2]]=dayPL[d];});
-  let hmHtml='<div style="display:flex;flex-wrap:wrap;gap:16px">';
-  Object.entries(hmMonths).sort((a,b)=>a[0].localeCompare(b[0])).slice(-9).forEach(([key,days])=>{
-    const[y,m]=key.split('-');const label=new Date(+y,+m-1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
-    const dIM=new Date(+y,+m,0).getDate(),fDay=new Date(+y,+m-1,1).getDay();
-    hmHtml+=`<div><div style="font-size:10px;color:var(--t3);margin-bottom:5px;text-align:center">${label}</div><div style="display:grid;grid-template-columns:repeat(7,14px);gap:2px">`;
-    for(let i=0;i<fDay;i++)hmHtml+='<div></div>';
-    for(let d=1;d<=dIM;d++){
-      const pl=days[d];let bg='var(--bg4)';
-      if(pl!==undefined){const int=Math.min(Math.abs(pl)/maxAbs,1);bg=pl>0?`rgba(0,229,160,${.12+int*.7})`:`rgba(255,69,96,${.12+int*.7})`;}
-      hmHtml+=`<div style="width:14px;height:14px;border-radius:3px;background:${bg};cursor:pointer" title="${pl!==undefined?TE.fmt(pl):'—'}"></div>`;
-    }
-    hmHtml+='</div></div>';
-  });
-  hmHtml+='</div>';
-  document.getElementById('hmap').innerHTML=hmHtml;
 }
 
-window.addEventListener('te:trades-changed',renderAna);
-renderAna();
+// ── Alerts Panel Functions ──
+function toggleAlertsPanel() {
+  const panel = document.getElementById('alerts-settings');
+  const btn = document.getElementById('alerts-toggle-btn');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    btn.textContent = '▲';
+    loadAlertSettings();
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = '⚙️';
+  }
+}
+
+function loadAlertSettings() {
+  if (typeof DhanAlerts === 'undefined') return;
+  const cfg = DhanAlerts.getConfig();
+  
+  document.getElementById('alert-enabled').checked = cfg.enabled;
+  document.getElementById('alert-sl').checked = cfg.slAlert;
+  document.getElementById('alert-target').checked = cfg.targetAlert;
+  document.getElementById('alert-nearsl').checked = cfg.nearSlAlert;
+  document.getElementById('alert-nearsl-pct').value = cfg.nearSlPct || 1.5;
+  document.getElementById('alert-trailing').checked = cfg.trailingAlert;
+  document.getElementById('alert-trailing-pct').value = cfg.trailingPct || 5;
+  
+  updateAlertStatusIndicator();
+}
+
+function updateAlertConfig() {
+  if (typeof DhanAlerts === 'undefined') return;
+  
+  const cfg = {
+    enabled: document.getElementById('alert-enabled').checked,
+    slAlert: document.getElementById('alert-sl').checked,
+    targetAlert: document.getElementById('alert-target').checked,
+    nearSlAlert: document.getElementById('alert-nearsl').checked,
+    nearSlPct: parseFloat(document.getElementById('alert-nearsl-pct').value) || 1.5,
+    trailingAlert: document.getElementById('alert-trailing').checked,
+    trailingPct: parseFloat(document.getElementById('alert-trailing-pct').value) || 5
+  };
+  
+  DhanAlerts.setConfig(cfg);
+  updateAlertStatusIndicator();
+  
+  if (cfg.enabled && !DhanAlerts.isRunning()) {
+    DhanAlerts.start();
+  } else if (!cfg.enabled && DhanAlerts.isRunning()) {
+    DhanAlerts.stop();
+  }
+}
+
+function updateAlertStatusIndicator() {
+  const dot = document.getElementById('alerts-status-dot');
+  const text = document.getElementById('alerts-status-text');
+  
+  if (typeof DhanAlerts === 'undefined') {
+    dot.style.background = 'var(--t4)';
+    text.textContent = 'Not loaded';
+    return;
+  }
+  
+  const cfg = DhanAlerts.getConfig();
+  const running = DhanAlerts.isRunning();
+  
+  if (!cfg.enabled) {
+    dot.style.background = 'var(--t4)';
+    text.textContent = 'Disabled';
+  } else if (running) {
+    dot.style.background = 'var(--g)';
+    dot.style.boxShadow = '0 0 6px var(--g)';
+    text.textContent = 'Active';
+  } else {
+    dot.style.background = 'var(--y)';
+    dot.style.boxShadow = 'none';
+    text.textContent = 'Paused';
+  }
+}
+
+function clearAlertCooldowns() {
+  if (typeof DhanAlerts !== 'undefined') {
+    DhanAlerts.clearTriggered();
+    if (typeof toast === 'function') {
+      toast('Alert cooldowns cleared', '✅');
+    }
+  }
+}
+
+// ── Helper: Get best date for a trade ──
+function getTradeDate(t, type = 'exit') {
+  if (type === 'exit') {
+    // Try exit date first
+    const exitDates = (t.exits || []).map(e => e.date).filter(Boolean).sort();
+    if (exitDates.length) return exitDates[exitDates.length - 1];
+  }
+  // Fall back to entry date
+  const entryDates = (t.entries || []).map(e => e.date).filter(Boolean).sort();
+  if (entryDates.length) return entryDates[entryDates.length - 1];
+  // Last resort
+  return t.date || null;
+}
+
+// ── Helper: Calculate R-multiple even without SL ──
+function calcRMultiple(t) {
+  const ct = TE.calc({ ...t });
+  // If SL is set, use proper R calculation
+  if (t.sl && ct.avgEntry && t.sl !== ct.avgEntry) {
+    const risk = Math.abs(ct.avgEntry - t.sl);
+    const m = t.side === 'Buy' ? 1 : -1;
+    if (ct.avgExit) {
+      return m * (ct.avgExit - ct.avgEntry) / risk;
+    }
+  }
+  // Fallback: estimate R based on % move (assume 5% SL)
+  if (ct.avgEntry && ct.avgExit) {
+    const pctMove = (ct.avgExit - ct.avgEntry) / ct.avgEntry * 100;
+    const m = t.side === 'Buy' ? 1 : -1;
+    return m * pctMove / 5; // Assume 5% risk
+  }
+  return 0;
+}
+
+function renderAna(){
+  const all = TE.trades.map(t => TE.calc({...t}));
+  const closed = all.filter(t => t.status === 'Closed');
+  const open = all.filter(t => t.status !== 'Closed');
+  const wins = closed.filter(t => t.realisedPL > 0);
+  const losses = closed.filter(t => t.realisedPL < 0);
+  const breakeven = closed.filter(t => t.realisedPL === 0);
+  
+  // Data quality stats
+  const withSL = closed.filter(t => t.sl && t.sl > 0).length;
+  const withSetup = closed.filter(t => t.setup && t.setup.trim()).length;
+  const withExitDate = closed.filter(t => (t.exits || []).some(e => e.date)).length;
+  
+  document.getElementById('data-summary').innerHTML = 
+    `${closed.length} closed · ${open.length} open · ` +
+    `<span style="color:${withSL < closed.length ? 'var(--y)' : 'var(--g)'}">${withSL}/${closed.length} with SL</span> · ` +
+    `<span style="color:${withSetup < closed.length ? 'var(--y)' : 'var(--g)'}">${withSetup}/${closed.length} tagged</span>`;
+
+  // Basic stats
+  const wr = closed.length ? wins.length / closed.length * 100 : 0;
+  const totalWin = wins.reduce((s, t) => s + t.realisedPL, 0);
+  const totalLoss = Math.abs(losses.reduce((s, t) => s + t.realisedPL, 0));
+  const avgW = wins.length ? totalWin / wins.length : 0;
+  const avgL = losses.length ? losses.reduce((s, t) => s + t.realisedPL, 0) / losses.length : 0;
+  
+  // Profit Factor - handle edge cases
+  let pf = 0;
+  if (totalLoss > 0) {
+    pf = totalWin / totalLoss;
+  } else if (totalWin > 0) {
+    pf = Infinity; // All wins, no losses
+  }
+  
+  // R-Multiple - use improved calculation
+  const rMultiples = closed.map(t => calcRMultiple(t));
+  const avgR = rMultiples.length ? rMultiples.reduce((s, r) => s + r, 0) / rMultiples.length : 0;
+  
+  // Expectancy
+  const expectancy = closed.length ? (totalWin - totalLoss) / closed.length : 0;
+  
+  const totalPL = closed.reduce((s, t) => s + t.realisedPL, 0);
+  const avgHold = closed.length ? closed.reduce((s, t) => s + (t.holdDays || 0), 0) / closed.length : 0;
+
+  // Streaks
+  let maxWS = 0, cWS = 0, maxLS = 0, cLS = 0;
+  closed.forEach(t => {
+    if (t.realisedPL > 0) { cWS++; maxWS = Math.max(maxWS, cWS); cLS = 0; }
+    else if (t.realisedPL < 0) { cLS++; maxLS = Math.max(maxLS, cLS); cWS = 0; }
+  });
+
+  // Equity curve - use entry date if exit date missing
+  const sorted = [...closed].sort((a, b) => {
+    const dateA = getTradeDate(a, 'exit') || getTradeDate(a, 'entry') || '';
+    const dateB = getTradeDate(b, 'exit') || getTradeDate(b, 'entry') || '';
+    return dateA.localeCompare(dateB);
+  });
+  
+  let eq = 0;
+  const curve = sorted.map(t => {
+    eq += t.realisedPL;
+    return { date: getTradeDate(t, 'exit') || getTradeDate(t, 'entry') || 'Unknown', equity: eq };
+  }).filter(p => p.date && p.date !== 'Unknown');
+  
+  // Max drawdown
+  let peak = -Infinity, maxDD = 0;
+  curve.forEach(p => {
+    if (p.equity > peak) peak = p.equity;
+    const dd = peak - p.equity;
+    if (dd > maxDD) maxDD = dd;
+  });
+
+  // Sharpe (annualized)
+  const returns = closed.map(t => t.realisedPL);
+  const mean = returns.length ? returns.reduce((s, r) => s + r, 0) / returns.length : 0;
+  const variance = returns.length > 1 ? returns.reduce((s, r) => s + Math.pow(r - mean, 2), 0) / (returns.length - 1) : 0;
+  const stdDev = Math.sqrt(variance);
+  const sharpe = stdDev > 0 ? (mean / stdDev) * Math.sqrt(Math.min(252, closed.length)) : 0;
+  
+  // Calmar
+  const calmar = maxDD > 0 ? totalPL / maxDD : (totalPL > 0 ? Infinity : 0);
+
+  // Payoff ratio
+  const payoff = avgL !== 0 ? Math.abs(avgW / avgL) : (avgW > 0 ? Infinity : 0);
+
+  // Core KPIs
+  const core = [
+    { l: 'Total Closed', v: closed.length, c: 'col-t', s: `${wins.length}W · ${losses.length}L · ${breakeven.length}BE` },
+    { l: 'Win Rate', v: wr.toFixed(1) + '%', c: wr >= 40 ? 'col-g' : wr >= 30 ? 'col-y' : 'col-r', s: `Target > 40%` },
+    { l: 'Profit Factor', v: pf === Infinity ? '∞' : pf.toFixed(2) + 'x', c: pf >= 1.5 ? 'col-g' : pf >= 1 ? 'col-y' : 'col-r', s: '> 1.5 good' },
+    { l: 'Expectancy', v: TE.fmt(expectancy), c: expectancy >= 0 ? 'col-g' : 'col-r', s: 'per trade avg' },
+    { l: 'Avg R-Multiple', v: avgR.toFixed(2) + 'R', c: avgR >= 0.5 ? 'col-g' : avgR >= 0 ? 'col-y' : 'col-r', s: withSL < closed.length ? '⚠️ estimated' : 'target > 0.5R' },
+    { l: 'Win Streak', v: maxWS, c: 'col-g', s: `Loss streak: ${maxLS}` },
+    { l: 'Avg Win', v: TE.fmt(avgW), c: 'col-g', s: `${wins.length} wins` },
+    { l: 'Avg Loss', v: TE.fmt(avgL), c: 'col-r', s: `${losses.length} losses` },
+    { l: 'Avg Hold', v: avgHold.toFixed(1) + 'd', c: 'col-t', s: 'days' },
+  ];
+  document.getElementById('ana-core').innerHTML = core.map(k => `<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+
+  // Advanced KPIs
+  const adv = [
+    { l: 'Max Drawdown', v: TE.fmt(maxDD), c: maxDD > 100000 ? 'col-r' : maxDD > 50000 ? 'col-y' : 'col-g', s: 'peak-to-trough' },
+    { l: 'Sharpe Ratio', v: sharpe.toFixed(2), c: sharpe >= 1 ? 'col-g' : sharpe >= 0 ? 'col-y' : 'col-r', s: sharpe >= 1 ? 'Good' : 'Target > 1.0' },
+    { l: 'Calmar Ratio', v: calmar === Infinity ? '∞' : calmar.toFixed(2), c: calmar >= 1 ? 'col-g' : 'col-y', s: 'P&L ÷ drawdown' },
+    { l: 'Total Net P&L', v: TE.fmt(totalPL), c: totalPL >= 0 ? 'col-g' : 'col-r', s: 'closed trades' },
+    { l: 'Payoff Ratio', v: payoff === Infinity ? '∞' : payoff.toFixed(2) + 'x', c: payoff >= 2 ? 'col-g' : payoff >= 1 ? 'col-y' : 'col-r', s: 'avg win ÷ avg loss' },
+    { l: 'Recovery Factor', v: maxDD > 0 ? (totalPL / maxDD).toFixed(2) : '—', c: 'col-t', s: 'P&L ÷ DD' },
+  ];
+  document.getElementById('ana-adv').innerHTML = adv.map(k => `<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}" style="font-size:17px">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+
+  // Equity Curve Chart
+  if (curve.length > 0) {
+    document.getElementById('eq-sub').textContent = `${curve.length} trades · Net ${TE.fmt(totalPL)}`;
+    dChart('equityChart', {
+      type: 'line',
+      data: {
+        labels: curve.map(p => p.date),
+        datasets: [{
+          data: curve.map(p => p.equity),
+          borderColor: totalPL >= 0 ? '#00E5A0' : '#FF4560',
+          backgroundColor: totalPL >= 0 ? 'rgba(0,229,160,.08)' : 'rgba(255,69,96,.08)',
+          fill: true, tension: .3, pointRadius: curve.length > 30 ? 0 : 3, borderWidth: 2
+        }]
+      },
+      options: { ...CO, scales: { ...CO.scales, y: { ...CO.scales.y, ticks: { ...CO.scales.y.ticks, callback: v => '₹' + v.toLocaleString('en-IN') } } } }
+    });
+  } else {
+    document.getElementById('eq-sub').textContent = 'No date data available';
+    document.getElementById('equityChart').parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3)">Add exit dates to see equity curve</div>';
+  }
+
+  // Monthly P&L - use best available date
+  const monthMap = {};
+  closed.forEach(t => {
+    const d = getTradeDate(t, 'exit') || getTradeDate(t, 'entry');
+    if (!d) return;
+    const k = d.slice(0, 7);
+    monthMap[k] = (monthMap[k] || 0) + t.realisedPL;
+  });
+  const months = Object.keys(monthMap).sort();
+  
+  if (months.length > 0) {
+    dChart('monthlyChart', {
+      type: 'bar',
+      data: {
+        labels: months.map(m => {
+          const [y, mo] = m.split('-');
+          return new Date(+y, +mo - 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        }),
+        datasets: [{
+          data: months.map(m => monthMap[m]),
+          backgroundColor: months.map(m => monthMap[m] >= 0 ? 'rgba(0,229,160,.7)' : 'rgba(255,69,96,.7)'),
+          borderRadius: 4
+        }]
+      },
+      options: CO
+    });
+  } else {
+    document.getElementById('monthlyChart').parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3)">No monthly data</div>';
+  }
+
+  // Setup Breakdown - handle untagged
+  const setupMap = {};
+  closed.forEach(t => {
+    const s = (t.setup && t.setup.trim()) || 'Untagged';
+    if (!setupMap[s]) setupMap[s] = { pl: 0, count: 0, wins: 0 };
+    setupMap[s].pl += t.realisedPL;
+    setupMap[s].count++;
+    if (t.realisedPL > 0) setupMap[s].wins++;
+  });
+  const sortedSetups = Object.entries(setupMap).sort((a, b) => b[1].pl - a[1].pl).slice(0, 8);
+  
+  if (sortedSetups.length > 0) {
+    dChart('setupChart', {
+      type: 'bar',
+      data: {
+        labels: sortedSetups.map(([k, v]) => `${k} (${v.count})`),
+        datasets: [{
+          data: sortedSetups.map(([, v]) => v.pl),
+          backgroundColor: sortedSetups.map(([, v]) => v.pl >= 0 ? '#00E5A033' : '#FF456033'),
+          borderColor: sortedSetups.map(([, v]) => v.pl >= 0 ? '#00E5A0' : '#FF4560'),
+          borderWidth: 1, borderRadius: 4
+        }]
+      },
+      options: { ...CO, indexAxis: 'y' }
+    });
+  } else {
+    document.getElementById('setupChart').parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3)">Tag your trades with setups</div>';
+  }
+
+  // Hold Days
+  const holdBins = { '1d': 0, '2-5d': 0, '6-14d': 0, '15-28d': 0, '1-3m': 0, '>3m': 0 };
+  closed.forEach(t => {
+    const d = t.holdDays || 0;
+    if (d <= 1) holdBins['1d']++;
+    else if (d <= 5) holdBins['2-5d']++;
+    else if (d <= 14) holdBins['6-14d']++;
+    else if (d <= 28) holdBins['15-28d']++;
+    else if (d <= 90) holdBins['1-3m']++;
+    else holdBins['>3m']++;
+  });
+  dChart('holdChart', {
+    type: 'bar',
+    data: {
+      labels: Object.keys(holdBins),
+      datasets: [{
+        data: Object.values(holdBins),
+        backgroundColor: '#3B8BFF33', borderColor: '#3B8BFF', borderWidth: 1, borderRadius: 4
+      }]
+    },
+    options: CO
+  });
+
+  // Symbol Performance
+  const symMap = {};
+  closed.forEach(t => {
+    if (!t.symbol) return;
+    if (!symMap[t.symbol]) symMap[t.symbol] = { n: 0, pl: 0, w: 0 };
+    symMap[t.symbol].n++;
+    symMap[t.symbol].pl += t.realisedPL;
+    if (t.realisedPL > 0) symMap[t.symbol].w++;
+  });
+  const symRows = Object.entries(symMap).sort((a, b) => b[1].pl - a[1].pl).slice(0, 10);
+  
+  document.getElementById('sym-perf').innerHTML = symRows.length ? 
+    `<table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead><tr style="color:var(--t3);font-size:10px;border-bottom:1px solid var(--b1)">
+        <th style="text-align:left;padding:4px 8px">Symbol</th>
+        <th style="text-align:right;padding:4px 8px">Trades</th>
+        <th style="text-align:right;padding:4px 8px">Win%</th>
+        <th style="text-align:right;padding:4px 8px">P&L</th>
+      </tr></thead>
+      <tbody>${symRows.map(([sym, s]) => `
+        <tr style="border-bottom:1px solid var(--b1)">
+          <td style="padding:5px 8px;font-weight:600;color:var(--t1)">${sym}</td>
+          <td style="text-align:right;padding:5px 8px">${s.n}</td>
+          <td style="text-align:right;color:var(--y)">${(s.w / s.n * 100).toFixed(0)}%</td>
+          <td style="text-align:right;font-weight:600;color:${s.pl >= 0 ? 'var(--g)' : 'var(--r)'}">${TE.fmt(s.pl)}</td>
+        </tr>`).join('')}</tbody>
+    </table>` : 
+    '<div style="color:var(--t4);text-align:center;padding:20px">No symbol data</div>';
+
+  // Heatmap - use best available date
+  const dayPL = {};
+  closed.forEach(t => {
+    const d = getTradeDate(t, 'exit') || getTradeDate(t, 'entry');
+    if (d) dayPL[d] = (dayPL[d] || 0) + t.realisedPL;
+  });
+  
+  const allDates = Object.keys(dayPL).sort();
+  if (!allDates.length) {
+    document.getElementById('hmap').innerHTML = '<div style="color:var(--t3);text-align:center;padding:20px">No date data for heatmap</div>';
+    return;
+  }
+  
+  const maxAbs = Math.max(...Object.values(dayPL).map(Math.abs), 1);
+  const hmMonths = {};
+  allDates.forEach(d => {
+    const [y, m] = d.split('-');
+    const k = `${y}-${m}`;
+    if (!hmMonths[k]) hmMonths[k] = {};
+    hmMonths[k][+d.split('-')[2]] = dayPL[d];
+  });
+  
+  let hmHtml = '<div style="display:flex;flex-wrap:wrap;gap:16px">';
+  Object.entries(hmMonths).sort((a, b) => a[0].localeCompare(b[0])).slice(-9).forEach(([key, days]) => {
+    const [y, m] = key.split('-');
+    const label = new Date(+y, +m - 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+    const dIM = new Date(+y, +m, 0).getDate();
+    const fDay = new Date(+y, +m - 1, 1).getDay();
+    
+    hmHtml += `<div><div style="font-size:10px;color:var(--t3);margin-bottom:5px;text-align:center">${label}</div><div style="display:grid;grid-template-columns:repeat(7,14px);gap:2px">`;
+    for (let i = 0; i < fDay; i++) hmHtml += '<div></div>';
+    for (let d = 1; d <= dIM; d++) {
+      const pl = days[d];
+      let bg = 'var(--bg4)';
+      if (pl !== undefined) {
+        const int = Math.min(Math.abs(pl) / maxAbs, 1);
+        bg = pl > 0 ? `rgba(0,229,160,${.12 + int * .7})` : `rgba(255,69,96,${.12 + int * .7})`;
+      }
+      hmHtml += `<div style="width:14px;height:14px;border-radius:3px;background:${bg};cursor:pointer" title="${d}: ${pl !== undefined ? TE.fmt(pl) : 'No trades'}"></div>`;
+    }
+    hmHtml += '</div></div>';
+  });
+  hmHtml += '</div>';
+  document.getElementById('hmap').innerHTML = hmHtml;
+}
+
+// ── Dhan CMP Update Listener ──
+window.addEventListener('dhan-cmp-update', () => {
+  updateMarketBadge();
+});
+
+window.addEventListener('te:trades-changed', renderAna);
+
+// Boot
+setTimeout(() => {
+  renderAna();
+  updateMarketBadge();
+  updateAlertStatusIndicator();
+  
+  if (typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen()) {
+    DhanLive.refresh();
+  }
+}, 150);
 </script>
 </body>
 </html>
