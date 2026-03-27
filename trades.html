@@ -20,6 +20,7 @@
       <div class="pill" onclick="fStatus('Partial',this)">Partial</div>
       <div class="pill" onclick="fStatus('Closed',this)">Closed</div>
     </div>
+    <div id="market-status-badge" style="margin-left:12px;font-size:11px;display:flex;align-items:center;gap:6px"></div>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-ghost btn-sm" onclick="mergeTrades()">🔀 Auto-Merge</button>
       <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export</button>
@@ -97,6 +98,9 @@
   </div>
 </div>
 
+<!-- Dhan Live CMP (BEFORE core.js) -->
+<script src="js/dhan-live.js"></script>
+
 <!-- Core Scripts -->
 <script src="js/core.js"></script>
 <script src="js/supabase.js"></script>
@@ -123,7 +127,12 @@ setTimeout(() => {
     fetchPrice: async sym => {
       const el = document.getElementById('f-sym-price');
       if (el) el.textContent = '⏳ Fetching…';
-      const price = await TE.fetchCMP(sym);
+      // Prefer DhanLive if active
+      let price = null;
+      if (typeof DhanLive !== 'undefined' && DhanLive.isDhanActive()) {
+        price = DhanLive.getCMP(sym);
+      }
+      if (!price) price = await TE.fetchCMP(sym);
       if (price) {
         const e0 = document.getElementById('e-price-0');
         if (e0 && !e0.value) e0.value = price.toFixed(2);
@@ -132,6 +141,75 @@ setTimeout(() => {
     }
   });
 }, 100);
+
+// ── Market Status Badge ──
+function updateMarketStatusBadge() {
+  const el = document.getElementById('market-status-badge');
+  if (!el) return;
+  
+  const dhanActive = typeof DhanLive !== 'undefined' && DhanLive.isDhanActive();
+  const marketOpen = typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen();
+  
+  let dot, source, status;
+  if (dhanActive) {
+    dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#00E5A0;box-shadow:0 0 6px #00E5A0"></span>';
+    source = '<span style="color:#00E5A0;font-weight:600">DHAN LIVE</span>';
+  } else {
+    dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F5C542"></span>';
+    source = '<span style="color:#F5C542;font-weight:500">YAHOO</span>';
+  }
+  
+  if (marketOpen) {
+    status = '<span style="color:var(--t3);font-size:10px;margin-left:4px">• Market Open</span>';
+  } else {
+    status = '<span style="color:var(--t4);font-size:10px;margin-left:4px">• Market Closed</span>';
+  }
+  
+  el.innerHTML = `${dot} ${source} ${status}`;
+}
+
+// ── Dhan CMP Update Listener — Live refresh for open trades ──
+window.addEventListener('dhan-cmp-update', (e) => {
+  const prices = e.detail?.prices || {};
+  if (!Object.keys(prices).length) return;
+  
+  // Update CMP in TE.trades for open positions
+  let updated = false;
+  TE.trades.forEach(t => {
+    if (t.status === 'Closed') return;
+    const sym = t.symbol;
+    if (prices[sym] && prices[sym] > 0) {
+      t.cmp = prices[sym];
+      updated = true;
+    }
+  });
+  
+  if (updated) {
+    TE.save();
+    // Re-render only the CMP cells to avoid full table re-render flicker
+    updateCMPCells();
+  }
+  
+  updateMarketStatusBadge();
+});
+
+// ── Update just CMP cells without full re-render ──
+function updateCMPCells() {
+  TE.trades.forEach(t => {
+    if (t.status === 'Closed') return;
+    const cmpEl = document.getElementById(`cmp-${t.id}`);
+    const uplEl = document.getElementById(`upl-${t.id}`);
+    if (cmpEl && t.cmp > 0) {
+      cmpEl.textContent = `₹${t.cmp.toFixed(2)}`;
+    }
+    if (uplEl) {
+      const calc = TE.calc({ ...t });
+      const cls = calc.unrealisedPL > 0 ? 'col-g' : calc.unrealisedPL < 0 ? 'col-r' : 'col-t';
+      uplEl.className = `${cls} mono`;
+      uplEl.textContent = TE.fmt(calc.unrealisedPL);
+    }
+  });
+}
 
 // ── Entry/Exit Row Builders ──
 function buildEntryRow(i, data) {
@@ -281,10 +359,11 @@ function renderTrades() {
   if (!rows.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No trades found</div></div>'; return; }
 
   el.innerHTML = `<table><thead><tr>
-    <th></th><th>Symbol</th><th>Side</th><th>Entries</th><th>Avg Entry</th><th>Exits</th><th>Avg Exit</th><th>Qty</th><th>Status</th><th>Realised P&L</th><th>Unreal P&L</th><th>R:R</th><th>Days</th><th></th>
+    <th></th><th>Symbol</th><th>Side</th><th>Entries</th><th>Avg Entry</th><th>Exits</th><th>Avg Exit</th><th>Qty</th><th>CMP</th><th>Status</th><th>Realised P&L</th><th>Unreal P&L</th><th>R:R</th><th>Days</th><th></th>
   </tr></thead><tbody>` +
   rows.map(t => {
     const epBadge = t.source === 'edgepilot' ? '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:rgba(0,229,160,.12);color:var(--g);font-weight:700;margin-left:3px">EP</span>' : '';
+    const cmpDisplay = t.status !== 'Closed' && t.cmp > 0 ? `₹${t.cmp.toFixed(2)}` : '—';
     return `<tr onclick="toggleExp('${t.id}')">
       <td id="ei-${t.id}" style="color:var(--t3);font-size:10px;width:20px">▶</td>
       <td><div class="sym-cell"><div class="sym-icon">${t.symbol.slice(0,3)}</div><div><div class="sym-name">${t.symbol}${epBadge}</div><div class="sym-date">${t.entries?.[0]?.date || '—'}</div></div></div></td>
@@ -294,9 +373,10 @@ function renderTrades() {
       <td style="font-size:10.5px;color:var(--t3)">${(t.exits||[]).map((e,i)=>`X${i+1}:${e.qty}@₹${(+e.price).toFixed(0)}`).join('<br>')||'—'}</td>
       <td class="mono">${t.avgExit?'₹'+t.avgExit.toFixed(2):'—'}</td>
       <td class="mono">${t.totalQty}</td>
+      <td class="mono" id="cmp-${t.id}">${cmpDisplay}</td>
       <td><span class="dot dot-${t.status.toLowerCase()}"></span>${t.status}</td>
       <td class="${t.realisedPL>0?'col-g':t.realisedPL<0?'col-r':'col-t'} mono">${TE.fmt(t.realisedPL)}</td>
-      <td class="${t.unrealisedPL>0?'col-g':t.unrealisedPL<0?'col-r':'col-t'} mono">${t.status!=='Closed'?TE.fmt(t.unrealisedPL):'—'}</td>
+      <td class="${t.unrealisedPL>0?'col-g':t.unrealisedPL<0?'col-r':'col-t'} mono" id="upl-${t.id}">${t.status!=='Closed'?TE.fmt(t.unrealisedPL):'—'}</td>
       <td><span class="rbdg ${t.rr>0?'pos':t.rr<0?'neg':'neu'}">${t.rr.toFixed(2)}R</span></td>
       <td class="mono">${t.holdDays}d</td>
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
@@ -305,7 +385,7 @@ function renderTrades() {
         <button class="ab dl" onclick="deleteTrade('${t.id}')" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
       </td>
     </tr>
-    <tr><td colspan="14" style="padding:0"><div class="exp-content" id="ec-${t.id}">
+    <tr><td colspan="15" style="padding:0"><div class="exp-content" id="ec-${t.id}">
       <div class="exp-grid">
         <div><div class="exp-lbl">Setup</div><div class="exp-val">${t.setup||'—'}</div></div>
         <div><div class="exp-lbl">Source</div><div class="exp-val">${t.source||'manual'}</div></div>
@@ -317,6 +397,8 @@ function renderTrades() {
       </div>
     </div></td></tr>`;
   }).join('') + '</tbody></table>';
+  
+  updateMarketStatusBadge();
 }
 
 function toggleExp(id) {
@@ -359,9 +441,9 @@ function mergeTrades() {
 function exportCSV() {
   const rows = TE.trades.map(t => {
     const c = TE.calc({...t});
-    return [t.symbol, t.side, t.setup || '', t.status, c.avgEntry.toFixed(2), c.avgExit.toFixed(2), c.totalQty, c.realisedPL.toFixed(2), c.rr.toFixed(2), t.source || ''].join(',');
+    return [t.symbol, t.side, t.setup || '', t.status, c.avgEntry.toFixed(2), c.avgExit.toFixed(2), c.totalQty, t.cmp || 0, c.realisedPL.toFixed(2), c.rr.toFixed(2), t.source || ''].join(',');
   });
-  const csv = ['Symbol,Side,Setup,Status,AvgEntry,AvgExit,Qty,PL,RR,Source', ...rows].join('\n');
+  const csv = ['Symbol,Side,Setup,Status,AvgEntry,AvgExit,Qty,CMP,PL,RR,Source', ...rows].join('\n');
   const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = 'te_trades.csv'; a.click();
 }
 
@@ -434,6 +516,14 @@ window.addEventListener('te:trades-changed', () => renderTrades());
 
 // ── Boot ──
 renderTrades();
+
+// ── Trigger manual Dhan refresh on page load if market open ──
+setTimeout(() => {
+  if (typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen()) {
+    DhanLive.refresh();
+  }
+  updateMarketStatusBadge();
+}, 500);
 </script>
 </body>
 </html>
