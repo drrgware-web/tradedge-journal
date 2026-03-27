@@ -22,12 +22,14 @@ TE.PAGE_MAP = {
   execute:    'execution.html',
   rrm:        'rrm-intel.html',
   mps:        'mps.html',
+  edgepilot:  'autopilot.html',
   settings:   'settings.html',
 };
 
 TE.PAGE_NAMES = {
   dashboard:'Dashboard', trades:'Trade Log', analytics:'Analytics',
   calendar:'Calendar', fund:'Fund Management', ai:'AI Trade Review',
+  edgepilot:'Edge Pilot',
   news:'News Intelligence', alerts:'Price Alerts', ledger:'Broker Ledger',
   possize:'Position Sizing', execute:'Trade Execution',
   rrm:'RRM Intelligence', mps:'MPS Dashboard', settings:'Settings & Sync'
