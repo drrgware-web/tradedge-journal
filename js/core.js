@@ -148,6 +148,98 @@ TE.getWorkerUrl = function() {
   return (localStorage.getItem('zd_worker_url') || '').trim();
 };
 
+// ═══ PRICE FETCHING ══════════════════════════════════════════
+
+/**
+ * Fetch CMP for a symbol - tries DhanLive first, then Yahoo via worker
+ * @param {string} sym - Stock symbol (e.g., 'RELIANCE', 'INFY')
+ * @returns {Promise<number|null>} - Price or null if unavailable
+ */
+TE.fetchCMP = async function(sym) {
+  if (!sym) return null;
+  sym = TE.cleanSym(sym);
+  
+  // 1. Try DhanLive cache first
+  if (typeof DhanLive !== 'undefined') {
+    const cached = DhanLive.getCMP(sym);
+    if (cached) return cached;
+  }
+  
+  // 2. Fetch from Yahoo via worker
+  const url = TE.getWorkerUrl();
+  if (!url) {
+    console.warn('[TE.fetchCMP] No worker URL configured');
+    return null;
+  }
+  
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+      body: JSON.stringify({ ticker: sym + '.NS', range: '1d', interval: '1d' })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.chart?.result?.[0]?.meta?.regularMarketPrice || null;
+  } catch (e) {
+    console.warn('[TE.fetchCMP] Failed for', sym, e.message);
+    return null;
+  }
+};
+
+/**
+ * Fetch CMP with source info - returns { price, source } or null
+ * @param {string} sym - Stock symbol
+ * @returns {Promise<{price: number, source: string}|null>}
+ */
+TE.fetchCMPWithSource = async function(sym) {
+  if (!sym) return null;
+  sym = TE.cleanSym(sym);
+  
+  // 1. Try DhanLive cache first
+  if (typeof DhanLive !== 'undefined') {
+    const cached = DhanLive.getCMP(sym);
+    if (cached) return { price: cached, source: 'dhan' };
+  }
+  
+  // 2. Fetch from Yahoo via worker
+  const url = TE.getWorkerUrl();
+  if (!url) return null;
+  
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+      body: JSON.stringify({ ticker: sym + '.NS', range: '1d', interval: '1d' })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    return price ? { price, source: 'yahoo' } : null;
+  } catch (e) {
+    console.warn('[TE.fetchCMPWithSource] Failed for', sym, e.message);
+    return null;
+  }
+};
+
+/**
+ * Batch fetch CMPs for multiple symbols
+ * @param {string[]} symbols - Array of symbols
+ * @returns {Promise<Object>} - { SYMBOL: price, ... }
+ */
+TE.fetchCMPBatch = async function(symbols) {
+  if (!symbols?.length) return {};
+  
+  const results = {};
+  const promises = symbols.map(async sym => {
+    const price = await TE.fetchCMP(sym);
+    if (price) results[TE.cleanSym(sym)] = price;
+  });
+  
+  await Promise.allSettled(promises);
+  return results;
+};
+
 // ── Telegram helper ──────────────────────────────────────────
 TE.sendTelegram = async function(text) {
   const bot  = localStorage.getItem('te_tg_bot')  || TE.TELEGRAM_BOT;
