@@ -256,9 +256,15 @@ window.addEventListener('te:trades-changed', () => {
   refreshCapital();
 });
 
-// ── Boot ──
-renderDash();
-refreshCapital();
+// ── Boot — defer until sidebar has injected shell ──
+// sidebar.js rewrites body.innerHTML, destroying original canvas refs.
+// Must render AFTER that completes.
+setTimeout(() => {
+  renderDash();
+  refreshCapital();
+  // Force Chart.js resize after layout settles
+  setTimeout(() => { Object.values(charts).forEach(c => c && c.resize()); }, 200);
+}, 150);
 
 // Deferred: auto-pull from cloud if empty
 setTimeout(() => {
