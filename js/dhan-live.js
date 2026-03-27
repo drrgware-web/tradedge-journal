@@ -1,384 +1,272 @@
 /**
- * TradEdge — Dhan Live CMP Module
+ * TradEdge — Dhan Live CMP Module v2
  * js/dhan-live.js
  *
- * Provides real-time Last Traded Price (LTP) via Dhan API.
- * Falls back to Yahoo proxy if Dhan is unavailable.
+ * Real-time LTP via Dhan API through Cloudflare Worker.
+ * Falls back to Yahoo proxy if Dhan unavailable.
+ *
+ * Worker actions used:
+ *   X-Kite-Action: dhan-ltp      → POST { NSE_EQ: [secId, ...] }
+ *   X-Kite-Action: dhan-symbols  → GET  (scrip master CSV)
+ *   X-Kite-Action: yahoo-proxy   → POST { ticker }
+ *
+ * Auth headers: X-Dhan-Token, X-Dhan-ID
  *
  * Usage:
- *   await DhanLive.init();                    // Load symbol map, start polling
- *   const price = DhanLive.getCMP('RELIANCE'); // Get latest cached price
- *   DhanLive.onUpdate(callback);              // Subscribe to price updates
- *   DhanLive.destroy();                       // Stop polling, cleanup
+ *   await DhanLive.init();
+ *   DhanLive.getCMP('RELIANCE');        // cached price
+ *   DhanLive.onUpdate(prices => {...}); // subscribe
+ *   DhanLive.destroy();                 // cleanup
  *
- * Requires in localStorage:
- *   dhan_id    — Dhan Client ID
- *   dhan_tk    — Dhan Access Token
- *   zd_worker_url — Cloudflare Worker base URL
+ * localStorage keys: dhan_id, dhan_tk, zd_worker_url
  */
 
 window.DhanLive = (() => {
   // --- Config ---
-  const POLL_INTERVAL = 30_000;       // 30 seconds
-  const MARKET_OPEN_H = 9;
-  const MARKET_OPEN_M = 15;
-  const MARKET_CLOSE_H = 15;
-  const MARKET_CLOSE_M = 30;
-  const BATCH_SIZE = 50;              // Dhan LTP max per request
-  const SYMBOL_MAP_KEY = 'dhan_symbol_map';
-  const SYMBOL_MAP_TTL = 24 * 60 * 60 * 1000; // 24h cache
+  const POLL_MS = 30_000;
+  const MKT_OPEN  = 9 * 60 + 15;   // 9:15 IST
+  const MKT_CLOSE = 15 * 60 + 45;  // 15:45 IST (+15 min buffer)
+  const BATCH = 50;
+  const SYM_KEY = 'dhan_symbol_map';
+  const SYM_TTL = 24 * 60 * 60 * 1000;
 
   // --- State ---
-  let _symbolMap = {};       // { 'RELIANCE': { secId: 2885, exchange: 'NSE_EQ' }, ... }
-  let _priceCache = {};      // { 'RELIANCE': 1234.50, ... }
-  let _pollTimer = null;
-  let _listeners = [];
-  let _initialized = false;
-  let _workerUrl = '';
-  let _token = '';
-  let _clientId = '';
+  let _map = {};         // { RELIANCE: { secId: 2885, exch: 'NSE_EQ' }, ... }
+  let _prices = {};      // { RELIANCE: 1234.50, ... }
+  let _timer = null;
+  let _cbs = [];
+  let _ready = false;
+  let _url = '', _tk = '', _id = '';
   let _useDhan = false;
 
   // --- Helpers ---
-  function isMarketHours() {
+  function isMarket() {
     const now = new Date();
     const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const day = ist.getDay();
-    if (day === 0 || day === 6) return false; // Weekend
-    const mins = ist.getHours() * 60 + ist.getMinutes();
-    return mins >= (MARKET_OPEN_H * 60 + MARKET_OPEN_M) &&
-           mins <= (MARKET_CLOSE_H * 60 + MARKET_CLOSE_M + 15); // +15 min buffer for closing
+    const d = ist.getDay();
+    if (d === 0 || d === 6) return false;
+    const m = ist.getHours() * 60 + ist.getMinutes();
+    return m >= MKT_OPEN && m <= MKT_CLOSE;
   }
 
-  function getOpenSymbols() {
+  function openSymbols() {
     try {
-      const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-      return [...new Set(trades.filter(t => t.status === 'Open').map(t => t.symbol))];
+      const t = JSON.parse(localStorage.getItem('te_trades') || '[]');
+      return [...new Set(t.filter(x => x.status === 'Open').map(x => x.symbol))];
     } catch { return []; }
   }
 
-  // --- Symbol Map: NSE symbol → Dhan securityId ---
-  async function loadSymbolMap() {
-    // Check localStorage cache first
+  function workerFetch(action, opts = {}) {
+    const headers = { 'Content-Type': 'application/json', 'X-Kite-Action': action };
+    if (_tk) headers['X-Dhan-Token'] = _tk;
+    if (_id) headers['X-Dhan-ID'] = _id;
+    return fetch(_url, { method: 'POST', ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+  }
+
+  // --- Symbol Map ---
+  async function loadMap() {
+    // Cache check
     try {
-      const cached = JSON.parse(localStorage.getItem(SYMBOL_MAP_KEY) || '{}');
-      if (cached._ts && Date.now() - cached._ts < SYMBOL_MAP_TTL && Object.keys(cached).length > 100) {
-        delete cached._ts;
-        _symbolMap = cached;
-        console.log(`[DhanLive] Symbol map loaded from cache (${Object.keys(_symbolMap).length} symbols)`);
+      const c = JSON.parse(localStorage.getItem(SYM_KEY) || '{}');
+      if (c._ts && Date.now() - c._ts < SYM_TTL && Object.keys(c).length > 100) {
+        delete c._ts;
+        _map = c;
+        console.log(`[DhanLive] Symbol map from cache (${Object.keys(_map).length})`);
         return;
       }
     } catch {}
 
-    // Fetch fresh from worker → Dhan master CSV
+    // Fetch fresh
     try {
-      const resp = await fetch(`${_workerUrl}/dhan-symbols`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const csv = await resp.text();
+      const res = await workerFetch('dhan-symbols', { body: '{}' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const csv = await res.text();
       const lines = csv.split('\n');
-      const header = lines[0].split(',');
+      const hdr = lines[0].split(',');
 
-      // Find column indices
-      const iSym = header.indexOf('SEM_TRADING_SYMBOL') !== -1
-        ? header.indexOf('SEM_TRADING_SYMBOL')
-        : header.indexOf('SEM_CUSTOM_SYMBOL');
-      const iSecId = header.indexOf('SEM_SMST_SECURITY_ID');
-      const iExch = header.indexOf('SEM_EXM_EXCH_ID');
-      const iSeg = header.indexOf('SEM_SEGMENT');
-      const iSeries = header.indexOf('SEM_SERIES');
+      const iSym = Math.max(hdr.indexOf('SEM_TRADING_SYMBOL'), hdr.indexOf('SEM_CUSTOM_SYMBOL'));
+      const iSec = hdr.indexOf('SEM_SMST_SECURITY_ID');
+      const iExch = hdr.indexOf('SEM_EXM_EXCH_ID');
+      const iSeg = hdr.indexOf('SEM_SEGMENT');
+      const iSeries = hdr.indexOf('SEM_SERIES');
 
-      if (iSym === -1 || iSecId === -1) {
-        // Try alternate column names
-        console.warn('[DhanLive] Could not find expected columns, trying alternate parse');
-        throw new Error('Column mismatch');
-      }
+      if (iSym === -1 || iSec === -1) throw new Error('Column mismatch in scrip master');
 
       const map = {};
       for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        if (!cols[iSym] || !cols[iSecId]) continue;
+        const c = lines[i].split(',');
+        if (!c[iSym] || !c[iSec]) continue;
+        const exch = (c[iExch] || '').trim();
+        const seg = (c[iSeg] || '').trim();
+        const series = (c[iSeries] || '').trim();
 
-        const exch = (cols[iExch] || '').trim();
-        const seg = (cols[iSeg] || '').trim();
-        const series = (cols[iSeries] || '').trim();
-
-        // Only NSE equity (EQ series)
         if (exch === 'NSE' && (series === 'EQ' || seg === 'E')) {
-          const sym = cols[iSym].trim().replace(/-EQ$/, '');
-          map[sym] = {
-            secId: parseInt(cols[iSecId].trim()),
-            exchange: 'NSE_EQ'
-          };
+          const sym = c[iSym].trim().replace(/-EQ$/, '');
+          map[sym] = { secId: parseInt(c[iSec].trim()), exch: 'NSE_EQ' };
         }
       }
 
-      _symbolMap = map;
-      // Cache with timestamp
-      const toStore = { ...map, _ts: Date.now() };
-      try { localStorage.setItem(SYMBOL_MAP_KEY, JSON.stringify(toStore)); } catch {}
+      _map = map;
+      try { localStorage.setItem(SYM_KEY, JSON.stringify({ ...map, _ts: Date.now() })); } catch {}
       console.log(`[DhanLive] Symbol map built (${Object.keys(map).length} NSE equities)`);
     } catch (err) {
-      console.warn('[DhanLive] Symbol map fetch failed, Dhan LTP unavailable:', err.message);
-      _symbolMap = {};
+      console.warn('[DhanLive] Symbol map failed:', err.message);
+      _map = {};
     }
   }
 
-  // --- Fetch LTP via Dhan ---
-  async function fetchDhanLTP(symbols) {
+  // --- Dhan LTP ---
+  async function fetchDhan(symbols) {
     if (!symbols.length) return {};
+    const valid = symbols.filter(s => _map[s]);
+    if (!valid.length) return {};
 
-    // Map symbols to security IDs
-    const validSymbols = symbols.filter(s => _symbolMap[s]);
-    if (!validSymbols.length) return {};
-
-    const results = {};
-    // Batch requests (Dhan limits per call)
-    for (let i = 0; i < validSymbols.length; i += BATCH_SIZE) {
-      const batch = validSymbols.slice(i, i + BATCH_SIZE);
-      const secIds = batch.map(s => _symbolMap[s].secId);
+    const out = {};
+    for (let i = 0; i < valid.length; i += BATCH) {
+      const batch = valid.slice(i, i + BATCH);
+      const ids = batch.map(s => _map[s].secId);
 
       try {
-        const resp = await fetch(`${_workerUrl}/dhan-ltp?token=${encodeURIComponent(_token)}&client_id=${encodeURIComponent(_clientId)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ NSE_EQ: secIds })
+        const res = await workerFetch('dhan-ltp', {
+          body: JSON.stringify({ NSE_EQ: ids })
         });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
 
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-
-        // Map security IDs back to symbols
-        if (data && data.data) {
+        if (data?.data) {
           for (const sym of batch) {
-            const secId = _symbolMap[sym].secId;
-            const entry = data.data[String(secId)] || data.data[secId];
-            if (entry && entry.last_price != null) {
-              results[sym] = entry.last_price;
-            }
+            const id = _map[sym].secId;
+            const entry = data.data[String(id)] || data.data[id];
+            if (entry?.last_price != null) out[sym] = entry.last_price;
           }
         }
       } catch (err) {
-        console.warn(`[DhanLive] Dhan LTP batch failed:`, err.message);
+        console.warn('[DhanLive] LTP batch failed:', err.message);
       }
     }
-
-    return results;
+    return out;
   }
 
-  // --- Fallback: Yahoo via Cloudflare Worker ---
-  async function fetchYahooLTP(symbols) {
-    const results = {};
-    // Yahoo can handle comma-separated symbols
-    const yahooSymbols = symbols.map(s => `${s}.NS`).join(',');
-
-    try {
-      const resp = await fetch(`${_workerUrl}/yahoo-proxy?symbols=${encodeURIComponent(yahooSymbols)}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-
-      if (data && data.quoteResponse && data.quoteResponse.result) {
-        for (const q of data.quoteResponse.result) {
-          const sym = q.symbol.replace('.NS', '').replace('.BO', '');
-          if (q.regularMarketPrice) {
-            results[sym] = q.regularMarketPrice;
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[DhanLive] Yahoo fallback failed:', err.message);
-    }
-
-    return results;
+  // --- Yahoo Fallback ---
+  async function fetchYahoo(symbols) {
+    const out = {};
+    const promises = symbols.map(async (sym) => {
+      try {
+        const res = await workerFetch('yahoo-proxy', {
+          body: JSON.stringify({ ticker: sym + '.NS', range: '1d', interval: '1d' })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (price) out[sym] = price;
+      } catch {}
+    });
+    await Promise.allSettled(promises);
+    return out;
   }
 
-  // --- Poll: Fetch prices and notify listeners ---
+  // --- Poll ---
   async function poll() {
-    const symbols = getOpenSymbols();
-    if (!symbols.length) return;
+    const syms = openSymbols();
+    if (!syms.length) return;
 
     let prices = {};
 
-    // Try Dhan first
-    if (_useDhan && Object.keys(_symbolMap).length > 0) {
-      prices = await fetchDhanLTP(symbols);
+    if (_useDhan && Object.keys(_map).length > 0) {
+      prices = await fetchDhan(syms);
     }
 
-    // Fallback to Yahoo for any missing symbols
-    const missing = symbols.filter(s => prices[s] == null);
+    const missing = syms.filter(s => prices[s] == null);
     if (missing.length > 0) {
-      const yahooPrices = await fetchYahooLTP(missing);
-      prices = { ...prices, ...yahooPrices };
+      const yp = await fetchYahoo(missing);
+      prices = { ...prices, ...yp };
     }
 
-    // Update cache
     let changed = false;
     for (const [sym, price] of Object.entries(prices)) {
-      if (price != null && _priceCache[sym] !== price) {
-        _priceCache[sym] = price;
+      if (price != null && _prices[sym] !== price) {
+        _prices[sym] = price;
         changed = true;
       }
     }
 
-    // Update te_trades CMP field
     if (changed) {
       try {
         const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-        let updated = false;
+        let upd = false;
         for (const t of trades) {
           if (t.status === 'Open' && prices[t.symbol] != null) {
             t.cmp = prices[t.symbol];
-            updated = true;
+            upd = true;
           }
         }
-        if (updated) {
-          localStorage.setItem('te_trades', JSON.stringify(trades));
-        }
+        if (upd) localStorage.setItem('te_trades', JSON.stringify(trades));
       } catch {}
 
-      // Notify listeners
-      for (const cb of _listeners) {
-        try { cb({ ...prices }); } catch {}
-      }
-
-      // Dispatch custom event for other modules
-      window.dispatchEvent(new CustomEvent('dhan-cmp-update', { detail: { prices: { ...prices } } }));
+      const snapshot = { ...prices };
+      for (const cb of _cbs) { try { cb(snapshot); } catch {} }
+      window.dispatchEvent(new CustomEvent('dhan-cmp-update', { detail: { prices: snapshot } }));
     }
 
     return prices;
   }
 
-  // --- Start/Stop Polling ---
-  function startPolling() {
-    stopPolling();
-    // Immediate first fetch
+  function startPoll() {
+    stopPoll();
     poll();
-    _pollTimer = setInterval(() => {
-      if (isMarketHours()) {
-        poll();
-      }
-    }, POLL_INTERVAL);
-    console.log('[DhanLive] Polling started (30s interval, market hours only)');
+    _timer = setInterval(() => { if (isMarket()) poll(); }, POLL_MS);
+    console.log('[DhanLive] Polling started (30s, market hours)');
   }
 
-  function stopPolling() {
-    if (_pollTimer) {
-      clearInterval(_pollTimer);
-      _pollTimer = null;
-    }
+  function stopPoll() {
+    if (_timer) { clearInterval(_timer); _timer = null; }
   }
 
   // --- Public API ---
   return {
-    /**
-     * Initialize Dhan Live module.
-     * Loads symbol map, starts polling if credentials available.
-     */
     async init() {
-      if (_initialized) return;
+      if (_ready) return;
+      _url = (localStorage.getItem('zd_worker_url') || '').replace(/\/$/, '');
+      _tk = localStorage.getItem('dhan_tk') || '';
+      _id = localStorage.getItem('dhan_id') || '';
+      _useDhan = !!(_url && _tk && _id);
 
-      _workerUrl = (localStorage.getItem('zd_worker_url') || '').replace(/\/$/, '');
-      _token = localStorage.getItem('dhan_tk') || '';
-      _clientId = localStorage.getItem('dhan_id') || '';
-      _useDhan = !!(_workerUrl && _token && _clientId);
-
-      if (!_workerUrl) {
-        console.warn('[DhanLive] No worker URL configured. Set zd_worker_url in localStorage.');
-        return;
-      }
+      if (!_url) { console.warn('[DhanLive] No zd_worker_url set'); return; }
 
       if (_useDhan) {
-        await loadSymbolMap();
+        await loadMap();
         console.log('[DhanLive] Dhan mode active');
       } else {
-        console.log('[DhanLive] Dhan creds missing — Yahoo fallback only');
+        console.log('[DhanLive] No Dhan creds — Yahoo only');
       }
 
-      _initialized = true;
-      startPolling();
+      _ready = true;
+      startPoll();
     },
 
-    /**
-     * Get cached CMP for a symbol. Returns null if not available.
-     */
-    getCMP(symbol) {
-      return _priceCache[symbol] ?? null;
-    },
+    getCMP(sym) { return _prices[sym] ?? null; },
+    getAllCMP() { return { ..._prices }; },
+    async refresh() { return await poll(); },
 
-    /**
-     * Get all cached prices. Returns { symbol: price, ... }
-     */
-    getAllCMP() {
-      return { ..._priceCache };
-    },
+    onUpdate(cb) { if (typeof cb === 'function') _cbs.push(cb); },
+    offUpdate(cb) { _cbs = _cbs.filter(x => x !== cb); },
 
-    /**
-     * Force an immediate price refresh. Returns prices object.
-     */
-    async refresh() {
-      return await poll();
-    },
+    isDhanActive() { return _useDhan && Object.keys(_map).length > 0; },
+    isMarketOpen() { return isMarket(); },
+    getSymbolInfo(sym) { return _map[sym] || null; },
 
-    /**
-     * Subscribe to price updates.
-     * Callback receives { symbol: price, ... } on each update.
-     */
-    onUpdate(callback) {
-      if (typeof callback === 'function') {
-        _listeners.push(callback);
-      }
-    },
+    destroy() { stopPoll(); _cbs = []; _ready = false; },
 
-    /**
-     * Remove a listener.
-     */
-    offUpdate(callback) {
-      _listeners = _listeners.filter(cb => cb !== callback);
-    },
-
-    /**
-     * Check if Dhan is the active source (vs Yahoo fallback).
-     */
-    isDhanActive() {
-      return _useDhan && Object.keys(_symbolMap).length > 0;
-    },
-
-    /**
-     * Check if currently within market hours.
-     */
-    isMarketOpen() {
-      return isMarketHours();
-    },
-
-    /**
-     * Get symbol map info (for debugging).
-     */
-    getSymbolInfo(symbol) {
-      return _symbolMap[symbol] || null;
-    },
-
-    /**
-     * Stop polling and cleanup.
-     */
-    destroy() {
-      stopPolling();
-      _listeners = [];
-      _initialized = false;
-      console.log('[DhanLive] Destroyed');
-    },
-
-    /**
-     * Reconfigure credentials without full re-init.
-     */
     reconfigure() {
-      _token = localStorage.getItem('dhan_tk') || '';
-      _clientId = localStorage.getItem('dhan_id') || '';
-      _useDhan = !!(_workerUrl && _token && _clientId);
-      console.log(`[DhanLive] Reconfigured — Dhan ${_useDhan ? 'active' : 'inactive'}`);
+      _tk = localStorage.getItem('dhan_tk') || '';
+      _id = localStorage.getItem('dhan_id') || '';
+      _useDhan = !!(_url && _tk && _id);
+      console.log(`[DhanLive] Reconfigured — Dhan ${_useDhan ? 'ON' : 'OFF'}`);
     }
   };
 })();
 
-// Auto-init when DOM ready (pages can also call DhanLive.init() manually)
+// Auto-init
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => DhanLive.init());
 } else {

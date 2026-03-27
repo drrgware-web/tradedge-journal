@@ -1,120 +1,81 @@
 /**
- * TradEdge — Dhan Orders Module
+ * TradEdge — Dhan Orders Module v2
  * js/dhan-orders.js
  *
- * Place and manage orders via Dhan API through Cloudflare Worker.
- * Integrates with Edge Pilot's executeOrder() flow.
+ * Order placement via Dhan API through Cloudflare Worker.
  *
- * Usage:
- *   const result = await DhanOrders.placeBracketOrder({
- *     symbol: 'RELIANCE',
- *     qty: 10,
- *     price: 1234.50,      // limit price (0 = market)
- *     sl: 1200,            // stop-loss trigger
- *     target: 1300,        // optional target
- *     product: 'CNC'       // CNC (delivery) | MIS (intraday)
- *   });
+ * Worker actions used:
+ *   X-Kite-Action: dhan-place   → POST order
+ *   X-Kite-Action: dhan-orders  → GET  order list
+ *   X-Kite-Action: dhan-cancel  → POST { orderId }
+ *   X-Kite-Action: dhan-positions → GET
+ *   X-Kite-Action: dhan-holdings  → GET
+ *   X-Kite-Action: dhan-margins   → GET
+ *   X-Kite-Action: dhan-forever-place/list/modify/delete
  *
- *   const orders = await DhanOrders.getOrders();
- *   const positions = await DhanOrders.getPositions();
- *   const holdings = await DhanOrders.getHoldings();
- *
- * Requires: DhanLive to be initialized (for symbol → securityId mapping)
- * localStorage: dhan_id, dhan_tk, zd_worker_url
+ * Auth: X-Dhan-Token, X-Dhan-ID headers
+ * Requires: DhanLive (for symbol → securityId mapping)
  */
 
 window.DhanOrders = (() => {
-  // --- Config ---
-  const ORDER_TYPES = {
-    MARKET: 'MARKET',
-    LIMIT: 'LIMIT',
-    SL: 'STOP_LOSS',
-    SLM: 'STOP_LOSS_MARKET'
-  };
 
-  const PRODUCT_TYPES = {
-    CNC: 'CNC',       // Delivery
-    MIS: 'INTRADAY',  // Intraday (Dhan uses INTRADAY not MIS)
-    BO: 'BO',         // Bracket Order
-    CO: 'CO'          // Cover Order
-  };
-
-  // --- Helpers ---
   function getCreds() {
-    const workerUrl = (localStorage.getItem('zd_worker_url') || '').replace(/\/$/, '');
-    const token = localStorage.getItem('dhan_tk') || '';
-    const clientId = localStorage.getItem('dhan_id') || '';
-    if (!workerUrl || !token || !clientId) {
-      throw new Error('Dhan credentials not configured. Set dhan_id, dhan_tk, zd_worker_url in Settings.');
-    }
-    return { workerUrl, token, clientId };
+    const url = (localStorage.getItem('zd_worker_url') || '').replace(/\/$/, '');
+    const tk = localStorage.getItem('dhan_tk') || '';
+    const id = localStorage.getItem('dhan_id') || '';
+    if (!url || !tk || !id) throw new Error('Dhan credentials not configured. Set dhan_id + dhan_tk in Settings.');
+    return { url, tk, id };
   }
 
-  function getSecurityId(symbol) {
+  function getSecId(symbol) {
     if (!window.DhanLive) throw new Error('DhanLive module not loaded');
     const info = DhanLive.getSymbolInfo(symbol);
-    if (!info) throw new Error(`Unknown symbol: ${symbol}. Symbol map may not be loaded.`);
-    return info;
+    if (!info) throw new Error(`Unknown symbol: ${symbol}. Ensure DhanLive is initialized.`);
+    return info; // { secId, exch }
   }
 
-  async function dhanRequest(endpoint, method = 'GET', body = null) {
-    const { workerUrl, token, clientId } = getCreds();
-    const url = `${workerUrl}${endpoint}?token=${encodeURIComponent(token)}&client_id=${encodeURIComponent(clientId)}`;
-
-    const opts = {
-      method,
-      headers: { 'Content-Type': 'application/json' }
+  async function workerCall(action, body = null) {
+    const { url, tk, id } = getCreds();
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Kite-Action': action,
+      'X-Dhan-Token': tk,
+      'X-Dhan-ID': id
     };
+    const opts = { method: 'POST', headers };
     if (body) opts.body = JSON.stringify(body);
 
-    const resp = await fetch(url, opts);
-    const data = await resp.json();
+    const res = await fetch(url, opts);
+    const data = await res.json();
 
-    if (!resp.ok) {
-      const msg = data?.remarks || data?.error || data?.message || `HTTP ${resp.status}`;
-      throw new Error(`Dhan API error: ${msg}`);
+    if (data?.error || data?.status === 'error') {
+      throw new Error(data.remarks || data.error || data.message || `Worker ${action} failed`);
     }
-
     return data;
   }
 
   // --- Order Placement ---
 
-  /**
-   * Place a simple order (LIMIT or MARKET).
-   */
-  async function placeOrder({
-    symbol,
-    qty,
-    price = 0,
-    side = 'BUY',
-    product = 'CNC',
-    orderType = null
-  }) {
-    const { secId, exchange } = getSecurityId(symbol);
-
-    const oType = orderType || (price > 0 ? ORDER_TYPES.LIMIT : ORDER_TYPES.MARKET);
-    const dhanProduct = PRODUCT_TYPES[product] || product;
+  async function placeOrder({ symbol, qty, price = 0, side = 'BUY', product = 'CNC', orderType = null }) {
+    const { secId, exch } = getSecId(symbol);
+    const oType = orderType || (price > 0 ? 'LIMIT' : 'MARKET');
 
     const payload = {
-      dhanClientId: getCreds().clientId,
-      transactionType: side.toUpperCase(),
-      exchangeSegment: exchange,
-      productType: dhanProduct,
-      orderType: oType,
-      validity: 'DAY',
+      symbol,
       securityId: String(secId),
+      exchange: exch || 'NSE_EQ',
+      transaction_type: side.toUpperCase(),
+      order_type: oType,
+      product,
       quantity: qty,
-      price: oType === ORDER_TYPES.MARKET ? 0 : price,
-      triggerPrice: 0,
-      disclosedQuantity: 0,
-      afterMarketOrder: false
+      price: oType === 'MARKET' ? 0 : price,
+      trigger_price: 0,
+      validity: 'DAY'
     };
 
-    console.log('[DhanOrders] Placing order:', payload);
-    const result = await dhanRequest('/dhan-orders', 'POST', payload);
+    console.log('[DhanOrders] Placing:', payload);
+    const result = await workerCall('dhan-place', payload);
 
-    // Log to console and dispatch event
     window.dispatchEvent(new CustomEvent('dhan-order-placed', {
       detail: { symbol, side, qty, price, result }
     }));
@@ -127,103 +88,62 @@ window.DhanOrders = (() => {
     };
   }
 
-  /**
-   * Place a bracket order: Entry + SL + optional Target.
-   * For CNC (delivery), this places separate orders since Dhan BO is intraday-only.
-   */
-  async function placeBracketOrder({
-    symbol,
-    qty,
-    price = 0,
-    sl,
-    target = null,
-    product = 'CNC',
-    side = 'BUY'
-  }) {
-    if (!sl) throw new Error('Stop-loss is required for bracket orders');
+  async function placeSLOrder({ symbol, qty, triggerPrice, side = 'SELL', product = 'CNC' }) {
+    const { secId, exch } = getSecId(symbol);
 
-    const results = {
-      entry: null,
-      stopLoss: null,
-      target: null,
-      errors: []
-    };
+    return await workerCall('dhan-place', {
+      symbol,
+      securityId: String(secId),
+      exchange: exch || 'NSE_EQ',
+      transaction_type: side.toUpperCase(),
+      order_type: 'SL-M',
+      product,
+      quantity: qty,
+      price: 0,
+      trigger_price: triggerPrice,
+      validity: 'DAY'
+    });
+  }
 
-    // --- Entry Order ---
+  async function placeBracketOrder({ symbol, qty, price = 0, sl, target = null, product = 'CNC', side = 'BUY' }) {
+    if (!sl) throw new Error('Stop-loss required');
+
+    const results = { entry: null, stopLoss: null, target: null, errors: [] };
+
+    // Entry
     try {
       results.entry = await placeOrder({ symbol, qty, price, side, product });
     } catch (err) {
-      results.errors.push(`Entry failed: ${err.message}`);
+      results.errors.push(`Entry: ${err.message}`);
       return results;
     }
 
-    // --- Stop-Loss Order (SL-M) ---
-    // For delivery (CNC), place a separate SL-M sell order
-    // The SL order uses the opposite side
+    // SL-M (opposite side)
     const slSide = side === 'BUY' ? 'SELL' : 'BUY';
     try {
-      const { secId, exchange } = getSecurityId(symbol);
-      const slPayload = {
-        dhanClientId: getCreds().clientId,
-        transactionType: slSide,
-        exchangeSegment: exchange,
-        productType: PRODUCT_TYPES[product] || product,
-        orderType: ORDER_TYPES.SLM,
-        validity: 'DAY',
-        securityId: String(secId),
-        quantity: qty,
-        price: 0,
-        triggerPrice: sl,
-        disclosedQuantity: 0,
-        afterMarketOrder: false
-      };
-
-      const slResult = await dhanRequest('/dhan-orders', 'POST', slPayload);
-      results.stopLoss = {
-        success: true,
-        orderId: slResult.orderId,
-        triggerPrice: sl,
-        raw: slResult
-      };
+      const slResult = await placeSLOrder({ symbol, qty, triggerPrice: sl, side: slSide, product });
+      results.stopLoss = { success: true, orderId: slResult.orderId, trigger: sl, raw: slResult };
     } catch (err) {
-      results.errors.push(`SL order failed: ${err.message}`);
+      results.errors.push(`SL: ${err.message}`);
     }
 
-    // --- Target Order (LIMIT) ---
+    // Target (LIMIT, opposite side)
     if (target) {
       try {
-        results.target = await placeOrder({
-          symbol,
-          qty,
-          price: target,
-          side: slSide,
-          product
-        });
+        results.target = await placeOrder({ symbol, qty, price: target, side: slSide, product });
       } catch (err) {
-        results.errors.push(`Target order failed: ${err.message}`);
+        results.errors.push(`Target: ${err.message}`);
       }
     }
 
-    // Dispatch event
-    window.dispatchEvent(new CustomEvent('dhan-bracket-placed', {
-      detail: { symbol, results }
-    }));
-
+    window.dispatchEvent(new CustomEvent('dhan-bracket-placed', { detail: { symbol, results } }));
     return results;
   }
 
-  // --- Pyramid Add (additional entry at higher price) ---
-  async function placePyramidOrder({
-    symbol,
-    qty,
-    price = 0,
-    sl,
-    pyramidLevel = 'P2',
-    product = 'CNC'
-  }) {
+  async function placePyramidOrder({ symbol, qty, price = 0, sl, pyramidLevel = 'P2', product = 'CNC' }) {
     const result = await placeOrder({ symbol, qty, price, product });
 
-    // Update te_trades with pyramid metadata
+    // Update te_trades pyramid metadata
     try {
       const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
       const trade = trades.find(t => t.symbol === symbol && t.status === 'Open');
@@ -243,116 +163,126 @@ window.DhanOrders = (() => {
     return result;
   }
 
-  // --- Order/Position/Holdings Queries ---
+  // --- Dhan Forever Orders (GTT equivalent) ---
 
-  async function getOrders() {
-    return await dhanRequest('/dhan-orders', 'GET');
+  async function placeForeverSL({ symbol, qty, triggerPrice, price = 0, product = 'CNC', side = 'SELL' }) {
+    const { secId, exch } = getSecId(symbol);
+    return await workerCall('dhan-forever-place', {
+      securityId: String(secId),
+      exchange: exch || 'NSE_EQ',
+      transaction_type: side,
+      order_type: price > 0 ? 'LIMIT' : 'SL-M',
+      product,
+      quantity: qty,
+      price,
+      trigger_price: triggerPrice,
+      type: 'SINGLE'
+    });
   }
 
-  async function getPositions() {
-    return await dhanRequest('/dhan-positions', 'GET');
+  async function placeForeverOCO({ symbol, qty, slTrigger, slPrice = 0, targetPrice, product = 'CNC' }) {
+    const { secId, exch } = getSecId(symbol);
+    return await workerCall('dhan-forever-place', {
+      securityId: String(secId),
+      exchange: exch || 'NSE_EQ',
+      transaction_type: 'SELL',
+      order_type: 'LIMIT',
+      product,
+      quantity: qty,
+      price: targetPrice,
+      trigger_price: 0,
+      type: 'OCO',
+      slTrigger,
+      slPrice: slPrice || 0,
+      qty1: qty
+    });
   }
 
-  async function getHoldings() {
-    return await dhanRequest('/dhan-holdings', 'GET');
-  }
+  // --- Queries ---
 
-  /**
-   * Cancel an order by orderId.
-   */
+  async function getOrders() { return await workerCall('dhan-orders', {}); }
+  async function getPositions() { return await workerCall('dhan-positions', {}); }
+  async function getHoldings() { return await workerCall('dhan-holdings', {}); }
+  async function getMargins() { return await workerCall('dhan-margins', {}); }
+  async function getForeverOrders() { return await workerCall('dhan-forever-list', {}); }
+
   async function cancelOrder(orderId) {
-    const { workerUrl, token, clientId } = getCreds();
-    // Dhan cancel is DELETE /v2/orders/{orderId}
-    const url = `${workerUrl}/dhan-orders?token=${encodeURIComponent(token)}&client_id=${encodeURIComponent(clientId)}&order_id=${orderId}`;
-    const resp = await fetch(url, { method: 'DELETE' });
-    return await resp.json();
+    return await workerCall('dhan-cancel', { orderId });
   }
 
-  // --- Telegram Notification ---
-  async function notifyTelegram(message) {
+  async function cancelForever(orderId) {
+    return await workerCall('dhan-forever-delete', { orderId });
+  }
+
+  // --- Telegram ---
+  async function notifyTelegram(msg) {
     try {
-      const botToken = '8659936599';
-      const chatId = '183752078';
-      // Use worker to avoid CORS, or direct if allowed
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
+      await fetch(`https://api.telegram.org/bot8659936599:AAGoa-eJV35BxhLUogzel_0JcLp6d8yZz2U/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: 'HTML'
-        })
+        body: JSON.stringify({ chat_id: '183752078', text: msg, parse_mode: 'HTML' })
       });
     } catch (err) {
-      console.warn('[DhanOrders] Telegram notification failed:', err.message);
+      console.warn('[DhanOrders] Telegram failed:', err.message);
     }
   }
 
   // --- Public API ---
   return {
     placeOrder,
+    placeSLOrder,
     placeBracketOrder,
     placePyramidOrder,
+    placeForeverSL,
+    placeForeverOCO,
     getOrders,
     getPositions,
     getHoldings,
+    getMargins,
+    getForeverOrders,
     cancelOrder,
+    cancelForever,
     notifyTelegram,
 
     /**
-     * Full execution flow for Edge Pilot.
-     * Places order + SL + optional target, logs to te_trades, sends Telegram alert.
+     * Full Edge Pilot execution flow:
+     * Place order + SL + Telegram alert
      */
-    async executeFromEdgePilot({
-      symbol, qty, price, sl, target, product = 'CNC', pyramidLevel = null
-    }) {
-      const actionLabel = pyramidLevel ? `${pyramidLevel} ADD` : 'ENTRY';
+    async executeFromEdgePilot({ symbol, qty, price, sl, target, product = 'CNC', pyramidLevel = null }) {
+      const label = pyramidLevel ? `${pyramidLevel} ADD` : 'ENTRY';
 
       try {
         let result;
         if (pyramidLevel) {
-          result = await placePyramidOrder({ symbol, qty, price, sl, pyramidLevel, product });
-          result = { entry: result, stopLoss: null, target: null, errors: [] };
+          const r = await placePyramidOrder({ symbol, qty, price, sl, pyramidLevel, product });
+          result = { entry: r, stopLoss: null, target: null, errors: [] };
         } else {
           result = await placeBracketOrder({ symbol, qty, price, sl, target, product });
         }
 
-        // Build Telegram message
         const entryId = result.entry?.orderId || 'N/A';
         const slId = result.stopLoss?.orderId || 'N/A';
-        const errors = result.errors.length ? `\n⚠️ ${result.errors.join(', ')}` : '';
+        const errs = result.errors.length ? `\n⚠️ ${result.errors.join(', ')}` : '';
 
-        const msg = `🟢 <b>EDGE PILOT — ${actionLabel}</b>\n` +
+        await notifyTelegram(
+          `🟢 <b>EDGE PILOT — ${label}</b>\n` +
           `📊 ${symbol}\n` +
           `💰 Qty: ${qty} @ ₹${price || 'MKT'}\n` +
           `🛡️ SL: ₹${sl}\n` +
           (target ? `🎯 Target: ₹${target}\n` : '') +
           `📋 Entry: #${entryId}\n` +
-          `📋 SL: #${slId}${errors}`;
-
-        await notifyTelegram(msg);
+          `📋 SL: #${slId}${errs}`
+        );
 
         return result;
       } catch (err) {
-        // Notify failure
-        await notifyTelegram(
-          `🔴 <b>ORDER FAILED</b>\n📊 ${symbol}\n❌ ${err.message}`
-        );
+        await notifyTelegram(`🔴 <b>ORDER FAILED</b>\n📊 ${symbol}\n❌ ${err.message}`);
         throw err;
       }
     },
 
-    /**
-     * Check if Dhan order placement is available.
-     */
     isReady() {
-      try {
-        getCreds();
-        return true;
-      } catch {
-        return false;
-      }
+      try { getCreds(); return true; } catch { return false; }
     }
   };
 })();
