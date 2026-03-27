@@ -200,6 +200,123 @@
   </div>
 </div>
 
+<!-- Corporate Actions Panel -->
+<div id="corp-actions-panel" style="margin-top:16px">
+  <div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">📰</span>
+        <span style="font-size:12px;font-weight:700;color:var(--t1)">Corporate Actions & AI Insights</span>
+        <span id="corp-actions-count" style="font-size:10px;color:var(--t3);background:var(--bg3);padding:2px 8px;border-radius:10px">0</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-ghost btn-xs" onclick="refreshCorpActions()" id="corp-refresh-btn">↻ Refresh</button>
+        <button class="btn btn-ghost btn-xs" onclick="toggleCorpActionsPanel()" id="corp-toggle-btn">▼</button>
+      </div>
+    </div>
+    
+    <!-- Collapsible Content -->
+    <div id="corp-actions-content" style="display:none">
+      <div id="corp-actions-list" style="max-height:400px;overflow-y:auto">
+        <div style="text-align:center;padding:20px;color:var(--t3)">
+          <div class="spinner" style="margin:0 auto 12px"></div>
+          <div>Loading corporate actions...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Panel -->
+<div id="settings-panel" style="margin-top:16px">
+  <div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">⚙️</span>
+        <span style="font-size:12px;font-weight:700;color:var(--t1)">Settings</span>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="toggleSettingsPanel()" id="settings-toggle-btn">▼</button>
+    </div>
+    
+    <!-- Collapsible Settings -->
+    <div id="settings-content" style="display:none">
+      <div style="display:grid;gap:12px">
+        
+        <!-- Groq API Key -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">🤖</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Groq AI Key</span>
+            <span id="groq-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="groq-key-input" placeholder="gsk_xxxxx..." style="flex:1;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:11px">
+            <button class="btn btn-ghost btn-xs" onclick="toggleGroqKeyVisibility()" id="groq-eye-btn" style="padding:8px">👁️</button>
+            <button class="btn btn-xs" onclick="saveGroqKey()" style="background:var(--g);color:#000;font-weight:600;padding:8px 12px">Save</button>
+          </div>
+          <div style="font-size:9px;color:var(--t4);margin-top:6px">
+            Get free key from <a href="https://console.groq.com/keys" target="_blank" style="color:var(--b)">console.groq.com/keys</a> • Used for AI sentiment analysis
+          </div>
+        </div>
+        
+        <!-- Telegram Settings -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">📱</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Telegram Alerts</span>
+            <span id="telegram-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Bot Token</label>
+              <input type="password" id="tg-bot-input" placeholder="123456:ABC..." style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Chat ID</label>
+              <input type="text" id="tg-chat-input" placeholder="183752078" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-xs" onclick="testTelegram()" style="flex:1">🧪 Test</button>
+            <button class="btn btn-xs" onclick="saveTelegramSettings()" style="background:var(--g);color:#000;font-weight:600;flex:1">Save</button>
+          </div>
+        </div>
+        
+        <!-- Dhan API Settings -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">📊</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Dhan API</span>
+            <span id="dhan-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Client ID</label>
+              <input type="text" id="dhan-id-input" placeholder="1234567890" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Access Token</label>
+              <input type="password" id="dhan-token-input" placeholder="eyJ..." style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+          </div>
+          <button class="btn btn-xs" onclick="saveDhanSettings()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save Dhan Settings</button>
+        </div>
+        
+        <!-- Worker URL -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">🌐</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Cloudflare Worker URL</span>
+          </div>
+          <input type="text" id="worker-url-input" placeholder="https://xxx.workers.dev" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px;margin-bottom:8px">
+          <button class="btn btn-xs" onclick="saveWorkerUrl()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save Worker URL</button>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Quick Launch Links -->
 <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
   <a href="autopilot.html" style="flex:1;min-width:160px;text-decoration:none">
@@ -255,6 +372,9 @@
 
 <!-- Dhan Intraday Alerts -->
 <script src="js/dhan-alerts.js"></script>
+
+<!-- Corporate Actions -->
+<script src="js/corporate-actions.js"></script>
 
 <!-- Dashboard Logic -->
 <script>
@@ -866,6 +986,336 @@ window.addEventListener('te:alert-triggered', (e) => {
     toast(`${emoji} ${symbol}: ${type.replace('_', ' ').toUpperCase()}`, emoji);
   }
 });
+
+// ── Corporate Actions Panel Functions ──
+let corpActionsData = [];
+
+function toggleCorpActionsPanel() {
+  const content = document.getElementById('corp-actions-content');
+  const btn = document.getElementById('corp-toggle-btn');
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    btn.textContent = '▲';
+    // Load if not loaded
+    if (!corpActionsData.length) {
+      refreshCorpActions();
+    }
+  } else {
+    content.style.display = 'none';
+    btn.textContent = '▼';
+  }
+}
+
+async function refreshCorpActions() {
+  const btn = document.getElementById('corp-refresh-btn');
+  const listEl = document.getElementById('corp-actions-list');
+  const countEl = document.getElementById('corp-actions-count');
+  const groqNotice = document.getElementById('groq-key-notice');
+  
+  btn.textContent = '⏳ Loading...';
+  btn.disabled = true;
+  
+  // Check for Groq key
+  if (!localStorage.getItem('groq_key')) {
+    groqNotice.style.display = 'block';
+  } else {
+    groqNotice.style.display = 'none';
+  }
+  
+  listEl.innerHTML = `
+    <div style="text-align:center;padding:20px;color:var(--t3)">
+      <div class="spinner" style="margin:0 auto 12px"></div>
+      <div>Fetching corporate actions...</div>
+    </div>
+  `;
+  
+  try {
+    if (typeof CorpActions !== 'undefined') {
+      corpActionsData = await CorpActions.fetchForPortfolio();
+      renderCorpActionsPanel();
+      
+      // Update count
+      const totalAnnouncements = corpActionsData.reduce((s, d) => s + (d.announcements?.length || 0), 0);
+      countEl.textContent = totalAnnouncements;
+    } else {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--r)">CorpActions module not loaded</div>';
+    }
+  } catch (err) {
+    console.error('[Dashboard] Corp actions error:', err);
+    listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--r)">Error: ${err.message}</div>`;
+  }
+  
+  btn.textContent = '↻ Refresh';
+  btn.disabled = false;
+}
+
+function renderCorpActionsPanel() {
+  const listEl = document.getElementById('corp-actions-list');
+  
+  if (!corpActionsData.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">No open positions to analyze</div>';
+    return;
+  }
+  
+  // Filter to only those with data
+  const withData = corpActionsData.filter(d => d.announcements?.length || d.aiAnalysis);
+  
+  if (!withData.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">No announcements found for your positions</div>';
+    return;
+  }
+  
+  let html = '';
+  
+  withData.forEach(item => {
+    const { symbol, announcements, aiAnalysis } = item;
+    
+    // AI Signal Card
+    let aiCard = '';
+    if (aiAnalysis) {
+      const signalColors = {
+        BUY: { bg: 'rgba(0,229,160,0.15)', color: '#00E5A0', icon: '🟢' },
+        SELL: { bg: 'rgba(255,69,96,0.15)', color: '#FF4560', icon: '🔴' },
+        HOLD: { bg: 'rgba(245,197,66,0.15)', color: '#F5C542', icon: '🟡' },
+        WATCH: { bg: 'rgba(59,139,255,0.15)', color: '#3B8BFF', icon: '👁️' }
+      };
+      const style = signalColors[aiAnalysis.signal] || signalColors.HOLD;
+      
+      aiCard = `
+        <div style="background:${style.bg};border-left:3px solid ${style.color};border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:14px">${style.icon}</span>
+            <span style="font-weight:700;color:${style.color}">${aiAnalysis.signal}</span>
+            <span style="font-size:9px;color:var(--t3);background:var(--bg3);padding:2px 6px;border-radius:4px">${aiAnalysis.sentiment}</span>
+            <span style="font-size:9px;color:var(--t4);margin-left:auto">${aiAnalysis.confidence || '—'}% confidence</span>
+          </div>
+          <div style="font-size:10px;color:var(--t2)">${aiAnalysis.summary || aiAnalysis.impact || ''}</div>
+          ${aiAnalysis.risks?.length ? `<div style="font-size:9px;color:var(--r);margin-top:4px">⚠️ ${aiAnalysis.risks.join(' | ')}</div>` : ''}
+        </div>
+      `;
+    }
+    
+    // Recent announcements
+    const announcementList = (announcements || []).slice(0, 3).map(a => {
+      const typeColors = {
+        dividend: '#00E5A0', bonus: '#00E5A0', buyback: '#00E5A0',
+        acquisition: '#3B8BFF', order: '#3B8BFF', expansion: '#00E5A0',
+        results: '#F5C542', rating: '#F5C542', negative: '#FF4560',
+        press: '#8BA0B8', general: '#8BA0B8'
+      };
+      const color = typeColors[a.type] || '#8BA0B8';
+      
+      return `
+        <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1);font-size:10px">
+          <span style="color:var(--t4);min-width:40px">${a.date}</span>
+          <span style="width:4px;height:4px;border-radius:50%;background:${color};margin-top:5px;flex-shrink:0"></span>
+          <span style="color:var(--t2)">${a.summary?.slice(0, 100)}${a.summary?.length > 100 ? '...' : ''}</span>
+        </div>
+      `;
+    }).join('');
+    
+    html += `
+      <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="width:28px;height:28px;border-radius:6px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--t1);font-size:10px">${symbol.slice(0,3)}</div>
+          <div style="font-weight:600;color:var(--t1)">${symbol}</div>
+          <span style="font-size:9px;color:var(--t4);margin-left:auto">${announcements?.length || 0} updates</span>
+        </div>
+        ${aiCard}
+        ${announcementList || '<div style="font-size:10px;color:var(--t4)">No recent announcements</div>'}
+      </div>
+    `;
+  });
+  
+  listEl.innerHTML = html;
+}
+
+// ── Settings Panel Functions ──
+function toggleSettingsPanel() {
+  const content = document.getElementById('settings-content');
+  const btn = document.getElementById('settings-toggle-btn');
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    btn.textContent = '▲';
+    loadSettingsValues();
+  } else {
+    content.style.display = 'none';
+    btn.textContent = '▼';
+  }
+}
+
+function loadSettingsValues() {
+  // Groq
+  const groqKey = localStorage.getItem('groq_key') || '';
+  document.getElementById('groq-key-input').value = groqKey;
+  updateGroqStatus();
+  
+  // Telegram
+  const tgBot = localStorage.getItem('te_tg_bot') || '';
+  const tgChat = localStorage.getItem('te_tg_chat') || '';
+  document.getElementById('tg-bot-input').value = tgBot;
+  document.getElementById('tg-chat-input').value = tgChat;
+  updateTelegramStatus();
+  
+  // Dhan
+  const dhanId = localStorage.getItem('dhan_id') || '';
+  const dhanToken = localStorage.getItem('dhan_tk') || '';
+  document.getElementById('dhan-id-input').value = dhanId;
+  document.getElementById('dhan-token-input').value = dhanToken;
+  updateDhanStatus();
+  
+  // Worker URL
+  const workerUrl = localStorage.getItem('zd_worker_url') || '';
+  document.getElementById('worker-url-input').value = workerUrl;
+}
+
+function updateGroqStatus() {
+  const status = document.getElementById('groq-status');
+  const key = localStorage.getItem('groq_key');
+  if (key && key.startsWith('gsk_')) {
+    status.textContent = '✓ Connected';
+    status.style.background = 'rgba(0,229,160,0.15)';
+    status.style.color = '#00E5A0';
+  } else {
+    status.textContent = 'Not set';
+    status.style.background = 'var(--bg2)';
+    status.style.color = 'var(--t4)';
+  }
+}
+
+function updateTelegramStatus() {
+  const status = document.getElementById('telegram-status');
+  const bot = localStorage.getItem('te_tg_bot');
+  const chat = localStorage.getItem('te_tg_chat');
+  if (bot && chat) {
+    status.textContent = '✓ Configured';
+    status.style.background = 'rgba(0,229,160,0.15)';
+    status.style.color = '#00E5A0';
+  } else {
+    status.textContent = 'Not set';
+    status.style.background = 'var(--bg2)';
+    status.style.color = 'var(--t4)';
+  }
+}
+
+function updateDhanStatus() {
+  const status = document.getElementById('dhan-status');
+  const id = localStorage.getItem('dhan_id');
+  const token = localStorage.getItem('dhan_tk');
+  if (id && token) {
+    status.textContent = '✓ Connected';
+    status.style.background = 'rgba(0,229,160,0.15)';
+    status.style.color = '#00E5A0';
+  } else {
+    status.textContent = 'Not set';
+    status.style.background = 'var(--bg2)';
+    status.style.color = 'var(--t4)';
+  }
+}
+
+function toggleGroqKeyVisibility() {
+  const input = document.getElementById('groq-key-input');
+  const btn = document.getElementById('groq-eye-btn');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+}
+
+function saveGroqKey() {
+  const key = document.getElementById('groq-key-input').value.trim();
+  if (key) {
+    localStorage.setItem('groq_key', key);
+    updateGroqStatus();
+    if (typeof toast === 'function') toast('Groq API key saved!', '✅');
+  } else {
+    localStorage.removeItem('groq_key');
+    updateGroqStatus();
+    if (typeof toast === 'function') toast('Groq API key removed', '🗑️');
+  }
+}
+
+function saveTelegramSettings() {
+  const bot = document.getElementById('tg-bot-input').value.trim();
+  const chat = document.getElementById('tg-chat-input').value.trim();
+  
+  if (bot) localStorage.setItem('te_tg_bot', bot);
+  else localStorage.removeItem('te_tg_bot');
+  
+  if (chat) localStorage.setItem('te_tg_chat', chat);
+  else localStorage.removeItem('te_tg_chat');
+  
+  // Also update TE object if available
+  if (typeof TE !== 'undefined') {
+    TE.TELEGRAM_BOT = bot;
+    TE.TELEGRAM_CHAT = chat;
+  }
+  
+  updateTelegramStatus();
+  if (typeof toast === 'function') toast('Telegram settings saved!', '✅');
+}
+
+async function testTelegram() {
+  const bot = document.getElementById('tg-bot-input').value.trim() || localStorage.getItem('te_tg_bot');
+  const chat = document.getElementById('tg-chat-input').value.trim() || localStorage.getItem('te_tg_chat');
+  
+  if (!bot || !chat) {
+    if (typeof toast === 'function') toast('Enter bot token and chat ID first', '⚠️');
+    return;
+  }
+  
+  try {
+    const msg = `🧪 TradEdge Test Alert\n\nTime: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n✅ Telegram alerts are working!`;
+    const url = `https://api.telegram.org/bot${bot}/sendMessage`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text: msg, parse_mode: 'HTML' })
+    });
+    
+    if (res.ok) {
+      if (typeof toast === 'function') toast('Test message sent!', '✅');
+    } else {
+      const err = await res.json();
+      if (typeof toast === 'function') toast(`Error: ${err.description}`, '❌');
+    }
+  } catch (err) {
+    if (typeof toast === 'function') toast(`Error: ${err.message}`, '❌');
+  }
+}
+
+function saveDhanSettings() {
+  const id = document.getElementById('dhan-id-input').value.trim();
+  const token = document.getElementById('dhan-token-input').value.trim();
+  
+  if (id) localStorage.setItem('dhan_id', id);
+  else localStorage.removeItem('dhan_id');
+  
+  if (token) localStorage.setItem('dhan_tk', token);
+  else localStorage.removeItem('dhan_tk');
+  
+  updateDhanStatus();
+  if (typeof toast === 'function') toast('Dhan settings saved!', '✅');
+  
+  // Refresh DhanLive if available
+  if (typeof DhanLive !== 'undefined') {
+    DhanLive.refresh();
+  }
+}
+
+function saveWorkerUrl() {
+  const url = document.getElementById('worker-url-input').value.trim();
+  if (url) {
+    localStorage.setItem('zd_worker_url', url);
+    if (typeof toast === 'function') toast('Worker URL saved!', '✅');
+  } else {
+    localStorage.removeItem('zd_worker_url');
+    if (typeof toast === 'function') toast('Worker URL removed', '🗑️');
+  }
+}
 
 // ── Alerts Panel Functions ──
 function toggleAlertsPanel() {
