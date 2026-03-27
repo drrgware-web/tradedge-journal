@@ -73,4 +73,7 @@ jobs:
           git add data/rrm_data.json
           DATE=$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M IST')
           git commit -m "📊 RRM v4.2 EOD ${DATE}" || exit 0
-          git push
+          git pull --rebase origin main
+            git push
+
+
