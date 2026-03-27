@@ -334,7 +334,7 @@ function calculatePortfolioRisk() {
   let positionRisks = [];
   
   openTrades.forEach(t => {
-    const { symbol, side, avgEntry, openQty, sl, cmp } = t;
+    const { symbol, side, avgEntry, openQty, sl, target, cmp } = t;
     const currentPrice = cmp || avgEntry;
     const positionValue = avgEntry * openQty;
     totalPositionValue += positionValue;
@@ -361,6 +361,7 @@ function calculatePortfolioRisk() {
         side,
         avgEntry,
         sl,
+        target: target || 0,
         cmp: currentPrice,
         openQty,
         riskPerShare,
@@ -375,6 +376,7 @@ function calculatePortfolioRisk() {
         symbol,
         side,
         avgEntry,
+        target: target || 0,
         cmp: currentPrice,
         openQty,
         positionValue,
@@ -484,34 +486,214 @@ function renderRiskBreakdown(risk) {
           <th style="text-align:center;padding:6px 4px">Side</th>
           <th style="text-align:right;padding:6px 8px">Entry</th>
           <th style="text-align:right;padding:6px 8px">SL</th>
+          <th style="text-align:right;padding:6px 8px">Target</th>
           <th style="text-align:right;padding:6px 8px">CMP</th>
           <th style="text-align:right;padding:6px 8px">Qty</th>
-          <th style="text-align:right;padding:6px 8px">SL Dist</th>
           <th style="text-align:right;padding:6px 8px">Risk</th>
+          <th style="text-align:center;padding:6px 8px">Action</th>
         </tr>
       </thead>
       <tbody>
         ${allPositions.map(p => {
           const slDisplay = p.hasSL ? `₹${p.sl.toFixed(2)}` : '<span style="color:var(--r)">—</span>';
-          const slDistDisplay = p.hasSL ? `<span style="${p.slDistancePct < 2 ? 'color:var(--r)' : p.slDistancePct < 5 ? 'color:var(--y)' : 'color:var(--t2)'}">${p.slDistancePct.toFixed(1)}%</span>` : '<span style="color:var(--r)">N/A</span>';
+          const targetDisplay = p.target ? `₹${p.target.toFixed(2)}` : '<span style="color:var(--t4)">—</span>';
           const riskDisplay = p.hasSL ? `<span style="color:var(--r)">${TE.fmt(p.positionRisk)}</span>` : '<span style="color:var(--y)">⚠️ No SL</span>';
           
           return `
-            <tr style="border-bottom:1px solid var(--b1)">
-              <td style="padding:6px 8px;font-weight:600;color:var(--t1)">${p.symbol}</td>
+            <tr style="border-bottom:1px solid var(--b1);cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+              <td style="padding:6px 8px;font-weight:600;color:var(--t1)" onclick="openSLEditor('${p.symbol}')">${p.symbol}</td>
               <td style="text-align:center;padding:6px 4px"><span class="bdg bdg-${p.side.toLowerCase()}" style="font-size:9px">${p.side}</span></td>
               <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace">₹${p.avgEntry.toFixed(2)}</td>
-              <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace">${slDisplay}</td>
+              <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace;cursor:pointer" onclick="openSLEditor('${p.symbol}')" title="Click to edit SL">${slDisplay}</td>
+              <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace;cursor:pointer" onclick="openSLEditor('${p.symbol}')" title="Click to edit Target">${targetDisplay}</td>
               <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace;color:var(--y)">₹${p.cmp.toFixed(2)}</td>
               <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace">${p.openQty}</td>
-              <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace">${slDistDisplay}</td>
               <td style="text-align:right;padding:6px 8px;font-family:'IBM Plex Mono',monospace">${riskDisplay}</td>
+              <td style="text-align:center;padding:6px 8px">
+                <button class="btn btn-ghost btn-xs" onclick="openSLEditor('${p.symbol}')" style="font-size:10px;padding:2px 8px">✏️ Edit</button>
+              </td>
             </tr>
           `;
         }).join('')}
       </tbody>
     </table>
   `;
+}
+
+// ── SL/Target Editor Modal ──
+function openSLEditor(symbol) {
+  // Find all trades for this symbol
+  const trades = TE.trades.filter(t => t.symbol === symbol && t.status !== 'Closed');
+  if (!trades.length) return;
+  
+  const trade = trades[0]; // Use first trade for values
+  const ct = TE.calc({ ...trade });
+  const cmp = trade.cmp || ct.avgEntry;
+  const currentSL = trade.sl || '';
+  const currentTarget = trade.target || '';
+  
+  // Calculate suggested SL levels
+  const suggestedSL5 = (ct.avgEntry * 0.95).toFixed(2);
+  const suggestedSL3 = (ct.avgEntry * 0.97).toFixed(2);
+  const suggestedSL2 = (ct.avgEntry * 0.98).toFixed(2);
+  
+  // Calculate suggested targets
+  const suggestedT5 = (ct.avgEntry * 1.05).toFixed(2);
+  const suggestedT10 = (ct.avgEntry * 1.10).toFixed(2);
+  const suggestedT15 = (ct.avgEntry * 1.15).toFixed(2);
+  
+  const modal = document.createElement('div');
+  modal.id = 'sl-editor-modal';
+  modal.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeSLEditor()">
+      <div style="background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:20px;width:90%;max-width:420px;box-shadow:0 20px 40px rgba(0,0,0,0.5)">
+        
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:36px;height:36px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--t1);font-size:12px">${symbol.slice(0,3)}</div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--t1)">${symbol}</div>
+              <div style="font-size:11px;color:var(--t3)">${trade.side} · Qty: ${ct.openQty} · Entry: ₹${ct.avgEntry.toFixed(2)}</div>
+            </div>
+          </div>
+          <button onclick="closeSLEditor()" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;padding:4px">✕</button>
+        </div>
+        
+        <!-- Current Price -->
+        <div style="background:var(--bg3);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;color:var(--t3)">Current Market Price</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--y)">₹${cmp.toFixed(2)}</span>
+        </div>
+        
+        <!-- SL Input -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:11px;color:var(--t3);margin-bottom:6px">Stop Loss</label>
+          <div style="display:flex;gap:8px">
+            <input type="number" id="sl-input" value="${currentSL}" placeholder="Enter SL price" step="0.05" style="flex:1;padding:10px 12px;background:var(--bg3);border:1px solid var(--b1);border-radius:8px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:14px">
+            <button onclick="document.getElementById('sl-input').value=''" class="btn btn-ghost btn-xs" style="padding:10px">✕</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button onclick="document.getElementById('sl-input').value='${suggestedSL2}'" class="btn btn-ghost btn-xs" style="font-size:10px">-2% (₹${suggestedSL2})</button>
+            <button onclick="document.getElementById('sl-input').value='${suggestedSL3}'" class="btn btn-ghost btn-xs" style="font-size:10px">-3% (₹${suggestedSL3})</button>
+            <button onclick="document.getElementById('sl-input').value='${suggestedSL5}'" class="btn btn-ghost btn-xs" style="font-size:10px">-5% (₹${suggestedSL5})</button>
+          </div>
+        </div>
+        
+        <!-- Target Input -->
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:11px;color:var(--t3);margin-bottom:6px">Target</label>
+          <div style="display:flex;gap:8px">
+            <input type="number" id="target-input" value="${currentTarget}" placeholder="Enter target price" step="0.05" style="flex:1;padding:10px 12px;background:var(--bg3);border:1px solid var(--b1);border-radius:8px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:14px">
+            <button onclick="document.getElementById('target-input').value=''" class="btn btn-ghost btn-xs" style="padding:10px">✕</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button onclick="document.getElementById('target-input').value='${suggestedT5}'" class="btn btn-ghost btn-xs" style="font-size:10px">+5% (₹${suggestedT5})</button>
+            <button onclick="document.getElementById('target-input').value='${suggestedT10}'" class="btn btn-ghost btn-xs" style="font-size:10px">+10% (₹${suggestedT10})</button>
+            <button onclick="document.getElementById('target-input').value='${suggestedT15}'" class="btn btn-ghost btn-xs" style="font-size:10px">+15% (₹${suggestedT15})</button>
+          </div>
+        </div>
+        
+        <!-- Risk Preview -->
+        <div id="sl-risk-preview" style="background:rgba(255,69,96,0.08);border:1px solid rgba(255,69,96,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;font-size:11px">
+            <span style="color:var(--t3)">Risk if SL hit:</span>
+            <span id="sl-risk-amount" style="font-family:'IBM Plex Mono',monospace;color:var(--r);font-weight:600">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px">
+            <span style="color:var(--t3)">R:R Ratio:</span>
+            <span id="sl-rr-ratio" style="font-family:'IBM Plex Mono',monospace;color:var(--g);font-weight:600">—</span>
+          </div>
+        </div>
+        
+        <!-- Actions -->
+        <div style="display:flex;gap:10px">
+          <button onclick="closeSLEditor()" class="btn btn-ghost" style="flex:1">Cancel</button>
+          <button onclick="saveSLTarget('${symbol}')" class="btn" style="flex:2;background:var(--g);color:#000;font-weight:700">💾 Save</button>
+        </div>
+        
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Add live risk calculation
+  const slInput = document.getElementById('sl-input');
+  const targetInput = document.getElementById('target-input');
+  
+  function updateRiskPreview() {
+    const sl = parseFloat(slInput.value);
+    const target = parseFloat(targetInput.value);
+    const riskEl = document.getElementById('sl-risk-amount');
+    const rrEl = document.getElementById('sl-rr-ratio');
+    
+    if (sl && sl > 0) {
+      const riskPerShare = trade.side === 'Buy' ? ct.avgEntry - sl : sl - ct.avgEntry;
+      const totalRisk = riskPerShare * ct.openQty;
+      riskEl.textContent = TE.fmt(Math.abs(totalRisk));
+      riskEl.style.color = riskPerShare > 0 ? 'var(--r)' : 'var(--g)';
+      
+      if (target && target > 0) {
+        const rewardPerShare = trade.side === 'Buy' ? target - ct.avgEntry : ct.avgEntry - target;
+        const rr = riskPerShare > 0 ? (rewardPerShare / riskPerShare).toFixed(2) : '—';
+        rrEl.textContent = rr !== '—' ? `1:${rr}` : '—';
+        rrEl.style.color = parseFloat(rr) >= 2 ? 'var(--g)' : parseFloat(rr) >= 1 ? 'var(--y)' : 'var(--r)';
+      } else {
+        rrEl.textContent = '—';
+      }
+    } else {
+      riskEl.textContent = '—';
+      rrEl.textContent = '—';
+    }
+  }
+  
+  slInput.addEventListener('input', updateRiskPreview);
+  targetInput.addEventListener('input', updateRiskPreview);
+  updateRiskPreview();
+  
+  // Focus SL input
+  setTimeout(() => slInput.focus(), 100);
+}
+
+function closeSLEditor() {
+  const modal = document.getElementById('sl-editor-modal');
+  if (modal) modal.remove();
+}
+
+function saveSLTarget(symbol) {
+  const sl = parseFloat(document.getElementById('sl-input').value) || 0;
+  const target = parseFloat(document.getElementById('target-input').value) || 0;
+  
+  // Update all trades for this symbol
+  let updated = false;
+  TE.trades.forEach(t => {
+    if (t.symbol === symbol && t.status !== 'Closed') {
+      if (sl > 0) t.sl = sl;
+      else delete t.sl;
+      
+      if (target > 0) t.target = target;
+      else delete t.target;
+      
+      updated = true;
+    }
+  });
+  
+  if (updated) {
+    TE.save();
+    closeSLEditor();
+    refreshPortfolioRisk();
+    renderOpenPositions();
+    
+    // Sync to Supabase if enabled
+    if (localStorage.getItem('sb_auto')) {
+      TE.sbPush().then(() => console.log('[SL Editor] Synced to Supabase'));
+    }
+    
+    if (typeof toast === 'function') {
+      toast(`${symbol}: SL/Target updated`, '✅');
+    }
+  }
 }
 
 // ── Chart helper ──
