@@ -6,12 +6,29 @@
 <title>TradEdge — Position Sizing</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/tradedge.css">
+<style>
+.market-badge{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 10px;border-radius:12px;background:rgba(0,0,0,0.3);border:1px solid var(--b1);margin-left:12px}
+.market-dot{width:8px;height:8px;border-radius:50%}
+.market-dot.live{background:var(--g);box-shadow:0 0 8px var(--g)}
+.market-dot.yahoo{background:var(--y)}
+</style>
 </head>
 <body>
 
-<div style="margin-bottom:20px">
-  <div style="font-size:18px;font-weight:700;color:var(--t1)">📐 Position Sizing Calculator</div>
-  <div style="font-size:12px;color:var(--t3);margin-top:3px">Calculate exact position size based on risk parameters and account equity.</div>
+<div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
+  <div>
+    <div style="font-size:18px;font-weight:700;color:var(--t1);display:flex;align-items:center">
+      📐 Position Sizing Calculator
+      <div class="market-badge" id="market-badge">
+        <span class="market-dot yahoo" id="market-dot"></span>
+        <span id="market-source">YAHOO</span>
+        <span style="color:var(--t3)">•</span>
+        <span id="market-status">Checking...</span>
+        <button onclick="refreshPrice()" style="background:none;border:none;color:var(--g);cursor:pointer;font-size:10px;padding:0 4px" title="Refresh price">↻</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--t3);margin-top:3px">Calculate exact position size based on risk parameters and account equity.</div>
+  </div>
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -84,6 +101,9 @@
   </div>
 </div>
 
+<!-- Dhan Live CMP (BEFORE other scripts) -->
+<script src="js/dhan-live.js"></script>
+
 <script src="js/core.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/journal-sync.js"></script>
@@ -94,23 +114,134 @@
 <script>
 'use strict';
 
+// ═══ DHAN LIVE INTEGRATION ═══
+let currentSymbol = '';
+
+function updateMarketBadge() {
+  const dot = document.getElementById('market-dot');
+  const source = document.getElementById('market-source');
+  const status = document.getElementById('market-status');
+  
+  if (typeof DhanLive !== 'undefined') {
+    const isDhanActive = DhanLive.isDhanActive();
+    const isMarketOpen = DhanLive.isMarketOpen();
+    
+    dot.className = 'market-dot ' + (isDhanActive ? 'live' : 'yahoo');
+    source.textContent = isDhanActive ? 'DHAN LIVE' : 'YAHOO';
+    source.style.color = isDhanActive ? 'var(--g)' : 'var(--y)';
+    status.textContent = isMarketOpen ? 'Market Open' : 'Market Closed';
+  } else {
+    dot.className = 'market-dot yahoo';
+    source.textContent = 'YAHOO';
+    source.style.color = 'var(--y)';
+    status.textContent = 'Fallback';
+  }
+}
+
+async function fetchPriceWithDhan(sym) {
+  // Try Dhan first if available and market is open
+  if (typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen()) {
+    const dhanPrice = DhanLive.getCMP(sym);
+    if (dhanPrice) return { price: dhanPrice, source: 'dhan' };
+    
+    // Try fetching via DhanLive
+    await DhanLive.refresh();
+    const refreshedPrice = DhanLive.getCMP(sym);
+    if (refreshedPrice) return { price: refreshedPrice, source: 'dhan' };
+  }
+  
+  // Fallback to TE.fetchCMP (Yahoo via worker)
+  if (typeof TE !== 'undefined' && TE.fetchCMP) {
+    const price = await TE.fetchCMP(sym);
+    if (price) return { price, source: 'yahoo' };
+  }
+  
+  return null;
+}
+
+function refreshPrice() {
+  const sym = (document.getElementById('ps-symbol').value || '').trim().toUpperCase();
+  if (!sym) return;
+  
+  const el = document.getElementById('ps-price-status');
+  el.textContent = '⏳ Refreshing…';
+  
+  // Trigger Dhan refresh
+  if (typeof DhanLive !== 'undefined') {
+    DhanLive.refresh();
+  }
+  
+  // Re-fetch price
+  fetchPriceWithDhan(sym).then(result => {
+    if (result) {
+      const e = document.getElementById('ps-entry');
+      e.value = result.price.toFixed(2);
+      calc();
+      el.innerHTML = `<span style="color:var(--g)">✓ ₹${result.price.toFixed(2)}</span> <span style="font-size:9px;color:var(--t3)">(${result.source.toUpperCase()})</span>`;
+      updateMarketBadge();
+    } else {
+      el.textContent = 'Price unavailable';
+    }
+  });
+}
+
+// Listen for Dhan CMP updates
+window.addEventListener('dhan-cmp-update', (e) => {
+  updateMarketBadge();
+  
+  // Auto-update entry price if symbol matches
+  if (currentSymbol && e.detail?.prices?.[currentSymbol]) {
+    const price = e.detail.prices[currentSymbol];
+    const el = document.getElementById('ps-price-status');
+    const entry = document.getElementById('ps-entry');
+    
+    // Only auto-update if entry is empty or matches previous Dhan price
+    if (!entry.value || entry.dataset.source === 'dhan') {
+      entry.value = price.toFixed(2);
+      entry.dataset.source = 'dhan';
+      calc();
+      el.innerHTML = `<span style="color:var(--g)">✓ ₹${price.toFixed(2)}</span> <span style="font-size:9px;color:var(--t3)">(DHAN LIVE)</span>`;
+    }
+  }
+});
+
 // Init
 document.getElementById('ps-capital').value = TE.cfg.cap || 5000000;
 document.getElementById('ps-risk').value = TE.cfg.risk || 0.5;
 document.getElementById('ps-risk-slider').value = TE.cfg.risk || 0.5;
 
+// Initial badge update
+setTimeout(updateMarketBadge, 100);
+
+// Trigger initial Dhan refresh if market open
+setTimeout(() => {
+  if (typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen()) {
+    DhanLive.refresh();
+  }
+}, 500);
+
 setTimeout(() => {
   TE.createAutocomplete({
     inputId: 'ps-symbol', dropId: 'ps-sym-drop',
     fetchPrice: async sym => {
+      currentSymbol = sym;
       const el = document.getElementById('ps-price-status');
       el.textContent = '⏳ Fetching…';
-      const price = await TE.fetchCMP(sym);
-      if (price) {
+      
+      const result = await fetchPriceWithDhan(sym);
+      
+      if (result) {
         const e = document.getElementById('ps-entry');
-        if (e && !e.value) { e.value = price.toFixed(2); calc(); }
-        el.innerHTML = `<span style="color:var(--g)">✓ ₹${price.toFixed(2)}</span>`;
-      } else el.textContent = 'Price unavailable';
+        if (e && !e.value) { 
+          e.value = result.price.toFixed(2);
+          e.dataset.source = result.source;
+          calc(); 
+        }
+        el.innerHTML = `<span style="color:var(--g)">✓ ₹${result.price.toFixed(2)}</span> <span style="font-size:9px;color:var(--t3)">(${result.source.toUpperCase()})</span>`;
+        updateMarketBadge();
+      } else {
+        el.textContent = 'Price unavailable';
+      }
     }
   });
 }, 100);
