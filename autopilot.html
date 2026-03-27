@@ -2802,19 +2802,6 @@ function renderAPIOrder(o) {
   `;
 }
 
-
-// ─────────────────────────────────────────────────
-// CHANGE 4: ADD LIVE CMP REFRESH (after boot())
-// ─────────────────────────────────────────────────
-// FIND:
-//
-//   boot();
-//   </script>
-//
-// REPLACE with:
-
-// boot();
-
 // ── LIVE CMP REFRESH — Update exec cards when DhanLive pushes new prices ──
 window.addEventListener('dhan-cmp-update', (e) => {
   const prices = e.detail?.prices || {};
