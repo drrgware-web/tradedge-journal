@@ -31,7 +31,10 @@
 </div>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-  <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Open Positions</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Open Positions</div>
+    <div id="market-status-badge" style="font-size:11px;display:flex;align-items:center;gap:6px"></div>
+  </div>
   <button class="btn btn-ghost btn-xs" onclick="nav('trades')">View All →</button>
 </div>
 <div class="tbl-wrap" id="open-tbl"></div>
@@ -91,6 +94,9 @@
   </a>
 </div>
 
+<!-- Dhan Live CMP (BEFORE core.js) -->
+<script src="js/dhan-live.js"></script>
+
 <!-- Core Scripts -->
 <script src="js/core.js"></script>
 <script src="js/supabase.js"></script>
@@ -112,6 +118,57 @@ function setEqMode(m) {
   renderDash();
 }
 
+// ── Market Status Badge ──
+function updateMarketStatusBadge() {
+  const el = document.getElementById('market-status-badge');
+  if (!el) return;
+  
+  const dhanActive = typeof DhanLive !== 'undefined' && DhanLive.isDhanActive();
+  const marketOpen = typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen();
+  
+  let dot, source, status;
+  if (dhanActive) {
+    dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#00E5A0;box-shadow:0 0 6px #00E5A0"></span>';
+    source = '<span style="color:#00E5A0;font-weight:600">DHAN LIVE</span>';
+  } else {
+    dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F5C542"></span>';
+    source = '<span style="color:#F5C542;font-weight:500">YAHOO</span>';
+  }
+  
+  if (marketOpen) {
+    status = '<span style="color:var(--t3);font-size:10px;margin-left:4px">• Market Open</span>';
+  } else {
+    status = '<span style="color:var(--t4);font-size:10px;margin-left:4px">• Market Closed</span>';
+  }
+  
+  el.innerHTML = `${dot} ${source} ${status}`;
+}
+
+// ── Dhan CMP Update Listener — Live refresh for open positions ──
+window.addEventListener('dhan-cmp-update', (e) => {
+  const prices = e.detail?.prices || {};
+  if (!Object.keys(prices).length) return;
+  
+  // Update CMP in TE.trades for open positions
+  let updated = false;
+  TE.trades.forEach(t => {
+    if (t.status === 'Closed') return;
+    const sym = t.symbol;
+    if (prices[sym] && prices[sym] > 0) {
+      t.cmp = prices[sym];
+      updated = true;
+    }
+  });
+  
+  if (updated) {
+    TE.save();
+    // Update just the open positions table without full dashboard re-render
+    renderOpenPositions();
+  }
+  
+  updateMarketStatusBadge();
+});
+
 // ── Chart helper ──
 const CO = {
   responsive:true, maintainAspectRatio:false, animation:{duration:300},
@@ -129,6 +186,55 @@ function dChart(id, cfg) {
   const c = document.getElementById(id);
   if (!c) return;
   charts[id] = new Chart(c, cfg);
+}
+
+// ── Render Open Positions Table (separate function for live updates) ──
+function renderOpenPositions() {
+  const all  = TE.trades.map(t => TE.calc({...t}));
+  const open = all.filter(t => t.status !== 'Closed');
+  
+  const el = document.getElementById('open-tbl');
+  if (!open.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No open positions</div></div>';
+    return;
+  }
+
+  // Group by symbol
+  const symMap = {};
+  open.forEach(t => {
+    const sym = t.symbol.toUpperCase();
+    if (!symMap[sym]) symMap[sym] = { symbol:t.symbol, side:t.side, trades:[t], totalQty:0, totalUnreal:0, totalEntryVal:0, setup:t.setup, id:t.id, cmp:t.cmp, holdDays:t.holdDays };
+    else { symMap[sym].trades.push(t); if (t.cmp) symMap[sym].cmp = t.cmp; if (t.holdDays > symMap[sym].holdDays) symMap[sym].holdDays = t.holdDays; }
+    symMap[sym].totalQty += (t.openQty || 0);
+    symMap[sym].totalUnreal += (t.unrealisedPL || 0);
+    symMap[sym].totalEntryVal += (t.avgEntry || 0) * (t.openQty || 0);
+  });
+
+  const grouped = Object.values(symMap).map(g => {
+    g.avgEntry = g.totalQty ? g.totalEntryVal / g.totalQty : 0;
+    g.tradeCount = g.trades.length;
+    g.avgRR = g.trades.reduce((s,t) => s + (t.rr||0), 0) / g.trades.length;
+    g.epPyramid = g.trades[0]?._epPyramid || null;
+    g.epSource = g.trades[0]?.source || 'manual';
+    return g;
+  }).sort((a,b) => Math.abs(b.totalUnreal) - Math.abs(a.totalUnreal));
+
+  el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Side</th><th>Avg Entry</th><th>CMP</th><th>Open Qty</th><th>Unrealised P&L</th><th>R:R</th><th>Days</th><th>Source</th></tr></thead><tbody>` +
+    grouped.map(g => {
+      const epBadge = g.epSource === 'edgepilot' ? '<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(0,229,160,.12);color:var(--g);font-weight:700;margin-left:4px">EP</span>' : '';
+      const cmpDisplay = g.cmp ? `<span style="color:var(--y)">₹${g.cmp.toFixed(2)}</span>` : '<span style="color:var(--t4)">—</span>';
+      return `<tr>
+        <td><div class="sym-cell"><div class="sym-icon">${g.symbol.slice(0,3)}</div><div><div class="sym-name">${g.symbol}${g.tradeCount>1?` <span style="font-size:9px;color:var(--t4)">(${g.tradeCount})</span>`:''}${epBadge}</div><div class="sym-date">${g.setup||'—'}</div></div></div></td>
+        <td><span class="bdg bdg-${g.side.toLowerCase()}">${g.side}</span></td>
+        <td class="mono">₹${g.avgEntry.toFixed(2)}</td>
+        <td class="mono" id="cmp-${g.symbol}">${cmpDisplay}</td>
+        <td class="mono">${g.totalQty}</td>
+        <td class="${g.totalUnreal>=0?'col-g':'col-r'} mono" id="upl-${g.symbol}">${TE.fmt(g.totalUnreal)}</td>
+        <td><span class="rbdg ${g.avgRR>0?'pos':g.avgRR<0?'neg':'neu'}">${g.avgRR.toFixed(2)}R</span></td>
+        <td class="mono">${g.holdDays}d</td>
+        <td style="font-size:10px;color:var(--t4)">${g.epSource}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
 }
 
 // ── Render Dashboard ──
@@ -189,48 +295,10 @@ function renderDash() {
   });
 
   // Open Positions Table
-  const el = document.getElementById('open-tbl');
-  if (!open.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No open positions</div></div>';
-    return;
-  }
-
-  // Group by symbol
-  const symMap = {};
-  open.forEach(t => {
-    const sym = t.symbol.toUpperCase();
-    if (!symMap[sym]) symMap[sym] = { symbol:t.symbol, side:t.side, trades:[t], totalQty:0, totalUnreal:0, totalEntryVal:0, setup:t.setup, id:t.id, cmp:t.cmp, holdDays:t.holdDays };
-    else { symMap[sym].trades.push(t); if (t.cmp) symMap[sym].cmp = t.cmp; if (t.holdDays > symMap[sym].holdDays) symMap[sym].holdDays = t.holdDays; }
-    symMap[sym].totalQty += (t.openQty || 0);
-    symMap[sym].totalUnreal += (t.unrealisedPL || 0);
-    symMap[sym].totalEntryVal += (t.avgEntry || 0) * (t.openQty || 0);
-  });
-
-  const grouped = Object.values(symMap).map(g => {
-    g.avgEntry = g.totalQty ? g.totalEntryVal / g.totalQty : 0;
-    g.tradeCount = g.trades.length;
-    g.avgRR = g.trades.reduce((s,t) => s + (t.rr||0), 0) / g.trades.length;
-    // Show EP metadata if present
-    g.epPyramid = g.trades[0]?._epPyramid || null;
-    g.epSource = g.trades[0]?.source || 'manual';
-    return g;
-  }).sort((a,b) => Math.abs(b.totalUnreal) - Math.abs(a.totalUnreal));
-
-  el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Side</th><th>Avg Entry</th><th>CMP</th><th>Open Qty</th><th>Unrealised P&L</th><th>R:R</th><th>Days</th><th>Source</th></tr></thead><tbody>` +
-    grouped.map(g => {
-      const epBadge = g.epSource === 'edgepilot' ? '<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(0,229,160,.12);color:var(--g);font-weight:700;margin-left:4px">EP</span>' : '';
-      return `<tr>
-        <td><div class="sym-cell"><div class="sym-icon">${g.symbol.slice(0,3)}</div><div><div class="sym-name">${g.symbol}${g.tradeCount>1?` <span style="font-size:9px;color:var(--t4)">(${g.tradeCount})</span>`:''}${epBadge}</div><div class="sym-date">${g.setup||'—'}</div></div></div></td>
-        <td><span class="bdg bdg-${g.side.toLowerCase()}">${g.side}</span></td>
-        <td class="mono">₹${g.avgEntry.toFixed(2)}</td>
-        <td class="mono">${g.cmp?'<span style="color:var(--y)">₹'+g.cmp.toFixed(2)+'</span>':'<span style="color:var(--t4)">—</span>'}</td>
-        <td class="mono">${g.totalQty}</td>
-        <td class="${g.totalUnreal>=0?'col-g':'col-r'} mono">${TE.fmt(g.totalUnreal)}</td>
-        <td><span class="rbdg ${g.avgRR>0?'pos':g.avgRR<0?'neg':'neu'}">${g.avgRR.toFixed(2)}R</span></td>
-        <td class="mono">${g.holdDays}d</td>
-        <td style="font-size:10px;color:var(--t4)">${g.epSource}</td>
-      </tr>`;
-    }).join('') + '</tbody></table>';
+  renderOpenPositions();
+  
+  // Update market status badge
+  updateMarketStatusBadge();
 }
 
 // ── Capital Sync Display ──
@@ -265,6 +333,14 @@ setTimeout(() => {
   // Force Chart.js resize after layout settles
   setTimeout(() => { Object.values(charts).forEach(c => c && c.resize()); }, 200);
 }, 150);
+
+// ── Trigger manual Dhan refresh on page load if market open ──
+setTimeout(() => {
+  if (typeof DhanLive !== 'undefined' && DhanLive.isMarketOpen()) {
+    DhanLive.refresh();
+  }
+  updateMarketStatusBadge();
+}, 500);
 
 // Deferred: auto-pull from cloud if empty
 setTimeout(() => {
