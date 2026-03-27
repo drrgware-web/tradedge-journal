@@ -110,6 +110,9 @@
 <!-- Dhan Portfolio Sync -->
 <script src="js/dhan-sync.js"></script>
 
+<!-- Dhan Intraday Alerts -->
+<script src="js/dhan-alerts.js"></script>
+
 <!-- Dashboard Logic -->
 <script>
 'use strict';
@@ -331,6 +334,17 @@ window.addEventListener('te:trades-changed', (e) => {
   // If from dhan-sync, show confirmation
   if (e.detail?.source === 'dhan-sync') {
     console.log('[Dashboard] Refreshed after Dhan sync');
+  }
+});
+
+// ── Listen for alert triggers ──
+window.addEventListener('te:alert-triggered', (e) => {
+  const { type, symbol, data } = e.detail || {};
+  console.log(`[Dashboard] Alert: ${type} for ${symbol}`);
+  // Could show toast notification here
+  if (typeof toast === 'function') {
+    const emoji = type === 'sl_hit' ? '🔴' : type === 'target_hit' ? '🎯' : '⚠️';
+    toast(`${emoji} ${symbol}: ${type.replace('_', ' ').toUpperCase()}`, emoji);
   }
 });
 
