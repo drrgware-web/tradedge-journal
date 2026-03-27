@@ -2711,16 +2711,21 @@ async function executeOrder(symbol) {
   );
 }
 
-
-
+async function placeDhanOrder(symbol) {
+  if (!window.DhanOrders || !DhanOrders.isReady()) {
+    showToast('⚠️', 'Dhan Not Configured',
+      'Set dhan_id + dhan_tk in localStorage or Settings page. DhanOrders module required.',
+      5000
+    );
     return;
   }
-
-  const pick = state.topPicks.find(p => p.symbol === symbol);
+const pick = state.topPicks.find(p => p.symbol === symbol);
   if (!pick) return;
 
   const pyramidInfo = detectPyramidLevel(symbol, pick);
   const o = calcOrderDetails(pick, pyramidInfo);
+
+
 
   if (!confirm(`⚡ DHAN API ORDER\n\nBUY ${o.adjQty} × ${o.symbol} @ ₹${o.entry}\nSL: ₹${o.sl}\nTarget: ₹${o.target1}\n\nProceed?`)) return;
 
