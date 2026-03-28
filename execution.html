@@ -110,6 +110,87 @@
 .ep-tr-edit-row:last-child { border-bottom:none; }
 .ep-tr-input { padding:6px 8px; background:var(--bg2); border:1px solid var(--b1); border-radius:6px; color:var(--t1); font-family:'IBM Plex Mono',monospace; font-size:11px; width:100%; }
 </style>
+
+<script>
+// ═══ UI Sound System (Web Audio API — zero files) ═══
+let _audioCtx = null;
+function getAudioCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+
+function playHoverClick() {
+  try {
+    const ctx = getAudioCtx(); if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(3200, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + 0.04);
+    gain.gain.setValueAtTime(0.04, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.05);
+  } catch(e) {}
+}
+
+function playSwoopClick() {
+  try {
+    const ctx = getAudioCtx(); if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.18);
+  } catch(e) {}
+}
+
+function playSuccessChime() {
+  try {
+    const ctx = getAudioCtx(); if (ctx.state === 'suspended') ctx.resume();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.05, ctx.currentTime + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.2);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.2);
+    });
+  } catch(e) {}
+}
+
+function playAlertSound() {
+  try {
+    const ctx = getAudioCtx(); if (ctx.state === 'suspended') ctx.resume();
+    [880, 660, 880].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'square'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.04, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.1);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.1);
+    });
+  } catch(e) {}
+}
+
+// Delegated event listeners (work on dynamically rendered cards)
+document.addEventListener('mouseenter', function(e) {
+  if (e.target.closest('.ep-pos-card')) playHoverClick();
+  else if (e.target.closest('.exec-hm-block')) playHoverClick();
+}, true);
+
+document.addEventListener('click', function(e) {
+  if (e.target.closest('.ep-act-btn, .exec-broker-pill, .exec-sort-pill, .exec-otype-chip, .gtt-tab, .ep-ob-tab')) playSwoopClick();
+}, true);
+</script>
 </head>
 <body>
 
@@ -151,8 +232,8 @@
   <div class="exec-pnl-card"><div class="pnl-label">Total P&L</div><div class="pnl-value" id="total-pnl" style="color:var(--t3)">—</div></div>
   <div class="exec-pnl-card"><div class="pnl-label">Open Positions</div><div class="pnl-value" id="pos-count" style="color:var(--c)">0</div></div>
   <div class="exec-pnl-card"><div class="pnl-label">Day P&L</div><div class="pnl-value" id="day-pnl" style="color:var(--t3)">—</div></div>
-  <div class="exec-pnl-card"><div class="pnl-label">Margin Used</div><div class="pnl-value" id="margin" style="color:var(--y)">—</div></div>
-  <div class="exec-pnl-card"><div class="pnl-label">Capital Risk %</div><div class="pnl-value" id="risk-pct" style="color:var(--t3)">—</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">Deployed %</div><div class="pnl-value" id="margin" style="color:var(--y)">—</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">SL Risk %</div><div class="pnl-value" id="risk-pct" style="color:var(--t3)">—</div></div>
 </div>
 
 <!-- Heatmap -->
@@ -2072,7 +2153,8 @@ async function placeOrder() {
     const result = await TE.exec.sendOrder(sym, TE.exec.side, TE.exec.otype, qty, price, trigger, product, validity);
     if (result.ok) {
       statusEl.innerHTML = `<span style="color:var(--g)">✅ Order placed — ID: ${result.orderId}</span>`;
-      TE.exec.playSound('fill');
+      playSuccessChime();
+      try { TE.exec.playSound('fill'); } catch(e) {}
 
       // Bracket: place SL + Target
       if (document.getElementById('bracket-cb').checked) {
@@ -2216,7 +2298,8 @@ function checkTrancheAlerts() {
       if (cmp >= tr.trigger) {
         markAlertSent(alertKey);
 
-        // Toast
+        // Toast + Sound
+        playAlertSound();
         toast(`⚡ ${trade.symbol} ${tr.label}: CMP ₹${cmp.toFixed(0)} crossed ₹${tr.trigger.toFixed(0)} — Sell ${tr.qty} shares`, '⚡');
 
         // Telegram
@@ -2247,6 +2330,7 @@ function checkSLBreachAlerts() {
     // SL breach: CMP dropped below SL
     if (cmp <= sl && cmp > 0) {
       markAlertSent(alertKey);
+      playAlertSound(); playAlertSound(); // Double alert for urgency
       toast(`🔴 ${trade.symbol}: CMP ₹${cmp.toFixed(0)} HIT SL ₹${sl.toFixed(0)} — EXIT NOW`, '🔴');
       sendTelegramAlert(
         `🔴 SL BREACH — ${trade.symbol}\n` +
@@ -2798,14 +2882,40 @@ function renderPnlBar() {
     totalValue += Math.abs(qty * ltp);
   });
   const cap = computeCurrentCapital();
-  riskPct = cap.current > 0 ? (totalValue / cap.current * 100) : 0;
+
+  // True SL-based risk: what you'd lose if ALL stop losses hit
+  let totalSLRisk = 0, posWithoutSL = 0;
+  positions.forEach(p => {
+    const qty = Math.abs(p.quantity || p.netQty || 0);
+    const ltp = p.last_price || p.lastPrice || p.ltp || 0;
+    const trade = p._trade;
+    if (trade && trade.sl && +trade.sl > 0) {
+      totalSLRisk += Math.max(0, ltp - (+trade.sl)) * qty;
+    } else {
+      posWithoutSL++;
+      totalSLRisk += ltp * qty * 0.10; // No SL = assume 10% worst case
+    }
+  });
+
+  const deployedPct = cap.current > 0 ? (totalValue / cap.current * 100) : 0;
+  const slRiskPct = cap.current > 0 ? (totalSLRisk / cap.current * 100) : 0;
 
   const f = n => (n >= 0 ? '+' : '-') + '₹' + Math.abs(n).toFixed(0);
   const el1 = document.getElementById('total-pnl'); el1.textContent = f(totalPnl); el1.style.color = totalPnl >= 0 ? 'var(--g)' : 'var(--r)';
   document.getElementById('pos-count').textContent = positions.length;
   const el3 = document.getElementById('day-pnl'); el3.textContent = f(totalPnl); el3.style.color = totalPnl >= 0 ? 'var(--g)' : 'var(--r)';
-  document.getElementById('margin').textContent = '₹' + (totalValue / 1000).toFixed(1) + 'K';
-  const rEl = document.getElementById('risk-pct'); rEl.textContent = riskPct.toFixed(1) + '%'; rEl.style.color = riskPct > 20 ? 'var(--r)' : riskPct > 10 ? 'var(--y)' : 'var(--g)';
+
+  // Deployed %
+  const mEl = document.getElementById('margin');
+  mEl.textContent = deployedPct.toFixed(1) + '%';
+  mEl.style.color = deployedPct > 80 ? 'var(--r)' : deployedPct > 60 ? 'var(--y)' : 'var(--g)';
+  mEl.title = '₹' + (totalValue / 100000).toFixed(2) + 'L deployed of ₹' + (cap.current / 100000).toFixed(2) + 'L';
+
+  // True SL Risk %
+  const rEl = document.getElementById('risk-pct');
+  rEl.textContent = slRiskPct.toFixed(1) + '%' + (posWithoutSL ? ' ⚠' : '');
+  rEl.style.color = slRiskPct > 10 ? 'var(--r)' : slRiskPct > 5 ? 'var(--y)' : 'var(--g)';
+  rEl.title = '₹' + (totalSLRisk / 1000).toFixed(1) + 'K at risk if all SLs hit' + (posWithoutSL ? ' (' + posWithoutSL + ' without SL)' : '');
 }
 
 // ── Heatmap ──
