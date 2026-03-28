@@ -1498,27 +1498,48 @@ function saveWorkerUrl() {
 // INIT + AUTOCOMPLETE (PRESERVED)
 // ═══════════════════════════════════════════════════════════════
 
-setTimeout(() => {
-  TE.createAutocomplete({
-    inputId: 'exec-sym', dropId: 'exec-sym-drop',
-    fetchPrice: async sym => {
-      const el = document.getElementById('exec-price-status');
-      el.textContent = '⏳ Fetching…';
-      const price = await TE.fetchCMP(sym);
-      if (price) {
-        const pe = document.getElementById('exec-price');
-        if (pe && !pe.value) pe.value = price.toFixed(2);
-        el.innerHTML = `<span style="color:var(--g)">₹${price.toFixed(2)}</span>`;
-      } else el.textContent = 'Unavailable';
-      // Update pyramid detection on symbol change
-      updatePyramidWarn(sym);
-    }
-  });
-  TE.createAutocomplete({ inputId: 'gtt-sym', dropId: 'gtt-sym-drop' });
-  populateJournalDropdown();
-  checkBrokerStatus();
-  renderCapitalBar();
-}, 100);
+setTimeout(async () => {
+  try {
+    // Guard: ensure TE namespace exists
+    if (typeof TE === 'undefined') { console.error('TE namespace not loaded'); return; }
+    if (!TE.exec) TE.exec = { positions: [], broker: 'zerodha', side: 'BUY', otype: 'MARKET', sortBy: 'pnl', gttOrders: [],
+      refreshPositions: async () => [], refreshOrders: async () => [], sendOrder: async () => ({ ok: false, error: 'Not connected' }),
+      computePnl: () => ({ totalPnl: 0, dayPnl: 0, totalValue: 0, riskPct: 0, count: 0 }),
+      runNudges: () => ({ score: 50, nudges: [] }), saveGTTs: () => {}, playSound: () => {},
+      autoJournal: () => {}, gttAutoFromJournal: () => 0 };
+    if (!TE.fetchCMP) TE.fetchCMP = async () => null;
+    if (!TE.getWorkerUrl) TE.getWorkerUrl = () => localStorage.getItem('zd_worker_url') || '';
+    if (!TE.isMarketOpen) TE.isMarketOpen = () => { const h = new Date().getUTCHours() + 5.5; return h >= 9.25 && h <= 15.5; };
+    if (!TE.getOpenTrades) TE.getOpenTrades = () => JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open');
+    if (!TE.trades) { try { TE.trades = JSON.parse(localStorage.getItem('te_trades') || '[]'); } catch(e) { TE.trades = []; } }
+    if (!TE.createAutocomplete) TE.createAutocomplete = () => {};
+    if (!TE.fmt) TE.fmt = n => '₹' + Math.abs(n||0).toFixed(0);
+
+    TE.createAutocomplete({
+      inputId: 'exec-sym', dropId: 'exec-sym-drop',
+      fetchPrice: async sym => {
+        const el = document.getElementById('exec-price-status');
+        el.textContent = '⏳ Fetching…';
+        const price = await TE.fetchCMP(sym);
+        if (price) {
+          const pe = document.getElementById('exec-price');
+          if (pe && !pe.value) pe.value = price.toFixed(2);
+          el.innerHTML = `<span style="color:var(--g)">₹${price.toFixed(2)}</span>`;
+        } else el.textContent = 'Unavailable';
+        updatePyramidWarn(sym);
+      }
+    });
+    TE.createAutocomplete({ inputId: 'gtt-sym', dropId: 'gtt-sym-drop' });
+    populateJournalDropdown();
+    checkBrokerStatus();
+    renderCapitalBar();
+
+    // Auto-load positions from journal on boot
+    await refreshAll();
+  } catch (e) {
+    console.error('Execution page init error:', e);
+  }
+}, 200);
 
 // ── Broker Selection ──
 function setBroker(b) {
@@ -1732,19 +1753,25 @@ async function placeOrder() {
 // ═══════════════════════════════════════════════════════════════
 
 async function refreshAll() {
-  // 1. Try fetching broker positions (may return empty if token expired)
-  try { await TE.exec.refreshPositions(); } catch(e) { console.log('Broker refresh skipped:', e); }
+  try {
+    // 1. Try fetching broker positions (may return empty if token expired)
+    try { if (TE.exec.refreshPositions) await TE.exec.refreshPositions(); } catch(e) { console.log('Broker refresh skipped:', e); }
 
-  // 2. Build merged positions: journal trades as PRIMARY, broker as enrichment
-  await buildMergedPositions();
+    // 2. Build merged positions: journal trades as PRIMARY, broker as enrichment
+    await buildMergedPositions();
 
-  renderPositions();
-  renderPnlBar();
-  renderHeatmap();
-  renderSquareOffBar();
-  renderCapitalBar();
-  populateJournalDropdown();
-  await refreshOrders();
+    renderPositions();
+    renderPnlBar();
+    renderHeatmap();
+    renderSquareOffBar();
+    renderCapitalBar();
+    populateJournalDropdown();
+    try { await refreshOrders(); } catch(e) { console.log('Orders refresh skipped:', e); }
+  } catch (e) {
+    console.error('refreshAll error:', e);
+    // Still try to render what we can
+    try { renderCapitalBar(); } catch(e2) {}
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1820,6 +1847,7 @@ async function fetchATRForSymbol(sym) {
 }
 
 async function buildMergedPositions() {
+  try {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
   const openTrades = trades.filter(t => t.status === 'Open');
   const brokerPos = TE.exec.positions || [];
@@ -1935,6 +1963,23 @@ async function buildMergedPositions() {
       });
     }
   });
+  } catch (e) {
+    console.error('buildMergedPositions error:', e);
+    // Fallback: show journal trades without CMP enrichment
+    try {
+      const fallbackTrades = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open');
+      _mergedPositions = fallbackTrades.map(trade => {
+        const nt = normalizeTrade(trade);
+        if (!nt || !nt._n) return null;
+        return {
+          tradingsymbol: trade.symbol, symbol: trade.symbol,
+          quantity: nt._n.remainingQty, average_price: nt._n.avgEntry,
+          last_price: nt._n.avgEntry, pnl: 0, product: 'CNC',
+          _trade: trade, _nt: nt, _hasBroker: false, _cmpSource: 'entry', _atrSource: 'none',
+        };
+      }).filter(Boolean);
+    } catch (e2) { _mergedPositions = []; }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
