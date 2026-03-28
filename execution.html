@@ -489,6 +489,24 @@ document.addEventListener('click', function(e) {
           <button class="btn btn-xs" onclick="saveWorkerUrl()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save Worker URL</button>
         </div>
         
+        <!-- EdgeCloud Settings -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">☁️</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">EdgeCloud Indicator</span>
+            <span id="ec-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(0,229,160,0.15);color:#00E5A0">Active</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <label style="font-size:10px;color:var(--t2)">SuperTrend Multiplier:</label>
+            <button class="ep-act-btn" id="ec-st2-btn" onclick="setECMultiplier(2)" style="font-size:10px;padding:4px 10px">10, 2</button>
+            <button class="ep-act-btn" id="ec-st3-btn" onclick="setECMultiplier(3)" style="font-size:10px;padding:4px 10px">10, 3</button>
+          </div>
+          <div style="font-size:9px;color:var(--t4)">
+            Walking Line = SuperTrend (TSL) · Running Line = EMA(21) · Cloud = zone between them<br>
+            10,2 = tighter TSL, more responsive · 10,3 = wider TSL, fewer whipsaws
+          </div>
+        </div>
+        
       </div>
     </div>
   </div>
@@ -773,6 +791,7 @@ document.addEventListener('click', function(e) {
 <script src="js/journal-sync.js"></script>
 <script src="js/symbols.js"></script>
 <script src="js/execution.js"></script>
+<script src="js/edgecloud.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/sidebar.js"></script>
 
@@ -1538,6 +1557,8 @@ function openSLMove(tradeId) {
   if (ema8 > 0) slButtons.push({ label: '8 EMA ₹' + ema8.toFixed(0), value: ema8, color: 'var(--g)' });
   if (ema21 > 0) slButtons.push({ label: '21 EMA ₹' + ema21.toFixed(0), value: ema21, color: 'var(--g)' });
   if (dma10 > 0) slButtons.push({ label: '10 DMA ₹' + dma10.toFixed(0), value: dma10, color: 'var(--g)' });
+  if (trade._ecWalking && +trade._ecWalking > 0) slButtons.push({ label: 'EC Walk ₹' + (+trade._ecWalking).toFixed(0), value: +trade._ecWalking, color: 'var(--c)' });
+  if (trade._ecRunning && +trade._ecRunning > 0) slButtons.push({ label: 'EC Run ₹' + (+trade._ecRunning).toFixed(0), value: +trade._ecRunning, color: '#ff9800' });
   slPresets.innerHTML = slButtons.map(b =>
     `<button class="ep-act-btn" style="font-size:9px;color:${b.color}" onclick="document.getElementById('sl-move-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
   ).join('');
@@ -1856,6 +1877,7 @@ function loadSettingsValues() {
   updateDhanStatus();
   const workerUrl = localStorage.getItem('zd_worker_url') || '';
   document.getElementById('worker-url-input').value = workerUrl;
+  loadECSettings();
 }
 
 function updateGroqStatus() {
@@ -1932,6 +1954,29 @@ function saveWorkerUrl() {
   checkBrokerStatus();
 }
 
+// ── EdgeCloud Settings ──
+function setECMultiplier(m) {
+  localStorage.setItem('ec_st_multiplier', m);
+  const b2 = document.getElementById('ec-st2-btn');
+  const b3 = document.getElementById('ec-st3-btn');
+  if (b2 && b3) {
+    b2.style.borderColor = m === 2 ? 'var(--c)' : '';
+    b2.style.color = m === 2 ? 'var(--c)' : '';
+    b3.style.borderColor = m === 3 ? 'var(--c)' : '';
+    b3.style.color = m === 3 ? 'var(--c)' : '';
+  }
+  if (typeof toast === 'function') toast(`EdgeCloud: SuperTrend(10,${m})`, '☁️');
+  _atrFetchTime = 0; // Force re-fetch on next refresh
+}
+
+function loadECSettings() {
+  const m = +localStorage.getItem('ec_st_multiplier') || 2;
+  const b2 = document.getElementById('ec-st2-btn');
+  const b3 = document.getElementById('ec-st3-btn');
+  if (b2) { b2.style.borderColor = m === 2 ? 'var(--c)' : ''; b2.style.color = m === 2 ? 'var(--c)' : ''; }
+  if (b3) { b3.style.borderColor = m === 3 ? 'var(--c)' : ''; b3.style.color = m === 3 ? 'var(--c)' : ''; }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // INIT + AUTOCOMPLETE (PRESERVED)
 // ═══════════════════════════════════════════════════════════════
@@ -1950,10 +1995,114 @@ setTimeout(async () => {
       autoJournal: () => {}, gttAutoFromJournal: () => 0 };
     if (!TE.fetchCMP) TE.fetchCMP = async () => null;
 
-    // OVERRIDE: Always use Worker's yahoo-proxy (core.js uses allorigins which is unreliable)
+    // OVERRIDE: 3-tier CMP cascade — Dhan LTP (fastest) → Yahoo proxy (fallback)
+    // Both routed through Cloudflare Worker to avoid CORS
     const _workerUrl = localStorage.getItem('zd_worker_url') || '';
     if (_workerUrl) {
+
+      // ── Dhan Symbol Master — symbol → securityId mapping ──
+      // Cached in localStorage as JSON map, refreshed daily
+      let _dhanSymMap = null;
+      const _dhanSymMapKey = 'te_dhan_sym_map';
+      const _dhanSymMapTsKey = 'te_dhan_sym_map_ts';
+
+      async function getDhanSymMap() {
+        if (_dhanSymMap) return _dhanSymMap;
+        // Try localStorage cache (valid for 24h)
+        try {
+          const cached = localStorage.getItem(_dhanSymMapKey);
+          const ts = +localStorage.getItem(_dhanSymMapTsKey) || 0;
+          if (cached && (Date.now() - ts < 86400000)) {
+            _dhanSymMap = JSON.parse(cached);
+            console.log('Dhan sym map: loaded from cache,', Object.keys(_dhanSymMap).length, 'symbols');
+            return _dhanSymMap;
+          }
+        } catch (e) {}
+
+        // Fetch from Worker → Dhan CSV
+        try {
+          console.log('Dhan sym map: fetching from Worker...');
+          const res = await fetch(_workerUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'dhan-symbols' },
+            signal: AbortSignal.timeout(15000)
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const csv = await res.text();
+          const lines = csv.split('\n');
+          if (lines.length < 2) throw new Error('Empty CSV');
+
+          // Parse header to find column indices
+          const header = lines[0].split(',').map(h => h.trim().toUpperCase());
+          const idxSecId = header.findIndex(h => h.includes('SECURITY_ID'));
+          const idxSymbol = header.findIndex(h => h.includes('TRADING_SYMBOL'));
+          const idxSegment = header.findIndex(h => h.includes('SEGMENT'));
+          const idxExch = header.findIndex(h => h.includes('EXCH_ID'));
+
+          if (idxSecId < 0 || idxSymbol < 0) throw new Error('Cannot parse CSV headers');
+
+          _dhanSymMap = {};
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',');
+            // Only NSE equity
+            const exch = (cols[idxExch] || '').trim();
+            const seg = (cols[idxSegment] || '').trim();
+            if ((exch === 'NSE' || exch === 'NSE_EQ') && (seg.includes('E') || seg === 'NSE_EQ')) {
+              const sym = (cols[idxSymbol] || '').trim().toUpperCase().replace(/-EQ$/,'');
+              const secId = (cols[idxSecId] || '').trim();
+              if (sym && secId && /^\d+$/.test(secId)) {
+                _dhanSymMap[sym] = secId;
+              }
+            }
+          }
+
+          // Cache in localStorage
+          localStorage.setItem(_dhanSymMapKey, JSON.stringify(_dhanSymMap));
+          localStorage.setItem(_dhanSymMapTsKey, String(Date.now()));
+          console.log('Dhan sym map: cached', Object.keys(_dhanSymMap).length, 'symbols');
+          return _dhanSymMap;
+        } catch (e) {
+          console.log('Dhan sym map fetch failed:', e.message);
+          _dhanSymMap = {};
+          return _dhanSymMap;
+        }
+      }
+
+      // Pre-load the symbol map on boot (non-blocking)
+      getDhanSymMap().catch(() => {});
+
+      // ── Single-symbol CMP: Dhan → Yahoo ──
       TE.fetchCMP = async function(symbol) {
+        const dhanId = localStorage.getItem('dhan_id') || '';
+        const dhanTk = localStorage.getItem('dhan_tk') || '';
+
+        // Tier 1: Dhan LTP via Worker (real-time, fastest during market hours)
+        if (dhanId && dhanTk) {
+          try {
+            const symMap = await getDhanSymMap();
+            const secId = symMap[symbol.toUpperCase()];
+            if (secId) {
+              const dhanRes = await fetch(_workerUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Kite-Action': 'dhan-ltp',
+                  'X-Dhan-Token': dhanTk,
+                  'X-Dhan-ID': dhanId
+                },
+                body: JSON.stringify({ NSE_EQ: [parseInt(secId)] }),
+                signal: AbortSignal.timeout(4000)
+              });
+              if (dhanRes.ok) {
+                const dhanData = await dhanRes.json();
+                const ltp = dhanData?.data?.NSE_EQ?.[secId]?.last_price;
+                if (ltp && ltp > 0) return ltp;
+              }
+            }
+          } catch (e) { /* Dhan failed, fall through to Yahoo */ }
+        }
+
+        // Tier 2: Yahoo proxy via Worker (reliable fallback)
         const ticker = symbol.includes('.') ? symbol : symbol + '.NS';
         try {
           const res = await fetch(_workerUrl, {
@@ -1967,7 +2116,86 @@ setTimeout(async () => {
           return data?.chart?.result?.[0]?.meta?.regularMarketPrice || null;
         } catch (e) { return null; }
       };
-      console.log('fetchCMP: overridden to use Worker yahoo-proxy');
+
+      // ── Batch Dhan LTP: fetch all symbols in ONE API call ──
+      // Returns { SYMBOL: { price, source } } map
+      TE.fetchCMPBatch = async function(symbols) {
+        const result = {};
+        if (!symbols || !symbols.length) return result;
+
+        const dhanId = localStorage.getItem('dhan_id') || '';
+        const dhanTk = localStorage.getItem('dhan_tk') || '';
+
+        // Tier 1: Batch Dhan LTP (up to 1000 instruments in one call)
+        if (dhanId && dhanTk) {
+          try {
+            const symMap = await getDhanSymMap();
+            const secIds = [];
+            const secIdToSym = {}; // reverse map: secId → symbol
+            symbols.forEach(sym => {
+              const secId = symMap[sym.toUpperCase()];
+              if (secId) {
+                secIds.push(parseInt(secId));
+                secIdToSym[secId] = sym;
+              }
+            });
+
+            if (secIds.length) {
+              const dhanRes = await fetch(_workerUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Kite-Action': 'dhan-ltp',
+                  'X-Dhan-Token': dhanTk,
+                  'X-Dhan-ID': dhanId
+                },
+                body: JSON.stringify({ NSE_EQ: secIds }),
+                signal: AbortSignal.timeout(6000)
+              });
+              if (dhanRes.ok) {
+                const dhanData = await dhanRes.json();
+                if (dhanData?.data?.NSE_EQ) {
+                  Object.entries(dhanData.data.NSE_EQ).forEach(([secId, data]) => {
+                    const sym = secIdToSym[secId];
+                    if (sym && data?.last_price && data.last_price > 0) {
+                      result[sym] = { price: data.last_price, source: 'dhan' };
+                    }
+                  });
+                }
+              }
+              if (Object.keys(result).length) {
+                console.log(`CMP Dhan batch: ${Object.keys(result).length}/${symbols.length} symbols`);
+              }
+            }
+          } catch (e) { console.log('Dhan batch LTP error:', e.message); }
+        }
+
+        // Tier 2: Yahoo fallback for symbols Dhan missed
+        const missing = symbols.filter(s => !result[s]);
+        if (missing.length) {
+          console.log(`CMP Yahoo fallback for ${missing.length} symbols:`, missing.join(', '));
+          await Promise.allSettled(missing.map(async sym => {
+            const ticker = sym.includes('.') ? sym : sym + '.NS';
+            try {
+              const res = await fetch(_workerUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+                body: JSON.stringify({ ticker, range: '1d', interval: '1d' }),
+                signal: AbortSignal.timeout(8000)
+              });
+              if (res.ok) {
+                const data = await res.json();
+                const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+                if (price) result[sym] = { price, source: 'yahoo' };
+              }
+            } catch (e) { /* skip */ }
+          }));
+        }
+
+        return result;
+      };
+
+      console.log('fetchCMP: 3-tier cascade (Dhan LTP → Yahoo proxy)');
     }
     if (!TE.getWorkerUrl) TE.getWorkerUrl = () => localStorage.getItem('zd_worker_url') || '';
     if (!TE.isMarketOpen) TE.isMarketOpen = () => { const h = new Date().getUTCHours() + 5.5; return h >= 9.25 && h <= 15.5; };
@@ -2269,6 +2497,9 @@ async function refreshAll() {
     // 5. Auto-trail SL based on EMA/DMA (once per day per trade)
     autoTrailSL();
 
+    // 6. EdgeCloud signal alerts
+    if (typeof EdgeCloud !== 'undefined') checkEdgeCloudAlerts();
+
     renderPositions();
     renderPnlBar();
     renderHeatmap();
@@ -2400,6 +2631,15 @@ function autoTrailSL() {
       if (atr > 0) { trailValue = cmp - 3 * atr; trailSource = 'Chandelier 3×ATR'; }
     }
 
+    // EdgeCloud TSL override — use Walking Line if higher
+    if (trade._ecTsl && +trade._ecTsl > 0) {
+      const ecTSL = +trade._ecTsl;
+      if (ecTSL > trailValue && ecTSL > currentSL) {
+        trailValue = ecTSL;
+        trailSource = `EdgeCloud ${trade._ecTslSource || 'SuperTrend'}`;
+      }
+    }
+
     // Only raise SL, never lower it
     if (trailValue > 0 && trailValue > currentSL) {
       const trailKey = `auto_tsl_${trade.id}_${new Date().toISOString().slice(0, 10)}`;
@@ -2492,6 +2732,61 @@ function checkSLBreachAlerts() {
           );
         }
       });
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EDGECLOUD SIGNAL ALERTS
+// ═══════════════════════════════════════════════════════════════
+
+function checkEdgeCloudAlerts() {
+  _mergedPositions.forEach(p => {
+    const trade = p._trade;
+    if (!trade || !trade._ecState) return;
+    const cmp = p.last_price || 0;
+    if (!cmp || p._cmpSource === 'entry') return;
+
+    // Pullback re-entry alert
+    if (trade._ecLastPullback) {
+      const alertKey = `ec_pullback_${trade.id}_${trade._ecLastPullback.bar}`;
+      if (!wasAlertSent(alertKey)) {
+        markAlertSent(alertKey);
+        playAlertSound();
+        toast(`🟢 ${trade.symbol}: EdgeCloud Pullback (${trade._ecLastPullback.score}pts) — Add opportunity`, '🟢');
+        sendTelegramAlert(EdgeCloud.telegramAlert(trade.symbol, trade._ecLastPullback, 'pullback'));
+      }
+    }
+
+    // Pyramid breakout alert
+    if (trade._ecLastPyramid) {
+      const alertKey = `ec_pyramid_${trade.id}_${trade._ecLastPyramid.bar}`;
+      if (!wasAlertSent(alertKey)) {
+        markAlertSent(alertKey);
+        playAlertSound();
+        toast(`🔺 ${trade.symbol}: EdgeCloud Pyramid — Donchian breakout`, '🔺');
+        sendTelegramAlert(EdgeCloud.telegramAlert(trade.symbol, trade._ecLastPyramid, 'pyramid'));
+      }
+    }
+
+    // Exhaustion star alert
+    if (trade._ecLastStar && trade._ecLastStar.level >= 2) {
+      const alertKey = `ec_star_${trade.id}_${trade._ecLastStar.bar}`;
+      if (!wasAlertSent(alertKey)) {
+        markAlertSent(alertKey);
+        playAlertSound();
+        playAlertSound();
+        toast(`⭐ ${trade.symbol}: EdgeCloud Exhaustion L${trade._ecLastStar.level} — ${trade._ecLastStar.levelLabel}`, '⭐');
+        sendTelegramAlert(EdgeCloud.telegramAlert(trade.symbol, trade._ecLastStar, 'star'));
+      }
+    }
+
+    // State change alert (entered cloud or weakening)
+    const stateKey = `ec_state_${trade.id}_${trade._ecState}`;
+    if ((trade._ecState === 'in_cloud' || trade._ecState === 'weakening') && !wasAlertSent(stateKey)) {
+      markAlertSent(stateKey);
+      toast(`⚠️ ${trade.symbol}: Entered EdgeCloud — caution`, '⚠️');
+      sendTelegramAlert(`⚠️ EdgeCloud — ${trade.symbol}\nState: ${trade._ecState.toUpperCase()}\nWalking TSL: ₹${trade._ecWalking}\nAction: ${trade._ecAction || 'Monitor'}`);
     }
   });
 }
@@ -2635,16 +2930,28 @@ async function fetchTechDataForSymbol(sym) {
     _cmpFetchTime = now;
     const syms = openTrades.map(t => t.symbol).filter(s => s);
     console.log('CMP fetch: starting for', syms.join(', '));
-    // Timeout wrapper: abort CMP fetch after 8s per symbol
-    const fetchWithTimeout = (sym, ms) => Promise.race([
-      (async () => {
-        const cmp = await TE.fetchCMP(sym);
-        if (cmp) { _cmpCache[sym] = { price: cmp, time: now }; console.log('CMP:', sym, '₹' + cmp); }
-        else console.log('CMP:', sym, 'null');
-      })(),
-      new Promise(r => setTimeout(r, ms))
-    ]).catch(e => console.log('CMP timeout/error:', sym, e));
-    await Promise.allSettled(syms.map(sym => fetchWithTimeout(sym, 8000)));
+
+    // Use batch fetch if available (Dhan batch → Yahoo fallback)
+    if (typeof TE.fetchCMPBatch === 'function') {
+      try {
+        const batchResult = await TE.fetchCMPBatch(syms);
+        Object.entries(batchResult).forEach(([sym, data]) => {
+          _cmpCache[sym] = { price: data.price, time: now, source: data.source };
+          console.log(`CMP: ${sym} ₹${data.price} (${data.source})`);
+        });
+      } catch (e) { console.log('Batch CMP error:', e.message); }
+    } else {
+      // Fallback: per-symbol fetch (old behavior)
+      const fetchWithTimeout = (sym, ms) => Promise.race([
+        (async () => {
+          const cmp = await TE.fetchCMP(sym);
+          if (cmp) { _cmpCache[sym] = { price: cmp, time: now, source: 'yahoo' }; console.log('CMP:', sym, '₹' + cmp); }
+          else console.log('CMP:', sym, 'null');
+        })(),
+        new Promise(r => setTimeout(r, ms))
+      ]).catch(e => console.log('CMP timeout/error:', sym, e));
+      await Promise.allSettled(syms.map(sym => fetchWithTimeout(sym, 8000)));
+    }
     console.log('CMP fetch: done. Cache:', Object.keys(_cmpCache).length, 'symbols');
   } else if (openTrades.length) {
     console.log('CMP fetch: throttled (last fetch', ((now - _cmpFetchTime)/1000).toFixed(0), 's ago)');
@@ -2697,6 +3004,32 @@ async function fetchTechDataForSymbol(sym) {
         const updated = updatedTrades.find(u => u.id === t.id);
         if (updated) openTrades[i] = updated;
       });
+
+      // EdgeCloud computation — runs alongside ATR/EMA fetch
+      if (typeof EdgeCloud !== 'undefined') {
+        const ecMultiplier = +localStorage.getItem('ec_st_multiplier') || 2;
+        console.log(`EdgeCloud: computing for ${symsNeedATR.length} symbols (ST mult=${ecMultiplier})`);
+        for (let ei = 0; ei < symsNeedATR.length; ei += 2) {
+          const ecBatch = symsNeedATR.slice(ei, ei + 2);
+          await Promise.allSettled(ecBatch.map(async sym => {
+            try {
+              const ec = await EdgeCloud.fetchAndCompute(sym, { stMultiplier: ecMultiplier });
+              if (ec && ec.current) {
+                const ecTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+                const ecIdx = ecTrades.findIndex(t => t.symbol === sym && t.status === 'Open');
+                if (ecIdx >= 0) {
+                  EdgeCloud.storeOnTrade(ecTrades[ecIdx], ec);
+                  localStorage.setItem('te_trades', JSON.stringify(ecTrades));
+                  console.log(`EdgeCloud ${sym}: ${ec.current.state} | Walk ₹${ec.current.walkingLine} | Run ₹${ec.current.runningLine} | CW ₹${ec.current.cloudWidth} | ${ec.current.actionLabel}`);
+                  // Update openTrades reference too
+                  const otIdx = openTrades.findIndex(t => t.symbol === sym);
+                  if (otIdx >= 0) openTrades[otIdx] = ecTrades[ecIdx];
+                }
+              }
+            } catch (e) { console.log('EdgeCloud error for', sym, e.message); }
+          }));
+        }
+      }
     }
   }
 
@@ -2732,7 +3065,7 @@ async function fetchTechDataForSymbol(sym) {
       _trade: trade,
       _nt: nt,
       _hasBroker: !!broker,
-      _cmpSource: broker ? 'broker' : cached ? 'yahoo' : 'entry',
+      _cmpSource: broker ? 'broker' : cached?.source === 'dhan' ? 'dhan' : cached ? 'yahoo' : 'entry',
       _cmpTime: cached?.time || 0,
       _atrSource: atrSource,
     };
@@ -2830,6 +3163,7 @@ function renderPositions() {
     // CMP data source dot (where price was fetched from)
     const cmpSrc = p._cmpSource || 'entry';
     const cmpDot = cmpSrc === 'broker' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#00e5a0;vertical-align:middle" title="Live from broker"></span>'
+      : cmpSrc === 'dhan' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#3b8bff;vertical-align:middle" title="Dhan LTP API"></span>'
       : cmpSrc === 'yahoo' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;vertical-align:middle" title="Yahoo Finance"></span>'
       : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t4);vertical-align:middle" title="Using entry price"></span>';
 
@@ -2891,6 +3225,12 @@ function renderPositions() {
 
       <!-- ATR Meter -->
       ${trade?._epAtr14 || trade ? `<div class="ep-pos-section">${renderATRMeter(trade, ltp, p._atrSource)}</div>` : ''}
+
+      <!-- EdgeCloud -->
+      ${trade?._ecState && typeof EdgeCloud !== 'undefined' ? `<div class="ep-pos-section">
+        <div class="ep-section-label">EdgeCloud</div>
+        ${EdgeCloud.renderCardSection(trade, ltp)}
+      </div>` : ''}
 
       <!-- Tranche Exit Plan (quick view) -->
       ${trade ? `<div class="ep-pos-section">
