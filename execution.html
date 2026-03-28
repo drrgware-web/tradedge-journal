@@ -93,6 +93,22 @@
 
 /* Position grid */
 .ep-pos-grid { display:flex; flex-direction:column; gap:10px; }
+
+/* Tranche Exit Plan */
+.ep-tranche-row { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:10px; border-bottom:1px solid rgba(255,255,255,.04); }
+.ep-tranche-row:last-child { border-bottom:none; }
+.ep-tranche-row.done { opacity:.45; }
+.ep-tranche-row.next { background:rgba(0,229,160,.06); border-radius:6px; padding:4px 6px; margin:0 -6px; }
+.ep-tr-tag { font-size:8px; font-weight:700; padding:2px 6px; border-radius:4px; min-width:24px; text-align:center; }
+.ep-tr-trigger { font-family:'IBM Plex Mono',monospace; font-weight:600; min-width:65px; }
+.ep-tr-qty { font-family:'IBM Plex Mono',monospace; color:var(--t2); min-width:40px; }
+.ep-tr-tsl { font-size:9px; color:var(--t3); margin-left:auto; font-style:italic; }
+.ep-tr-status { font-size:9px; font-weight:700; min-width:45px; text-align:center; }
+
+/* Modal tranche editor */
+.ep-tr-edit-row { display:grid; grid-template-columns:40px 1fr 70px 1fr 30px; gap:6px; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+.ep-tr-edit-row:last-child { border-bottom:none; }
+.ep-tr-input { padding:6px 8px; background:var(--bg2); border:1px solid var(--b1); border-radius:6px; color:var(--t1); font-family:'IBM Plex Mono',monospace; font-size:11px; width:100%; }
 </style>
 </head>
 <body>
@@ -542,6 +558,26 @@
         <div style="color:var(--t4);font-size:10px">Set SL and Target to see R:R preview</div>
       </div>
 
+      <!-- Tranche Exit Plan Editor -->
+      <div style="background:rgba(0,187,255,.04);border:1px solid rgba(0,187,255,.12);border-radius:10px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:10px;font-weight:700;color:var(--c)">📊 TRANCHE EXIT PLAN</div>
+          <button class="ep-act-btn" style="font-size:9px;padding:3px 8px" onclick="resetTranches()">↻ Reset to ATR defaults</button>
+        </div>
+        <div style="display:grid;grid-template-columns:40px 1fr 70px 1fr 30px;gap:4px;padding:4px 0;font-size:8px;color:var(--t3)">
+          <span></span><span>TRIGGER ₹</span><span>QTY</span><span>TSL AFTER EXIT</span><span></span>
+        </div>
+        <div id="tranche-editor">
+          <div style="color:var(--t4);font-size:10px;padding:8px 0">Loading…</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-sm" style="background:var(--c);color:#000;font-weight:700;flex:1" onclick="saveTrancheEdits(_slMoveTradeId)">Save Plan</button>
+        </div>
+        <div style="font-size:8px;color:var(--t3);margin-top:6px;line-height:1.4">
+          T1-T3: Sell into strength at ATR multiples. RUN: Let the last tranche ride with trailing SL — this is where outsized R-multiples come from.
+        </div>
+      </div>
+
       <!-- SL History -->
       <div>
         <div class="ep-section-label" style="margin-top:4px">SL Move History</div>
@@ -884,6 +920,119 @@ function calcTradeGrade(trade, nt, pnlPct, cap) {
   if (score >= 55) return 'B';
   if (score >= 35) return 'C';
   return 'D';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRANCHE EXIT PLANNER
+// ═══════════════════════════════════════════════════════════════
+
+function generateDefaultTranches(trade) {
+  const nt = normalizeTrade(trade);
+  if (!nt || !nt._n) return [];
+  const avg = nt._n.avgEntry;
+  const totalQty = nt._n.remainingQty;
+  const atr = +trade._epAtr14 || (avg * 0.02);
+  const q25 = Math.max(1, Math.floor(totalQty * 0.25));
+  const q50 = Math.max(1, Math.floor(totalQty * 0.25));
+  const q75 = Math.max(1, Math.floor(totalQty * 0.25));
+  const qRunner = totalQty - q25 - q50 - q75;
+
+  return [
+    { id: 't1', label: 'T1', pct: 25, trigger: Math.round((avg + atr * 5) * 100) / 100, qty: q25, tslAction: 'Move SL to Day Low', status: 'pending', color: 'var(--y)' },
+    { id: 't2', label: 'T2', pct: 25, trigger: Math.round((avg + atr * 6) * 100) / 100, qty: q50, tslAction: 'Move SL to VWAP', status: 'pending', color: '#ff9800' },
+    { id: 't3', label: 'T3', pct: 25, trigger: Math.round((avg + atr * 7) * 100) / 100, qty: q75, tslAction: 'Move SL to 8 EMA', status: 'pending', color: 'var(--r)' },
+    { id: 't4', label: 'RUN', pct: null, trigger: 0, qty: Math.max(1, qRunner), tslAction: 'Trail with 21 EMA / 10 DMA', status: 'pending', color: 'var(--g)' },
+  ];
+}
+
+function getTranches(trade) {
+  if (trade._epTranches && trade._epTranches.length) return trade._epTranches;
+  return generateDefaultTranches(trade);
+}
+
+function updateTrancheStatuses(tranches, cmp, exitedQty) {
+  let qtyExited = exitedQty || 0;
+  return tranches.map((tr, i) => {
+    const t = { ...tr };
+    if (t.id === 't4') {
+      // Runner tranche — never triggered by price, only by TSL
+      t.status = qtyExited >= (tranches[0].qty + tranches[1].qty + tranches[2].qty) ? 'next' : 'pending';
+    } else if (qtyExited >= t.qty * (i + 1)) {
+      t.status = 'done';
+    } else if (t.trigger > 0 && cmp >= t.trigger) {
+      t.status = 'next'; // CMP has reached this tranche — action needed
+    } else {
+      t.status = 'pending';
+    }
+    return t;
+  });
+}
+
+function renderTrancheQuickView(trade, cmp) {
+  if (!trade) return '';
+  const nt = normalizeTrade(trade);
+  if (!nt || !nt._n) return '';
+  const tranches = getTranches(trade);
+  const exitedQty = nt._n.totalExitQty || 0;
+  const updated = updateTrancheStatuses(tranches, cmp, exitedQty);
+
+  return updated.map(tr => {
+    const isDone = tr.status === 'done';
+    const isNext = tr.status === 'next';
+    const statusIcon = isDone ? '<span style="color:var(--g)">✓</span>' : isNext ? '<span style="color:var(--y)">▶</span>' : '<span style="color:var(--t4)">○</span>';
+    const statusLabel = isDone ? 'Done' : isNext ? 'NOW' : 'Pending';
+    const statusColor = isDone ? 'var(--g)' : isNext ? 'var(--y)' : 'var(--t4)';
+    const triggerLabel = tr.trigger > 0 ? `₹${tr.trigger.toFixed(0)}` : 'TSL hit';
+
+    return `<div class="ep-tranche-row ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}">
+      <span class="ep-tr-tag" style="background:${tr.color}22;color:${tr.color}">${tr.label}</span>
+      <span class="ep-tr-trigger" style="color:${isNext ? 'var(--y)' : 'var(--t2)'}">${triggerLabel}</span>
+      <span class="ep-tr-qty">${tr.qty} qty</span>
+      <span class="ep-tr-tsl">${tr.tslAction}</span>
+      <span class="ep-tr-status" style="color:${statusColor}">${statusIcon} ${statusLabel}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderTrancheEditor(trade) {
+  if (!trade) return '';
+  const tranches = getTranches(trade);
+  return `<div style="margin-top:8px">
+    ${tranches.map((tr, i) => `<div class="ep-tr-edit-row">
+      <span class="ep-tr-tag" style="background:${tr.color}22;color:${tr.color};font-size:10px">${tr.label}</span>
+      <input type="number" class="ep-tr-input" id="tr-trigger-${i}" value="${tr.trigger || ''}" placeholder="${tr.id === 't4' ? 'TSL' : 'Trigger ₹'}" step="0.05" ${tr.id === 't4' ? 'disabled' : ''}>
+      <input type="number" class="ep-tr-input" id="tr-qty-${i}" value="${tr.qty}" placeholder="Qty" min="1" style="width:70px">
+      <select class="ep-tr-input" id="tr-tsl-${i}" style="font-family:'Outfit',sans-serif;font-size:10px">
+        <option value="Day Low" ${tr.tslAction.includes('Day Low') ? 'selected' : ''}>SL → Day Low</option>
+        <option value="VWAP" ${tr.tslAction.includes('VWAP') ? 'selected' : ''}>SL → VWAP</option>
+        <option value="8 EMA" ${tr.tslAction.includes('8 EMA') ? 'selected' : ''}>SL → 8 EMA</option>
+        <option value="21 EMA" ${tr.tslAction.includes('21 EMA') ? 'selected' : ''}>SL → 21 EMA</option>
+        <option value="10 DMA" ${tr.tslAction.includes('10 DMA') ? 'selected' : ''}>SL → 10 DMA</option>
+        <option value="Chandelier 3ATR" ${tr.tslAction.includes('Chandelier') ? 'selected' : ''}>SL → Chand 3ATR</option>
+      </select>
+      <span style="font-size:9px;color:var(--t4)">${tr.pct ? tr.pct + '%' : '🏃'}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function saveTrancheEdits(tradeId) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const idx = trades.findIndex(t => t.id === tradeId);
+  if (idx < 0) return;
+  const trade = trades[idx];
+  const oldTranches = getTranches(trade);
+
+  trade._epTranches = oldTranches.map((tr, i) => ({
+    ...tr,
+    trigger: +document.getElementById('tr-trigger-' + i)?.value || tr.trigger,
+    qty: +document.getElementById('tr-qty-' + i)?.value || tr.qty,
+    tslAction: 'Move SL to ' + (document.getElementById('tr-tsl-' + i)?.value || 'Day Low'),
+  }));
+
+  trades[idx] = trade;
+  localStorage.setItem('te_trades', JSON.stringify(trades));
+  syncTradeToSupabase(trade);
+  toast(`Tranche plan saved for ${trade.symbol}`, '✅');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1376,7 +1525,23 @@ function openSLMove(tradeId) {
   document.getElementById('tgt-new').oninput = updateSLTgtPreview;
 
   updateSLTgtPreview();
+
+  // Populate tranche editor
+  document.getElementById('tranche-editor').innerHTML = renderTrancheEditor(trade);
+
   openM('m-sl-move');
+}
+
+// Reset tranches to ATR defaults
+function resetTranches() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.id === _slMoveTradeId);
+  if (!trade) return;
+  trade._epTranches = null; // Clear custom, will regenerate from defaults
+  const idx = trades.findIndex(t => t.id === _slMoveTradeId);
+  if (idx >= 0) { trades[idx] = trade; localStorage.setItem('te_trades', JSON.stringify(trades)); }
+  document.getElementById('tranche-editor').innerHTML = renderTrancheEditor(trade);
+  toast('Tranches reset to ATR defaults', '↻');
 }
 
 // R:R Preview calculator
@@ -2326,6 +2491,12 @@ function renderPositions() {
 
       <!-- ATR Meter -->
       ${trade?._epAtr14 || trade ? `<div class="ep-pos-section">${renderATRMeter(trade, ltp, p._atrSource)}</div>` : ''}
+
+      <!-- Tranche Exit Plan (quick view) -->
+      ${trade ? `<div class="ep-pos-section">
+        <div class="ep-section-label">Exit Plan</div>
+        ${renderTrancheQuickView(trade, ltp)}
+      </div>` : ''}
 
       <!-- Pyramid -->
       <div class="ep-pos-section">
