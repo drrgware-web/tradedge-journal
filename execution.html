@@ -2679,7 +2679,7 @@ function renderPositions() {
     const posValue = Math.abs(qty * avg);
     const riskPct = _capForCards.current > 0 ? (posValue / _capForCards.current * 100) : 0;
 
-    return `<div class="ep-pos-card">
+    return `<div class="ep-pos-card" data-symbol="${sym}">
       <!-- Header -->
       <div class="ep-pos-header">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -2933,6 +2933,19 @@ function renderPnlBar() {
   rEl.title = '₹' + (totalSLRisk / 1000).toFixed(1) + 'K at risk if all SLs hit' + (posWithoutSL ? ' (' + posWithoutSL + ' without SL)' : '');
 }
 
+// ── Scroll to position card from heatmap click ──
+function scrollToPosition(sym) {
+  const card = document.querySelector(`.ep-pos-card[data-symbol="${sym}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Flash highlight
+    card.style.outline = '2px solid var(--c)';
+    card.style.outlineOffset = '2px';
+    setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 2000);
+    playSwoopClick();
+  }
+}
+
 // ── Heatmap ──
 function renderHeatmap() {
   const c = document.getElementById('heatmap');
@@ -2950,7 +2963,7 @@ function renderHeatmap() {
     const pctTotal = total > 0 ? value / total * 100 : 0;
     const width = Math.max(pctTotal, 8);
     const bg = pnl >= 0 ? `hsl(${145 + Math.min(pnlPct * 3, 30)},70%,${25 + Math.min(pnlPct * 2, 20)}%)` : `hsl(0,${60 + Math.min(Math.abs(pnlPct) * 3, 30)}%,${25 + Math.min(Math.abs(pnlPct), 15)}%)`;
-    return `<div class="exec-hm-block" style="flex:${width};background:${bg}" title="${sym}: ${TE.fmt(pnl)} (${pnlPct.toFixed(1)}%)">
+    return `<div class="exec-hm-block" style="flex:${width};background:${bg};cursor:pointer" title="${sym}: ${TE.fmt(pnl)} (${pnlPct.toFixed(1)}%) — Click to manage" onclick="scrollToPosition('${sym}')">
       <div class="hm-sym">${sym}</div><div class="hm-pnl">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div></div>`;
   }).join('') + '</div>';
 }
