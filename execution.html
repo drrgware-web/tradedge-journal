@@ -3013,15 +3013,19 @@ async function fetchTechDataForSymbol(sym) {
           const ecBatch = symsNeedATR.slice(ei, ei + 2);
           await Promise.allSettled(ecBatch.map(async sym => {
             try {
-              const ec = await EdgeCloud.fetchAndCompute(sym, { stMultiplier: ecMultiplier });
+              // Phase 2: Use regime-aware compute (MPS + sector RS overlay)
+              const tradeSector = openTrades.find(t => t.symbol === sym)?.sector || '';
+              const ecFn = typeof EdgeCloud.fetchComputeWithRegime === 'function' ? EdgeCloud.fetchComputeWithRegime : EdgeCloud.fetchAndCompute;
+              const ec = await ecFn(sym, { stMultiplier: ecMultiplier }, tradeSector);
               if (ec && ec.current) {
                 const ecTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
                 const ecIdx = ecTrades.findIndex(t => t.symbol === sym && t.status === 'Open');
                 if (ecIdx >= 0) {
                   EdgeCloud.storeOnTrade(ecTrades[ecIdx], ec);
                   localStorage.setItem('te_trades', JSON.stringify(ecTrades));
-                  console.log(`EdgeCloud ${sym}: ${ec.current.state} | Walk ₹${ec.current.walkingLine} | Run ₹${ec.current.runningLine} | CW ₹${ec.current.cloudWidth} | ${ec.current.actionLabel}`);
-                  // Update openTrades reference too
+                  const regimeInfo = ec.regime?.mps ? ` | MPS:${ec.regime.mps.zone}` : '';
+                  const sectorInfo = ec.regime?.sector ? ` | ${ec.regime.sector.name}:${ec.regime.sector.quadrant}` : '';
+                  console.log(`EdgeCloud ${sym}: ${ec.current.state} | Walk ₹${ec.current.walkingLine} | Run ₹${ec.current.runningLine}${regimeInfo}${sectorInfo} | ${ec.current.actionLabel}`);
                   const otIdx = openTrades.findIndex(t => t.symbol === sym);
                   if (otIdx >= 0) openTrades[otIdx] = ecTrades[ecIdx];
                 }
