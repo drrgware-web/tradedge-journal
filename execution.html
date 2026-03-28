@@ -2072,7 +2072,12 @@ function renderPositions() {
       : tradeSource === 'zerodha' || tradeSource === 'Zerodha' ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#00e5a0;vertical-align:middle" title="Zerodha"></span>'
       : tradeSource === 'definedge' || tradeSource === 'Definedge' ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;vertical-align:middle" title="Definedge"></span>'
       : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--t3);vertical-align:middle" title="Manual"></span>';
-    const cmpStatusLabel = p._cmpSource === 'broker' ? 'Live' : p._cmpSource === 'yahoo' ? 'Yahoo' : 'Entry';
+
+    // CMP data source dot (where price was fetched from)
+    const cmpSrc = p._cmpSource || 'entry';
+    const cmpDot = cmpSrc === 'broker' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#00e5a0;vertical-align:middle" title="Live from broker"></span>'
+      : cmpSrc === 'yahoo' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;vertical-align:middle" title="Yahoo Finance"></span>'
+      : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t4);vertical-align:middle" title="Using entry price"></span>';
 
     // RS rank
     const rsRank = trade?._epRsRank || null;
@@ -2110,7 +2115,7 @@ function renderPositions() {
 
       <!-- Metrics Row -->
       <div class="ep-pos-metrics-row">
-        <div class="ep-metric"><div class="ep-metric-label">CMP ${brokerDot}</div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">CMP ${cmpDot}</div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
         <div class="ep-metric"><div class="ep-metric-label">P&L%</div><div class="ep-metric-val" style="color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</div></div>
         <div class="ep-metric"><div class="ep-metric-label">SL</div><div class="ep-metric-val" style="color:var(--r)">₹${trade?.sl ? (+trade.sl).toFixed(0) : '—'}</div></div>
         <div class="ep-metric"><div class="ep-metric-label">Risk%</div><div class="ep-metric-val" style="color:${riskPct > 10 ? 'var(--r)' : riskPct > 5 ? 'var(--y)' : 'var(--t2)'}">${riskPct.toFixed(1)}%</div></div>
