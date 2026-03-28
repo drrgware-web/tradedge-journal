@@ -2148,11 +2148,13 @@ async function placeOrder() {
 
 async function refreshAll() {
   try {
+    console.log('refreshAll: starting...');
     // 1. Try fetching broker positions (may return empty if token expired)
     try { if (TE.exec.refreshPositions) await TE.exec.refreshPositions(); } catch(e) { console.log('Broker refresh skipped:', e); }
 
     // 2. Build merged positions: journal trades as PRIMARY, broker as enrichment
     await buildMergedPositions();
+    console.log('refreshAll: merged', _mergedPositions.length, 'positions. CMP sources:', _mergedPositions.map(p => p.symbol + ':' + p._cmpSource + ':₹' + (p.last_price||0).toFixed(0)).join(', '));
 
     // 3. Check tranche triggers and fire alerts
     checkTrancheAlerts();
@@ -2167,6 +2169,7 @@ async function refreshAll() {
     renderCapitalBar();
     populateJournalDropdown();
     try { await refreshOrders(); } catch(e) { console.log('Orders refresh skipped:', e); }
+    console.log('refreshAll: complete');
   } catch (e) {
     console.error('refreshAll error:', e);
     try { renderCapitalBar(); } catch(e2) {}
@@ -2380,12 +2383,20 @@ async function buildMergedPositions() {
   if (openTrades.length && (now - _cmpFetchTime > 30000)) {
     _cmpFetchTime = now;
     const syms = openTrades.map(t => t.symbol).filter(s => s);
-    // Timeout wrapper: abort CMP fetch after 5s per symbol
+    console.log('CMP fetch: starting for', syms.join(', '));
+    // Timeout wrapper: abort CMP fetch after 8s per symbol
     const fetchWithTimeout = (sym, ms) => Promise.race([
-      (async () => { const cmp = await TE.fetchCMP(sym); if (cmp) _cmpCache[sym] = { price: cmp, time: now }; })(),
+      (async () => {
+        const cmp = await TE.fetchCMP(sym);
+        if (cmp) { _cmpCache[sym] = { price: cmp, time: now }; console.log('CMP:', sym, '₹' + cmp); }
+        else console.log('CMP:', sym, 'null');
+      })(),
       new Promise(r => setTimeout(r, ms))
-    ]).catch(() => {});
-    await Promise.allSettled(syms.map(sym => fetchWithTimeout(sym, 5000)));
+    ]).catch(e => console.log('CMP timeout/error:', sym, e));
+    await Promise.allSettled(syms.map(sym => fetchWithTimeout(sym, 8000)));
+    console.log('CMP fetch: done. Cache:', Object.keys(_cmpCache).length, 'symbols');
+  } else if (openTrades.length) {
+    console.log('CMP fetch: throttled (last fetch', ((now - _cmpFetchTime)/1000).toFixed(0), 's ago)');
   }
 
   // Fetch ATR(14) — heavier call, throttle to every 5 minutes
