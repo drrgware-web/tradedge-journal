@@ -2912,6 +2912,8 @@ async function fetchTechDataForSymbol(sym) {
     return { atr14, ema8, ema21, dma10 };
   } catch (e) { console.log('Tech fetch error for', sym, e.message); return null; }
 }
+
+async function buildMergedPositions() {
   try {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
   const openTrades = trades.filter(t => t.status === 'Open');
