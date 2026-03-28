@@ -181,12 +181,7 @@ function playAlertSound() {
   } catch(e) {}
 }
 
-// Delegated event listeners (work on dynamically rendered cards)
-document.addEventListener('mouseenter', function(e) {
-  if (e.target.closest('.ep-pos-card')) playHoverClick();
-  else if (e.target.closest('.exec-hm-block')) playHoverClick();
-}, true);
-
+// Delegated event listeners — sounds only on deliberate clicks, not hover
 document.addEventListener('click', function(e) {
   if (e.target.closest('.ep-act-btn, .exec-broker-pill, .exec-sort-pill, .exec-otype-chip, .gtt-tab, .ep-ob-tab')) playSwoopClick();
 }, true);
