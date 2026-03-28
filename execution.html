@@ -1517,20 +1517,27 @@ function openSLMove(tradeId) {
   const cmp = mp ? mp.last_price : avg;
 
   document.getElementById('sl-move-sym').textContent = trade.symbol;
-  document.getElementById('sl-move-info').innerHTML = `Avg ₹${avg.toFixed(0)} · CMP ₹${cmp.toFixed(0)} · ATR ₹${atr.toFixed(1)}`;
+  const emaInfo = trade._epEma8 ? ` · 8E ₹${trade._epEma8.toFixed(0)} · 21E ₹${(trade._epEma21||0).toFixed(0)} · 10D ₹${(trade._epDma10||0).toFixed(0)}` : '';
+  document.getElementById('sl-move-info').innerHTML = `Avg ₹${avg.toFixed(0)} · CMP ₹${cmp.toFixed(0)} · ATR ₹${atr.toFixed(1)}${emaInfo}`;
   document.getElementById('sl-move-current').value = currentSL.toFixed(2);
   document.getElementById('sl-move-new').value = '';
   document.getElementById('tgt-current').value = currentTarget ? currentTarget.toFixed(2) : '';
   document.getElementById('tgt-new').value = '';
 
-  // ── SL Quick Presets ──
+  // ── SL Quick Presets (with live EMA/DMA if available) ──
   const slPresets = document.getElementById('sl-presets');
+  const ema8 = trade._epEma8 || 0;
+  const ema21 = trade._epEma21 || 0;
+  const dma10 = trade._epDma10 || 0;
   const slButtons = [
     { label: 'B/E ₹' + avg.toFixed(0), value: avg, color: 'var(--c)' },
     { label: 'Chand 3×ATR ₹' + (cmp - 3 * atr).toFixed(0), value: cmp - 3 * atr, color: 'var(--y)' },
     { label: 'CMP-1ATR ₹' + (cmp - atr).toFixed(0), value: cmp - atr, color: 'var(--t2)' },
     { label: 'CMP-2ATR ₹' + (cmp - 2 * atr).toFixed(0), value: cmp - 2 * atr, color: 'var(--t2)' },
   ];
+  if (ema8 > 0) slButtons.push({ label: '8 EMA ₹' + ema8.toFixed(0), value: ema8, color: 'var(--g)' });
+  if (ema21 > 0) slButtons.push({ label: '21 EMA ₹' + ema21.toFixed(0), value: ema21, color: 'var(--g)' });
+  if (dma10 > 0) slButtons.push({ label: '10 DMA ₹' + dma10.toFixed(0), value: dma10, color: 'var(--g)' });
   slPresets.innerHTML = slButtons.map(b =>
     `<button class="ep-act-btn" style="font-size:9px;color:${b.color}" onclick="document.getElementById('sl-move-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
   ).join('');
@@ -2259,6 +2266,9 @@ async function refreshAll() {
     // 4. Check SL breach alerts
     checkSLBreachAlerts();
 
+    // 5. Auto-trail SL based on EMA/DMA (once per day per trade)
+    autoTrailSL();
+
     renderPositions();
     renderPnlBar();
     renderHeatmap();
@@ -2313,22 +2323,116 @@ function checkTrancheAlerts() {
       if (cmp >= tr.trigger) {
         markAlertSent(alertKey);
 
+        // Compute suggested TSL based on tranche's tslAction
+        let suggestedSL = 0;
+        const tslAction = tr.tslAction || '';
+        if (tslAction.includes('8 EMA') && trade._epEma8) suggestedSL = trade._epEma8;
+        else if (tslAction.includes('21 EMA') && trade._epEma21) suggestedSL = trade._epEma21;
+        else if (tslAction.includes('10 DMA') && trade._epDma10) suggestedSL = trade._epDma10;
+        else if (tslAction.includes('VWAP')) suggestedSL = cmp * 0.98; // Approximate VWAP as CMP-2%
+        else if (tslAction.includes('Day Low')) suggestedSL = cmp * 0.97; // Approximate day low as CMP-3%
+        else if (tslAction.includes('Chandelier')) suggestedSL = cmp - 3 * (+trade._epAtr14 || cmp * 0.02);
+
+        const slNote = suggestedSL ? `\nSuggested SL: ₹${suggestedSL.toFixed(2)} (${tslAction})` : '';
+
         // Toast + Sound
         playAlertSound();
         toast(`⚡ ${trade.symbol} ${tr.label}: CMP ₹${cmp.toFixed(0)} crossed ₹${tr.trigger.toFixed(0)} — Sell ${tr.qty} shares`, '⚡');
 
-        // Telegram
+        // Telegram with suggested SL
         sendTelegramAlert(
           `⚡ TRANCHE ${tr.label} TRIGGERED\n` +
           `${trade.symbol} CMP: ₹${cmp.toFixed(2)}\n` +
           `Trigger: ₹${tr.trigger.toFixed(2)} (${tr.id === 't1' ? '5×' : tr.id === 't2' ? '6×' : '7×'} ATR)\n` +
           `Action: Sell ${tr.qty} shares (${tr.pct || 25}%)\n` +
-          `After exit: ${tr.tslAction}\n` +
+          `After exit: ${tr.tslAction}${slNote}\n` +
           `Entry: ₹${nt._n.avgEntry.toFixed(2)} | P&L: +${((cmp / nt._n.avgEntry - 1) * 100).toFixed(1)}%`
         );
       }
     });
   });
+}
+
+// Auto-Trail SL daily — checks if current SL should be raised based on EMA/DMA
+function autoTrailSL() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  let updated = false;
+
+  trades.forEach((trade, idx) => {
+    if (trade.status !== 'Open') return;
+    if (!trade.sl || !trade._epEma21) return; // Need both SL and tech data
+
+    const currentSL = +trade.sl;
+    const mp = _mergedPositions.find(m => m.symbol === trade.symbol);
+    if (!mp || mp._cmpSource === 'entry') return; // Don't trail on stale data
+
+    const cmp = mp.last_price || 0;
+    const nt = normalizeTrade(trade);
+    if (!nt || !nt._n) return;
+    const avg = nt._n.avgEntry;
+    const exitedQty = nt._n.totalExitQty || 0;
+    const totalEntryQty = nt._n.totalEntryQty || 0;
+    const pnlPct = avg > 0 ? ((cmp - avg) / avg * 100) : 0;
+
+    // Only auto-trail if in profit and SL is already above entry (discipline maintained)
+    if (pnlPct < 5 || currentSL < avg) return;
+
+    // Determine trail level based on how many tranches have been exited
+    const exitPct = totalEntryQty > 0 ? (exitedQty / totalEntryQty * 100) : 0;
+    let trailValue = 0;
+    let trailSource = '';
+
+    if (exitPct >= 75) {
+      // Runner phase: trail with 21 EMA or 10 DMA (whichever is higher)
+      trailValue = Math.max(trade._epEma21 || 0, trade._epDma10 || 0);
+      trailSource = '21 EMA / 10 DMA';
+    } else if (exitPct >= 50) {
+      // After T3: trail with 8 EMA
+      trailValue = trade._epEma8 || 0;
+      trailSource = '8 EMA';
+    } else if (exitPct >= 25) {
+      // After T2: trail with 21 EMA
+      trailValue = trade._epEma21 || 0;
+      trailSource = '21 EMA';
+    } else {
+      // Pre-tranche or after T1: Chandelier 3×ATR from high
+      const atr = +trade._epAtr14 || 0;
+      if (atr > 0) { trailValue = cmp - 3 * atr; trailSource = 'Chandelier 3×ATR'; }
+    }
+
+    // Only raise SL, never lower it
+    if (trailValue > 0 && trailValue > currentSL) {
+      const trailKey = `auto_tsl_${trade.id}_${new Date().toISOString().slice(0, 10)}`;
+      if (wasAlertSent(trailKey)) return; // Once per day per trade
+      markAlertSent(trailKey);
+
+      trade._epSlMoves = trade._epSlMoves || [];
+      trade._epSlMoves.push({
+        date: new Date().toISOString().slice(0, 10),
+        from: currentSL,
+        to: Math.round(trailValue * 100) / 100,
+        reason: `Auto-TSL: ${trailSource}`
+      });
+      trade.sl = Math.round(trailValue * 100) / 100;
+      trades[idx] = trade;
+      updated = true;
+
+      console.log(`Auto-TSL: ${trade.symbol} SL ₹${currentSL.toFixed(0)} → ₹${trailValue.toFixed(0)} (${trailSource})`);
+      toast(`🔄 ${trade.symbol}: SL auto-trailed to ₹${trailValue.toFixed(0)} (${trailSource})`, '🔄');
+      sendTelegramAlert(
+        `🔄 AUTO-TSL — ${trade.symbol}\n` +
+        `SL: ₹${currentSL.toFixed(2)} → ₹${trailValue.toFixed(2)}\n` +
+        `Basis: ${trailSource}\n` +
+        `CMP: ₹${cmp.toFixed(2)} | P&L: +${pnlPct.toFixed(1)}%`
+      );
+    }
+  });
+
+  if (updated) {
+    localStorage.setItem('te_trades', JSON.stringify(trades));
+    // Sync updated trades
+    trades.filter(t => t.status === 'Open').forEach(t => syncTradeToSupabase(t));
+  }
 }
 
 function checkSLBreachAlerts() {
@@ -2464,7 +2568,55 @@ async function fetchATRForSymbol(sym) {
   return null;
 }
 
-async function buildMergedPositions() {
+// Fetch full technical data: ATR(14) + EMA(8) + EMA(21) + SMA(10) from Yahoo OHLCV
+async function fetchTechDataForSymbol(sym) {
+  const wk = localStorage.getItem('zd_worker_url') || '';
+  if (!wk) return null;
+  try {
+    const ticker = sym.includes('.') ? sym : sym + '.NS';
+    const r = await fetch(wk, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+      body: JSON.stringify({ ticker, range: '3mo', interval: '1d' }),
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const rs = d?.chart?.result?.[0];
+    if (!rs) return null;
+    const ts = rs.timestamp || [];
+    const q = rs.indicators?.quote?.[0] || {};
+    const bars = [];
+    for (let i = 0; i < ts.length; i++) {
+      const o = q.open?.[i], h = q.high?.[i], l = q.low?.[i], c = q.close?.[i];
+      if (o && h && l && c) bars.push({ o, h, l, c });
+    }
+    if (bars.length < 21) return null;
+
+    // ATR(14) — Wilder's smoothing
+    const atr14 = calcATR14(bars);
+
+    // EMA helper
+    function calcEMA(closes, period) {
+      const k = 2 / (period + 1);
+      let ema = closes.slice(0, period).reduce((s, v) => s + v, 0) / period;
+      for (let i = period; i < closes.length; i++) {
+        ema = closes[i] * k + ema * (1 - k);
+      }
+      return ema;
+    }
+
+    const closes = bars.map(b => b.c);
+    const ema8 = calcEMA(closes, 8);
+    const ema21 = calcEMA(closes, 21);
+
+    // 10-day SMA (DMA)
+    const last10 = closes.slice(-10);
+    const dma10 = last10.reduce((s, v) => s + v, 0) / last10.length;
+
+    return { atr14, ema8, ema21, dma10 };
+  } catch (e) { console.log('Tech fetch error for', sym, e.message); return null; }
+}
   try {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
   const openTrades = trades.filter(t => t.status === 'Open');
@@ -2498,32 +2650,48 @@ async function buildMergedPositions() {
     console.log('CMP fetch: throttled (last fetch', ((now - _cmpFetchTime)/1000).toFixed(0), 's ago)');
   }
 
-  // Fetch ATR(14) — heavier call, throttle to every 5 minutes
-  if (openTrades.length && (now - _atrFetchTime > 300000)) {
+  // Fetch ATR(14) + EMA/DMA — refresh every hour (was 5 min, only for missing)
+  if (openTrades.length && (now - _atrFetchTime > 3600000)) {
     _atrFetchTime = now;
-    const symsNeedATR = openTrades.filter(t => !t._epAtr14 && !_atrCache[t.symbol]).map(t => t.symbol);
+    // Refresh ALL open trades (not just missing ones)
+    const symsNeedATR = openTrades.map(t => t.symbol).filter(s => s);
     if (symsNeedATR.length) {
-      console.log('Fetching ATR(14) for:', symsNeedATR.join(', '));
-      // Fetch sequentially to avoid rate limits (max 2 concurrent)
+      console.log('Fetching ATR(14)+EMA/DMA for:', symsNeedATR.join(', '));
       for (let i = 0; i < symsNeedATR.length; i += 2) {
         const batch = symsNeedATR.slice(i, i + 2);
-        const results = await Promise.allSettled(batch.map(async sym => {
-          const atr = await fetchATRForSymbol(sym);
-          if (atr) {
-            _atrCache[sym] = atr;
-            // Persist to trade in localStorage
+        await Promise.allSettled(batch.map(async sym => {
+          const techData = await fetchTechDataForSymbol(sym);
+          if (techData) {
+            _atrCache[sym] = techData.atr14;
             const allTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
             const tIdx = allTrades.findIndex(t => t.symbol === sym && t.status === 'Open');
             if (tIdx >= 0) {
-              allTrades[tIdx]._epAtr14 = atr;
+              allTrades[tIdx]._epAtr14 = techData.atr14;
+              allTrades[tIdx]._epEma8 = techData.ema8;
+              allTrades[tIdx]._epEma21 = techData.ema21;
+              allTrades[tIdx]._epDma10 = techData.dma10;
+              allTrades[tIdx]._epTechUpdated = new Date().toISOString();
+
+              // Auto-update tranche triggers with fresh ATR
+              if (allTrades[tIdx]._epTranches) {
+                const avg = normalizeTrade(allTrades[tIdx])?._n?.avgEntry || 0;
+                if (avg > 0) {
+                  const atr = techData.atr14;
+                  allTrades[tIdx]._epTranches.forEach(tr => {
+                    if (tr.id === 't1') tr.trigger = Math.round((avg + atr * 5) * 100) / 100;
+                    if (tr.id === 't2') tr.trigger = Math.round((avg + atr * 6) * 100) / 100;
+                    if (tr.id === 't3') tr.trigger = Math.round((avg + atr * 7) * 100) / 100;
+                  });
+                }
+              }
+
               localStorage.setItem('te_trades', JSON.stringify(allTrades));
-              console.log(`ATR(14) ${sym}: ₹${atr}`);
+              console.log(`Tech ${sym}: ATR ₹${techData.atr14.toFixed(1)} | EMA8 ₹${techData.ema8.toFixed(1)} | EMA21 ₹${techData.ema21.toFixed(1)} | 10DMA ₹${techData.dma10.toFixed(1)}`);
             }
           }
-          return { sym, atr };
         }));
       }
-      // Re-read trades after ATR updates
+      // Re-read trades after updates
       const updatedTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
       openTrades.forEach((t, i) => {
         const updated = updatedTrades.find(u => u.id === t.id);
