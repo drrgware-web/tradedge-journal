@@ -1182,8 +1182,8 @@ async function confirmPartialSell() {
   });
 
   // Check if fully closed
-  const nt = normalizeTrade(trade);
-  if (nt._n.remainingQty <= 0) trade.status = 'Closed';
+  const nt2 = normalizeTrade(trade);
+  if (nt2._n.remainingQty <= 0) trade.status = 'Closed';
 
   trades[idx] = trade;
   localStorage.setItem('te_trades', JSON.stringify(trades));
@@ -1501,7 +1501,10 @@ function saveWorkerUrl() {
 setTimeout(async () => {
   try {
     // Guard: ensure TE namespace exists
-    if (typeof TE === 'undefined') { console.error('TE namespace not loaded'); return; }
+    if (typeof TE === 'undefined') {
+      console.error('TE namespace not loaded — using standalone mode');
+      window.TE = {};
+    }
     if (!TE.exec) TE.exec = { positions: [], broker: 'zerodha', side: 'BUY', otype: 'MARKET', sortBy: 'pnl', gttOrders: [],
       refreshPositions: async () => [], refreshOrders: async () => [], sendOrder: async () => ({ ok: false, error: 'Not connected' }),
       computePnl: () => ({ totalPnl: 0, dayPnl: 0, totalValue: 0, riskPct: 0, count: 0 }),
@@ -1520,26 +1523,62 @@ setTimeout(async () => {
       fetchPrice: async sym => {
         const el = document.getElementById('exec-price-status');
         el.textContent = '⏳ Fetching…';
-        const price = await TE.fetchCMP(sym);
-        if (price) {
-          const pe = document.getElementById('exec-price');
-          if (pe && !pe.value) pe.value = price.toFixed(2);
-          el.innerHTML = `<span style="color:var(--g)">₹${price.toFixed(2)}</span>`;
-        } else el.textContent = 'Unavailable';
+        try {
+          const price = await TE.fetchCMP(sym);
+          if (price) {
+            const pe = document.getElementById('exec-price');
+            if (pe && !pe.value) pe.value = price.toFixed(2);
+            el.innerHTML = `<span style="color:var(--g)">₹${price.toFixed(2)}</span>`;
+          } else el.textContent = 'Unavailable';
+        } catch(e) { el.textContent = 'Error'; }
         updatePyramidWarn(sym);
       }
     });
     TE.createAutocomplete({ inputId: 'gtt-sym', dropId: 'gtt-sym-drop' });
     populateJournalDropdown();
     checkBrokerStatus();
-    renderCapitalBar();
 
-    // Auto-load positions from journal on boot
-    await refreshAll();
+    // STEP 1: Render immediately from journal (no network calls)
+    renderCapitalBar();
+    quickRenderFromJournal();
+
+    // STEP 2: Enrich with live CMP in background (non-blocking)
+    refreshAll().catch(e => console.error('Background refresh error:', e));
+
   } catch (e) {
     console.error('Execution page init error:', e);
+    // Last resort: try to show something
+    try { renderCapitalBar(); } catch(e2) {}
+    try { quickRenderFromJournal(); } catch(e2) {}
   }
 }, 200);
+
+// Instant render from journal — no network calls, uses entry prices
+function quickRenderFromJournal() {
+  try {
+    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+    const openTrades = trades.filter(t => t.status === 'Open');
+    if (!openTrades.length) return;
+
+    _mergedPositions = openTrades.map(trade => {
+      const nt = normalizeTrade(trade);
+      if (!nt || !nt._n) return null;
+      return {
+        tradingsymbol: trade.symbol, symbol: trade.symbol,
+        quantity: nt._n.remainingQty, average_price: nt._n.avgEntry,
+        last_price: nt._n.avgEntry, // Entry price as placeholder until CMP loads
+        pnl: 0, product: 'CNC',
+        _trade: trade, _nt: nt, _hasBroker: false,
+        _cmpSource: 'entry', _cmpTime: 0, _atrSource: trade._epAtr14 ? 'real' : 'estimate',
+      };
+    }).filter(Boolean);
+
+    renderPositions();
+    renderPnlBar();
+    renderHeatmap();
+    renderSquareOffBar();
+  } catch (e) { console.error('quickRenderFromJournal error:', e); }
+}
 
 // ── Broker Selection ──
 function setBroker(b) {
@@ -1864,12 +1903,12 @@ async function buildMergedPositions() {
   if (openTrades.length && (now - _cmpFetchTime > 30000)) {
     _cmpFetchTime = now;
     const syms = openTrades.map(t => t.symbol).filter(s => s);
-    await Promise.allSettled(syms.map(async sym => {
-      try {
-        const cmp = await TE.fetchCMP(sym);
-        if (cmp) _cmpCache[sym] = { price: cmp, time: now };
-      } catch(e) {}
-    }));
+    // Timeout wrapper: abort CMP fetch after 5s per symbol
+    const fetchWithTimeout = (sym, ms) => Promise.race([
+      (async () => { const cmp = await TE.fetchCMP(sym); if (cmp) _cmpCache[sym] = { price: cmp, time: now }; })(),
+      new Promise(r => setTimeout(r, ms))
+    ]).catch(() => {});
+    await Promise.allSettled(syms.map(sym => fetchWithTimeout(sym, 5000)));
   }
 
   // Fetch ATR(14) — heavier call, throttle to every 5 minutes
