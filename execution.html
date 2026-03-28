@@ -2154,6 +2154,12 @@ async function refreshAll() {
     // 2. Build merged positions: journal trades as PRIMARY, broker as enrichment
     await buildMergedPositions();
 
+    // 3. Check tranche triggers and fire alerts
+    checkTrancheAlerts();
+
+    // 4. Check SL breach alerts
+    checkSLBreachAlerts();
+
     renderPositions();
     renderPnlBar();
     renderHeatmap();
@@ -2163,9 +2169,125 @@ async function refreshAll() {
     try { await refreshOrders(); } catch(e) { console.log('Orders refresh skipped:', e); }
   } catch (e) {
     console.error('refreshAll error:', e);
-    // Still try to render what we can
     try { renderCapitalBar(); } catch(e2) {}
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ALERT SYSTEM — Tranche triggers, SL breaches, ATR climax
+// ═══════════════════════════════════════════════════════════════
+
+let _alertsSent = JSON.parse(localStorage.getItem('te_alerts_sent') || '{}');
+
+function markAlertSent(key) {
+  _alertsSent[key] = Date.now();
+  // Clean old alerts (>24h)
+  const cutoff = Date.now() - 86400000;
+  Object.keys(_alertsSent).forEach(k => { if (_alertsSent[k] < cutoff) delete _alertsSent[k]; });
+  localStorage.setItem('te_alerts_sent', JSON.stringify(_alertsSent));
+}
+
+function wasAlertSent(key) {
+  return _alertsSent[key] && (Date.now() - _alertsSent[key] < 86400000);
+}
+
+function checkTrancheAlerts() {
+  _mergedPositions.forEach(p => {
+    const trade = p._trade;
+    if (!trade) return;
+    const cmp = p.last_price || 0;
+    if (!cmp || p._cmpSource === 'entry') return; // Don't alert on entry price (no real CMP)
+
+    const tranches = getTranches(trade);
+    const nt = normalizeTrade(trade);
+    const exitedQty = nt?._n?.totalExitQty || 0;
+
+    tranches.forEach((tr, i) => {
+      if (tr.id === 't4') return; // Runner has no price trigger
+      if (tr.trigger <= 0) return;
+
+      const alertKey = `tranche_${trade.id}_${tr.id}`;
+      if (wasAlertSent(alertKey)) return;
+
+      // Check if CMP has crossed this tranche trigger
+      if (cmp >= tr.trigger) {
+        markAlertSent(alertKey);
+
+        // Toast
+        toast(`⚡ ${trade.symbol} ${tr.label}: CMP ₹${cmp.toFixed(0)} crossed ₹${tr.trigger.toFixed(0)} — Sell ${tr.qty} shares`, '⚡');
+
+        // Telegram
+        sendTelegramAlert(
+          `⚡ TRANCHE ${tr.label} TRIGGERED\n` +
+          `${trade.symbol} CMP: ₹${cmp.toFixed(2)}\n` +
+          `Trigger: ₹${tr.trigger.toFixed(2)} (${tr.id === 't1' ? '5×' : tr.id === 't2' ? '6×' : '7×'} ATR)\n` +
+          `Action: Sell ${tr.qty} shares (${tr.pct || 25}%)\n` +
+          `After exit: ${tr.tslAction}\n` +
+          `Entry: ₹${nt._n.avgEntry.toFixed(2)} | P&L: +${((cmp / nt._n.avgEntry - 1) * 100).toFixed(1)}%`
+        );
+      }
+    });
+  });
+}
+
+function checkSLBreachAlerts() {
+  _mergedPositions.forEach(p => {
+    const trade = p._trade;
+    if (!trade || !trade.sl) return;
+    const cmp = p.last_price || 0;
+    if (!cmp || p._cmpSource === 'entry') return;
+
+    const sl = +trade.sl;
+    const alertKey = `sl_breach_${trade.id}`;
+    if (wasAlertSent(alertKey)) return;
+
+    // SL breach: CMP dropped below SL
+    if (cmp <= sl && cmp > 0) {
+      markAlertSent(alertKey);
+      toast(`🔴 ${trade.symbol}: CMP ₹${cmp.toFixed(0)} HIT SL ₹${sl.toFixed(0)} — EXIT NOW`, '🔴');
+      sendTelegramAlert(
+        `🔴 SL BREACH — ${trade.symbol}\n` +
+        `CMP: ₹${cmp.toFixed(2)} ≤ SL: ₹${sl.toFixed(2)}\n` +
+        `ACTION: Exit immediately\n` +
+        `Qty: ${p.quantity} shares`
+      );
+    }
+
+    // SL proximity warning: within 1.5% of SL
+    const slProxKey = `sl_prox_${trade.id}`;
+    if (!wasAlertSent(slProxKey)) {
+      const distPct = sl > 0 ? ((cmp - sl) / sl) * 100 : 99;
+      if (distPct > 0 && distPct <= 1.5) {
+        markAlertSent(slProxKey);
+        toast(`⚠️ ${trade.symbol}: CMP ₹${cmp.toFixed(0)} within 1.5% of SL ₹${sl.toFixed(0)}`, '⚠️');
+        sendTelegramAlert(
+          `⚠️ SL PROXIMITY — ${trade.symbol}\n` +
+          `CMP: ₹${cmp.toFixed(2)} is ${distPct.toFixed(1)}% from SL ₹${sl.toFixed(2)}\n` +
+          `Watch closely`
+        );
+      }
+    }
+
+    // ATR climax alert (5x, 6x, 7x) — separate from tranches
+    const nt = normalizeTrade(trade);
+    const atr = +trade._epAtr14;
+    if (atr > 0 && nt?._n?.avgEntry) {
+      const atrMult = (cmp - nt._n.avgEntry) / atr;
+      [5, 6, 7].forEach(level => {
+        const atrKey = `atr_${level}x_${trade.id}`;
+        if (!wasAlertSent(atrKey) && atrMult >= level) {
+          markAlertSent(atrKey);
+          const action = level === 5 ? 'Sell 25%' : level === 6 ? 'Sell 50%' : 'Sell 75-100%';
+          sendTelegramAlert(
+            `📊 ATR ${level}× — ${trade.symbol}\n` +
+            `CMP: ₹${cmp.toFixed(2)} | ATR(14): ₹${atr.toFixed(1)}\n` +
+            `Move: ${atrMult.toFixed(1)}× ATR from entry\n` +
+            `Action: ${action}`
+          );
+        }
+      });
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
