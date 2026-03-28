@@ -1163,8 +1163,425 @@ window.EdgeCloud = (function () {
 
 
   // ═══════════════════════════════════════════════════════════════════════
-  // PUBLIC API
+  // TIER 3: SIGNAL SCORING ENGINE — Learns from Trade Outcomes
   // ═══════════════════════════════════════════════════════════════════════
+  //
+  // Analyzes closed trades that had EdgeCloud signals at entry/during hold,
+  // correlates signal factors with actual R-multiple outcomes, and produces
+  // adjusted weights that improve future signal scoring.
+  //
+  // Data flow:
+  //   1. analyzeTrades() scans all closed trades in te_trades
+  //   2. For each trade, extracts signal context at entry (stored _ec* fields)
+  //   3. Computes actual outcome (R-multiple, P&L%, holding days, max drawdown)
+  //   4. Correlates factors → outcomes to find which factors predict winners
+  //   5. Stores learned weights in localStorage (te_ec_learned_weights)
+  //   6. applyLearnedWeights() adjusts live signal scores using these weights
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const WEIGHT_STORAGE_KEY = 'te_ec_learned_weights';
+  const ANALYSIS_STORAGE_KEY = 'te_ec_signal_analysis';
+
+  // Default factor weights (before any learning)
+  const DEFAULT_WEIGHTS = {
+    // Pullback factors
+    p_cloudResidence: 15,    // 2-7 bars in cloud
+    p_volumeContraction: 20, // Vol drops during pullback
+    p_reentryBarQuality: 15, // Close in upper 30%
+    p_rsiFloor: 15,          // RSI stays above 40
+    p_cloudStable: 10,       // Cloud not expanding
+    p_aboveEMA: 15,          // Closes above Running Line
+    p_sectorLeading: 10,     // Sector in Leading/Improving
+    // Pyramid factors
+    a_volumeSurge: 25,       // Breakout vol > 1.5× avg
+    a_distFromP: 15,         // Min bars from last P
+    a_aboveBothLines: 20,    // Above Walking + Running
+    a_channelExpanding: 15,  // Donchian rising
+    a_rsiRange: 15,          // RSI 55-80
+    a_sectorStrength: 10,    // Sector RS score
+    // Star factors
+    s_disparityLevel: 20,    // Disparity × cloud width
+    s_trendDuration: 15,     // Bars above cloud
+    s_reversalBar: 15,       // Close in lower 40%
+    s_directionChange: 10,   // Prior bar was up, this is down
+    s_climaxVolume: 15,      // Vol spike on exhaustion
+    // Regime factors
+    r_mpsRegime: 15,         // MPS zone alignment
+    r_sectorQuadrant: 15,    // Sector RS quadrant
+  };
+
+  /**
+   * Extract outcome metrics from a closed/partial trade
+   */
+  function extractOutcome(trade) {
+    if (!trade) return null;
+    const entries = trade.entries || [];
+    const exits = trade.exits || [];
+    if (!entries.length) return null;
+
+    const totalEntryQty = entries.reduce((s, e) => s + (+e.qty || 0), 0);
+    const totalExitQty = exits.reduce((s, e) => s + (+e.qty || 0), 0);
+    const avgEntry = totalEntryQty > 0
+      ? entries.reduce((s, e) => s + (+e.price || 0) * (+e.qty || 0), 0) / totalEntryQty : 0;
+    const avgExit = totalExitQty > 0
+      ? exits.reduce((s, e) => s + (+e.price || 0) * (+e.qty || 0), 0) / totalExitQty : 0;
+
+    if (!avgEntry) return null;
+
+    const pnlPct = avgExit > 0 ? ((avgExit - avgEntry) / avgEntry * 100) : 0;
+    const riskPerShare = trade.sl ? Math.abs(avgEntry - (+trade.sl)) : avgEntry * 0.05;
+    const rMultiple = riskPerShare > 0 && avgExit > 0 ? (avgExit - avgEntry) / riskPerShare : 0;
+
+    const entryDate = new Date(entries[0].date);
+    const exitDate = exits.length ? new Date(exits[exits.length - 1].date) : new Date();
+    const holdingDays = Math.max(1, Math.floor((exitDate - entryDate) / 86400000));
+
+    // Outcome classification
+    let outcome = 'neutral';
+    if (rMultiple >= 2) outcome = 'big_win';
+    else if (rMultiple >= 1) outcome = 'win';
+    else if (rMultiple >= 0) outcome = 'scratch';
+    else if (rMultiple >= -0.5) outcome = 'small_loss';
+    else outcome = 'loss';
+
+    return {
+      symbol: trade.symbol,
+      tradeId: trade.id,
+      avgEntry, avgExit, pnlPct: Math.round(pnlPct * 100) / 100,
+      rMultiple: Math.round(rMultiple * 100) / 100,
+      holdingDays, outcome,
+      isWin: rMultiple > 0,
+      isBigWin: rMultiple >= 2,
+      sector: trade.sector || trade._ecSectorName || '',
+    };
+  }
+
+  /**
+   * Extract signal context that was active at trade entry/hold
+   */
+  function extractSignalContext(trade) {
+    return {
+      // EdgeCloud state at last update
+      ecState: trade._ecState || null,
+      cloudBullish: trade._ecCloudBullish,
+      disparity: trade._ecDisparity || 0,
+      rsi: trade._ecRsi || 0,
+      cloudWidth: trade._ecCloudWidth || 0,
+
+      // Signal counts over trade lifetime
+      pullbackCount: trade._ecPullbackCount || 0,
+      pyramidCount: trade._ecPyramidCount || 0,
+      starCount: trade._ecStarCount || 0,
+
+      // Last signal details (if any)
+      lastPullback: trade._ecLastPullback || null,
+      lastPyramid: trade._ecLastPyramid || null,
+      lastStar: trade._ecLastStar || null,
+
+      // Regime at last update
+      mpsZone: trade._ecMpsZone || null,
+      mpsRegime: trade._ecMpsRegime || null,
+      sectorName: trade._ecSectorName || null,
+      sectorQuadrant: trade._ecSectorQuadrant || null,
+      sizeMulti: trade._ecSizeMulti || 1,
+
+      // Trade metadata
+      pyramidLevel: trade._epPyramid || 'p1',
+      entryCount: (trade.entries || []).length,
+      slMoveCount: (trade._epSlMoves || []).length,
+      grade: trade._epGrade || null,
+      source: trade.source || 'manual',
+    };
+  }
+
+  /**
+   * Analyze all trades and compute factor → outcome correlations
+   * Returns analysis object with win rates per factor and learned weights
+   */
+  function analyzeTrades(trades) {
+    if (!trades || !trades.length) return null;
+
+    // Only analyze trades that have EdgeCloud data AND some exit data
+    const analyzable = trades.filter(t =>
+      (t.status === 'Closed' || (t.exits && t.exits.length > 0)) &&
+      t._ecState // Has EdgeCloud data
+    );
+
+    if (analyzable.length < 5) {
+      return { error: 'Need at least 5 closed trades with EdgeCloud data', count: analyzable.length };
+    }
+
+    const results = [];
+
+    analyzable.forEach(trade => {
+      const outcome = extractOutcome(trade);
+      const context = extractSignalContext(trade);
+      if (!outcome) return;
+
+      results.push({ ...outcome, ...context });
+    });
+
+    if (results.length < 5) {
+      return { error: 'Not enough analyzable trades', count: results.length };
+    }
+
+    // ── Compute factor win rates ──────────────────────────────────────
+
+    const factors = {};
+
+    function trackFactor(name, condition, result) {
+      if (!factors[name]) factors[name] = { present: { wins: 0, total: 0, rSum: 0 }, absent: { wins: 0, total: 0, rSum: 0 } };
+      const bucket = condition ? factors[name].present : factors[name].absent;
+      bucket.total++;
+      bucket.rSum += result.rMultiple;
+      if (result.isWin) bucket.wins++;
+    }
+
+    results.forEach(r => {
+      // Cloud state factors
+      trackFactor('entered_strong_bull', r.ecState === 'strong_bull', r);
+      trackFactor('entered_in_cloud', r.ecState === 'in_cloud', r);
+      trackFactor('cloud_bullish', r.cloudBullish === true, r);
+
+      // Signal presence factors
+      trackFactor('had_pullback_signal', r.pullbackCount > 0, r);
+      trackFactor('had_pyramid_signal', r.pyramidCount > 0, r);
+      trackFactor('had_star_signal', r.starCount > 0, r);
+      trackFactor('multiple_pullbacks', r.pullbackCount >= 2, r);
+
+      // Pullback quality (if last pullback exists)
+      if (r.lastPullback) {
+        trackFactor('p_high_score', (r.lastPullback.adjustedScore || r.lastPullback.score || 0) >= 60, r);
+        trackFactor('p_strong_reentry', r.lastPullback.rsiAtReentry >= 50, r);
+        trackFactor('p_short_cloud', (r.lastPullback.barsInCloud || 0) <= 4, r);
+      }
+
+      // RSI context
+      trackFactor('rsi_above_50', r.rsi > 50, r);
+      trackFactor('rsi_above_60', r.rsi > 60, r);
+      trackFactor('rsi_overbought', r.rsi > 70, r);
+
+      // Disparity
+      trackFactor('low_disparity', r.disparity <= 1.5, r);
+      trackFactor('high_disparity', r.disparity >= 3, r);
+
+      // Regime factors
+      trackFactor('mps_bull', r.mpsRegime === 'bull', r);
+      trackFactor('mps_bear', r.mpsRegime === 'bear', r);
+      trackFactor('sector_leading', r.sectorQuadrant === 'Leading', r);
+      trackFactor('sector_improving', r.sectorQuadrant === 'Improving', r);
+      trackFactor('sector_lagging', r.sectorQuadrant === 'Lagging', r);
+
+      // Trade management
+      trackFactor('had_sl_moves', r.slMoveCount > 0, r);
+      trackFactor('pyramided', r.entryCount >= 2, r);
+      trackFactor('systematic_entry', r.source === 'edgepilot' || r.source === 'autopilot', r);
+
+      // Size multiplier
+      trackFactor('full_size', r.sizeMulti >= 1.0, r);
+      trackFactor('reduced_size', r.sizeMulti < 0.7, r);
+    });
+
+    // ── Compute win rates and edge ──────────────────────────────────
+
+    const factorAnalysis = {};
+    Object.entries(factors).forEach(([name, data]) => {
+      const pWinRate = data.present.total > 0 ? (data.present.wins / data.present.total * 100) : 0;
+      const aWinRate = data.absent.total > 0 ? (data.absent.wins / data.absent.total * 100) : 0;
+      const pAvgR = data.present.total > 0 ? (data.present.rSum / data.present.total) : 0;
+      const aAvgR = data.absent.total > 0 ? (data.absent.rSum / data.absent.total) : 0;
+      const edge = pWinRate - aWinRate;
+      const rEdge = pAvgR - aAvgR;
+
+      factorAnalysis[name] = {
+        present: { count: data.present.total, winRate: Math.round(pWinRate), avgR: Math.round(pAvgR * 100) / 100 },
+        absent: { count: data.absent.total, winRate: Math.round(aWinRate), avgR: Math.round(aAvgR * 100) / 100 },
+        edge: Math.round(edge),       // Win rate edge (pp)
+        rEdge: Math.round(rEdge * 100) / 100,  // R-multiple edge
+        significant: data.present.total >= 3 && data.absent.total >= 3, // Minimum sample
+      };
+    });
+
+    // ── Derive learned weight adjustments ────────────────────────────
+    // Factors with positive edge → boost weight. Negative edge → reduce.
+    // Only adjust factors with statistical significance (3+ samples each side)
+
+    const learnedWeights = { ...DEFAULT_WEIGHTS };
+    const adjustments = {};
+
+    // Map factor analysis back to weight keys
+    const factorToWeight = {
+      'had_pullback_signal': ['p_cloudResidence', 'p_volumeContraction', 'p_reentryBarQuality'],
+      'p_high_score': ['p_cloudResidence', 'p_reentryBarQuality'],
+      'p_strong_reentry': ['p_rsiFloor'],
+      'p_short_cloud': ['p_cloudResidence'],
+      'rsi_above_50': ['p_rsiFloor', 'a_rsiRange'],
+      'had_pyramid_signal': ['a_volumeSurge', 'a_aboveBothLines'],
+      'sector_leading': ['p_sectorLeading', 'a_sectorStrength', 'r_sectorQuadrant'],
+      'sector_lagging': ['p_sectorLeading', 'a_sectorStrength', 'r_sectorQuadrant'],
+      'mps_bull': ['r_mpsRegime'],
+      'mps_bear': ['r_mpsRegime'],
+      'high_disparity': ['s_disparityLevel'],
+      'had_star_signal': ['s_disparityLevel', 's_reversalBar'],
+    };
+
+    Object.entries(factorToWeight).forEach(([factor, weightKeys]) => {
+      const fa = factorAnalysis[factor];
+      if (!fa || !fa.significant) return;
+
+      // Scale adjustment: +/- up to 30% of original weight
+      const adjustPct = Math.max(-0.3, Math.min(0.3, fa.rEdge * 0.15));
+
+      weightKeys.forEach(wk => {
+        if (learnedWeights[wk] === undefined) return;
+        const adj = Math.round(learnedWeights[wk] * adjustPct);
+        learnedWeights[wk] = Math.max(0, learnedWeights[wk] + adj);
+        if (adj !== 0) {
+          adjustments[wk] = (adjustments[wk] || 0) + adj;
+        }
+      });
+    });
+
+    // ── Summary stats ────────────────────────────────────────────────
+
+    const totalTrades = results.length;
+    const wins = results.filter(r => r.isWin).length;
+    const bigWins = results.filter(r => r.isBigWin).length;
+    const avgR = results.reduce((s, r) => s + r.rMultiple, 0) / totalTrades;
+    const winRate = Math.round(wins / totalTrades * 100);
+    const avgHoldDays = Math.round(results.reduce((s, r) => s + r.holdingDays, 0) / totalTrades);
+
+    // Expectancy = (winRate × avgWin) - (lossRate × avgLoss)
+    const winRs = results.filter(r => r.isWin).map(r => r.rMultiple);
+    const lossRs = results.filter(r => !r.isWin).map(r => Math.abs(r.rMultiple));
+    const avgWinR = winRs.length ? winRs.reduce((s, v) => s + v, 0) / winRs.length : 0;
+    const avgLossR = lossRs.length ? lossRs.reduce((s, v) => s + v, 0) / lossRs.length : 0;
+    const expectancy = (winRate / 100 * avgWinR) - ((100 - winRate) / 100 * avgLossR);
+
+    const analysis = {
+      totalTrades, wins, bigWins, winRate,
+      avgR: Math.round(avgR * 100) / 100,
+      avgWinR: Math.round(avgWinR * 100) / 100,
+      avgLossR: Math.round(avgLossR * 100) / 100,
+      expectancy: Math.round(expectancy * 100) / 100,
+      avgHoldDays,
+      factorAnalysis,
+      learnedWeights,
+      adjustments,
+      tradesAnalyzed: results,
+      generatedAt: new Date().toISOString(),
+    };
+
+    // Persist
+    try {
+      localStorage.setItem(WEIGHT_STORAGE_KEY, JSON.stringify(learnedWeights));
+      localStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify(analysis));
+    } catch (e) { console.error('Failed to save learned weights:', e); }
+
+    return analysis;
+  }
+
+  /**
+   * Get stored learned weights (or defaults if none learned yet)
+   */
+  function getLearnedWeights() {
+    try {
+      const stored = localStorage.getItem(WEIGHT_STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return DEFAULT_WEIGHTS;
+  }
+
+  /**
+   * Get last analysis results
+   */
+  function getLastAnalysis() {
+    try {
+      const stored = localStorage.getItem(ANALYSIS_STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return null;
+  }
+
+  /**
+   * Run analysis on current te_trades and return results
+   * Call this from console or settings panel
+   */
+  function runAnalysis() {
+    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+    const result = analyzeTrades(trades);
+    if (result && !result.error) {
+      console.log('EdgeCloud Tier 3 Analysis Complete:');
+      console.log(`  Trades: ${result.totalTrades} | Win Rate: ${result.winRate}% | Avg R: ${result.avgR} | Expectancy: ${result.expectancy}R`);
+      console.log(`  Big Wins (2R+): ${result.bigWins} | Avg Hold: ${result.avgHoldDays} days`);
+      console.log('  Top factors by edge:');
+      Object.entries(result.factorAnalysis)
+        .filter(([, v]) => v.significant)
+        .sort((a, b) => Math.abs(b[1].rEdge) - Math.abs(a[1].rEdge))
+        .slice(0, 10)
+        .forEach(([name, v]) => {
+          const dir = v.rEdge >= 0 ? '+' : '';
+          console.log(`    ${name}: ${dir}${v.rEdge}R edge (${v.present.count} present, ${v.absent.count} absent)`);
+        });
+      console.log('  Weight adjustments:', result.adjustments);
+    }
+    return result;
+  }
+
+  /**
+   * Render Tier 3 analysis summary as HTML for a dashboard or modal
+   */
+  function renderAnalysisSummary() {
+    const analysis = getLastAnalysis();
+    if (!analysis || analysis.error) {
+      return `<div style="font-size:10px;color:var(--t4);padding:8px">
+        ${analysis?.error || 'No analysis yet. Close some trades with EdgeCloud data, then run EdgeCloud.runAnalysis()'}
+        ${analysis?.count !== undefined ? ` (${analysis.count} trades found)` : ''}
+      </div>`;
+    }
+
+    const expColor = analysis.expectancy >= 0.5 ? 'var(--g)' : analysis.expectancy >= 0 ? 'var(--y)' : 'var(--r)';
+    const wrColor = analysis.winRate >= 55 ? 'var(--g)' : analysis.winRate >= 45 ? 'var(--y)' : 'var(--r)';
+
+    // Top 5 factors sorted by absolute R-edge
+    const topFactors = Object.entries(analysis.factorAnalysis)
+      .filter(([, v]) => v.significant)
+      .sort((a, b) => Math.abs(b[1].rEdge) - Math.abs(a[1].rEdge))
+      .slice(0, 6);
+
+    const factorRows = topFactors.map(([name, v]) => {
+      const edgeColor = v.rEdge >= 0.3 ? 'var(--g)' : v.rEdge <= -0.3 ? 'var(--r)' : 'var(--t2)';
+      const label = name.replace(/_/g, ' ').replace(/^(p|a|s|r) /, '');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="font-size:9px;color:var(--t2)">${label}</span>
+        <div style="display:flex;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px">
+          <span style="color:var(--t3)">${v.present.winRate}% (${v.present.count})</span>
+          <span style="color:${edgeColor};font-weight:700">${v.rEdge >= 0 ? '+' : ''}${v.rEdge}R</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Weight changes
+    const adjEntries = Object.entries(analysis.adjustments || {}).filter(([, v]) => v !== 0);
+    const adjRows = adjEntries.length ? adjEntries.map(([name, adj]) => {
+      const adjColor = adj > 0 ? 'var(--g)' : 'var(--r)';
+      return `<span style="font-size:8px;padding:2px 5px;border-radius:4px;background:var(--bg3);color:${adjColor}">${name.replace(/_/g,' ')} ${adj > 0 ? '+' : ''}${adj}</span>`;
+    }).join(' ') : '<span style="font-size:9px;color:var(--t4)">No adjustments (need more data)</span>';
+
+    return `<div style="margin:0">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+        <div style="text-align:center"><div style="font-size:8px;color:var(--t3)">Win Rate</div><div style="font-size:14px;font-weight:700;color:${wrColor};font-family:'IBM Plex Mono',monospace">${analysis.winRate}%</div></div>
+        <div style="text-align:center"><div style="font-size:8px;color:var(--t3)">Avg R</div><div style="font-size:14px;font-weight:700;color:var(--c);font-family:'IBM Plex Mono',monospace">${analysis.avgR}R</div></div>
+        <div style="text-align:center"><div style="font-size:8px;color:var(--t3)">Expectancy</div><div style="font-size:14px;font-weight:700;color:${expColor};font-family:'IBM Plex Mono',monospace">${analysis.expectancy}R</div></div>
+        <div style="text-align:center"><div style="font-size:8px;color:var(--t3)">Trades</div><div style="font-size:14px;font-weight:700;color:var(--t1);font-family:'IBM Plex Mono',monospace">${analysis.totalTrades}</div></div>
+      </div>
+      <div style="font-size:9px;font-weight:700;color:var(--t2);margin-bottom:4px">Factor edge (R-multiple)</div>
+      ${factorRows}
+      <div style="font-size:9px;font-weight:700;color:var(--t2);margin:8px 0 4px">Weight adjustments</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${adjRows}</div>
+      <div style="font-size:8px;color:var(--t4);margin-top:6px">Analyzed ${analysis.generatedAt?.slice(0,10) || '—'} · ${analysis.totalTrades} trades · ${analysis.bigWins} big wins (2R+)</div>
+    </div>`;
+  }
 
   return {
     // Core
@@ -1176,6 +1593,14 @@ window.EdgeCloud = (function () {
     applyRegime: applyRegime,
     fetchMPS: fetchMPS,
     fetchSectorRS: fetchSectorRS,
+
+    // Tier 3: Signal scoring engine
+    runAnalysis: runAnalysis,
+    analyzeTrades: analyzeTrades,
+    getLearnedWeights: getLearnedWeights,
+    getLastAnalysis: getLastAnalysis,
+    renderAnalysisSummary: renderAnalysisSummary,
+    DEFAULT_WEIGHTS: DEFAULT_WEIGHTS,
 
     // Integration
     storeOnTrade: storeOnTrade,
@@ -1196,7 +1621,7 @@ window.EdgeCloud = (function () {
     calcJdK: calcJdK,
 
     // Version
-    VERSION: '2.0.0',
+    VERSION: '3.0.0',
     NAME: 'EdgeCloud',
   };
 
