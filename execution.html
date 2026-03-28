@@ -458,37 +458,90 @@
   </div>
 </div>
 
-<!-- ═══ SL MOVE MODAL (NEW) ═══ -->
+<!-- ═══ SL & TARGET MODAL (ENHANCED) ═══ -->
 <div class="overlay" id="m-sl-move" onclick="if(event.target===this)closeM('m-sl-move')">
-  <div class="modal" style="max-width:420px">
-    <div class="m-head"><div class="m-title">🛡️ Move Stop Loss</div><button class="m-x" onclick="closeM('m-sl-move')">✕</button></div>
+  <div class="modal" style="max-width:500px">
+    <div class="m-head"><div class="m-title">🛡️ SL & Target Management</div><button class="m-x" onclick="closeM('m-sl-move')">✕</button></div>
     <div class="m-body" style="display:flex;flex-direction:column;gap:12px">
-      <div style="font-size:13px;font-weight:700;color:var(--c)" id="sl-move-sym">—</div>
-      <div class="fg2">
-        <div class="fg">
-          <label class="fl">Current SL</label>
-          <input type="number" class="fi" id="sl-move-current" readonly style="opacity:.6">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;font-weight:700;color:var(--c)" id="sl-move-sym">—</div>
+        <div style="font-size:11px;color:var(--t3)" id="sl-move-info"></div>
+      </div>
+
+      <!-- SL Section -->
+      <div style="background:rgba(255,69,96,.04);border:1px solid rgba(255,69,96,.15);border-radius:10px;padding:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--r);margin-bottom:8px">🔻 STOP LOSS</div>
+        <div class="fg2">
+          <div class="fg">
+            <label class="fl">Current SL</label>
+            <input type="number" class="fi" id="sl-move-current" readonly style="opacity:.6">
+          </div>
+          <div class="fg">
+            <label class="fl">New SL ₹</label>
+            <input type="number" class="fi" id="sl-move-new" step="0.05">
+          </div>
         </div>
-        <div class="fg">
-          <label class="fl">New SL ₹</label>
-          <input type="number" class="fi" id="sl-move-new" step="0.05">
+        <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap" id="sl-presets"></div>
+        <div class="fg" style="margin-top:8px">
+          <label class="fl">Reason</label>
+          <select class="fi" id="sl-move-reason">
+            <option value="breakeven">Move to Breakeven</option>
+            <option value="tsl_daylow">TSL — Day Low</option>
+            <option value="tsl_vwap">TSL — VWAP</option>
+            <option value="tsl_ema8">TSL — 8 EMA</option>
+            <option value="tsl_ema21">TSL — 21 EMA</option>
+            <option value="tsl_10dma">TSL — 10 DMA</option>
+            <option value="tsl_chandelier">TSL — Chandelier (3×ATR)</option>
+            <option value="pyramid_add">Pyramid Add — Tighten SL</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="fg" id="sl-custom-wrap" style="display:none;margin-top:6px">
+          <label class="fl">Custom Reason</label>
+          <input class="fi" id="sl-move-custom" placeholder="e.g. Below swing low…">
         </div>
       </div>
-      <div class="fg">
-        <label class="fl">Reason</label>
-        <select class="fi" id="sl-move-reason">
-          <option value="breakeven">Move to Breakeven</option>
-          <option value="tsl_daylow">TSL — Day Low</option>
-          <option value="tsl_vwap">TSL — VWAP</option>
-          <option value="tsl_ema">TSL — 8/21 EMA</option>
-          <option value="pyramid_add">Pyramid Add — Tighten SL</option>
-          <option value="custom">Custom</option>
-        </select>
+
+      <!-- Target Section -->
+      <div style="background:rgba(0,229,160,.04);border:1px solid rgba(0,229,160,.15);border-radius:10px;padding:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--g);margin-bottom:8px">🔺 TARGET</div>
+        <div class="fg2">
+          <div class="fg">
+            <label class="fl">Current Target</label>
+            <input type="number" class="fi" id="tgt-current" readonly style="opacity:.6">
+          </div>
+          <div class="fg">
+            <label class="fl">New Target ₹</label>
+            <input type="number" class="fi" id="tgt-new" step="0.05">
+          </div>
+        </div>
+        <!-- Smart Target Presets -->
+        <div style="margin-top:8px">
+          <div style="font-size:9px;color:var(--t3);margin-bottom:4px;font-weight:600">R:R Based</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="tgt-rr-presets"></div>
+        </div>
+        <div style="margin-top:8px">
+          <div style="font-size:9px;color:var(--t3);margin-bottom:4px;font-weight:600">ATR Sell-Into-Strength</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="tgt-atr-presets"></div>
+        </div>
+        <div style="margin-top:8px">
+          <div style="font-size:9px;color:var(--t3);margin-bottom:4px;font-weight:600">Technical Levels</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="tgt-tech-presets"></div>
+        </div>
+        <div class="fg" style="margin-top:8px">
+          <label class="fl">Target Type</label>
+          <select class="fi" id="tgt-type">
+            <option value="fixed">Fixed Price</option>
+            <option value="trailing">Trailing (auto-raise with price)</option>
+          </select>
+        </div>
       </div>
-      <div class="fg" id="sl-custom-wrap" style="display:none">
-        <label class="fl">Custom Reason</label>
-        <input class="fi" id="sl-move-custom" placeholder="e.g. Below swing low…">
+
+      <!-- R:R Preview -->
+      <div style="background:var(--bg3);border-radius:8px;padding:10px" id="sl-tgt-preview">
+        <div style="color:var(--t4);font-size:10px">Set SL and Target to see R:R preview</div>
       </div>
+
       <!-- SL History -->
       <div>
         <div class="ep-section-label" style="margin-top:4px">SL Move History</div>
@@ -499,7 +552,7 @@
     </div>
     <div class="m-foot">
       <button class="btn btn-ghost" onclick="closeM('m-sl-move')">Cancel</button>
-      <button class="btn btn-y" onclick="confirmSLMove()">✅ Update SL</button>
+      <button class="btn btn-y" onclick="confirmSLMove()">✅ Update SL & Target</button>
     </div>
   </div>
 </div>
@@ -1226,13 +1279,77 @@ function openSLMove(tradeId) {
   const trade = trades.find(t => t.id === tradeId);
   if (!trade) return;
   _slMoveTradeId = tradeId;
-  document.getElementById('sl-move-sym').textContent = trade.symbol;
+  const nt = normalizeTrade(trade);
+  const avg = nt._n.avgEntry;
+  const riskPerShare = nt._n.riskPerShare || 0;
+  const atr = +trade._epAtr14 || (avg * 0.02);
   const slMoves = trade._epSlMoves || [];
-  const currentSL = slMoves.length ? slMoves[slMoves.length - 1].to : (+trade.sl || 0);
+  const currentSL = slMoves.length ? +slMoves[slMoves.length - 1].to : (+trade.sl || 0);
+  const currentTarget = +trade.target || 0;
+
+  // Find CMP from merged positions
+  const mp = _mergedPositions.find(m => m.symbol === trade.symbol);
+  const cmp = mp ? mp.last_price : avg;
+
+  document.getElementById('sl-move-sym').textContent = trade.symbol;
+  document.getElementById('sl-move-info').innerHTML = `Avg ₹${avg.toFixed(0)} · CMP ₹${cmp.toFixed(0)} · ATR ₹${atr.toFixed(1)}`;
   document.getElementById('sl-move-current').value = currentSL.toFixed(2);
   document.getElementById('sl-move-new').value = '';
+  document.getElementById('tgt-current').value = currentTarget ? currentTarget.toFixed(2) : '';
+  document.getElementById('tgt-new').value = '';
 
-  // Render history
+  // ── SL Quick Presets ──
+  const slPresets = document.getElementById('sl-presets');
+  const slButtons = [
+    { label: 'B/E ₹' + avg.toFixed(0), value: avg, color: 'var(--c)' },
+    { label: 'Chand 3×ATR ₹' + (cmp - 3 * atr).toFixed(0), value: cmp - 3 * atr, color: 'var(--y)' },
+    { label: 'CMP-1ATR ₹' + (cmp - atr).toFixed(0), value: cmp - atr, color: 'var(--t2)' },
+    { label: 'CMP-2ATR ₹' + (cmp - 2 * atr).toFixed(0), value: cmp - 2 * atr, color: 'var(--t2)' },
+  ];
+  slPresets.innerHTML = slButtons.map(b =>
+    `<button class="ep-act-btn" style="font-size:9px;color:${b.color}" onclick="document.getElementById('sl-move-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
+  ).join('');
+
+  // ── Target R:R Presets ──
+  const rrPresets = document.getElementById('tgt-rr-presets');
+  if (riskPerShare > 0) {
+    const rrButtons = [
+      { label: '1:1 ₹' + (avg + riskPerShare).toFixed(0), value: avg + riskPerShare },
+      { label: '1:2 ₹' + (avg + riskPerShare * 2).toFixed(0), value: avg + riskPerShare * 2 },
+      { label: '1:3 ₹' + (avg + riskPerShare * 3).toFixed(0), value: avg + riskPerShare * 3 },
+      { label: '1:5 ₹' + (avg + riskPerShare * 5).toFixed(0), value: avg + riskPerShare * 5 },
+    ];
+    rrPresets.innerHTML = rrButtons.map(b =>
+      `<button class="ep-act-btn" style="font-size:9px;color:var(--g)" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
+    ).join('');
+  } else {
+    rrPresets.innerHTML = '<span style="font-size:9px;color:var(--t4)">Set SL first for R:R targets</span>';
+  }
+
+  // ── Target ATR Sell-Into-Strength Presets ──
+  const atrPresets = document.getElementById('tgt-atr-presets');
+  const atrButtons = [
+    { label: '5×ATR ₹' + (avg + atr * 5).toFixed(0), value: avg + atr * 5, note: 'Sell 25%', color: 'var(--y)' },
+    { label: '6×ATR ₹' + (avg + atr * 6).toFixed(0), value: avg + atr * 6, note: 'Sell 50%', color: '#ff9800' },
+    { label: '7×ATR ₹' + (avg + atr * 7).toFixed(0), value: avg + atr * 7, note: 'Sell 75%+', color: 'var(--r)' },
+  ];
+  atrPresets.innerHTML = atrButtons.map(b =>
+    `<button class="ep-act-btn" style="font-size:9px;color:${b.color}" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()" title="${b.note}">${b.label}</button>`
+  ).join('');
+
+  // ── Target Technical Level Presets ──
+  const techPresets = document.getElementById('tgt-tech-presets');
+  const techButtons = [
+    { label: '+10% ₹' + (avg * 1.10).toFixed(0), value: avg * 1.10 },
+    { label: '+15% ₹' + (avg * 1.15).toFixed(0), value: avg * 1.15 },
+    { label: '+20% ₹' + (avg * 1.20).toFixed(0), value: avg * 1.20 },
+    { label: '+30% ₹' + (avg * 1.30).toFixed(0), value: avg * 1.30 },
+  ];
+  techPresets.innerHTML = techButtons.map(b =>
+    `<button class="ep-act-btn" style="font-size:9px" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
+  ).join('');
+
+  // ── SL History ──
   const hist = document.getElementById('sl-move-history');
   if (!slMoves.length) {
     hist.innerHTML = `<div style="color:var(--t4);font-size:10px;padding:4px 0">Initial SL: ₹${(+trade.sl || 0).toFixed(2)}</div>`;
@@ -1246,16 +1363,55 @@ function openSLMove(tradeId) {
     </div>`).join('');
   }
 
+  // ── Reason dropdown handler ──
   document.getElementById('sl-move-reason').onchange = function() {
     document.getElementById('sl-custom-wrap').style.display = this.value === 'custom' ? '' : 'none';
-    // Auto-fill common SL values
-    if (this.value === 'breakeven') {
-      const nt = normalizeTrade(trade);
-      document.getElementById('sl-move-new').value = nt._n.avgEntry.toFixed(2);
-    }
+    if (this.value === 'breakeven') document.getElementById('sl-move-new').value = avg.toFixed(2);
+    else if (this.value === 'tsl_chandelier') document.getElementById('sl-move-new').value = (cmp - 3 * atr).toFixed(2);
+    updateSLTgtPreview();
   };
 
+  // ── Input change listeners for preview ──
+  document.getElementById('sl-move-new').oninput = updateSLTgtPreview;
+  document.getElementById('tgt-new').oninput = updateSLTgtPreview;
+
+  updateSLTgtPreview();
   openM('m-sl-move');
+}
+
+// R:R Preview calculator
+function updateSLTgtPreview() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.id === _slMoveTradeId);
+  if (!trade) return;
+  const nt = normalizeTrade(trade);
+  const avg = nt._n.avgEntry;
+  const newSL = +document.getElementById('sl-move-new').value || +document.getElementById('sl-move-current').value || 0;
+  const newTgt = +document.getElementById('tgt-new').value || +document.getElementById('tgt-current').value || 0;
+  const mp = _mergedPositions.find(m => m.symbol === trade.symbol);
+  const cmp = mp ? mp.last_price : avg;
+  const preview = document.getElementById('sl-tgt-preview');
+
+  if (!newSL && !newTgt) {
+    preview.innerHTML = '<div style="color:var(--t4);font-size:10px">Set SL and Target to see R:R preview</div>';
+    return;
+  }
+
+  const risk = avg - newSL;
+  const reward = newTgt - avg;
+  const rrRatio = risk > 0 && newTgt > 0 ? (reward / risk).toFixed(2) : '—';
+  const riskPct = avg > 0 ? ((risk / avg) * 100).toFixed(1) : '—';
+  const rewardPct = avg > 0 && newTgt > 0 ? ((reward / avg) * 100).toFixed(1) : '—';
+  const currentR = risk > 0 ? ((cmp - avg) / risk).toFixed(2) : '—';
+  const rrColor = rrRatio >= 3 ? 'var(--g)' : rrRatio >= 2 ? 'var(--c)' : rrRatio >= 1 ? 'var(--y)' : 'var(--r)';
+
+  preview.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center">
+      <div><div style="font-size:9px;color:var(--t3)">Risk</div><div style="font-size:12px;font-weight:700;color:var(--r);font-family:'IBM Plex Mono',monospace">${riskPct}%</div></div>
+      <div><div style="font-size:9px;color:var(--t3)">Reward</div><div style="font-size:12px;font-weight:700;color:var(--g);font-family:'IBM Plex Mono',monospace">${rewardPct}%</div></div>
+      <div><div style="font-size:9px;color:var(--t3)">R:R</div><div style="font-size:12px;font-weight:700;color:${rrColor};font-family:'IBM Plex Mono',monospace">1:${rrRatio}</div></div>
+      <div><div style="font-size:9px;color:var(--t3)">Current R</div><div style="font-size:12px;font-weight:700;color:var(--c);font-family:'IBM Plex Mono',monospace">${currentR}R</div></div>
+    </div>`;
 }
 
 async function confirmSLMove() {
@@ -1264,58 +1420,91 @@ async function confirmSLMove() {
   if (idx < 0) return;
   const trade = trades[idx];
   const newSL = +document.getElementById('sl-move-new').value;
-  if (!newSL) { toast('Enter new SL', '⚠️'); return; }
+  const newTarget = +document.getElementById('tgt-new').value;
 
-  const reasonSel = document.getElementById('sl-move-reason').value;
-  const reason = reasonSel === 'custom' ? document.getElementById('sl-move-custom').value : reasonSel;
-  const oldSL = +document.getElementById('sl-move-current').value || +trade.sl || 0;
+  if (!newSL && !newTarget) { toast('Enter new SL or Target', '⚠️'); return; }
 
-  trade._epSlMoves = trade._epSlMoves || [];
-  trade._epSlMoves.push({
-    date: new Date().toISOString().slice(0, 10),
-    from: oldSL,
-    to: newSL,
-    reason: reason
-  });
-  trade.sl = newSL;
+  let slChanged = false, tgtChanged = false;
+
+  // Update SL if changed
+  if (newSL) {
+    const reasonSel = document.getElementById('sl-move-reason').value;
+    const reason = reasonSel === 'custom' ? document.getElementById('sl-move-custom').value : reasonSel;
+    const oldSL = +document.getElementById('sl-move-current').value || +trade.sl || 0;
+
+    trade._epSlMoves = trade._epSlMoves || [];
+    trade._epSlMoves.push({
+      date: new Date().toISOString().slice(0, 10),
+      from: oldSL,
+      to: newSL,
+      reason: reason
+    });
+    trade.sl = newSL;
+    slChanged = true;
+
+    // Update matching GTT orders
+    if (TE.exec && TE.exec.gttOrders) {
+      let gttUpdated = 0;
+      TE.exec.gttOrders.forEach(g => {
+        if (g.symbol === trade.symbol && g.status === 'active') {
+          if (g.type === 'oco' && g.slTrigger) {
+            g.slTrigger = newSL;
+            g.slLimit = newSL;
+            g.updatedAt = Date.now();
+            g.note = (g.note || '') + ` | SL updated ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`;
+            gttUpdated++;
+          } else if (g.type === 'single' && g.side === 'SELL' && g.trigger1 === oldSL) {
+            g.trigger1 = newSL;
+            g.limit1 = newSL;
+            g.updatedAt = Date.now();
+            gttUpdated++;
+          }
+        }
+      });
+      if (gttUpdated) {
+        TE.exec.saveGTTs();
+        renderGTTList();
+        toast(`${gttUpdated} GTT(s) also updated`, '🎯');
+      }
+    }
+  }
+
+  // Update Target if changed
+  if (newTarget) {
+    trade.target = newTarget;
+    trade._epTargetType = document.getElementById('tgt-type').value;
+    tgtChanged = true;
+
+    // Update OCO GTT target leg if exists
+    if (TE.exec && TE.exec.gttOrders) {
+      TE.exec.gttOrders.forEach(g => {
+        if (g.symbol === trade.symbol && g.status === 'active' && g.type === 'oco' && g.tgtTrigger) {
+          g.tgtTrigger = newTarget;
+          g.tgtLimit = newTarget;
+          g.updatedAt = Date.now();
+        }
+      });
+      TE.exec.saveGTTs();
+    }
+  }
 
   trades[idx] = trade;
   localStorage.setItem('te_trades', JSON.stringify(trades));
-
-  // Issue 9: Update matching GTT orders for this symbol
-  if (TE.exec && TE.exec.gttOrders) {
-    let gttUpdated = 0;
-    TE.exec.gttOrders.forEach(g => {
-      if (g.symbol === trade.symbol && g.status === 'active') {
-        if (g.type === 'oco' && g.slTrigger) {
-          g.slTrigger = newSL;
-          g.slLimit = newSL;
-          g.updatedAt = Date.now();
-          g.note = (g.note || '') + ` | SL updated ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`;
-          gttUpdated++;
-        } else if (g.type === 'single' && g.side === 'SELL' && g.trigger1 === oldSL) {
-          g.trigger1 = newSL;
-          g.limit1 = newSL;
-          g.updatedAt = Date.now();
-          gttUpdated++;
-        }
-      }
-    });
-    if (gttUpdated) {
-      TE.exec.saveGTTs();
-      renderGTTList();
-      toast(`${gttUpdated} GTT order(s) also updated`, '🎯');
-    }
-  }
 
   // Supabase sync
   syncTradeToSupabase(trade);
 
   // Telegram
-  sendTelegramAlert(`🛡️ SL Moved: ${trade.symbol}\n₹${oldSL.toFixed(2)} → ₹${newSL.toFixed(2)}\nReason: ${reason}`);
+  let tgMsg = `🛡️ ${trade.symbol}`;
+  if (slChanged) tgMsg += `\nSL: ₹${(+document.getElementById('sl-move-current').value).toFixed(0)} → ₹${newSL.toFixed(0)}`;
+  if (tgtChanged) tgMsg += `\nTarget: ₹${newTarget.toFixed(0)}`;
+  sendTelegramAlert(tgMsg);
 
   closeM('m-sl-move');
-  toast(`SL updated: ${trade.symbol} → ₹${newSL.toFixed(2)}`, '✅');
+  const parts = [];
+  if (slChanged) parts.push(`SL → ₹${newSL.toFixed(0)}`);
+  if (tgtChanged) parts.push(`Target → ₹${newTarget.toFixed(0)}`);
+  toast(`${trade.symbol}: ${parts.join(' · ')}`, '✅');
   renderPositions();
 }
 
@@ -2149,7 +2338,7 @@ function renderPositions() {
         <button class="ep-act-btn" onclick="quickPartial('${sym}',${i},25)">25%</button>
         <button class="ep-act-btn" onclick="quickPartial('${sym}',${i},50)">50%</button>
         <button class="ep-act-btn close" onclick="quickClose('${sym}',${i})">✕ Close</button>
-        ${trade ? `<button class="ep-act-btn sl" onclick="openSLMove('${trade.id}')">🛡 SL</button>` : ''}
+        ${trade ? `<button class="ep-act-btn sl" onclick="openSLMove('${trade.id}')">🛡 SL/Tgt</button>` : ''}
         ${trade ? `<button class="ep-act-btn" onclick="openPartialSell('${trade.id}',${i})">📤 Exit</button>` : ''}
         <button class="ep-act-btn chart" onclick="window.open('https://www.tradingview.com/chart/${EP_CONFIG.tvLayout}/?symbol=NSE:${sym}','_blank')">📊</button>
         ${trade ? `<button class="ep-act-btn" onclick="openOrderBuilder('${sym}','${isLong ? 'SELL' : 'BUY'}',${Math.abs(qty)},${ltp},${trade?.sl || 0})">📋</button>` : ''}
