@@ -21,7 +21,7 @@
 .ep-sl-track { position:relative; height:24px; border-radius:6px; overflow:hidden; background:var(--bg3); margin:6px 0; }
 .ep-sl-fill { position:absolute; top:0; left:0; height:100%; transition:width .4s; }
 .ep-sl-marker { position:absolute; top:0; height:100%; width:2px; z-index:2; }
-.ep-sl-label { position:absolute; bottom:-14px; font-size:8px; white-space:nowrap; transform:translateX(-50%); color:var(--t4); font-family:'IBM Plex Mono',monospace; }
+.ep-sl-label { position:absolute; bottom:-15px; font-size:9px; white-space:nowrap; transform:translateX(-50%); color:var(--t2); font-family:'IBM Plex Mono',monospace; font-weight:600; }
 .ep-sl-cmp { background:var(--c); width:3px; z-index:3; }
 .ep-sl-cmp::after { content:'▼'; position:absolute; top:-11px; left:50%; transform:translateX(-50%); font-size:8px; color:var(--c); }
 
@@ -29,8 +29,8 @@
 .ep-atr-wrap { margin:6px 0; }
 .ep-atr-bar { height:14px; border-radius:7px; background:var(--bg3); overflow:hidden; position:relative; }
 .ep-atr-fill { height:100%; border-radius:7px; transition:width .5s ease, background .5s; }
-.ep-atr-marks { display:flex; justify-content:space-between; margin-top:2px; }
-.ep-atr-marks span { font-size:8px; color:var(--t4); font-family:'IBM Plex Mono',monospace; }
+.ep-atr-marks { display:flex; justify-content:space-between; margin-top:3px; }
+.ep-atr-marks span { font-size:9px; color:var(--t2); font-family:'IBM Plex Mono',monospace; }
 .ep-atr-sell-tag { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:6px; }
 
 /* Pyramid Indicator */
@@ -54,14 +54,14 @@
 
 .ep-pos-metrics-row { display:grid; grid-template-columns:repeat(5,1fr); gap:2px; padding:4px 14px 8px; }
 .ep-metric { text-align:center; }
-.ep-metric-label { font-size:8px; color:var(--t4); text-transform:uppercase; letter-spacing:.5px; }
-.ep-metric-val { font-size:12px; font-weight:700; font-family:'IBM Plex Mono',monospace; }
+.ep-metric-label { font-size:9px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.ep-metric-val { font-size:13px; font-weight:700; font-family:'IBM Plex Mono',monospace; }
 
-.ep-pos-section { padding:4px 14px; border-top:1px solid rgba(255,255,255,.03); }
-.ep-section-label { font-size:8.5px; font-weight:700; color:var(--t4); text-transform:uppercase; letter-spacing:.8px; margin-bottom:3px; }
+.ep-pos-section { padding:6px 14px; border-top:1px solid rgba(255,255,255,.06); }
+.ep-section-label { font-size:9px; font-weight:700; color:var(--t2); text-transform:uppercase; letter-spacing:.8px; margin-bottom:4px; }
 
-.ep-pos-actions { display:flex; gap:4px; padding:8px 14px 10px; border-top:1px solid var(--b1); flex-wrap:wrap; }
-.ep-act-btn { padding:5px 10px; font-size:10px; font-weight:700; border:1px solid var(--b1); border-radius:6px; background:var(--bg3); color:var(--t2); cursor:pointer; font-family:'Outfit',sans-serif; transition:all .15s; }
+.ep-pos-actions { display:flex; gap:5px; padding:10px 14px 12px; border-top:1px solid var(--b1); flex-wrap:wrap; }
+.ep-act-btn { padding:6px 12px; font-size:11px; font-weight:700; border:1px solid var(--b1); border-radius:6px; background:var(--bg3); color:var(--t1); cursor:pointer; font-family:'Outfit',sans-serif; transition:all .15s; }
 .ep-act-btn:hover { background:var(--bg4,rgba(255,255,255,.08)); border-color:var(--c); color:var(--c); }
 .ep-act-btn.close { border-color:rgba(255,69,96,.3); color:var(--r); }
 .ep-act-btn.close:hover { background:rgba(255,69,96,.1); }
@@ -84,7 +84,7 @@
 /* Capital Bar */
 .ep-cap-bar { display:flex; gap:10px; align-items:center; padding:8px 14px; background:var(--bg2); border:1px solid var(--b1); border-radius:10px; margin-bottom:14px; flex-wrap:wrap; }
 .ep-cap-item { text-align:center; }
-.ep-cap-label { font-size:8px; color:var(--t4); text-transform:uppercase; letter-spacing:.5px; }
+.ep-cap-label { font-size:9px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
 .ep-cap-val { font-size:13px; font-weight:700; font-family:'IBM Plex Mono',monospace; }
 
 /* Pyramid warning banner */
@@ -580,12 +580,13 @@
         <button class="ep-ob-tab" onclick="setObTab('api',this)">⚡ API</button>
       </div>
       <div id="ob-clipboard" style="display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:10px;color:var(--t3)">Copy order text for manual entry in broker terminal</div>
-        <div style="background:var(--bg3);border-radius:8px;padding:12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t1);white-space:pre-wrap" id="ob-clip-text">—</div>
+        <div style="font-size:11px;color:var(--t2)">Copy order details → Paste in broker terminal, WhatsApp, or notes</div>
+        <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:8px;padding:12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--t1);white-space:pre-wrap" id="ob-clip-text">—</div>
         <button class="btn btn-sm" style="background:var(--c);color:#000;font-weight:700" onclick="copyObClipboard()">📋 Copy to Clipboard</button>
+        <div style="font-size:9px;color:var(--t3);padding:4px 8px;background:rgba(0,187,255,.05);border-radius:6px">Paste in: Kite web order form · Dhan order entry · WhatsApp group · Trading journal notes</div>
       </div>
       <div id="ob-deeplink" style="display:none;flex-direction:column;gap:8px">
-        <div style="font-size:10px;color:var(--t3)">Open order directly in broker app/web</div>
+        <div style="font-size:11px;color:var(--t2)">Open chart directly in broker app — place order from there</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <a class="btn btn-sm" style="background:var(--g);color:#000;font-weight:700;text-decoration:none" id="ob-link-zerodha" href="#" target="_blank">🟢 Zerodha Kite</a>
           <a class="btn btn-sm" style="background:var(--b);color:#fff;font-weight:700;text-decoration:none" id="ob-link-dhan" href="#" target="_blank">🔵 Dhan Web</a>
@@ -593,7 +594,7 @@
         </div>
       </div>
       <div id="ob-api" style="display:none;flex-direction:column;gap:8px">
-        <div style="font-size:10px;color:var(--t3)">Place via API (requires broker auth)</div>
+        <div style="font-size:11px;color:var(--t2)">Place order directly via broker API</div>
         <button class="btn btn-sm" style="background:var(--g);color:#000;font-weight:700" onclick="obPlaceApi()">⚡ Place via <span id="ob-broker">Dhan</span> API</button>
         <div id="ob-api-status" style="font-size:10px;color:var(--t3);min-height:14px"></div>
       </div>
@@ -2065,9 +2066,13 @@ function renderPositions() {
     const days = nt?._n?.daysSinceEntry || 0;
 
     // CMP source indicator
-    const cmpSource = p._cmpSource || 'unknown';
-    const cmpDot = cmpSource === 'broker' ? '🟢' : cmpSource === 'yahoo' ? '🔵' : '⚪';
-    const cmpLabel = cmpSource === 'broker' ? 'Live' : cmpSource === 'yahoo' ? 'Yahoo' : 'Entry price';
+    // Broker source indicator (color-coded by broker where trade was taken)
+    const tradeSource = trade?.source || '';
+    const brokerDot = tradeSource === 'dhan' || tradeSource === 'Dhan' ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b8bff;vertical-align:middle" title="Dhan"></span>'
+      : tradeSource === 'zerodha' || tradeSource === 'Zerodha' ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#00e5a0;vertical-align:middle" title="Zerodha"></span>'
+      : tradeSource === 'definedge' || tradeSource === 'Definedge' ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;vertical-align:middle" title="Definedge"></span>'
+      : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--t3);vertical-align:middle" title="Manual"></span>';
+    const cmpStatusLabel = p._cmpSource === 'broker' ? 'Live' : p._cmpSource === 'yahoo' ? 'Yahoo' : 'Entry';
 
     // RS rank
     const rsRank = trade?._epRsRank || null;
@@ -2088,6 +2093,7 @@ function renderPositions() {
       <div class="ep-pos-header">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="ep-pos-sym">${sym}</span>
+          ${brokerDot}
           ${rsBadge}
           <span class="ep-badge ep-badge-pyr">${(EP_CONFIG.pyramid[pyrLevel]?.label || 'P1').split('—')[0].trim()}</span>
           ${sector ? `<span class="ep-badge ep-badge-sector">${sector}</span>` : ''}
@@ -2104,7 +2110,7 @@ function renderPositions() {
 
       <!-- Metrics Row -->
       <div class="ep-pos-metrics-row">
-        <div class="ep-metric"><div class="ep-metric-label">CMP <span title="${cmpLabel}" style="cursor:help">${cmpDot}</span></div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">CMP ${brokerDot}</div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
         <div class="ep-metric"><div class="ep-metric-label">P&L%</div><div class="ep-metric-val" style="color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</div></div>
         <div class="ep-metric"><div class="ep-metric-label">SL</div><div class="ep-metric-val" style="color:var(--r)">₹${trade?.sl ? (+trade.sl).toFixed(0) : '—'}</div></div>
         <div class="ep-metric"><div class="ep-metric-label">Risk%</div><div class="ep-metric-val" style="color:${riskPct > 10 ? 'var(--r)' : riskPct > 5 ? 'var(--y)' : 'var(--t2)'}">${riskPct.toFixed(1)}%</div></div>
@@ -2163,16 +2169,21 @@ async function quickClose(sym, idx) {
   const qty = Math.abs(p.quantity || p.netQty || 0);
   const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
 
-  // Issue 13: Market hours check
-  if (p._hasBroker && typeof TE.isMarketOpen === 'function' && !TE.isMarketOpen()) {
+  // Auto-detect broker from trade source
+  const trade = p._trade;
+  const tradeBroker = trade?.source?.toLowerCase() || '';
+  const canSendBrokerOrder = tradeBroker && ['dhan', 'zerodha', 'definedge'].includes(tradeBroker);
+  if (canSendBrokerOrder && TE.exec.broker !== tradeBroker) TE.exec.broker = tradeBroker;
+
+  // Market hours check
+  if (canSendBrokerOrder && typeof TE.isMarketOpen === 'function' && !TE.isMarketOpen()) {
     if (!confirm(`⚠️ Market is CLOSED. Close ${sym} in journal only? (no broker order)`)) return;
-    // Fall through to journal-only close
   } else if (!confirm(`Close ${sym}: ${side} ${qty} at MARKET?`)) return;
 
   let brokerOk = false;
 
-  // Try broker order if connected AND market open
-  if (p._hasBroker && (typeof TE.isMarketOpen !== 'function' || TE.isMarketOpen())) {
+  // Try broker order if broker detected AND market open
+  if (canSendBrokerOrder && (typeof TE.isMarketOpen !== 'function' || TE.isMarketOpen())) {
     try {
       const result = await TE.exec.sendOrder(sym, side, 'MARKET', qty, 0, 0, p.product || 'CNC', 'DAY');
       if (result.ok) { brokerOk = true; TE.exec.playSound('fill'); }
@@ -2182,19 +2193,19 @@ async function quickClose(sym, idx) {
 
   // Update journal (always, but user was warned if broker failed)
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
-  if (trade) {
+  const journalTrade = trades.find(t => t.symbol === sym && t.status === 'Open');
+  if (journalTrade) {
     const ltp = p.last_price || p.lastPrice || p.ltp || 0;
-    trade.exits = trade.exits || [];
-    trade.exits.push({
+    journalTrade.exits = journalTrade.exits || [];
+    journalTrade.exits.push({
       date: new Date().toISOString().slice(0, 10),
       price: ltp, qty,
       reason: 'full_close',
       brokerConfirmed: brokerOk
     });
-    trade.status = 'Closed';
+    journalTrade.status = 'Closed';
     localStorage.setItem('te_trades', JSON.stringify(trades));
-    syncTradeToSupabase(trade);
+    syncTradeToSupabase(journalTrade);
   }
   toast(`Closed ${sym}` + (brokerOk ? '' : ' (journal only)'), brokerOk ? '✅' : '⚠️');
   sendTelegramAlert(`🔴 Closed: ${sym}\nQty: ${qty}${brokerOk ? ' at MARKET' : ' (journal only — broker failed)'}`);
@@ -2207,14 +2218,20 @@ async function quickPartial(sym, idx, pct) {
   const exitQty = Math.max(1, Math.floor(totalQty * pct / 100));
   const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
 
-  // Issue 13: Market hours check for broker orders
-  if (p._hasBroker && typeof TE.isMarketOpen === 'function' && !TE.isMarketOpen()) {
+  // Auto-detect broker from trade source
+  const trade = p._trade;
+  const tradeBroker = trade?.source?.toLowerCase() || '';
+  const canSendBrokerOrder = tradeBroker && ['dhan', 'zerodha', 'definedge'].includes(tradeBroker);
+  if (canSendBrokerOrder && TE.exec.broker !== tradeBroker) TE.exec.broker = tradeBroker;
+
+  // Market hours check for broker orders
+  if (canSendBrokerOrder && typeof TE.isMarketOpen === 'function' && !TE.isMarketOpen()) {
     toast('Market closed — use 📤 Exit for journal-only partial', '⚠️');
     return;
   }
 
   let brokerOk = false;
-  if (p._hasBroker) {
+  if (canSendBrokerOrder) {
     try {
       const result = await TE.exec.sendOrder(sym, side, 'MARKET', exitQty, 0, 0, p.product || 'CNC', 'DAY');
       if (result.ok) brokerOk = true;
@@ -2224,20 +2241,20 @@ async function quickPartial(sym, idx, pct) {
 
   toast(`${pct}%: ${side} ${exitQty} ${sym}` + (brokerOk ? '' : ' (journal)'), brokerOk ? '✅' : '⚠️');
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
-  if (trade) {
+  const journalTrade = trades.find(t => t.symbol === sym && t.status === 'Open');
+  if (journalTrade) {
     const ltp = p.last_price || p.lastPrice || p.ltp || 0;
-    trade.exits = trade.exits || [];
-    trade.exits.push({
+    journalTrade.exits = journalTrade.exits || [];
+    journalTrade.exits.push({
       date: new Date().toISOString().slice(0, 10),
       price: ltp, qty: exitQty,
       reason: `quick_${pct}pct`,
       brokerConfirmed: brokerOk
     });
-    const nt = normalizeTrade(trade);
-    if (nt._n.remainingQty <= 0) trade.status = 'Closed';
+    const nt = normalizeTrade(journalTrade);
+    if (nt._n.remainingQty <= 0) journalTrade.status = 'Closed';
     localStorage.setItem('te_trades', JSON.stringify(trades));
-    syncTradeToSupabase(trade);
+    syncTradeToSupabase(journalTrade);
   }
   setTimeout(refreshAll, 2000);
 }
