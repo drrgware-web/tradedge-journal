@@ -1942,6 +1942,26 @@ setTimeout(async () => {
       runNudges: () => ({ score: 50, nudges: [] }), saveGTTs: () => {}, playSound: () => {},
       autoJournal: () => {}, gttAutoFromJournal: () => 0 };
     if (!TE.fetchCMP) TE.fetchCMP = async () => null;
+
+    // OVERRIDE: Always use Worker's yahoo-proxy (core.js uses allorigins which is unreliable)
+    const _workerUrl = localStorage.getItem('zd_worker_url') || '';
+    if (_workerUrl) {
+      TE.fetchCMP = async function(symbol) {
+        const ticker = symbol.includes('.') ? symbol : symbol + '.NS';
+        try {
+          const res = await fetch(_workerUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+            body: JSON.stringify({ ticker, range: '1d', interval: '1d' }),
+            signal: AbortSignal.timeout(8000)
+          });
+          if (!res.ok) return null;
+          const data = await res.json();
+          return data?.chart?.result?.[0]?.meta?.regularMarketPrice || null;
+        } catch (e) { return null; }
+      };
+      console.log('fetchCMP: overridden to use Worker yahoo-proxy');
+    }
     if (!TE.getWorkerUrl) TE.getWorkerUrl = () => localStorage.getItem('zd_worker_url') || '';
     if (!TE.isMarketOpen) TE.isMarketOpen = () => { const h = new Date().getUTCHours() + 5.5; return h >= 9.25 && h <= 15.5; };
     if (!TE.getOpenTrades) TE.getOpenTrades = () => JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open');
