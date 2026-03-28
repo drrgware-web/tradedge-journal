@@ -667,7 +667,237 @@ window.EdgeCloud = (function () {
         stMultiplier: cfg.stMultiplier,
         emaPeriod: cfg.emaPeriod,
       },
+      // Phase 2: regime overlay applied via applyRegime()
+      regime: null,
     };
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PHASE 2: REGIME OVERLAY — MPS + Sector RS + Sweet Zone
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const MPS_ZONES = {
+    'Extreme Bull Zone':   { regime: 'bull',    signalGate: ['P','Arrow','Star'], sizeMulti: 1.5 },
+    'Bull Zone':           { regime: 'bull',    signalGate: ['P','Arrow','Star'], sizeMulti: 1.2 },
+    'Accumulation Zone':   { regime: 'bull',    signalGate: ['P','Arrow','Star'], sizeMulti: 1.0 },
+    'Caution Zone':        { regime: 'neutral', signalGate: ['P','Star'],         sizeMulti: 0.7 },
+    'Distribution Zone':   { regime: 'neutral', signalGate: ['Star'],             sizeMulti: 0.5 },
+    'No Money Zone':       { regime: 'bear',    signalGate: ['Star'],             sizeMulti: 0.0 },
+  };
+
+  const SECTOR_RS_MODIFIERS = {
+    'Leading':   { scoreMod: 20, sizeMulti: 1.0, color: 'var(--g)' },
+    'Improving': { scoreMod: 10, sizeMulti: 0.8, color: 'var(--c)' },
+    'Weakening': { scoreMod: -5, sizeMulti: 0.5, color: 'var(--y)' },
+    'Lagging':   { scoreMod:-15, sizeMulti: 0.3, color: 'var(--r)' },
+  };
+
+  const SECTOR_PROXY = {
+    'TCS':'IT','INFY':'IT','WIPRO':'IT','HCLTECH':'IT','TECHM':'IT','LTIM':'IT','MPHASIS':'IT',
+    'COFORGE':'IT','PERSISTENT':'IT','LTTS':'IT','TATAELXSI':'IT','DATAPATTNS':'IT',
+    'HDFCBANK':'Bank','ICICIBANK':'Bank','KOTAKBANK':'Bank','AXISBANK':'Bank','SBIN':'Bank',
+    'BANKBARODA':'Bank','PNB':'Bank','INDUSINDBK':'Bank','IDFCFIRSTB':'Bank','UNIONBANK':'Bank',
+    'FEDERALBNK':'Bank','BANDHANBNK':'Bank','CANBK':'Bank','INDIANB':'Bank',
+    'BAJFINANCE':'Financial Services','BAJAJFINSV':'Financial Services','CHOLAFIN':'Financial Services',
+    'SHRIRAMFIN':'Financial Services','MUTHOOTFIN':'Financial Services','MANAPPURAM':'Financial Services',
+    'TATAMOTORS':'Auto','MARUTI':'Auto','M&M':'Auto','BAJAJ-AUTO':'Auto','HEROMOTOCO':'Auto',
+    'EICHERMOT':'Auto','ASHOKLEY':'Auto','TVSMOTOR':'Auto','MOTHERSON':'Auto',
+    'SUNPHARMA':'Pharma','DRREDDY':'Pharma','CIPLA':'Pharma','DIVISLAB':'Pharma',
+    'LUPIN':'Pharma','AUROPHARMA':'Pharma','TORNTPHARM':'Pharma','ALKEM':'Pharma',
+    'BIOCON':'Pharma','IPCALAB':'Pharma','PHARMABEES':'Pharma',
+    'TATASTEEL':'Metal','JSWSTEEL':'Metal','HINDALCO':'Metal','VEDL':'Metal',
+    'COALINDIA':'Metal','NMDC':'Metal','SAIL':'Metal','NATIONALUM':'Metal',
+    'RELIANCE':'Oil & Gas','ONGC':'Oil & Gas','BPCL':'Oil & Gas','IOC':'Oil & Gas',
+    'GAIL':'Oil & Gas','OIL':'Oil & Gas','PETRONET':'Oil & Gas',
+    'NTPC':'Power','POWERGRID':'Power','TATAPOWER':'Power','ADANIGREEN':'Power',
+    'NHPC':'Power','SJVN':'Power','IREDA':'Power','TDPOWERSYS':'Power',
+    'BEL':'Power','QPOWER':'Power',
+    'HINDUNILVR':'FMCG','ITC':'FMCG','NESTLEIND':'FMCG','BRITANNIA':'FMCG',
+    'DABUR':'FMCG','MARICO':'FMCG','GODREJCP':'FMCG','COLPAL':'FMCG',
+    'LARSENTOUB':'Infrastructure','ADANIENT':'Infrastructure','MAHLOG':'Infrastructure',
+    'DLF':'Realty','GODREJPROP':'Realty','OBEROIRLTY':'Realty','PRESTIGE':'Realty','BRIGADE':'Realty',
+    'HAVELLS':'Consumer Durables','VOLTAS':'Consumer Durables','CROMPTON':'Consumer Durables',
+    'ASTRAMICRO':'Consumer Durables',
+    'BHARTIARTL':'Telecom','IDEA':'Telecom','TATACOMM':'Telecom',
+    'APOLLOHOSP':'Healthcare','FORTIS':'Healthcare','MAXHEALTH':'Healthcare',
+    'STARHEALTH':'Healthcare','METROPOLIS':'Healthcare','LALPATHLAB':'Healthcare',
+    'GOLDBEES':'Commodities','SILVERBEES':'Commodities',
+  };
+
+  const SECTOR_INDEX_MAP = {
+    'IT':'NIFTY_IT.NS', 'Bank':'NIFTY_BANK.NS', 'Financial Services':'NIFTY_FIN_SERVICE.NS',
+    'Auto':'NIFTY_AUTO.NS', 'Pharma':'NIFTY_PHARMA.NS', 'Metal':'NIFTY_METAL.NS',
+    'Oil & Gas':'NIFTY_OIL_AND_GAS.NS', 'Power':'NIFTY_ENERGY.NS', 'FMCG':'NIFTY_FMCG.NS',
+    'Infrastructure':'NIFTY_INFRA.NS', 'Realty':'NIFTY_REALTY.NS', 'PSU Bank':'NIFTY_PSU_BANK.NS',
+    'Consumer Durables':'NIFTY_CONSR_DURBL.NS', 'Telecom':'NIFTY_MEDIA.NS', 'Media':'NIFTY_MEDIA.NS',
+    'Healthcare':'NIFTY_HEALTHCARE.NS', 'Commodities':'NIFTY_COMMODITIES.NS',
+  };
+
+  // Session caches
+  let _mpsCache = null;
+  let _mpsFetched = false;
+  let _sectorRSCache = {};
+
+  async function fetchMPS() {
+    try {
+      const urls = ['mps_latest.json', 'data/mps_latest.json', '/mps_latest.json'];
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+          if (!res.ok) continue;
+          const data = await res.json();
+          const cur = data?.current || data;
+          if (!cur?.zone) continue;
+          const z = MPS_ZONES[cur.zone] || MPS_ZONES['Caution Zone'];
+          return {
+            zone: cur.zone, finalScore: cur.final_score || 0, state: cur.state || '',
+            regime: z.regime, sizeMulti: z.sizeMulti, signalGate: z.signalGate,
+            riskPerTrade: cur.risk_per_trade || '', zoneAction: cur.zone_action || '',
+            atrRegime: cur.atr_regime || '', burstLabel: cur.burst_label || '',
+            macro: cur.macro_summary || '',
+            modifiers: (cur.modifiers || []).filter(m => m.triggered).map(m => m.name),
+          };
+        } catch (e) { continue; }
+      }
+      // Fallback: localStorage
+      try {
+        const c = localStorage.getItem('te_mps_current');
+        if (c) { const d = JSON.parse(c); if (d?.zone) { const z = MPS_ZONES[d.zone] || MPS_ZONES['Caution Zone']; return { zone: d.zone, finalScore: d.final_score || 0, state: d.state || '', regime: z.regime, sizeMulti: z.sizeMulti, signalGate: z.signalGate, riskPerTrade:'',zoneAction:'',atrRegime:'',burstLabel:'',macro:'',modifiers:[] }; } }
+      } catch (e) {}
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function calcJdK(stockCloses, benchCloses, window) {
+    window = window || 10;
+    const n = Math.min(stockCloses.length, benchCloses.length);
+    if (n < window * 3) return null;
+    const sec = stockCloses.slice(-n), ben = benchCloses.slice(-n);
+    const rsRaw = sec.map((s, i) => ben[i] > 0 ? s / ben[i] : 1);
+    const rsNorm = new Array(rsRaw.length).fill(NaN);
+    for (let i = window - 1; i < rsRaw.length; i++) { let sum = 0; for (let j = i - window + 1; j <= i; j++) sum += rsRaw[j]; rsNorm[i] = sum / window > 0 ? (rsRaw[i] / (sum / window) * 100) : 100; }
+    const alpha = 2.0 / (window + 1);
+    const rsRatio = new Array(rsNorm.length).fill(NaN);
+    rsRatio[window - 1] = rsNorm[window - 1];
+    for (let i = window; i < rsNorm.length; i++) { if (!isNaN(rsNorm[i]) && !isNaN(rsRatio[i - 1])) rsRatio[i] = alpha * rsNorm[i] + (1 - alpha) * rsRatio[i - 1]; }
+    const rsMom = new Array(rsRatio.length).fill(NaN);
+    for (let i = window; i < rsRatio.length; i++) { if (!isNaN(rsRatio[i]) && !isNaN(rsRatio[i - window])) { const prev = rsRatio[i - window]; rsMom[i] = prev > 0 ? (rsRatio[i] / prev * 100) : 100; } }
+    let lastR = NaN, lastM = NaN;
+    for (let i = rsRatio.length - 1; i >= 0; i--) { if (!isNaN(rsRatio[i]) && isNaN(lastR)) lastR = rsRatio[i]; if (!isNaN(rsMom[i]) && isNaN(lastM)) lastM = rsMom[i]; if (!isNaN(lastR) && !isNaN(lastM)) break; }
+    if (isNaN(lastR) || isNaN(lastM)) return null;
+    return { ratio: Math.round(lastR * 100) / 100, mom: Math.round(lastM * 100) / 100 };
+  }
+
+  async function fetchSectorRS(sectorTicker) {
+    const wk = localStorage.getItem('zd_worker_url') || '';
+    if (!wk || !sectorTicker) return null;
+    try {
+      const [sRes, nRes] = await Promise.all([
+        fetch(wk, { method:'POST', headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'}, body:JSON.stringify({ticker:sectorTicker,range:'1y',interval:'1d'}), signal:AbortSignal.timeout(8000) }),
+        fetch(wk, { method:'POST', headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'}, body:JSON.stringify({ticker:'^NSEI',range:'1y',interval:'1d'}), signal:AbortSignal.timeout(8000) }),
+      ]);
+      if (!sRes.ok || !nRes.ok) return null;
+      const sData = await sRes.json(); const nData = await nRes.json();
+      const sCloses = sData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c => c != null);
+      const nCloses = nData?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c => c != null);
+      if (!sCloses?.length || !nCloses?.length) return null;
+      const jdk = calcJdK(sCloses, nCloses, 10);
+      if (!jdk) return null;
+      let quadrant = 'Lagging';
+      if (jdk.ratio >= 100 && jdk.mom >= 100) quadrant = 'Leading';
+      else if (jdk.ratio >= 100 && jdk.mom < 100) quadrant = 'Weakening';
+      else if (jdk.ratio < 100 && jdk.mom >= 100) quadrant = 'Improving';
+      return { quadrant, ratio: jdk.ratio, momentum: jdk.mom };
+    } catch (e) { return null; }
+  }
+
+  function applyRegime(ecResult, regime) {
+    if (!ecResult || !regime) return ecResult;
+    const mps = regime.mps || null;
+    const sectorRS = regime.sectorRS || null;
+    const sectorName = regime.sectorName || '';
+
+    let mpsGate = ['P','Arrow','Star'];
+    let mpsSizeMulti = 1.0;
+    let mpsRegime = 'unknown';
+    if (mps) { mpsGate = mps.signalGate || mpsGate; mpsSizeMulti = mps.sizeMulti ?? 1.0; mpsRegime = mps.regime || 'unknown'; }
+
+    let sectorScoreMod = 0, sectorSizeMulti = 1.0, sectorLabel = '', sectorColor = 'var(--t4)';
+    if (sectorRS) {
+      const mod = SECTOR_RS_MODIFIERS[sectorRS.quadrant];
+      if (mod) { sectorScoreMod = mod.scoreMod; sectorSizeMulti = mod.sizeMulti; sectorLabel = `${sectorName} ${sectorRS.quadrant}`; sectorColor = mod.color; }
+    }
+
+    const combinedSizeMulti = Math.round(mpsSizeMulti * sectorSizeMulti * 100) / 100;
+
+    const adjustSignal = (sig, type) => {
+      if (!sig) return sig;
+      const adj = { ...sig };
+      adj.adjustedScore = Math.max(0, Math.min(100, (sig.score || 0) + sectorScoreMod));
+      const typeKey = type === 'pullback' ? 'P' : type === 'pyramid' ? 'Arrow' : 'Star';
+      adj.gatedByMPS = !mpsGate.includes(typeKey);
+      adj.reasons = [...(adj.reasons || [])];
+      if (adj.gatedByMPS) adj.reasons.push(`BLOCKED by MPS ${mps?.zone || ''}`);
+      else if (sectorScoreMod !== 0) adj.reasons.push(`${sectorLabel} ${sectorScoreMod > 0 ? '+' : ''}${sectorScoreMod}`);
+      adj.sizeMultiplier = combinedSizeMulti;
+      return adj;
+    };
+
+    const adjP = adjustSignal(ecResult.recentSignals.pullback, 'pullback');
+    const adjPyr = adjustSignal(ecResult.recentSignals.pyramid, 'pyramid');
+    const adjStar = adjustSignal(ecResult.recentSignals.star, 'star');
+
+    // Override action label
+    let actionLabel = ecResult.current.actionLabel;
+    let actionColor = ecResult.current.actionColor;
+
+    if (mpsRegime === 'bear') {
+      if (adjP?.gatedByMPS) { actionLabel = 'P blocked — No Money Zone'; actionColor = 'var(--r)'; }
+      if (adjPyr?.gatedByMPS) { actionLabel = 'Pyramid blocked — No Money Zone'; actionColor = 'var(--r)'; }
+      if (adjStar && !adjStar.gatedByMPS) { actionLabel = (adjStar.levelLabel || 'Sell') + ' (MPS confirms)'; actionColor = 'var(--r)'; }
+      if (!adjP && !adjPyr && !adjStar && ecResult.current.state === 'strong_bull') { actionLabel = 'Hold cautious — MPS bear'; actionColor = 'var(--y)'; }
+    } else if (mpsRegime === 'neutral') {
+      if (adjPyr?.gatedByMPS) { actionLabel = 'Pyramid blocked — MPS caution'; actionColor = 'var(--y)'; }
+    }
+    if (sectorRS?.quadrant === 'Lagging' && actionLabel.includes('Add')) { actionLabel = 'P — weak sector, half size'; actionColor = 'var(--y)'; }
+
+    ecResult.regime = {
+      mps: mps ? { zone: mps.zone, score: mps.finalScore, regime: mpsRegime, sizeMulti: mpsSizeMulti, gate: mpsGate, state: mps.state, atrRegime: mps.atrRegime, macro: mps.macro } : null,
+      sector: sectorRS ? { name: sectorName, quadrant: sectorRS.quadrant, ratio: sectorRS.ratio, momentum: sectorRS.momentum, scoreMod: sectorScoreMod, sizeMulti: sectorSizeMulti, color: sectorColor } : null,
+      combined: { sizeMultiplier: combinedSizeMulti, signalGate: mpsGate },
+    };
+    ecResult.recentSignals = { pullback: adjP, pyramid: adjPyr, star: adjStar };
+    ecResult.current.actionLabel = actionLabel;
+    ecResult.current.actionColor = actionColor;
+    ecResult.current.regimeSizeMulti = combinedSizeMulti;
+    return ecResult;
+  }
+
+  async function fetchComputeWithRegime(sym, opts, sector) {
+    const ec = await fetchAndCompute(sym, opts);
+    if (!ec) return null;
+    // MPS: fetch once per session
+    let mps = _mpsCache;
+    if (!mps && !_mpsFetched) {
+      _mpsFetched = true;
+      mps = await fetchMPS();
+      _mpsCache = mps;
+      if (mps) { console.log(`MPS: ${mps.zone} (score ${mps.finalScore}) — ${mps.regime}`); try { localStorage.setItem('te_mps_current', JSON.stringify({ zone: mps.zone, final_score: mps.finalScore, state: mps.state })); } catch(e){} }
+    }
+    // Sector RS: resolve and cache hourly
+    const sectorName = sector || SECTOR_PROXY[sym.toUpperCase()] || '';
+    let sectorRS = null;
+    if (sectorName) {
+      const sectorTicker = SECTOR_INDEX_MAP[sectorName];
+      if (sectorTicker) {
+        const ck = `ec_sRS_${sectorName}`;
+        const cached = _sectorRSCache[ck];
+        if (cached && (Date.now() - cached.time < 3600000)) { sectorRS = cached.data; }
+        else { sectorRS = await fetchSectorRS(sectorTicker); if (sectorRS) { _sectorRSCache[ck] = { data: sectorRS, time: Date.now() }; console.log(`Sector RS ${sectorName}: ${sectorRS.quadrant} (R:${sectorRS.ratio} M:${sectorRS.momentum})`); } }
+      }
+    }
+    return applyRegime(ec, { mps, sectorRS, sectorName });
   }
 
 
@@ -749,6 +979,26 @@ window.EdgeCloud = (function () {
     trade._ecPullbackCount = ec.signals.pullbacks.length;
     trade._ecPyramidCount = ec.signals.pyramids.length;
     trade._ecStarCount = ec.signals.stars.length;
+
+    // Phase 2: Regime overlay data
+    if (ec.regime) {
+      if (ec.regime.mps) {
+        trade._ecMpsZone = ec.regime.mps.zone;
+        trade._ecMpsRegime = ec.regime.mps.regime;
+        trade._ecMpsSizeMulti = ec.regime.mps.sizeMulti;
+        trade._ecMpsGate = ec.regime.mps.gate;
+      }
+      if (ec.regime.sector) {
+        trade._ecSectorName = ec.regime.sector.name;
+        trade._ecSectorQuadrant = ec.regime.sector.quadrant;
+        trade._ecSectorRatio = ec.regime.sector.ratio;
+        trade._ecSectorMomentum = ec.regime.sector.momentum;
+        trade._ecSectorScoreMod = ec.regime.sector.scoreMod;
+      }
+      if (ec.regime.combined) {
+        trade._ecSizeMulti = ec.regime.combined.sizeMultiplier;
+      }
+    }
   }
 
 
@@ -800,15 +1050,34 @@ window.EdgeCloud = (function () {
     // Recent signal badges
     let signalBadges = '';
     if (trade._ecLastPullback) {
-      signalBadges += `<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(0,229,160,.12);color:var(--g)">P ${trade._ecLastPullback.score}pts</span>`;
+      const gated = trade._ecLastPullback.gatedByMPS;
+      signalBadges += `<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;background:${gated ? 'rgba(255,69,96,.12)' : 'rgba(0,229,160,.12)'};color:${gated ? 'var(--r)' : 'var(--g)'}">${gated ? 'P ✕' : 'P'} ${(trade._ecLastPullback.adjustedScore || trade._ecLastPullback.score)}pts</span>`;
     }
     if (trade._ecLastPyramid) {
-      signalBadges += `<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(245,158,11,.12);color:var(--y)">▲ PYR</span>`;
+      const gated = trade._ecLastPyramid.gatedByMPS;
+      signalBadges += `<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;background:${gated ? 'rgba(255,69,96,.12)' : 'rgba(245,158,11,.12)'};color:${gated ? 'var(--r)' : 'var(--y)'}">${gated ? '▲ ✕' : '▲ PYR'}</span>`;
     }
     if (trade._ecLastStar) {
       const starColors = { 1: 'var(--y)', 2: '#ff9800', 3: 'var(--r)' };
       const sc2 = starColors[trade._ecLastStar.level] || 'var(--y)';
       signalBadges += `<span style="font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(255,69,96,.12);color:${sc2}">★ ${trade._ecLastStar.levelLabel}</span>`;
+    }
+
+    // Phase 2: Regime badges
+    let regimeBadges = '';
+    if (trade._ecMpsZone) {
+      const mpsColors = { 'bull':'rgba(0,229,160,.12)', 'neutral':'rgba(245,158,11,.12)', 'bear':'rgba(255,69,96,.12)' };
+      const mpsTextColors = { 'bull':'var(--g)', 'neutral':'var(--y)', 'bear':'var(--r)' };
+      const reg = trade._ecMpsRegime || 'neutral';
+      regimeBadges += `<span style="font-size:7.5px;font-weight:700;padding:2px 5px;border-radius:4px;background:${mpsColors[reg]||mpsColors.neutral};color:${mpsTextColors[reg]||'var(--t3)'}">${trade._ecMpsZone}</span>`;
+    }
+    if (trade._ecSectorQuadrant) {
+      const sqColors = { Leading:'var(--g)', Improving:'var(--c)', Weakening:'var(--y)', Lagging:'var(--r)' };
+      regimeBadges += `<span style="font-size:7.5px;font-weight:700;padding:2px 5px;border-radius:4px;background:rgba(0,187,255,.08);color:${sqColors[trade._ecSectorQuadrant]||'var(--t3)'}">${trade._ecSectorName||''} ${trade._ecSectorQuadrant}</span>`;
+    }
+    if (trade._ecSizeMulti !== undefined && trade._ecSizeMulti !== 1) {
+      const smColor = trade._ecSizeMulti >= 1 ? 'var(--g)' : trade._ecSizeMulti >= 0.5 ? 'var(--y)' : 'var(--r)';
+      regimeBadges += `<span style="font-size:7.5px;font-weight:700;padding:2px 5px;border-radius:4px;background:var(--bg3);color:${smColor}">${trade._ecSizeMulti}× size</span>`;
     }
 
     return `<div style="margin:0">
@@ -839,6 +1108,9 @@ window.EdgeCloud = (function () {
       <!-- Signal badges -->
       ${signalBadges ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">${signalBadges}</div>` : ''}
 
+      <!-- Regime badges -->
+      ${regimeBadges ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">${regimeBadges}</div>` : ''}
+
       <!-- TSL recommendation -->
       <div style="display:flex;align-items:center;gap:6px;font-size:9px">
         <span style="color:var(--t3)">TSL:</span>
@@ -859,22 +1131,24 @@ window.EdgeCloud = (function () {
    */
   function telegramAlert(sym, signal, type) {
     if (!signal) return '';
-    const score = signal.score || 0;
+    const score = signal.adjustedScore || signal.score || 0;
     const reasons = (signal.reasons || []).join(' · ');
+    const gated = signal.gatedByMPS ? '\n🚫 BLOCKED by MPS' : '';
+    const sizeLine = signal.sizeMultiplier && signal.sizeMultiplier !== 1 ? `\nSize: ${signal.sizeMultiplier}×` : '';
 
     if (type === 'pullback') {
       return `🟢 EdgeCloud P — ${sym}\n` +
         `Price: ₹${signal.price.toFixed(2)}\n` +
         `TSL: ₹${signal.tsl?.toFixed(2) || signal.walkingLine?.toFixed(2)}\n` +
         `Score: ${score}/100 | ${signal.barsInCloud} bars in cloud\n` +
-        `RSI: ${signal.rsiAtReentry}\n` +
+        `RSI: ${signal.rsiAtReentry}${sizeLine}${gated}\n` +
         `${reasons}`;
     }
     if (type === 'pyramid') {
       return `🔺 EdgeCloud PYRAMID — ${sym}\n` +
         `Donchian(20) breakout: ₹${signal.donchianHigh?.toFixed(2)}\n` +
         `Price: ₹${signal.price.toFixed(2)}\n` +
-        `Score: ${score}/100\n` +
+        `Score: ${score}/100${sizeLine}${gated}\n` +
         `${reasons}`;
     }
     if (type === 'star') {
@@ -897,20 +1171,32 @@ window.EdgeCloud = (function () {
     compute: compute,
     fetchAndCompute: fetchAndCompute,
 
+    // Phase 2: Regime overlay
+    fetchComputeWithRegime: fetchComputeWithRegime,
+    applyRegime: applyRegime,
+    fetchMPS: fetchMPS,
+    fetchSectorRS: fetchSectorRS,
+
     // Integration
     storeOnTrade: storeOnTrade,
     renderCardSection: renderCardSection,
     telegramAlert: telegramAlert,
 
-    // Calculation primitives (for testing / reuse)
+    // Lookups
+    SECTOR_PROXY: SECTOR_PROXY,
+    SECTOR_INDEX_MAP: SECTOR_INDEX_MAP,
+    MPS_ZONES: MPS_ZONES,
+
+    // Calculation primitives
     calcATR: calcATR,
     calcEMASeries: calcEMASeries,
     calcSuperTrend: calcSuperTrend,
     calcDonchian: calcDonchian,
     calcRSI: calcRSI,
+    calcJdK: calcJdK,
 
     // Version
-    VERSION: '1.0.0',
+    VERSION: '2.0.0',
     NAME: 'EdgeCloud',
   };
 
