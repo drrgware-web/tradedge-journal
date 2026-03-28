@@ -41,7 +41,6 @@
 .shp-list{flex:1;min-width:200px}.shp-row{display:flex;align-items:center;padding:10px 12px;background:var(--bg2);border-radius:6px;margin-bottom:6px}.shp-dot{width:10px;height:10px;border-radius:50%;margin-right:10px}.shp-name{flex:1;font-size:11px;color:var(--t2)}.shp-pct{font-family:var(--mono);font-size:12px;font-weight:600;margin-right:10px}
 .shp-chg{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;min-width:50px;text-align:center}.shp-chg.up{background:rgba(34,197,94,.12);color:var(--green)}.shp-chg.dn{background:rgba(239,68,68,.12);color:var(--red)}.shp-chg.flat{background:var(--bg4);color:var(--t4)}
 .surv-st{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;margin-bottom:14px}.surv-st.safe{background:rgba(34,197,94,.12);color:var(--green)}.surv-st.danger{background:rgba(239,68,68,.12);color:var(--red)}.surv-st.caution{background:rgba(245,158,11,.12);color:var(--amber)}.surv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.surv-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--green)}.surv-item.fail{border-left-color:var(--red)}.surv-icon{font-size:12px}.surv-text{font-size:10px;color:var(--t2)}
-/* SHP Trend Chart */
 .shp-trend{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
 .chart-tb{display:flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);flex-wrap:wrap}
 .tb-grp{display:flex;gap:2px;background:var(--bg);border-radius:4px;padding:2px}.tb-btn{padding:5px 10px;border:none;border-radius:3px;font-size:9px;font-weight:600;font-family:var(--mono);cursor:pointer;background:transparent;color:var(--t4)}.tb-btn:hover{color:var(--t2)}.tb-btn.active{background:rgba(0,255,136,.1);color:var(--accent)}
@@ -49,6 +48,7 @@
 .chart-ft{padding:5px 12px;background:rgba(0,0,0,.2);font-size:8px;font-family:var(--mono);color:var(--t4);display:flex;justify-content:space-between}
 .ai-card{background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(6,182,212,.05));border:1px solid rgba(139,92,246,.2)}.ai-h{background:linear-gradient(90deg,rgba(139,92,246,.1),transparent)}.ai-body{padding:18px}.ai-content{font-size:12px;line-height:1.7;color:var(--t2)}.ai-content strong{color:var(--t1)}.ai-loading{text-align:center;padding:30px;color:var(--t4)}.ai-ft{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}.ai-powered{font-size:9px;color:var(--t4)}.ai-refresh{padding:5px 10px;background:var(--bg4);border:1px solid var(--border);border-radius:5px;color:var(--t3);font-size:9px;cursor:pointer}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 10px}@keyframes spin{to{transform:rotate(360deg)}}.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;color:var(--t4)}
+.stk-gear{padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t3);cursor:pointer;font-size:14px;transition:all .2s}.stk-gear:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -59,14 +59,17 @@
     <span class="stk-nm" id="nm">Loading...</span>
     <span id="badges"></span>
   </div>
-  <div style="position:relative">
-    <input type="text" class="srch" id="srch" placeholder="Search stock..." autocomplete="off">
-    <div class="srch-dd" id="srchDD"></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="stk-gear" onclick="toggleStockSettings()" title="API Settings">⚙️</button>
+    <div style="position:relative">
+      <input type="text" class="srch" id="srch" placeholder="Search stock..." autocomplete="off">
+      <div class="srch-dd" id="srchDD"></div>
+    </div>
   </div>
 </header>
 <main class="main" id="main"><div class="loading" id="ld"><div class="spinner"></div>Loading stock data...</div></main>
 <script>
-const TV='8RFOgQZr',WK='https://spring-fire-41a0.drrgware.workers.dev',GROQ='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',COL={promo:'#8b5cf6',fii:'#22c55e',dii:'#f59e0b',pub:'#3b82f6'},FUND_PE_THRESHOLD=40;
+const TV='8RFOgQZr',WK=localStorage.getItem('zd_worker_url')||'https://spring-fire-41a0.drrgware.workers.dev',GROQ=localStorage.getItem('groq_key')||'',COL={promo:'#8b5cf6',fii:'#22c55e',dii:'#f59e0b',pub:'#3b82f6'},FUND_PE_THRESHOLD=40;
 let D=null,F=null,allS=[],scannerStock=null,shpData=null,circuitData=null;
 
 function $(id){return document.getElementById(id)}
@@ -83,13 +86,11 @@ async function init(){
   if(!s){empty();return;}
   $('sym').textContent=s;document.title=s+' | TradEdge';
 
-  // FIX #2: Load scanner data FIRST for real price/returns/SMA
   scannerStock=allS.find(x=>x.s===s.toUpperCase());
 
   try{const r=await fetch('data/stock_details/'+s+'.json');if(r.ok){D=await r.json();D.symbol=D.symbol||s;}else throw 0;
   }catch(e){D={symbol:s,name:s,sector:'Unknown',technical:{},fundamentals:{},fund_holdings:{},volume:{},breakout:{},surveillance:{flags:[]}};}
 
-  // Merge scanner data into D (scanner data is more recent/accurate for price fields)
   if(scannerStock){
     const sc=scannerStock;
     D.name=D.name||sc.n;D.sector=D.sector||sc.sector||'';
@@ -113,7 +114,6 @@ async function init(){
     D.fundamentals.pb_ratio=sc.pb||D.fundamentals.pb_ratio||0;
     D.fundamentals.roe=sc.roe||D.fundamentals.roe||0;
     D.fundamentals.roce=sc.roce||D.fundamentals.roce||0;
-    // FIX #3: debt_equity from scanner is already ratio (0.11), not percentage
     D.fundamentals.debt_to_equity=sc.debt_equity!=null?sc.debt_equity:D.fundamentals.debt_to_equity;
     if(!D.fund_holdings)D.fund_holdings={};
     D.fund_holdings.promoter_pct=sc.promoter_holding||D.fund_holdings.promoter_pct||0;
@@ -128,7 +128,6 @@ async function init(){
 
 async function loadSyms(){
   try{const r=await fetch('data/scanner_results.json');if(r.ok){const d=await r.json();const stocks=d.all_stocks||[];allS=stocks.map(x=>({s:x.symbol,n:x.name||x.symbol,...x}));}}catch(e){}
-  // Load circuit limits data
   try{const r=await fetch('data/circuit_limits.json');if(r.ok){circuitData=await r.json();}}catch(e){}
 }
 
@@ -167,7 +166,6 @@ function renderQuality(){
   const total=priceEvt+volScore+candleScore+structScore+liqScore+rsScore+secScore;
   const grade=total>=80?'A':total>=65?'B':total>=50?'C':total>=35?'D':'F';
   const bars=[{l:'Price Event',v:priceEvt,m:25,c:'#22c55e'},{l:'Volume',v:volScore,m:20,c:'#f59e0b'},{l:'Candle',v:candleScore,m:15,c:'#22c55e'},{l:'Structure',v:structScore,m:15,c:'#8b5cf6'},{l:'Liquidity',v:liqScore,m:10,c:'#3b82f6'},{l:'Rel Strength',v:rsScore,m:10,c:'#8b5cf6'},{l:'Sector',v:secScore,m:5,c:'#22c55e'}];
-  // Use REAL SMA 50 from scanner data, not fake price*0.9
   const price=sv(D,'technical.close',0);const h52=sv(D,'breakout.high_52w',0);
   const sma50=sv(D,'technical.sma_50',0);const sma200=sv(D,'technical.sma_200',0);
   const support=sma50||sma200||(price*0.95);
@@ -176,9 +174,7 @@ function renderQuality(){
 
 function renderMetrics(){
   const f=D.fundamentals||{};const sc=scannerStock||{};
-  // D/E: scanner stores as percentage (11.43 = 11.43%), convert to ratio for display
   const deRaw=f.debt_to_equity;const deDisplay=deRaw!=null?(deRaw>2?fmt(deRaw/100,2):fmt(deRaw,2)):'—';
-  // O'Neil / MarketSmith style ratings
   const oneil=D.oneil||{};
   const epsR=oneil.eps_strength||sc.eps_strength||0;
   const priceR=oneil.price_strength||sc.price_strength||0;
@@ -197,7 +193,6 @@ function renderMetrics(){
   const hasOneil=compScore>0||epsR>0||priceR>0;
 
   return'<div class="sec"><div class="sec-t">Key Metrics & Ratings</div><div class="grid2">'+
-    // LEFT: O'Neil / MarketSmith Ratings — only if scanner data exists
     (hasOneil?'<div class="card"><div class="card-h"><span class="card-t">📊 O\'NEIL RATINGS</span><span style="font-size:16px;font-weight:800;color:'+gradeCol+';font-family:var(--mono)">'+grade+'</span></div><div class="card-b">'+
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="font-size:32px;font-weight:800;font-family:var(--mono);color:var(--accent)">'+compScore+'</div><div><div style="font-size:11px;font-weight:600;color:var(--t2)">Composite Score</div><div style="font-size:9px;color:var(--t4)">Overall stock quality rating</div></div></div>'+
       (epsR?ratingBar('EPS Strength',epsR,99,'#22c55e'):'')+
@@ -205,7 +200,6 @@ function renderMetrics(){
       (buyerD?ratingBar('Buyer Demand',buyerD,99,'#f59e0b'):'')+
       (bestGuru!=='—'?'<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between"><div><div style="font-size:9px;color:var(--t4)">Best Guru Match</div><div style="font-size:11px;font-weight:600;color:var(--accent2)">'+bestGuru+'</div></div><div style="text-align:right"><div style="font-size:9px;color:var(--t4)">Guru Score</div><div style="font-size:11px;font-weight:600;color:var(--t1)">'+bestGuruScore+'/100</div></div></div>':'')+
     '</div></div>':'<div class="card"><div class="card-h"><span class="card-t">📊 RATINGS</span></div><div class="card-b" style="text-align:center;padding:30px;color:var(--t4);font-size:12px">Scanner data not available for this stock</div></div>')+
-    // RIGHT: Fundamental Metrics
     '<div class="card"><div class="card-h"><span class="card-t">💰 FUNDAMENTALS</span></div><div class="card-b"><div class="met-grid" id="fundMetGrid">'+
       [{l:'Market Cap',v:'₹'+fmtCr(f.market_cap_cr)+'Cr',c:''},
        {l:'P/E',v:f.pe_ratio?fmt(f.pe_ratio,1):'—',c:f.pe_ratio>40?'var(--red)':f.pe_ratio>25?'var(--amber)':f.pe_ratio>0?'var(--green)':''},
@@ -224,7 +218,6 @@ function renderMetrics(){
   '</div></div>';
 }
 
-// FIX #1: Shareholding with QoQ trend chart
 function renderSHP(){
   const h=D.fund_holdings||{};const promo=h.promoter_pct||0;const fii=h.fii_pct||0;const dii=h.dii_pct||0;const inst=h.institutional_pct||0;const pub=h.public_pct||Math.max(0,100-promo-(fii||inst)-dii);
   const holders=[];
@@ -240,42 +233,32 @@ function renderSHP(){
 
 function drawDonut(){const c=$('shpC');if(!c)return;const ctx=c.getContext('2d');const h=D.fund_holdings||{};const promo=h.promoter_pct||50;const inst=h.fii_pct||h.institutional_pct||30;const dii=h.dii_pct||0;const pub=Math.max(0,100-promo-inst-dii);const data=[{p:promo,c:COL.promo},{p:inst,c:COL.fii},{p:dii,c:COL.dii},{p:pub,c:COL.pub}].filter(x=>x.p>0);let start=-Math.PI/2;data.forEach(x=>{const angle=(x.p/100)*Math.PI*2;ctx.beginPath();ctx.moveTo(80,80);ctx.arc(80,80,70,start,start+angle);ctx.fillStyle=x.c;ctx.fill();start+=angle;});ctx.beginPath();ctx.arc(80,80,40,0,Math.PI*2);ctx.fillStyle='#0d1117';ctx.fill();}
 
-// Draw SHP trend line chart from quarterly arrays
 function drawShpTrend(){
-  if(!shpData)return;
-  const cv=$('shpTrend');if(!cv)return;
+  if(!shpData)return;const cv=$('shpTrend');if(!cv)return;
   const dp=window.devicePixelRatio||1;const W=cv.parentElement.getBoundingClientRect().width;const H=120;
   cv.width=W*dp;cv.height=H*dp;cv.style.width=W+'px';cv.style.height=H+'px';
   const ctx=cv.getContext('2d');ctx.scale(dp,dp);
   const PAD={L:35,R:10,T:10,B:25};const cW=W-PAD.L-PAD.R;const cH=H-PAD.T-PAD.B;
   const labels=shpData.quarters||[];const n=labels.length;if(n<2)return;
-  // Show last 8 quarters
   const show=Math.min(n,8);const si=n-show;
   const series=[{d:shpData.promoter,c:COL.promo,n:'Promoter'},{d:shpData.fii,c:COL.fii,n:'FII'},{d:shpData.dii,c:COL.dii,n:'DII'},{d:shpData.public,c:COL.pub,n:'Public'}].filter(s=>s.d&&s.d.length>=n);
   if(!series.length)return;
-  // Find range (exclude promoter for better scale on FII/DII/Public)
   const nonPromo=series.filter(s=>s.n!=='Promoter');
   let minV=100,maxV=0;
   (nonPromo.length?nonPromo:series).forEach(s=>{for(let i=si;i<n;i++){const v=s.d[i];if(v<minV)minV=v;if(v>maxV)maxV=v;}});
   const range=maxV-minV||1;minV=Math.max(0,minV-range*0.1);maxV=maxV+range*0.1;const rng=maxV-minV;
-  // BG
   ctx.fillStyle='#06080c';ctx.fillRect(0,0,W,H);
-  // Grid
   ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=0.5;
   for(let i=0;i<=3;i++){const y=PAD.T+(i/3)*cH;ctx.beginPath();ctx.moveTo(PAD.L,y);ctx.lineTo(W-PAD.R,y);ctx.stroke();ctx.fillStyle='#445';ctx.font='8px "IBM Plex Mono"';ctx.textAlign='right';ctx.fillText((maxV-(i/3)*rng).toFixed(1)+'%',PAD.L-3,y+3);}
-  // X labels
   ctx.fillStyle='#556';ctx.font='8px "IBM Plex Mono"';ctx.textAlign='center';
   for(let i=0;i<show;i++){const x=PAD.L+(i/(show-1))*cW;const lbl=labels[si+i]||'';ctx.fillText(lbl.replace(/\s+/g,' ').slice(0,7),x,H-5);}
-  // Lines (skip promoter for cleaner view, or show all)
   series.forEach(s=>{
-    if(s.n==='Promoter')return; // Skip promoter (usually flat, dominates scale)
+    if(s.n==='Promoter')return;
     ctx.strokeStyle=s.c;ctx.lineWidth=1.5;ctx.beginPath();
     for(let i=0;i<show;i++){const x=PAD.L+(i/(show-1))*cW;const y=PAD.T+(1-(s.d[si+i]-minV)/rng)*cH;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
     ctx.stroke();
-    // Dot on last point
     const lx=PAD.L+((show-1)/(show-1))*cW;const ly=PAD.T+(1-(s.d[n-1]-minV)/rng)*cH;
     ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);ctx.fillStyle=s.c;ctx.fill();
-    // Label
     ctx.fillStyle=s.c;ctx.font='bold 8px "IBM Plex Mono"';ctx.textAlign='right';
     ctx.fillText(s.n+' '+s.d[n-1].toFixed(1)+'%',lx-8,ly-6);
   });
@@ -285,7 +268,6 @@ function renderSurv(){
   const s=D.surveillance||{};const dataFlags=s.flags||[];
   const checks=[{n:'NSE ASM List',key:'asm',f:false},{n:'NSE GSM List',key:'gsm',f:false},{n:'Circuit Limited',key:'circuit',f:false},{n:'High Debt',key:'high_debt',f:false},{n:'Low Inst.',key:'low_inst',f:false},{n:'Penny Stock',key:'penny',f:false},{n:'High Pledging',key:'high_pledge',f:false},{n:'Low Liquidity',key:'low_liq',f:false},{n:'Inst. Decline',key:'inst_decline',f:false}];
   dataFlags.forEach(function(flag){if(!flag)return;const fn=flag.name||flag.n||'';const isFlagged=flag.flagged===true||flag.f===true;for(let i=0;i<checks.length;i++){if(fn.toLowerCase().includes(checks[i].key)){checks[i].f=isFlagged;break;}}});
-  // Auto-detect from scanner data
   if(scannerStock){
     const sc=scannerStock;
     if(sc.debt_equity>1.5)checks.find(c=>c.key==='high_debt').f=true;
@@ -294,15 +276,12 @@ function renderSurv(){
     if(sc.volume_ratio<0.3)checks.find(c=>c.key==='low_liq').f=true;
     if(sc.surveillance_status&&sc.surveillance_status!=='normal'){checks.find(c=>c.key==='asm').f=true;}
   }
-  // Circuit limit from circuit_limits.json (real NSE data)
   if(circuitData&&circuitData.stocks){
     const ci=circuitData.stocks[D.symbol];
     if(ci&&ci.is_restricted){checks.find(c=>c.key==='circuit').f=true;}
-    // Also check band directly
     if(ci&&(ci.band==='2%'||ci.band==='5%')){checks.find(c=>c.key==='circuit').f=true;}
   }
   const rc=checks.filter(c=>c.f).length;const st=rc===0?'safe':rc<=2?'caution':'danger';
-  // Sync red flag count to Key Metrics after a tick (DOM needs to exist first)
   setTimeout(()=>{const el=$('metRedFlags');if(el){el.textContent=rc;el.style.color=rc===0?'var(--green)':rc<=2?'var(--amber)':'var(--red)';}},50);
   return'<div class="sec-t">Surveillance</div><div class="card"><div class="card-h"><span class="card-t">🛡️ SURVEILLANCE</span></div><div class="card-b"><div class="surv-st '+st+'">'+(rc===0?'✓ All Clear':'⚠ '+rc+' Red Flag'+(rc>1?'s':''))+'</div><div class="surv-grid">'+checks.map(c=>'<div class="surv-item '+(c.f?'fail':'')+'"><span class="surv-icon">'+(c.f?'🚩':'✓')+'</span><span class="surv-text">'+c.n+'</span></div>').join('')+'</div></div></div>';
 }
@@ -313,7 +292,7 @@ function fundCalcScore(p){if(!p||!p.quarters.length)return{score:0,flags:[]};con
 async function fetchFundScorecard(sym){
   const c=$('fundScorecardC');if(!c)return;
   const wk=localStorage.getItem('zd_worker_url')||'';
-  if(!wk){c.innerHTML='<div style="padding:16px;color:var(--t4);font-size:12px">Set <code>zd_worker_url</code> in localStorage for Screener.in data</div>';return;}
+  if(!wk){c.innerHTML='<div style="padding:16px;color:var(--t4);font-size:12px">Set Worker URL in ⚙️ Settings for Screener.in data</div>';return;}
   try{
     const r=await fetch(wk,{method:'GET',headers:{'X-Kite-Action':'screener','X-Screener-Symbol':sym},signal:AbortSignal.timeout(15000)});
     if(!r.ok)throw 0;const data=await r.json();if(!data.quarters||!data.quarters.length)throw 0;
@@ -321,7 +300,6 @@ async function fetchFundScorecard(sym){
     const quarters=data.quarters.map(q=>({label:q.label||'',eps:q.eps||0,epsYoY:q.epsYoY??null,epsQoQ:q.epsQoQ??null,revenueCr:q.sales||0,salesYoY:q.salesYoY??null,salesQoQ:q.salesQoQ??null,opm:q.opm||0,opmQoQ:q.opmQoQ??null}));
     F={info,quarters};const{score,flags}=fundCalcScore(F);
 
-    // Update SHP from worker arrays
     if(data.shareholding&&Array.isArray(data.shareholding.promoter)){
       shpData=data.shareholding;
       const shp=data.shareholding;const h=D.fund_holdings;
@@ -331,7 +309,6 @@ async function fetchFundScorecard(sym){
       h.fii_pct=getLast(shp.fii);h.fii_chg=getLast(shp.fii)-getPrev(shp.fii);
       h.dii_pct=getLast(shp.dii);h.dii_chg=getLast(shp.dii)-getPrev(shp.dii);
       h.public_pct=getLast(shp.public);h.public_chg=getLast(shp.public)-getPrev(shp.public);
-      // Re-render SHP section
       const sb=$('shpBody');if(sb){
         function cb2(cc){if(cc>0.01)return'<div class="shp-chg up">▲'+cc.toFixed(2)+'%</div>';if(cc<-0.01)return'<div class="shp-chg dn">▼'+Math.abs(cc).toFixed(2)+'%</div>';return'<div class="shp-chg flat">—</div>';}
         const holders2=[];
@@ -344,7 +321,6 @@ async function fetchFundScorecard(sym){
         drawDonut();drawShpTrend();
       }
     }
-    // Update metrics
     if(data.info){const f=D.fundamentals;if(data.info.mcapCr)f.market_cap_cr=data.info.mcapCr;if(data.info.pe)f.pe_ratio=data.info.pe;if(data.info.roe!=null)f.roe=data.info.roe;if(data.info.roce!=null)f.roce=data.info.roce;if(data.info.bookValue)f.book_value=data.info.bookValue;if(data.info.dividendYield!=null)f.dividend_yield=data.info.dividendYield;
       const mg=$('fundMetGrid');if(mg){const f2=D.fundamentals;const deR=f2.debt_to_equity;const deD=deR!=null?(deR>2?fmt(deR/100,2):fmt(deR,2)):'—';const rg2=scannerStock?.revenue_growth||0;const pm2=scannerStock?.profit_margin||0;const liveFlags=document.querySelectorAll('.surv-item.fail').length;
       function mc(l,n){if(l==='P/E')return n>40?'color:var(--red)':n>25?'color:var(--amber)':n>0?'color:var(--green)':'';if(l==='P/B')return n>5?'color:var(--red)':n>3?'color:var(--amber)':n>0?'color:var(--green)':'';if(l==='ROE'||l==='ROCE')return n>15?'color:var(--green)':n>0?'color:var(--amber)':n<0?'color:var(--red)':'';if(l==='D/E')return deR!=null?(deR>100?'color:var(--red)':deR>50?'color:var(--amber)':'color:var(--green)'):'';if(l==='Div Yield')return n>3?'color:var(--green)':n>1?'color:var(--accent2)':'';if(l==='EPS')return n>0?'color:var(--green)':n<0?'color:var(--red)':'';if(l==='Rev Growth'||l==='Profit Margin')return n>15?'color:var(--green)':n>0?'color:var(--accent2)':n<0?'color:var(--red)':'';if(l==='Red Flags')return n===0?'color:var(--green)':n<=2?'color:var(--amber)':'color:var(--red)';return'';}
@@ -363,7 +339,6 @@ async function fetchFundScorecard(sym){
         {l:'Red Flags',v:liveFlags+'',n:liveFlags}
       ].map(m=>'<div class="met-box"><div class="met-v" style="'+mc(m.l,m.n)+'">'+m.v+'</div><div class="met-l">'+m.l+'</div></div>').join('');}
     }
-    // Render scorecard
     const sc2=score>=70?'#22c55e':score>=40?'#eab308':'#f87171';const pe2=info.pe||0;const pc2=pe2>40?'#f87171':pe2>25?'#eab308':pe2>0?'#22c55e':'var(--t4)';
     const gf=v=>v!=null?(v>=0?'+':'')+v.toFixed(1)+'%':'—';const gc=v=>v!=null?(v>=0?'#22c55e':'#f87171'):'var(--t4)';
     const qr=quarters.slice(0,8).map((q,i)=>'<tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--t2)">'+q.label+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:var(--t1);text-align:right">'+(q.eps?.toFixed(1)??'—')+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+gc(q.epsYoY)+';text-align:right">'+gf(q.epsYoY)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+gc(q.epsQoQ)+';text-align:right">'+gf(q.epsQoQ)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:var(--t1);text-align:right">'+q.revenueCr+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+gc(q.salesYoY)+';text-align:right">'+gf(q.salesYoY)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+gc(q.salesQoQ)+';text-align:right">'+gf(q.salesQoQ)+'</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+(q.opm>=0?'#22c55e':'#f87171')+';text-align:right">'+q.opm.toFixed(1)+'%</td><td style="padding:6px;font-family:var(--mono);font-size:11px;color:'+pc2+';text-align:right">'+(i===0&&pe2?pe2.toFixed(1):'—')+'</td></tr>').join('');
@@ -371,7 +346,7 @@ async function fetchFundScorecard(sym){
   }catch(e){console.error('Scorecard:',e);c.innerHTML='<div style="padding:16px;color:var(--t4)">Fundamental data unavailable</div>';}
 }
 
-// ══════ CHART — TEChart v5 (vanilla JS, real Yahoo data via worker) ══════
+// ══════ CHART ══════
 function renderChart(){
   return'<div class="sec"><div class="sec-t">Price Chart</div><div class="card" style="overflow:hidden" id="chartCard">'+
     '<div class="chart-tb" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);flex-wrap:wrap">'+
@@ -397,7 +372,6 @@ function calcEMA(d,n){const k=2/(n+1);const r=[];let p=0;for(let i=0;i<n&&i<d.le
 function fmtVol(n){if(n>=1e7)return(n/1e7).toFixed(1)+'Cr';if(n>=1e5)return(n/1e5).toFixed(1)+'L';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n+'';}
 
 async function initChart(){
-  // Fetch real OHLCV from worker via yahoo-chart action
   const wk=localStorage.getItem('zd_worker_url')||'';
   if(wk){
     try{
@@ -405,7 +379,6 @@ async function initChart(){
       if(r.ok){const d=await r.json();if(d.prices&&d.prices.length){prices=d.prices;console.log('TEChart: loaded',prices.length,'bars from yahoo-chart');}}
     }catch(e){console.log('yahoo-chart error:',e);}
   }
-  // Fallback: try yahoo-proxy (existing action)
   if(!prices.length&&wk){
     try{
       const r=await fetch(wk,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker:D.symbol+'.NS',range:'1y',interval:'1d'})});
@@ -429,22 +402,17 @@ let hoverBar=null;
 function draw(){const cv=$('chart');if(!cv||!prices.length)return;const ctx=cv.getContext('2d');const dp=devicePixelRatio||1;const rect=cv.parentElement?cv.parentElement.getBoundingClientRect():{width:800};const W=rect.width-2,H=480,PAD={L:62,R:10,T:10,B:22},VH=72;const cH=H-PAD.T-PAD.B-VH-8;cv.width=W*dp;cv.height=H*dp;cv.style.width=W+'px';cv.style.height=H+'px';ctx.scale(dp,dp);const si=viewStart!=null?viewStart:Math.max(0,prices.length-viewCount);const vis=prices.slice(si,si+viewCount);if(!vis.length)return;let aH=vis.map(x=>x.h),aL=vis.map(x=>x.l);for(let i=0;i<vis.length;i++){const g=si+i;if(showEMA.e20&&g<ema20.length&&ema20[g]){aH.push(ema20[g]);aL.push(ema20[g])}if(showEMA.e50&&g<ema50.length&&ema50[g]){aH.push(ema50[g]);aL.push(ema50[g])}if(showEMA.e200&&g<ema200.length&&ema200[g]){aH.push(ema200[g]);aL.push(ema200[g])}}const pM=Math.max(...aH)*1.005,pm=Math.min(...aL)*.995,pR=pM-pm||1;const bW=(W-PAD.L-PAD.R)/viewCount;function toY(p){return PAD.T+(1-(p-pm)/pR)*cH}function toX(i){return PAD.L+i*bW+bW/2}
   ctx.fillStyle='#06080c';ctx.fillRect(0,0,W,H);ctx.strokeStyle='rgba(0,255,136,.04)';ctx.lineWidth=.5;
   for(let i=0;i<=6;i++){const p=pm+pR*i/6;const y=toY(p);ctx.beginPath();ctx.moveTo(PAD.L,y);ctx.lineTo(W-PAD.R,y);ctx.stroke();ctx.fillStyle='#334';ctx.font='10px "IBM Plex Mono",monospace';ctx.textAlign='right';ctx.fillText(p.toFixed(1),PAD.L-6,y+3)}
-  // Date labels
   ctx.fillStyle='#334';ctx.font='9px "IBM Plex Mono",monospace';ctx.textAlign='center';const ds=Math.max(1,Math.floor(viewCount/8));
   for(let i=0;i<vis.length;i+=ds){const x=toX(i);const dt=vis[i].date||'';if(dt){const p=dt.split('-');ctx.fillText(p[2]+'/'+p[1],x,H-4)}}
-  // Volume
   const maxV=Math.max(...vis.map(d=>d.v))||1;const vTop=PAD.T+cH+8;
   for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i);ctx.fillStyle=b.c>=b.o?'rgba(0,204,102,.25)':'rgba(238,51,68,.25)';ctx.fillRect(x-bW*.35,vTop+VH-(b.v/maxV)*VH,bW*.7,(b.v/maxV)*VH)}
   ctx.strokeStyle='rgba(0,255,136,.05)';ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(PAD.L,vTop-4);ctx.lineTo(W-PAD.R,vTop-4);ctx.stroke();
-  // EMAs
   function dE(ed,col){ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.beginPath();let s=false;for(let i=0;i<vis.length;i++){const g=si+i;if(g>=ed.length)break;const x=toX(i),y=toY(ed[g]);if(!s){ctx.moveTo(x,y);s=true}else ctx.lineTo(x,y)}ctx.stroke()}
   if(showEMA.e200&&ema200.length)dE(ema200,'#ff6644');if(showEMA.e50&&ema50.length)dE(ema50,'#ffaa00');if(showEMA.e20&&ema20.length)dE(ema20,'#00bbff');
-  // Price bars
   for(let i=0;i<vis.length;i++){const b=vis[i],x=toX(i),bu=b.c>=b.o,col=bu?'#00cc66':'#ee3344';
     if(chartType==='candle'){ctx.strokeStyle=col;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,toY(b.h));ctx.lineTo(x,toY(b.l));ctx.stroke();const bT=toY(Math.max(b.o,b.c)),bB=toY(Math.min(b.o,b.c)),bw=Math.max(bW*.6,2);ctx.fillStyle=bu?col+'55':col;ctx.fillRect(x-bw/2,bT,bw,Math.max(bB-bT,1));ctx.strokeRect(x-bw/2,bT,bw,Math.max(bB-bT,1))}
     else if(chartType==='line'){if(i===0){ctx.beginPath();ctx.moveTo(x,toY(b.c))}else ctx.lineTo(x,toY(b.c));if(i===vis.length-1){ctx.strokeStyle='#00bbff';ctx.lineWidth=1.5;ctx.stroke()}}
     else{ctx.strokeStyle=col;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,toY(b.h));ctx.lineTo(x,toY(b.l));ctx.stroke();ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,toY(b.c));ctx.lineTo(x+bW*.35,toY(b.c));ctx.stroke()}}
-  // OHLCV overlay
   ctx.fillStyle='#ddd';ctx.font='bold 13px "Outfit",sans-serif';ctx.textAlign='left';ctx.fillText('NSE:'+D.symbol,PAD.L+4,PAD.T+16);
   const hb=hoverBar||vis[vis.length-1];if(hb){const iy=PAD.T+32,bc=hb.c>=hb.o?'#00cc66':'#ee3344';ctx.font='11px "IBM Plex Mono",monospace';
     ctx.fillStyle='#667';ctx.fillText('O',PAD.L+4,iy);ctx.fillStyle=bc;ctx.fillText(hb.o?.toFixed(2),PAD.L+18,iy);
@@ -460,7 +428,133 @@ function onMM(e){const cv=$('chart');if(!cv)return;const r=cv.getBoundingClientR
   if(isDrag&&dragX!=null){const bd=Math.round((e.clientX-dragX)/bW2);if(Math.abs(bd)>=1){const cur=viewStart!=null?viewStart:Math.max(0,prices.length-viewCount);viewStart=Math.max(0,Math.min(prices.length-viewCount,cur-bd));dragX=e.clientX}}draw()}
 function onWH(e){e.preventDefault();viewCount=Math.max(20,Math.min(500,viewCount+(e.deltaY>0?1:-1)*Math.max(3,Math.floor(viewCount*.1))));draw()}
 
-// AI
-async function genAI(s){const c=$('aiC');if(!c)return;const p=sv(D,'technical.close',0);const ch=sv(D,'technical.change_pct',0);const mc=sv(D,'fundamentals.market_cap_cr',0);const pe=sv(D,'fundamentals.pe_ratio',0);const roe=sv(D,'fundamentals.roe',0);const pr=sv(D,'fund_holdings.promoter_pct',0);const ins=sv(D,'fund_holdings.institutional_pct',0);const r1m=sv(D,'technical.returns.1m',0);const r3m=sv(D,'technical.returns.3m',0);const rsi=sv(D,'technical.rsi',0);const ctx2='Stock: '+(D.name||s)+' ('+s+')\nSector: '+(D.sector||'N/A')+'\nPrice: ₹'+p+', Change: '+ch+'%, 1M: '+r1m+'%, 3M: '+r3m+'%\nRSI: '+rsi+', Market Cap: ₹'+mc+' Cr\nP/E: '+pe+', ROE: '+roe+'%\nPromoter: '+pr+'%, Institutional: '+ins+'%';try{const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:'Professional Indian stock analyst. Analyze in 2-3 paragraphs:\n\n'+ctx2+'\n\n1) Verdict (Bullish/Bearish/Neutral) 2) Strengths 3) Risks. Use **bold**. Be direct.'}],max_tokens:400,temperature:.7})});if(!r.ok)throw 0;const d=await r.json();const txt=d.choices?.[0]?.message?.content||'Unavailable';c.innerHTML='<div class="ai-content">'+txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')+'</div><div class="ai-ft"><span class="ai-powered">⚡ Llama 3.3 70B via Groq</span><button class="ai-refresh" onclick="genAI(\''+s+'\')">↻</button></div>';}catch(e){c.innerHTML='<div style="text-align:center;padding:20px;color:var(--t4)">AI unavailable <button class="ai-refresh" onclick="genAI(\''+s+'\')">↻ Retry</button></div>';}}
+// ══════ AI — FIXED: reads from localStorage ══════
+async function genAI(s){
+  const c=$('aiC');if(!c)return;
+  const groqKey=localStorage.getItem('groq_key')||GROQ;
+  if(!groqKey){
+    c.innerHTML='<div style="text-align:center;padding:20px;color:var(--t4)"><div style="font-size:14px;margin-bottom:8px">🤖 AI Analysis</div><div style="font-size:11px;color:var(--amber);margin-bottom:10px">Groq API key not set</div><button class="ai-refresh" onclick="toggleStockSettings()" style="background:rgba(139,92,246,.15);border-color:rgba(139,92,246,.3);color:var(--accent3)">⚙️ Open Settings</button></div>';
+    return;
+  }
+  const p=sv(D,'technical.close',0);const ch=sv(D,'technical.change_pct',0);const mc=sv(D,'fundamentals.market_cap_cr',0);const pe=sv(D,'fundamentals.pe_ratio',0);const roe=sv(D,'fundamentals.roe',0);const pr=sv(D,'fund_holdings.promoter_pct',0);const ins=sv(D,'fund_holdings.institutional_pct',0);const r1m=sv(D,'technical.returns.1m',0);const r3m=sv(D,'technical.returns.3m',0);const rsi=sv(D,'technical.rsi',0);
+  const ctx2='Stock: '+(D.name||s)+' ('+s+')\nSector: '+(D.sector||'N/A')+'\nPrice: ₹'+p+', Change: '+ch+'%, 1M: '+r1m+'%, 3M: '+r3m+'%\nRSI: '+rsi+', Market Cap: ₹'+mc+' Cr\nP/E: '+pe+', ROE: '+roe+'%\nPromoter: '+pr+'%, Institutional: '+ins+'%';
+  try{
+    const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+groqKey},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:'Professional Indian stock analyst. Analyze in 2-3 paragraphs:\n\n'+ctx2+'\n\n1) Verdict (Bullish/Bearish/Neutral) 2) Strengths 3) Risks. Use **bold**. Be direct.'}],max_tokens:400,temperature:.7})});
+    if(!r.ok){
+      const err=await r.json().catch(()=>({}));
+      throw new Error(err.error?.message||'API error '+r.status);
+    }
+    const d=await r.json();const txt=d.choices?.[0]?.message?.content||'Unavailable';
+    c.innerHTML='<div class="ai-content">'+txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')+'</div><div class="ai-ft"><span class="ai-powered">⚡ Llama 3.3 70B via Groq</span><button class="ai-refresh" onclick="genAI(\''+s+'\')">↻</button></div>';
+  }catch(e){
+    console.error('AI error:',e);
+    c.innerHTML='<div style="text-align:center;padding:20px;color:var(--t4)"><div style="margin-bottom:6px">AI unavailable</div><div style="font-size:10px;color:var(--amber);margin-bottom:8px">'+(e.message||'Check Groq key in ⚙️ Settings')+'</div><button class="ai-refresh" onclick="genAI(\''+s+'\')">↻ Retry</button></div>';
+  }
+}
 init();
-</script></body></html>
+</script>
+
+<!-- ═══ SETTINGS MODAL ═══ -->
+<div id="stk-settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;backdrop-filter:blur(4px)" onclick="if(event.target===this)toggleStockSettings()">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:92vw;max-height:90vh;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1">
+      <span style="font-size:13px;font-weight:700;color:var(--t1)">⚙️ API Settings</span>
+      <button onclick="toggleStockSettings()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;padding:2px 6px">✕</button>
+    </div>
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+      <!-- Groq -->
+      <div style="background:var(--bg2);border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span>🤖</span>
+          <span style="font-size:11px;font-weight:600;color:var(--t1)">Groq AI Key</span>
+          <span id="stk-groq-st" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg4);color:var(--t4)">—</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="stk-groq-inp" placeholder="gsk_xxxxx..." style="flex:1;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:11px">
+          <button onclick="document.getElementById('stk-groq-inp').type=document.getElementById('stk-groq-inp').type==='password'?'text':'password'" style="padding:8px;background:var(--bg4);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px">👁️</button>
+          <button onclick="stkSave('groq_key','stk-groq-inp','stk-groq-st','Groq key')" style="padding:8px 14px;background:var(--green);border:none;border-radius:6px;color:#000;font-weight:700;font-size:11px;cursor:pointer;font-family:var(--sans)">Save</button>
+        </div>
+        <div style="font-size:9px;color:var(--t4);margin-top:6px">Get free key → <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com/keys</a></div>
+      </div>
+      <!-- Worker URL -->
+      <div style="background:var(--bg2);border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span>🌐</span>
+          <span style="font-size:11px;font-weight:600;color:var(--t1)">Cloudflare Worker URL</span>
+          <span id="stk-wk-st" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg4);color:var(--t4)">—</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="stk-wk-inp" placeholder="https://xxx.workers.dev" style="flex:1;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:11px">
+          <button onclick="stkSave('zd_worker_url','stk-wk-inp','stk-wk-st','Worker URL')" style="padding:8px 14px;background:var(--green);border:none;border-radius:6px;color:#000;font-weight:700;font-size:11px;cursor:pointer;font-family:var(--sans)">Save</button>
+        </div>
+      </div>
+      <!-- Telegram -->
+      <div style="background:var(--bg2);border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span>📱</span>
+          <span style="font-size:11px;font-weight:600;color:var(--t1)">Telegram</span>
+          <span id="stk-tg-st" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg4);color:var(--t4)">—</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:9px;color:var(--t4)">Bot Token</label><input type="password" id="stk-tg-bot" placeholder="123456:ABC..." style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:10px;margin-top:2px"></div>
+          <div><label style="font-size:9px;color:var(--t4)">Chat ID</label><input type="text" id="stk-tg-chat" placeholder="183752078" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:10px;margin-top:2px"></div>
+        </div>
+        <button onclick="stkSaveTg()" style="width:100%;padding:8px;background:var(--green);border:none;border-radius:6px;color:#000;font-weight:700;font-size:11px;cursor:pointer;font-family:var(--sans)">Save Telegram</button>
+      </div>
+      <!-- Dhan -->
+      <div style="background:var(--bg2);border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span>📊</span>
+          <span style="font-size:11px;font-weight:600;color:var(--t1)">Dhan API</span>
+          <span id="stk-dhan-st" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg4);color:var(--t4)">—</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:9px;color:var(--t4)">Client ID</label><input type="text" id="stk-dhan-id" placeholder="1234567890" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:10px;margin-top:2px"></div>
+          <div><label style="font-size:9px;color:var(--t4)">Access Token</label><input type="password" id="stk-dhan-tk" placeholder="eyJ..." style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--t1);font-family:var(--mono);font-size:10px;margin-top:2px"></div>
+        </div>
+        <button onclick="stkSaveDhan()" style="width:100%;padding:8px;background:var(--green);border:none;border-radius:6px;color:#000;font-weight:700;font-size:11px;cursor:pointer;font-family:var(--sans)">Save Dhan</button>
+      </div>
+    </div>
+    <div style="padding:10px 18px;background:rgba(0,0,0,.2);border-top:1px solid var(--border);font-size:9px;color:var(--t4);text-align:center">Settings shared across all TradEdge pages via localStorage</div>
+  </div>
+</div>
+<script>
+function toggleStockSettings(){
+  const o=document.getElementById('stk-settings-overlay');
+  const vis=o.style.display==='none';
+  o.style.display=vis?'':'none';
+  if(vis)stkLoadSettings();
+}
+function stkLoadSettings(){
+  document.getElementById('stk-groq-inp').value=localStorage.getItem('groq_key')||'';
+  stkSt('stk-groq-st',!!(localStorage.getItem('groq_key')));
+  document.getElementById('stk-wk-inp').value=localStorage.getItem('zd_worker_url')||'';
+  stkSt('stk-wk-st',!!(localStorage.getItem('zd_worker_url')));
+  document.getElementById('stk-tg-bot').value=localStorage.getItem('te_tg_bot')||'';
+  document.getElementById('stk-tg-chat').value=localStorage.getItem('te_tg_chat')||'';
+  stkSt('stk-tg-st',!!(localStorage.getItem('te_tg_bot')&&localStorage.getItem('te_tg_chat')));
+  document.getElementById('stk-dhan-id').value=localStorage.getItem('dhan_id')||'';
+  document.getElementById('stk-dhan-tk').value=localStorage.getItem('dhan_tk')||'';
+  stkSt('stk-dhan-st',!!(localStorage.getItem('dhan_id')&&localStorage.getItem('dhan_tk')));
+}
+function stkSt(id,ok){const e=document.getElementById(id);if(!e)return;e.textContent=ok?'✓ Set':'Not set';e.style.background=ok?'rgba(34,197,94,.15)':'var(--bg4)';e.style.color=ok?'#22c55e':'var(--t4)';}
+function stkSave(key,inpId,stId,label){
+  const v=document.getElementById(inpId).value.trim();
+  if(v){localStorage.setItem(key,v);stkSt(stId,true);stkToast(label+' saved!');}
+  else{localStorage.removeItem(key);stkSt(stId,false);stkToast(label+' removed');}
+}
+function stkSaveTg(){
+  const b=document.getElementById('stk-tg-bot').value.trim(),c=document.getElementById('stk-tg-chat').value.trim();
+  if(b)localStorage.setItem('te_tg_bot',b);else localStorage.removeItem('te_tg_bot');
+  if(c)localStorage.setItem('te_tg_chat',c);else localStorage.removeItem('te_tg_chat');
+  stkSt('stk-tg-st',!!(b&&c));stkToast('Telegram saved!');
+}
+function stkSaveDhan(){
+  const i=document.getElementById('stk-dhan-id').value.trim(),t=document.getElementById('stk-dhan-tk').value.trim();
+  if(i)localStorage.setItem('dhan_id',i);else localStorage.removeItem('dhan_id');
+  if(t)localStorage.setItem('dhan_tk',t);else localStorage.removeItem('dhan_tk');
+  stkSt('stk-dhan-st',!!(i&&t));stkToast('Dhan saved!');
+}
+function stkToast(msg){const t=document.createElement('div');t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 20px;background:rgba(34,197,94,.9);color:#000;font-size:12px;font-weight:700;border-radius:8px;z-index:999;font-family:var(--sans);pointer-events:none';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500);}
+</script>
+</body></html>
