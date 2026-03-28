@@ -271,7 +271,7 @@
         </div>
       </div>
       <div id="positions" style="max-height:none;overflow-y:auto;padding:8px">
-        <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Select broker → Refresh</div>
+        <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Click ↻ Refresh to load positions from journal</div>
       </div>
     </div>
 
@@ -970,7 +970,7 @@ function openPartialSell(tradeId, posIdx) {
   document.getElementById('partial-sym').textContent = trade.symbol;
   document.getElementById('partial-total-qty').value = nt._n.remainingQty;
   document.getElementById('partial-exit-qty').value = '';
-  const p = TE.exec.positions[posIdx];
+  const p = _mergedPositions[posIdx] || TE.exec.positions[posIdx];
   const cmp = p ? (p.last_price || p.lastPrice || p.ltp || 0) : 0;
   document.getElementById('partial-price').value = cmp ? cmp.toFixed(2) : '';
   updatePartialSummary();
@@ -1044,10 +1044,10 @@ async function confirmPartialSell() {
   // Supabase sync
   syncTradeToSupabase(trade);
 
-  // Send broker order
+  // Send broker order if connected
   if (_partialPosIdx !== null) {
-    const p = TE.exec.positions[_partialPosIdx];
-    if (p) {
+    const p = _mergedPositions[_partialPosIdx] || TE.exec.positions[_partialPosIdx];
+    if (p && p._hasBroker) {
       const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
       const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
       await TE.exec.sendOrder(sym, side, 'MARKET', exitQty, 0, 0, p.product || 'CNC', 'DAY');
@@ -1504,7 +1504,12 @@ async function placeOrder() {
 // ═══════════════════════════════════════════════════════════════
 
 async function refreshAll() {
-  await TE.exec.refreshPositions();
+  // 1. Try fetching broker positions (may return empty if token expired)
+  try { await TE.exec.refreshPositions(); } catch(e) { console.log('Broker refresh skipped:', e); }
+
+  // 2. Build merged positions: journal trades as PRIMARY, broker as enrichment
+  await buildMergedPositions();
+
   renderPositions();
   renderPnlBar();
   renderHeatmap();
@@ -1515,23 +1520,112 @@ async function refreshAll() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// MERGED POSITIONS: Journal trades + Live CMP
+// ═══════════════════════════════════════════════════════════════
+
+let _mergedPositions = [];
+let _cmpCache = {};
+let _cmpFetchTime = 0;
+
+async function buildMergedPositions() {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const openTrades = trades.filter(t => t.status === 'Open');
+  const brokerPos = TE.exec.positions || [];
+
+  // Build a lookup of broker positions by symbol
+  const brokerMap = {};
+  brokerPos.forEach(p => {
+    const sym = (p.tradingsymbol || p.tradingSymbol || p.symbol || '').toUpperCase();
+    if (sym) brokerMap[sym] = p;
+  });
+
+  // Fetch live CMPs for all open trades (batch, throttled to every 30s)
+  const now = Date.now();
+  if (openTrades.length && (now - _cmpFetchTime > 30000)) {
+    _cmpFetchTime = now;
+    const syms = openTrades.map(t => t.symbol).filter(s => s);
+    await Promise.allSettled(syms.map(async sym => {
+      try {
+        const cmp = await TE.fetchCMP(sym);
+        if (cmp) _cmpCache[sym] = { price: cmp, time: now };
+      } catch(e) {}
+    }));
+  }
+
+  // Merge: journal trade → normalized position object
+  _mergedPositions = openTrades.map(trade => {
+    const nt = normalizeTrade(trade);
+    if (!nt || !nt._n) return null;
+    const sym = trade.symbol;
+    const broker = brokerMap[sym.toUpperCase()];
+    const cached = _cmpCache[sym];
+
+    // Priority for LTP: broker live > CMP cache > entry avg
+    const ltp = broker?.last_price || broker?.lastPrice || broker?.ltp || cached?.price || nt._n.avgEntry;
+    const avg = nt._n.avgEntry;
+    const qty = nt._n.remainingQty;
+    const pnl = (ltp - avg) * qty;
+    const pnlPct = avg > 0 ? ((ltp - avg) / avg * 100) : 0;
+
+    return {
+      // Standard position fields (compatible with existing render code)
+      tradingsymbol: sym,
+      symbol: sym,
+      quantity: qty,
+      average_price: avg,
+      last_price: ltp,
+      pnl: pnl,
+      product: 'CNC',
+      // Journal trade reference (for Edge Pilot features)
+      _trade: trade,
+      _nt: nt,
+      _hasBroker: !!broker,
+      _cmpSource: broker ? 'broker' : cached ? 'yahoo' : 'entry',
+      _cmpTime: cached?.time || 0,
+    };
+  }).filter(Boolean);
+
+  // Also include broker-only positions not in journal (rare but possible)
+  brokerPos.forEach(p => {
+    const sym = (p.tradingsymbol || p.tradingSymbol || p.symbol || '').toUpperCase();
+    const qty = p.quantity || p.netQty || 0;
+    if (!qty) return; // skip zero-qty
+    const alreadyMerged = _mergedPositions.some(m => m.symbol.toUpperCase() === sym);
+    if (!alreadyMerged) {
+      _mergedPositions.push({
+        ...p,
+        symbol: sym,
+        tradingsymbol: sym,
+        _trade: null,
+        _nt: null,
+        _hasBroker: true,
+        _cmpSource: 'broker',
+      });
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RENDER ENHANCED POSITIONS
 // ═══════════════════════════════════════════════════════════════
 
 function renderPositions() {
-  const positions = [...TE.exec.positions];
+  const positions = [..._mergedPositions];
   document.getElementById('pos-badge').textContent = positions.length;
   const container = document.getElementById('positions');
-  if (!positions.length) { container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">No positions</div>'; return; }
+  if (!positions.length) {
+    const openCount = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open').length;
+    container.innerHTML = openCount
+      ? `<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px"><div class="spinner" style="width:20px;height:20px;border-width:2px;margin-bottom:8px"></div>Loading ${openCount} journal positions…<br><button class="btn btn-ghost btn-sm" onclick="refreshAll()" style="margin-top:8px">↻ Refresh</button></div>`
+      : '<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">No open positions in journal</div>';
+    return;
+  }
 
   positions.sort((a, b) => {
     if (TE.exec.sortBy === 'pnl') return Math.abs(b.pnl || 0) - Math.abs(a.pnl || 0);
     if (TE.exec.sortBy === 'value') return Math.abs((b.quantity || 0) * (b.last_price || 0)) - Math.abs((a.quantity || 0) * (a.last_price || 0));
     return ((a.tradingsymbol || a.symbol || '') + '').localeCompare((b.tradingsymbol || b.symbol || '') + '');
   });
-
-  // Match positions to journal trades
-  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
 
   container.innerHTML = '<div class="ep-pos-grid">' + positions.map((p, i) => {
     const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
@@ -1543,15 +1637,20 @@ function renderPositions() {
     const isLong = qty > 0;
     const pnlColor = pnl >= 0 ? 'var(--g)' : 'var(--r)';
 
-    // Find matching journal trade
-    const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
-    const nt = trade ? normalizeTrade(trade) : null;
+    // Journal trade (from merge)
+    const trade = p._trade || null;
+    const nt = p._nt || (trade ? normalizeTrade(trade) : null);
     const phases = trade ? getLifecyclePhase(trade) : [true, false, false, false, false, false];
     const pyrLevel = trade?._epPyramid || 'p1';
     const sector = trade?.sector || '';
     const days = nt?._n?.daysSinceEntry || 0;
 
-    // RS rank (from trade metadata or mock)
+    // CMP source indicator
+    const cmpSource = p._cmpSource || 'unknown';
+    const cmpDot = cmpSource === 'broker' ? '🟢' : cmpSource === 'yahoo' ? '🔵' : '⚪';
+    const cmpLabel = cmpSource === 'broker' ? 'Live' : cmpSource === 'yahoo' ? 'Yahoo' : 'Entry price';
+
+    // RS rank
     const rsRank = trade?._epRsRank || null;
     let rsBadge = '';
     if (rsRank && rsRank <= 10) rsBadge = `<span class="ep-badge ep-badge-rs">RS TOP 10%</span>`;
@@ -1587,7 +1686,7 @@ function renderPositions() {
 
       <!-- Metrics Row -->
       <div class="ep-pos-metrics-row">
-        <div class="ep-metric"><div class="ep-metric-label">CMP</div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">CMP <span title="${cmpLabel}" style="cursor:help">${cmpDot}</span></div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
         <div class="ep-metric"><div class="ep-metric-label">P&L%</div><div class="ep-metric-val" style="color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</div></div>
         <div class="ep-metric"><div class="ep-metric-label">SL</div><div class="ep-metric-val" style="color:var(--r)">₹${trade?.sl ? (+trade.sl).toFixed(0) : '—'}</div></div>
         <div class="ep-metric"><div class="ep-metric-label">Risk%</div><div class="ep-metric-val" style="color:${riskPct > 10 ? 'var(--r)' : riskPct > 5 ? 'var(--y)' : 'var(--t2)'}">${riskPct.toFixed(1)}%</div></div>
@@ -1642,62 +1741,72 @@ function sortPos(by, el) {
 // ═══════════════════════════════════════════════════════════════
 
 async function quickClose(sym, idx) {
-  const p = TE.exec.positions[idx]; if (!p) return;
+  const p = _mergedPositions[idx] || TE.exec.positions[idx]; if (!p) return;
   const qty = Math.abs(p.quantity || p.netQty || 0);
   const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
   if (!confirm(`Close ${sym}: ${side} ${qty} at MARKET?`)) return;
-  const result = await TE.exec.sendOrder(sym, side, 'MARKET', qty, 0, 0, p.product || 'CNC', 'DAY');
-  if (result.ok) {
-    toast(`Closed ${sym}`, '✅');
-    TE.exec.playSound('fill');
-    // Update journal
-    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-    const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
-    if (trade) {
-      const ltp = p.last_price || p.lastPrice || p.ltp || 0;
-      trade.exits = trade.exits || [];
-      trade.exits.push({ date: new Date().toISOString().slice(0, 10), price: ltp, qty, reason: 'full_close' });
-      trade.status = 'Closed';
-      localStorage.setItem('te_trades', JSON.stringify(trades));
-      syncTradeToSupabase(trade);
-    }
-    sendTelegramAlert(`🔴 Closed: ${sym}\nQty: ${qty} at MARKET`);
-    setTimeout(refreshAll, 2000);
-  } else toast('Failed: ' + result.error, '❌');
+
+  // Try broker order if connected
+  if (p._hasBroker) {
+    const result = await TE.exec.sendOrder(sym, side, 'MARKET', qty, 0, 0, p.product || 'CNC', 'DAY');
+    if (!result.ok) { toast('Broker order failed: ' + result.error, '⚠️'); }
+    else { TE.exec.playSound('fill'); }
+  }
+
+  // Always update journal
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
+  if (trade) {
+    const ltp = p.last_price || p.lastPrice || p.ltp || 0;
+    trade.exits = trade.exits || [];
+    trade.exits.push({ date: new Date().toISOString().slice(0, 10), price: ltp, qty, reason: 'full_close' });
+    trade.status = 'Closed';
+    localStorage.setItem('te_trades', JSON.stringify(trades));
+    syncTradeToSupabase(trade);
+  }
+  toast(`Closed ${sym}`, '✅');
+  sendTelegramAlert(`🔴 Closed: ${sym}\nQty: ${qty} at MARKET`);
+  setTimeout(refreshAll, 2000);
 }
 
 async function quickPartial(sym, idx, pct) {
-  const p = TE.exec.positions[idx]; if (!p) return;
+  const p = _mergedPositions[idx] || TE.exec.positions[idx]; if (!p) return;
   const totalQty = Math.abs(p.quantity || p.netQty || 0);
   const exitQty = Math.max(1, Math.floor(totalQty * pct / 100));
   const side = (p.quantity || p.netQty || 0) > 0 ? 'SELL' : 'BUY';
-  const result = await TE.exec.sendOrder(sym, side, 'MARKET', exitQty, 0, 0, p.product || 'CNC', 'DAY');
-  if (result.ok) {
-    toast(`${pct}%: ${side} ${exitQty} ${sym}`, '✅');
-    // Journal update
-    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-    const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
-    if (trade) {
-      const ltp = p.last_price || p.lastPrice || p.ltp || 0;
-      trade.exits = trade.exits || [];
-      trade.exits.push({ date: new Date().toISOString().slice(0, 10), price: ltp, qty: exitQty, reason: `quick_${pct}pct` });
-      const nt = normalizeTrade(trade);
-      if (nt._n.remainingQty <= 0) trade.status = 'Closed';
-      localStorage.setItem('te_trades', JSON.stringify(trades));
-      syncTradeToSupabase(trade);
-    }
-    setTimeout(refreshAll, 2000);
-  } else toast('Failed: ' + result.error, '❌');
+
+  // Try broker order if connected
+  if (p._hasBroker) {
+    const result = await TE.exec.sendOrder(sym, side, 'MARKET', exitQty, 0, 0, p.product || 'CNC', 'DAY');
+    if (!result.ok) { toast('Broker order failed: ' + result.error, '⚠️'); }
+  }
+
+  // Always update journal
+  toast(`${pct}%: ${side} ${exitQty} ${sym}`, '✅');
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.symbol === sym && t.status === 'Open');
+  if (trade) {
+    const ltp = p.last_price || p.lastPrice || p.ltp || 0;
+    trade.exits = trade.exits || [];
+    trade.exits.push({ date: new Date().toISOString().slice(0, 10), price: ltp, qty: exitQty, reason: `quick_${pct}pct` });
+    const nt = normalizeTrade(trade);
+    if (nt._n.remainingQty <= 0) trade.status = 'Closed';
+    localStorage.setItem('te_trades', JSON.stringify(trades));
+    syncTradeToSupabase(trade);
+  }
+  setTimeout(refreshAll, 2000);
 }
 
 // ── Square Off All ──
 function renderSquareOffBar() {
   const bar = document.getElementById('sqoff-bar');
-  if (!TE.exec.positions.length) { bar.style.display = 'none'; return; }
+  const positions = _mergedPositions.length ? _mergedPositions : TE.exec.positions;
+  if (!positions.length) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
-  const pnl = TE.exec.computePnl();
-  document.getElementById('sqoff-count').textContent = pnl.count;
-  document.getElementById('sqoff-value').textContent = '₹' + (pnl.totalValue / 1000).toFixed(1) + 'K';
+  let totalValue = 0;
+  positions.forEach(p => { totalValue += Math.abs((p.quantity || 0) * (p.last_price || p.lastPrice || 0)); });
+  document.getElementById('sqoff-count').textContent = positions.length;
+  document.getElementById('sqoff-value').textContent = '₹' + (totalValue / 1000).toFixed(1) + 'K';
 }
 
 async function squareOffAll() {
@@ -1718,21 +1827,34 @@ async function squareOffAll() {
 
 // ── P&L Bar ──
 function renderPnlBar() {
-  const pnl = TE.exec.computePnl();
+  // Use merged positions if available, otherwise broker
+  const positions = _mergedPositions.length ? _mergedPositions : TE.exec.positions;
+  let totalPnl = 0, dayPnl = 0, totalValue = 0, riskPct = 0;
+  positions.forEach(p => {
+    const qty = p.quantity || p.netQty || 0;
+    const avg = p.average_price || p.averagePrice || 0;
+    const ltp = p.last_price || p.lastPrice || p.ltp || 0;
+    totalPnl += (ltp - avg) * qty;
+    totalValue += Math.abs(qty * ltp);
+  });
+  const cap = computeCurrentCapital();
+  riskPct = cap.current > 0 ? (totalValue / cap.current * 100) : 0;
+
   const f = n => (n >= 0 ? '+' : '-') + '₹' + Math.abs(n).toFixed(0);
-  const el1 = document.getElementById('total-pnl'); el1.textContent = f(pnl.totalPnl); el1.style.color = pnl.totalPnl >= 0 ? 'var(--g)' : 'var(--r)';
-  document.getElementById('pos-count').textContent = pnl.count;
-  const el3 = document.getElementById('day-pnl'); el3.textContent = f(pnl.dayPnl); el3.style.color = pnl.dayPnl >= 0 ? 'var(--g)' : 'var(--r)';
-  document.getElementById('margin').textContent = '₹' + (pnl.totalValue / 1000).toFixed(1) + 'K';
-  const rEl = document.getElementById('risk-pct'); rEl.textContent = pnl.riskPct.toFixed(1) + '%'; rEl.style.color = pnl.riskPct > 20 ? 'var(--r)' : pnl.riskPct > 10 ? 'var(--y)' : 'var(--g)';
+  const el1 = document.getElementById('total-pnl'); el1.textContent = f(totalPnl); el1.style.color = totalPnl >= 0 ? 'var(--g)' : 'var(--r)';
+  document.getElementById('pos-count').textContent = positions.length;
+  const el3 = document.getElementById('day-pnl'); el3.textContent = f(totalPnl); el3.style.color = totalPnl >= 0 ? 'var(--g)' : 'var(--r)';
+  document.getElementById('margin').textContent = '₹' + (totalValue / 1000).toFixed(1) + 'K';
+  const rEl = document.getElementById('risk-pct'); rEl.textContent = riskPct.toFixed(1) + '%'; rEl.style.color = riskPct > 20 ? 'var(--r)' : riskPct > 10 ? 'var(--y)' : 'var(--g)';
 }
 
 // ── Heatmap ──
 function renderHeatmap() {
   const c = document.getElementById('heatmap');
-  if (!TE.exec.positions.length) { c.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">No positions</div>'; return; }
-  const total = TE.exec.positions.reduce((s, p) => s + Math.abs((p.quantity || p.netQty || 0) * (p.last_price || p.lastPrice || 0)), 0);
-  c.innerHTML = '<div class="exec-heatmap">' + TE.exec.positions.map(p => {
+  const positions = _mergedPositions.length ? _mergedPositions : TE.exec.positions;
+  if (!positions.length) { c.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">No positions</div>'; return; }
+  const total = positions.reduce((s, p) => s + Math.abs((p.quantity || p.netQty || 0) * (p.last_price || p.lastPrice || 0)), 0);
+  c.innerHTML = '<div class="exec-heatmap">' + positions.map(p => {
     const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
     const qty = Math.abs(p.quantity || p.netQty || 0);
     const ltp = p.last_price || p.lastPrice || 0;
@@ -1926,7 +2048,7 @@ let _liveTimer = null;
 function startLive() {
   if (_liveTimer) clearInterval(_liveTimer);
   _liveTimer = setInterval(() => {
-    if (TE.isMarketOpen() && TE.exec.positions.length) {
+    if (TE.isMarketOpen() && (_mergedPositions.length || TE.exec.positions.length)) {
       document.getElementById('live-indicator').style.display = '';
       refreshAll();
     } else {
