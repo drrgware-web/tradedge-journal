@@ -70,7 +70,7 @@
 
 /* SL Move Modal */
 .ep-sl-history { max-height:150px; overflow-y:auto; margin-top:8px; }
-.ep-sl-row { display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,.03); font-size:10px; }
+.ep-sl-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.03); font-size:11px; }
 .ep-sl-row .sl-date { color:var(--t4); min-width:65px; font-family:'IBM Plex Mono',monospace; }
 .ep-sl-row .sl-from { color:var(--r); }
 .ep-sl-row .sl-to { color:var(--g); }
@@ -108,7 +108,7 @@
 /* Modal tranche editor */
 .ep-tr-edit-row { display:grid; grid-template-columns:40px 1fr 70px 1fr 30px; gap:6px; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
 .ep-tr-edit-row:last-child { border-bottom:none; }
-.ep-tr-input { padding:6px 8px; background:var(--bg2); border:1px solid var(--b1); border-radius:6px; color:var(--t1); font-family:'IBM Plex Mono',monospace; font-size:11px; width:100%; }
+.ep-tr-input { padding:8px 10px; background:var(--bg2); border:1px solid var(--b1); border-radius:6px; color:var(--t1); font-family:'IBM Plex Mono',monospace; font-size:12px; width:100%; }
 </style>
 
 <script>
@@ -570,17 +570,17 @@ document.addEventListener('click', function(e) {
 
 <!-- ═══ SL & TARGET MODAL (ENHANCED) ═══ -->
 <div class="overlay" id="m-sl-move" onclick="if(event.target===this)closeM('m-sl-move')">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:620px">
     <div class="m-head"><div class="m-title">🛡️ SL & Target Management</div><button class="m-x" onclick="closeM('m-sl-move')">✕</button></div>
     <div class="m-body" style="display:flex;flex-direction:column;gap:12px">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:14px;font-weight:700;color:var(--c)" id="sl-move-sym">—</div>
-        <div style="font-size:11px;color:var(--t3)" id="sl-move-info"></div>
+        <div style="font-size:16px;font-weight:700;color:var(--c)" id="sl-move-sym">—</div>
+        <div style="font-size:12px;color:var(--t3)" id="sl-move-info"></div>
       </div>
 
       <!-- SL Section -->
       <div style="background:rgba(255,69,96,.04);border:1px solid rgba(255,69,96,.15);border-radius:10px;padding:12px">
-        <div style="font-size:10px;font-weight:700;color:var(--r);margin-bottom:8px">🔻 STOP LOSS</div>
+        <div style="font-size:12px;font-weight:700;color:var(--r);margin-bottom:8px">🔻 STOP LOSS</div>
         <div class="fg2">
           <div class="fg">
             <label class="fl">Current SL</label>
@@ -614,7 +614,7 @@ document.addEventListener('click', function(e) {
 
       <!-- Target Section -->
       <div style="background:rgba(0,229,160,.04);border:1px solid rgba(0,229,160,.15);border-radius:10px;padding:12px">
-        <div style="font-size:10px;font-weight:700;color:var(--g);margin-bottom:8px">🔺 TARGET</div>
+        <div style="font-size:12px;font-weight:700;color:var(--g);margin-bottom:8px">🔺 TARGET</div>
         <div class="fg2">
           <div class="fg">
             <label class="fl">Current Target</label>
@@ -627,15 +627,15 @@ document.addEventListener('click', function(e) {
         </div>
         <!-- Smart Target Presets -->
         <div style="margin-top:8px">
-          <div style="font-size:9px;color:var(--t3);margin-bottom:4px;font-weight:600">R:R Based</div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:600">R:R Based</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap" id="tgt-rr-presets"></div>
         </div>
         <div style="margin-top:8px">
-          <div style="font-size:9px;color:var(--t3);margin-bottom:4px;font-weight:600">ATR Sell-Into-Strength</div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:600">ATR Sell-Into-Strength</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap" id="tgt-atr-presets"></div>
         </div>
         <div style="margin-top:8px">
-          <div style="font-size:9px;color:var(--t3);margin-bottom:4px;font-weight:600">Technical Levels</div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:4px;font-weight:600">Technical Levels</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap" id="tgt-tech-presets"></div>
         </div>
         <div class="fg" style="margin-top:8px">
@@ -655,10 +655,10 @@ document.addEventListener('click', function(e) {
       <!-- Tranche Exit Plan Editor -->
       <div style="background:rgba(0,187,255,.04);border:1px solid rgba(0,187,255,.12);border-radius:10px;padding:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <div style="font-size:10px;font-weight:700;color:var(--c)">📊 TRANCHE EXIT PLAN</div>
+          <div style="font-size:12px;font-weight:700;color:var(--c)">📊 TRANCHE EXIT PLAN</div>
           <button class="ep-act-btn" style="font-size:9px;padding:3px 8px" onclick="resetTranches()">↻ Reset to ATR defaults</button>
         </div>
-        <div style="display:grid;grid-template-columns:40px 1fr 70px 1fr 30px;gap:4px;padding:4px 0;font-size:8px;color:var(--t3)">
+        <div style="display:grid;grid-template-columns:40px 1fr 70px 1fr 30px;gap:4px;padding:4px 0;font-size:10px;color:var(--t3)">
           <span></span><span>TRIGGER ₹</span><span>QTY</span><span>TSL AFTER EXIT</span><span></span>
         </div>
         <div id="tranche-editor">
@@ -667,7 +667,7 @@ document.addEventListener('click', function(e) {
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="btn btn-sm" style="background:var(--c);color:#000;font-weight:700;flex:1" onclick="saveTrancheEdits(_slMoveTradeId)">Save Plan</button>
         </div>
-        <div style="font-size:8px;color:var(--t3);margin-top:6px;line-height:1.4">
+        <div style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.4">
           T1-T3: Sell into strength at ATR multiples. RUN: Let the last tranche ride with trailing SL — this is where outsized R-multiples come from.
         </div>
       </div>
@@ -1562,7 +1562,7 @@ function openSLMove(tradeId) {
   if (trade._ecWalking && +trade._ecWalking > 0) slButtons.push({ label: 'EC Walk ₹' + (+trade._ecWalking).toFixed(0), value: +trade._ecWalking, color: 'var(--c)' });
   if (trade._ecRunning && +trade._ecRunning > 0) slButtons.push({ label: 'EC Run ₹' + (+trade._ecRunning).toFixed(0), value: +trade._ecRunning, color: '#ff9800' });
   slPresets.innerHTML = slButtons.map(b =>
-    `<button class="ep-act-btn" style="font-size:9px;color:${b.color}" onclick="document.getElementById('sl-move-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
+    `<button class="ep-act-btn" style="font-size:11px;color:${b.color}" onclick="document.getElementById('sl-move-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
   ).join('');
 
   // ── Target R:R Presets ──
@@ -1575,7 +1575,7 @@ function openSLMove(tradeId) {
       { label: '1:5 ₹' + (avg + riskPerShare * 5).toFixed(0), value: avg + riskPerShare * 5 },
     ];
     rrPresets.innerHTML = rrButtons.map(b =>
-      `<button class="ep-act-btn" style="font-size:9px;color:var(--g)" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
+      `<button class="ep-act-btn" style="font-size:11px;color:var(--g)" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
     ).join('');
   } else {
     rrPresets.innerHTML = '<span style="font-size:9px;color:var(--t4)">Set SL first for R:R targets</span>';
@@ -1599,7 +1599,7 @@ function openSLMove(tradeId) {
     );
   }
   atrPresets.innerHTML = atrButtons.map(b =>
-    `<button class="ep-act-btn" style="font-size:9px;color:${b.color}" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()" title="${b.note}">${b.label}</button>`
+    `<button class="ep-act-btn" style="font-size:11px;color:${b.color}" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()" title="${b.note}">${b.label}</button>`
   ).join('');
 
   // ── Target Technical Level Presets ──
@@ -1611,7 +1611,7 @@ function openSLMove(tradeId) {
     { label: '+30% ₹' + (avg * 1.30).toFixed(0), value: avg * 1.30 },
   ];
   techPresets.innerHTML = techButtons.map(b =>
-    `<button class="ep-act-btn" style="font-size:9px" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
+    `<button class="ep-act-btn" style="font-size:11px" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
   ).join('');
 
   // ── SL History ──
