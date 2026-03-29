@@ -2712,6 +2712,39 @@ async function executeOrder(symbol) {
 }
 
 async function placeDhanOrder(symbol) {
+  // ── TRY OPENALGO FIRST ──
+  if (window.OpenAlgo && OpenAlgo.isConfigured()) {
+    try {
+      const pick = state.topPicks.find(p => p.symbol === symbol);
+      if (!pick) return;
+      const pyramidInfo = detectPyramidLevel(symbol, pick);
+      const o = calcOrderDetails(pick, pyramidInfo);
+      
+      if (!confirm(`⚡ OPENALGO ORDER\n\nBUY ${o.adjQty} × ${o.symbol} @ MARKET\nSL: ₹${o.sl}\n\nProceed?`)) return;
+      
+      showToast('⏳', `Placing ${o.symbol} via OpenAlgo...`, 'Sending...', 10000);
+      
+      const result = await OpenAlgo.placeOrder({
+        symbol: o.symbol,
+        action: 'BUY',
+        quantity: o.adjQty,
+        priceType: 'MARKET',
+        product: 'CNC',
+        strategy: 'TradEdge_EP',
+      });
+      
+      if (result.status === 'success') {
+        showToast('✅', `${o.symbol} — OpenAlgo order placed!`, `Order ID: ${result.orderid}`, 6000);
+        await executeOrder(symbol);
+        return;
+      } else {
+        showToast('⚠️', `OpenAlgo failed, trying Dhan...`, result.error || 'Unknown error');
+      }
+    } catch (e) {
+      console.warn('[EP] OpenAlgo failed, falling back to Dhan:', e.message);
+    }
+  }
+  // ── FALL THROUGH TO EXISTING DHAN CODE BELOW ──
   if (!window.DhanOrders || !DhanOrders.isReady()) {
     showToast('⚠️', 'Dhan Not Configured',
       'Set dhan_id + dhan_tk in localStorage or Settings page. DhanOrders module required.',
