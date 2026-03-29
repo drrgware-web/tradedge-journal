@@ -392,22 +392,27 @@ def process_stock(symbol: str, bench: dict) -> dict:
 # ════════════════════════════════════════════════════════════════
 
 def load_symbols(top_n=None, specific=None):
-    """Load stock symbols from scanner_results.json or nse_symbols.json."""
+    """Load stock symbols from scanner_results.json + nse_symbols.json (merged)."""
     stocks = []
+    seen_symbols = set()
 
     if specific:
         return [{"symbol": s.strip().upper(), "name": s.strip().upper()} for s in specific.split(",")]
 
-    # Try scanner_results.json first (has all metadata)
+    # 1. Load scanner_results.json first (has rich metadata: sector, market cap, O'Neil grade)
     if SCANNER_FILE.exists():
         try:
             data = json.loads(SCANNER_FILE.read_text())
             all_stocks = data.get("all_stocks", [])
             if all_stocks:
                 for s in all_stocks:
+                    sym = s.get("symbol", "").strip().upper()
+                    if not sym or sym in seen_symbols:
+                        continue
+                    seen_symbols.add(sym)
                     stocks.append({
-                        "symbol": s.get("symbol", ""),
-                        "name": s.get("name", s.get("symbol", "")),
+                        "symbol": sym,
+                        "name": s.get("name", sym),
                         "sector": s.get("sector", ""),
                         "cmp": s.get("close") or s.get("cmp", 0),
                         "change_pct": s.get("change_pct", 0),
@@ -423,12 +428,31 @@ def load_symbols(top_n=None, specific=None):
         except Exception as e:
             print(f"  Warning: scanner_results.json parse error: {e}")
 
-    # Fallback to nse_symbols.json
-    if not stocks and SYMBOLS_FILE.exists():
+    # 2. Merge nse_symbols.json — add any symbols NOT already in scanner_results
+    if SYMBOLS_FILE.exists():
         try:
             symbols = json.loads(SYMBOLS_FILE.read_text())
-            stocks = [{"symbol": s, "name": s} for s in symbols if isinstance(s, str)]
-            print(f"  Loaded {len(stocks)} symbols from nse_symbols.json")
+            added = 0
+            for s in symbols:
+                if isinstance(s, str):
+                    sym = s.strip().upper()
+                    name = sym
+                    sector = "Unknown"
+                elif isinstance(s, dict):
+                    sym = s.get("symbol", "").strip().upper()
+                    name = s.get("name", sym)
+                    sector = s.get("sector", "Unknown")
+                else:
+                    continue
+                if not sym or sym in seen_symbols:
+                    continue
+                seen_symbols.add(sym)
+                stocks.append({"symbol": sym, "name": name, "sector": sector})
+                added += 1
+            if added > 0:
+                print(f"  Merged +{added} new symbols from nse_symbols.json (total: {len(stocks)})")
+            else:
+                print(f"  nse_symbols.json: no new symbols to add (all {len(symbols)} already in scanner_results)")
         except Exception as e:
             print(f"  Warning: nse_symbols.json parse error: {e}")
 
@@ -443,7 +467,6 @@ def load_symbols(top_n=None, specific=None):
         print(f"  Filtered to top {top_n} by market cap")
 
     return stocks
-
 
 # ════════════════════════════════════════════════════════════════
 #  MAIN
