@@ -1224,7 +1224,7 @@ function renderATRMeter(trade, cmp, atrSource) {
       ? `Day H-L ₹${todayRange.toFixed(0)} ÷ ATR ₹${atr.toFixed(0)} · ${displayMultiple.toFixed(1)}×`
       : `ATR(14) ₹${atr.toFixed(0)} · awaiting H/L <span style="font-size:8px;color:var(--y)" title="H/L available after EdgeCloud refresh">⏳</span>`;
 
-    const entryInfo = `<span style="font-size:8px;color:var(--t4)" title="Price move from entry in ATR units (for reference, not a sell signal)">Entry move: ${entryAtrMultiple >= 0 ? '+' : ''}${entryAtrMultiple.toFixed(1)}× ATR</span>`;
+    const entryInfo = `<span style="font-size:8px;color:var(--t2)" title="Price move from entry in ATR units (for reference, not a sell signal)">Entry move: ${entryAtrMultiple >= 0 ? '+' : ''}${entryAtrMultiple.toFixed(1)}× ATR</span>`;
 
     return `<div class="ep-atr-wrap">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
