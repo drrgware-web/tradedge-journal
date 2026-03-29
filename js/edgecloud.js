@@ -1112,7 +1112,7 @@ window.EdgeCloud = (function () {
         <div style="position:absolute;top:0;left:${runPct}%;width:2px;height:100%;background:#ff9800;z-index:2" title="Running ₹${run}"></div>
         <div style="position:absolute;top:0;left:${cmpPct}%;width:3px;height:100%;background:var(--t1);z-index:3" title="CMP ₹${cmp}"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--t4);margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--t3);margin-bottom:6px">
         <span style="color:var(--c)">Walk ₹${walk.toFixed(0)}</span>
         <span style="color:#ff9800">Run ₹${run.toFixed(0)}</span>
         <span>Cloud ₹${cw.toFixed(0)}</span>
