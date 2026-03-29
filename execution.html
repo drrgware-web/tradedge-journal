@@ -1192,37 +1192,52 @@ function renderSLLadder(trade, cmp) {
 // ═══════════════════════════════════════════════════════════════
 
 function renderATRMeter(trade, cmp, atrSource) {
-  const t = normalizeTrade(trade);
-  if (!t || !t._n || !t._n.avgEntry || !cmp) return '';
-  const atr = +t._epAtr14 || (t._n.avgEntry * 0.02);
-  if (!atr) return '';
-  const isReal = !!t._epAtr14;
-  const moveFromEntry = cmp - t._n.avgEntry;
-  const atrMultiple = moveFromEntry / atr;
-  const maxDisplay = 8;
-  const fillPct = Math.min(Math.max(atrMultiple / maxDisplay * 100, 0), 100);
+    const t = normalizeTrade(trade);
+    if (!t || !t._n || !t._n.avgEntry || !cmp) return '';
+    const atr = +t._epAtr14 || (t._n.avgEntry * 0.02);
+    if (!atr) return '';
 
-  let barColor = 'var(--c)';
-  let sellTag = '';
-  if (atrMultiple >= 7) { barColor = 'var(--r)'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,69,96,.15);color:var(--r)">SELL 75-100%</span>`; }
-  else if (atrMultiple >= 6) { barColor = '#ff9800'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,152,0,.15);color:#ff9800">SELL 50%</span>`; }
-  else if (atrMultiple >= 5) { barColor = 'var(--y)'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,193,7,.15);color:var(--y)">SELL 25%</span>`; }
+    // ── ATR Sell-Into-Strength (CORRECT) ──
+    // Uses Today's Range (H-L) ÷ ATR(14) — NOT price move from entry
+    const todayHigh = +trade._ecTodayHigh || 0;
+    const todayLow  = +trade._ecTodayLow  || 0;
+    const todayRange = todayHigh > 0 && todayLow > 0 ? todayHigh - todayLow : 0;
+    const atrSellRatio = +trade._ecAtrSellRatio || (todayRange > 0 && atr > 0 ? todayRange / atr : 0);
 
-  const atrLabel = isReal
-    ? `ATR(14) ₹${atr.toFixed(1)} · ${atrMultiple.toFixed(1)}×`
-    : `ATR ~₹${atr.toFixed(1)} · ${atrMultiple.toFixed(1)}× <span style="font-size:8px;color:var(--y)" title="Estimated 2% — real ATR loading…">⚠ est</span>`;
+    // Legacy: move from entry (shown as secondary info)
+    const moveFromEntry = cmp - t._n.avgEntry;
+    const entryAtrMultiple = atr > 0 ? moveFromEntry / atr : 0;
 
-  return `<div class="ep-atr-wrap">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-      <span style="font-size:9px;font-weight:700;color:var(--t3)">${atrLabel}</span>
-      ${sellTag}
-    </div>
-    <div class="ep-atr-bar">
-      <div class="ep-atr-fill" style="width:${fillPct}%;background:linear-gradient(90deg,var(--c),${barColor})"></div>
-    </div>
-    <div class="ep-atr-marks"><span>0×</span><span>5×</span><span>6×</span><span>7×</span><span>8×</span></div>
-  </div>`;
-}
+    // Display value = Today's Range ÷ ATR(14)
+    const displayMultiple = atrSellRatio;
+    const maxDisplay = 8;
+    const fillPct = Math.min(Math.max(displayMultiple / maxDisplay * 100, 0), 100);
+
+    let barColor = 'var(--c)';
+    let sellTag = '';
+    if (displayMultiple >= 7) { barColor = 'var(--r)'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,69,96,.15);color:var(--r)">SELL 75-100%</span>`; }
+    else if (displayMultiple >= 6) { barColor = '#ff9800'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,152,0,.15);color:#ff9800">SELL 50%</span>`; }
+    else if (displayMultiple >= 5) { barColor = 'var(--y)'; sellTag = `<span class="ep-atr-sell-tag" style="background:rgba(255,193,7,.15);color:var(--y)">SELL 25%</span>`; }
+
+    const hasLiveHL = todayHigh > 0 && todayLow > 0;
+    const atrLabel = hasLiveHL
+      ? `Day H-L ₹${todayRange.toFixed(0)} ÷ ATR ₹${atr.toFixed(0)} · ${displayMultiple.toFixed(1)}×`
+      : `ATR(14) ₹${atr.toFixed(0)} · awaiting H/L <span style="font-size:8px;color:var(--y)" title="H/L available after EdgeCloud refresh">⏳</span>`;
+
+    const entryInfo = `<span style="font-size:8px;color:var(--t4)" title="Price move from entry in ATR units (for reference, not a sell signal)">Entry move: ${entryAtrMultiple >= 0 ? '+' : ''}${entryAtrMultiple.toFixed(1)}× ATR</span>`;
+
+    return `<div class="ep-atr-wrap">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <span style="font-size:9px;font-weight:700;color:var(--t3)">${atrLabel}</span>
+        ${sellTag}
+      </div>
+      <div class="ep-atr-bar">
+        <div class="ep-atr-fill" style="width:${fillPct}%;background:linear-gradient(90deg,var(--c),${barColor})"></div>
+      </div>
+      <div class="ep-atr-marks"><span>0×</span><span>5×</span><span>6×</span><span>7×</span><span>8×</span></div>
+      <div style="margin-top:2px">${entryInfo}</div>
+    </div>`;
+  }
 
 // ═══════════════════════════════════════════════════════════════
 // PYRAMID INDICATOR
