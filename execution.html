@@ -861,7 +861,7 @@ function normalizeTrade(t) {
 
 function getOpenPositions(symbol) {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  return trades.filter(t => t.symbol === symbol && t.status === 'Open').map(normalizeTrade).filter(Boolean);
+  return trades.filter(t => t.symbol === symbol && t.status === 'Open' || t.status === 'Partial').map(normalizeTrade).filter(Boolean);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1074,14 +1074,16 @@ function renderTrancheQuickView(trade, cmp) {
   return updated.map(tr => {
     const isDone = tr.status === 'done';
     const isNext = tr.status === 'next';
+    const isStar = tr._starOverride;
     const statusIcon = isDone ? '<span style="color:var(--g)">✓</span>' : isNext ? '<span style="color:var(--y)">▶</span>' : '<span style="color:var(--t4)">○</span>';
-    const statusLabel = isDone ? 'Done' : isNext ? 'NOW' : 'Pending';
-    const statusColor = isDone ? 'var(--g)' : isNext ? 'var(--y)' : 'var(--t4)';
+    const statusLabel = isDone ? 'Done' : isNext ? (isStar ? '★ NOW' : 'NOW') : 'Pending';
+    const statusColor = isDone ? 'var(--g)' : isNext ? (isStar ? 'var(--r)' : 'var(--y)') : 'var(--t4)';
     const triggerLabel = tr.trigger > 0 ? `₹${tr.trigger.toFixed(0)}` : 'TSL hit';
+    const starNote = isStar ? `<span style="font-size:8px;color:var(--r)" title="Star L${tr._starLevel} override — was ₹${(tr._origTrigger||0).toFixed(0)}"> ★</span>` : '';
 
-    return `<div class="ep-tranche-row ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}">
+    return `<div class="ep-tranche-row ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}" ${isStar && !isDone ? 'style="background:rgba(255,69,96,.06);border-radius:6px;padding:4px 6px;margin:0 -6px"' : ''}>
       <span class="ep-tr-tag" style="background:${tr.color}22;color:${tr.color}">${tr.label}</span>
-      <span class="ep-tr-trigger" style="color:${isNext ? 'var(--y)' : 'var(--t2)'}">${triggerLabel}</span>
+      <span class="ep-tr-trigger" style="color:${isStar ? 'var(--r)' : isNext ? 'var(--y)' : 'var(--t2)'}">${triggerLabel}${starNote}</span>
       <span class="ep-tr-qty">${tr.qty} qty</span>
       <span class="ep-tr-tsl">${tr.tslAction}</span>
       <span class="ep-tr-status" style="color:${statusColor}">${statusIcon} ${statusLabel}</span>
@@ -1586,6 +1588,16 @@ function openSLMove(tradeId) {
     { label: '6×ATR ₹' + (avg + atr * 6).toFixed(0), value: avg + atr * 6, note: 'Sell 50%', color: '#ff9800' },
     { label: '7×ATR ₹' + (avg + atr * 7).toFixed(0), value: avg + atr * 7, note: 'Sell 75%+', color: 'var(--r)' },
   ];
+  // EdgeCloud disparity-based levels (adaptive to cloud width)
+  const ecCW = trade._ecCloudWidth || 0;
+  const ecRun = trade._ecRunning || 0;
+  if (ecCW > 0 && ecRun > 0) {
+    atrButtons.push(
+      { label: '★ 2×CW ₹' + (ecRun + ecCW * 2).toFixed(0), value: ecRun + ecCW * 2, note: 'Mild extension — tighten TSL', color: 'var(--c)' },
+      { label: '★ 3×CW ₹' + (ecRun + ecCW * 3).toFixed(0), value: ecRun + ecCW * 3, note: 'Star L1 — sell 25%', color: 'var(--y)' },
+      { label: '★ 4×CW ₹' + (ecRun + ecCW * 4).toFixed(0), value: ecRun + ecCW * 4, note: 'Star L2/L3 — sell 50-75%', color: 'var(--r)' },
+    );
+  }
   atrPresets.innerHTML = atrButtons.map(b =>
     `<button class="ep-act-btn" style="font-size:9px;color:${b.color}" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()" title="${b.note}">${b.label}</button>`
   ).join('');
@@ -2199,7 +2211,7 @@ setTimeout(async () => {
     }
     if (!TE.getWorkerUrl) TE.getWorkerUrl = () => localStorage.getItem('zd_worker_url') || '';
     if (!TE.isMarketOpen) TE.isMarketOpen = () => { const h = new Date().getUTCHours() + 5.5; return h >= 9.25 && h <= 15.5; };
-    if (!TE.getOpenTrades) TE.getOpenTrades = () => JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open');
+    if (!TE.getOpenTrades) TE.getOpenTrades = () => JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open' || t.status === 'Partial');
     if (!TE.trades) { try { TE.trades = JSON.parse(localStorage.getItem('te_trades') || '[]'); } catch(e) { TE.trades = []; } }
     if (!TE.createAutocomplete) TE.createAutocomplete = () => {};
     if (!TE.fmt) TE.fmt = n => '₹' + Math.abs(n||0).toFixed(0);
@@ -2243,7 +2255,7 @@ setTimeout(async () => {
 function quickRenderFromJournal() {
   try {
     const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-    const openTrades = trades.filter(t => t.status === 'Open');
+    const openTrades = trades.filter(t => t.status === 'Open' || t.status === 'Partial');
     if (!openTrades.length) return;
 
     _mergedPositions = openTrades.map(trade => {
@@ -2356,7 +2368,7 @@ async function placeOrder() {
   const riskPct = capConfig.riskPct || 1;
 
   // Check max positions
-  const openTrades = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open');
+  const openTrades = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open' || t.status === 'Partial');
   if (openTrades.length >= maxPositions) {
     toast(`⛔ Max ${maxPositions} positions reached. Close a position first.`, '⛔');
     return;
@@ -2381,7 +2393,7 @@ async function placeOrder() {
     // Simple sector check: count positions in same sector
     const tradeSector = openTrades.find(t => t.symbol === sym)?.sector || '';
     if (tradeSector) {
-      const sectorValue = openTrades.filter(t => t.sector === tradeSector && t.status === 'Open')
+      const sectorValue = openTrades.filter(t => t.sector === tradeSector && t.status === 'Open' || t.status === 'Partial')
         .reduce((s, t) => { const nt = normalizeTrade(t); return s + (nt?._n?.avgEntry || 0) * (nt?._n?.remainingQty || 0); }, 0);
       const sectorPct = cap.current > 0 ? ((sectorValue + orderValue) / cap.current) * 100 : 0;
       if (sectorPct > maxSectorPct) {
@@ -2671,7 +2683,7 @@ function autoTrailSL() {
   if (updated) {
     localStorage.setItem('te_trades', JSON.stringify(trades));
     // Sync updated trades
-    trades.filter(t => t.status === 'Open').forEach(t => syncTradeToSupabase(t));
+    trades.filter(t => t.status === 'Open' || t.status === 'Partial').forEach(t => syncTradeToSupabase(t));
   }
 }
 
@@ -2769,15 +2781,100 @@ function checkEdgeCloudAlerts() {
       }
     }
 
-    // Exhaustion star alert
-    if (trade._ecLastStar && trade._ecLastStar.level >= 2) {
+    // Exhaustion star alert + TRANCHE MERGE
+    if (trade._ecLastStar && trade._ecLastStar.level >= 1) {
+      const starLevel = trade._ecLastStar.level;
       const alertKey = `ec_star_${trade.id}_${trade._ecLastStar.bar}`;
       if (!wasAlertSent(alertKey)) {
         markAlertSent(alertKey);
-        playAlertSound();
-        playAlertSound();
-        toast(`⭐ ${trade.symbol}: EdgeCloud Exhaustion L${trade._ecLastStar.level} — ${trade._ecLastStar.levelLabel}`, '⭐');
+
+        if (starLevel >= 2) {
+          playAlertSound();
+          playAlertSound();
+        } else {
+          playAlertSound();
+        }
+        toast(`⭐ ${trade.symbol}: EdgeCloud Exhaustion L${starLevel} — ${trade._ecLastStar.levelLabel}`, '⭐');
         sendTelegramAlert(EdgeCloud.telegramAlert(trade.symbol, trade._ecLastStar, 'star'));
+
+        // ── STAR → TRANCHE MERGE ──
+        // Star signals accelerate tranche exits by overriding pending trigger prices to CMP
+        const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+        const tIdx = trades.findIndex(t => t.id === trade.id);
+        if (tIdx >= 0) {
+          const tr = trades[tIdx];
+          const tranches = getTranches(tr);
+          const nt = normalizeTrade(tr);
+          const exitedQty = nt?._n?.totalExitQty || 0;
+          const updated = updateTrancheStatuses(tranches, cmp, exitedQty);
+
+          // Find pending tranches (not done, not runner)
+          const pendingTranches = updated.filter(t => t.status === 'pending' && t.id !== 't4');
+          const tranchesToAccelerate = starLevel >= 3 ? pendingTranches.length
+            : starLevel >= 2 ? Math.min(2, pendingTranches.length)
+            : Math.min(1, pendingTranches.length);
+
+          let accelerated = 0;
+          if (tranchesToAccelerate > 0) {
+            for (let ti = 0; ti < tranchesToAccelerate && ti < pendingTranches.length; ti++) {
+              const pt = pendingTranches[ti];
+              const origTrigger = pt.trigger;
+              // Only accelerate if CMP is below the original trigger (star caught it early)
+              // or set to CMP if already above (confirm the exit)
+              const trancheIdx = tranches.findIndex(t => t.id === pt.id);
+              if (trancheIdx >= 0) {
+                tranches[trancheIdx].trigger = Math.round(cmp * 100) / 100;
+                tranches[trancheIdx]._starOverride = true;
+                tranches[trancheIdx]._starLevel = starLevel;
+                tranches[trancheIdx]._origTrigger = origTrigger;
+                tranches[trancheIdx].tslAction = starLevel >= 2
+                  ? 'Move SL to Walking Line (Star L' + starLevel + ')'
+                  : 'Move SL to Running Line (Star L' + starLevel + ')';
+                accelerated++;
+              }
+            }
+
+            tr._epTranches = tranches;
+
+            // Auto-tighten SL based on star level
+            const currentSL = +tr.sl || 0;
+            let newSL = currentSL;
+            let slSource = '';
+            if (starLevel >= 2 && trade._ecWalking && +trade._ecWalking > currentSL) {
+              newSL = +trade._ecWalking;
+              slSource = `Star L${starLevel} → Walking Line`;
+            } else if (starLevel === 1 && trade._ecRunning && +trade._ecRunning > currentSL) {
+              newSL = +trade._ecRunning;
+              slSource = `Star L${starLevel} → Running Line`;
+            }
+
+            if (newSL > currentSL) {
+              tr._epSlMoves = tr._epSlMoves || [];
+              tr._epSlMoves.push({
+                date: new Date().toISOString().slice(0, 10),
+                from: currentSL,
+                to: Math.round(newSL * 100) / 100,
+                reason: `EdgeCloud ${slSource}`
+              });
+              tr.sl = Math.round(newSL * 100) / 100;
+            }
+
+            trades[tIdx] = tr;
+            localStorage.setItem('te_trades', JSON.stringify(trades));
+            syncTradeToSupabase(tr);
+
+            const accLabel = accelerated === 1 ? pendingTranches[0].label : pendingTranches.slice(0, accelerated).map(t => t.label).join('+');
+            toast(`⭐→📊 ${trade.symbol}: Star L${starLevel} accelerated ${accLabel} to ₹${cmp.toFixed(0)}${newSL > currentSL ? ' · SL → ₹' + newSL.toFixed(0) : ''}`, '⭐');
+            sendTelegramAlert(
+              `⭐→📊 STAR → TRANCHE MERGE\n` +
+              `${trade.symbol} Star L${starLevel}\n` +
+              `Accelerated: ${accLabel} trigger → ₹${cmp.toFixed(2)}\n` +
+              `${newSL > currentSL ? 'SL: ₹' + currentSL.toFixed(0) + ' → ₹' + newSL.toFixed(0) + ' (' + slSource + ')' : 'SL unchanged'}\n` +
+              `Disparity: ${trade._ecLastStar.disparityMultiple}× cloud\n` +
+              `Action: Sell ${pendingTranches.slice(0, accelerated).reduce((s, t) => s + (t.qty || 0), 0)} shares`
+            );
+          }
+        }
       }
     }
 
@@ -2916,7 +3013,7 @@ async function fetchTechDataForSymbol(sym) {
 async function buildMergedPositions() {
   try {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  const openTrades = trades.filter(t => t.status === 'Open');
+  const openTrades = trades.filter(t => t.status === 'Open' || t.status === 'Partial');
   const brokerPos = TE.exec.positions || [];
 
   // Build a lookup of broker positions by symbol
@@ -2973,7 +3070,7 @@ async function buildMergedPositions() {
           if (techData) {
             _atrCache[sym] = techData.atr14;
             const allTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-            const tIdx = allTrades.findIndex(t => t.symbol === sym && t.status === 'Open');
+            const tIdx = allTrades.findIndex(t => t.symbol === sym && t.status === 'Open' || t.status === 'Partial');
             if (tIdx >= 0) {
               allTrades[tIdx]._epAtr14 = techData.atr14;
               allTrades[tIdx]._epEma8 = techData.ema8;
@@ -3021,7 +3118,7 @@ async function buildMergedPositions() {
               const ec = await ecFn(sym, { stMultiplier: ecMultiplier }, tradeSector);
               if (ec && ec.current) {
                 const ecTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-                const ecIdx = ecTrades.findIndex(t => t.symbol === sym && t.status === 'Open');
+                const ecIdx = ecTrades.findIndex(t => t.symbol === sym && t.status === 'Open' || t.status === 'Partial');
                 if (ecIdx >= 0) {
                   EdgeCloud.storeOnTrade(ecTrades[ecIdx], ec);
                   localStorage.setItem('te_trades', JSON.stringify(ecTrades));
@@ -3100,7 +3197,7 @@ async function buildMergedPositions() {
     console.error('buildMergedPositions error:', e);
     // Fallback: show journal trades without CMP enrichment
     try {
-      const fallbackTrades = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open');
+      const fallbackTrades = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open' || t.status === 'Partial');
       _mergedPositions = fallbackTrades.map(trade => {
         const nt = normalizeTrade(trade);
         if (!nt || !nt._n) return null;
@@ -3124,7 +3221,7 @@ function renderPositions() {
   document.getElementById('pos-badge').textContent = positions.length;
   const container = document.getElementById('positions');
   if (!positions.length) {
-    const openCount = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open').length;
+    const openCount = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open' || t.status === 'Partial').length;
     container.innerHTML = openCount
       ? `<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px"><div class="spinner" style="width:20px;height:20px;border-width:2px;margin-bottom:8px"></div>Loading ${openCount} journal positions…<br><button class="btn btn-ghost btn-sm" onclick="refreshAll()" style="margin-top:8px">↻ Refresh</button></div>`
       : '<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">No open positions in journal</div>';
@@ -3304,7 +3401,7 @@ async function quickClose(sym, idx) {
 
   // Update journal (always, but user was warned if broker failed)
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  const journalTrade = trades.find(t => t.symbol === sym && t.status === 'Open');
+  const journalTrade = trades.find(t => t.symbol === sym && t.status === 'Open' || t.status === 'Partial');
   if (journalTrade) {
     const ltp = p.last_price || p.lastPrice || p.ltp || 0;
     journalTrade.exits = journalTrade.exits || [];
@@ -3352,7 +3449,7 @@ async function quickPartial(sym, idx, pct) {
 
   toast(`${pct}%: ${side} ${exitQty} ${sym}` + (brokerOk ? '' : ' (journal)'), brokerOk ? '✅' : '⚠️');
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  const journalTrade = trades.find(t => t.symbol === sym && t.status === 'Open');
+  const journalTrade = trades.find(t => t.symbol === sym && t.status === 'Open' || t.status === 'Partial');
   if (journalTrade) {
     const ltp = p.last_price || p.lastPrice || p.ltp || 0;
     journalTrade.exits = journalTrade.exits || [];
