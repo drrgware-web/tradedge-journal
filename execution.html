@@ -2753,7 +2753,34 @@ function autoTrailSL() {
     const pnlPct = avg > 0 ? ((cmp - avg) / avg * 100) : 0;
 
     // Only auto-trail if in profit and SL is already above entry (discipline maintained)
-    if (pnlPct < 5 || currentSL < avg) return;
+    // Auto-breakeven: if P&L > 3% and SL still below entry, move to entry
+      if (currentSL < avg && pnlPct >= 3) {
+        const beKey = `auto_be_${trade.id}`;
+        if (!wasAlertSent(beKey)) {
+          markAlertSent(beKey);
+          trade._epSlMoves = trade._epSlMoves || [];
+          trade._epSlMoves.push({
+            date: new Date().toISOString().slice(0, 10),
+            from: currentSL,
+            to: Math.round(avg * 100) / 100,
+            reason: 'breakeven'
+          });
+          trade.sl = Math.round(avg * 100) / 100;
+          trades[idx] = trade;
+          updated = true;
+          console.log(`Auto-B/E: ${trade.symbol} SL ₹${currentSL.toFixed(0)} → ₹${avg.toFixed(0)}`);
+          toast(`🛡️ ${trade.symbol}: SL moved to breakeven ₹${avg.toFixed(0)}`, '🛡️');
+          sendTelegramAlert(
+            `🛡️ AUTO-BREAKEVEN — ${trade.symbol}\n` +
+            `SL: ₹${currentSL.toFixed(2)} → ₹${avg.toFixed(2)}\n` +
+            `CMP: ₹${cmp.toFixed(2)} | P&L: +${pnlPct.toFixed(1)}%`
+          );
+        }
+        return; // Don't trail further until SL is at entry
+      }
+
+      // Only auto-trail if in profit and SL is already above entry
+      if (pnlPct < 5 || currentSL < avg) return;
 
     // Determine trail level based on how many tranches have been exited
     const exitPct = totalEntryQty > 0 ? (exitedQty / totalEntryQty * 100) : 0;
