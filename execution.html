@@ -1045,8 +1045,9 @@ function getTranches(trade) {
   return generateDefaultTranches(trade);
 }
 
-function updateTrancheStatuses(tranches, cmp, exitedQty) {
+function updateTrancheStatuses(tranches, cmp, exitedQty, avgEntry) {
   let qtyExited = exitedQty || 0;
+  const isInLoss = avgEntry && cmp && cmp < avgEntry;
   return tranches.map((tr, i) => {
     const t = { ...tr };
     if (t.id === 't4') {
@@ -1055,7 +1056,12 @@ function updateTrancheStatuses(tranches, cmp, exitedQty) {
     } else if (qtyExited >= t.qty * (i + 1)) {
       t.status = 'done';
     } else if (t.trigger > 0 && cmp >= t.trigger) {
-      t.status = 'next'; // CMP has reached this tranche — action needed
+      // CMP above trigger — but is the trade actually in profit?
+      if (isInLoss) {
+        t.status = 'stale'; // Trigger is stale (ATR outdated), trade is in loss
+      } else {
+        t.status = 'next'; // CMP has reached this tranche — action needed
+      }
     } else {
       t.status = 'pending';
     }
@@ -1069,29 +1075,35 @@ function renderTrancheQuickView(trade, cmp, posIdx) {
   if (!nt || !nt._n) return '';
   const tranches = getTranches(trade);
   const exitedQty = nt._n.totalExitQty || 0;
-  const updated = updateTrancheStatuses(tranches, cmp, exitedQty);
+  const updated = updateTrancheStatuses(tranches, cmp, exitedQty, nt._n.avgEntry);
 
   return updated.map(tr => {
     const isDone = tr.status === 'done';
     const isNext = tr.status === 'next';
+    const isStale = tr.status === 'stale';
     const isStar = tr._starOverride;
-    const statusIcon = isDone ? '<span style="color:var(--g)">✓</span>' : isNext ? '<span style="color:var(--y)">▶</span>' : '<span style="color:var(--t4)">○</span>';
-    const statusLabel = isDone ? 'Done' : isNext ? (isStar ? '★ NOW' : 'NOW') : 'Pending';
-    const statusColor = isDone ? 'var(--g)' : isNext ? (isStar ? 'var(--r)' : 'var(--y)') : 'var(--t4)';
+    const statusIcon = isDone ? '<span style="color:var(--g)">✓</span>'
+      : isStale ? '<span style="color:var(--r)">⚠</span>'
+      : isNext ? '<span style="color:var(--y)">▶</span>'
+      : '<span style="color:var(--t4)">○</span>';
+    const statusLabel = isDone ? 'Done' : isStale ? 'Stale' : isNext ? (isStar ? '★ NOW' : 'NOW') : 'Pending';
+    const statusColor = isDone ? 'var(--g)' : isStale ? 'var(--r)' : isNext ? (isStar ? 'var(--r)' : 'var(--y)') : 'var(--t4)';
     const triggerLabel = tr.trigger > 0 ? `₹${tr.trigger.toFixed(0)}` : 'TSL hit';
     const starNote = isStar ? `<span style="font-size:8px;color:var(--r)" title="Star L${tr._starLevel} override — was ₹${(tr._origTrigger||0).toFixed(0)}"> ★</span>` : '';
 
-    // NOW button: clickable → opens partial exit pre-filled with tranche qty + reason
-    const nowClick = isNext && trade.id && posIdx !== undefined
-      ? `onclick="openTrancheExit('${trade.id}',${posIdx},${tr.qty},'${tr.id}','${(tr.tslAction||'').replace(/'/g,'')}')" style="cursor:pointer" title="Click to execute ${tr.label} exit (${tr.qty} shares)"`
+    // NOW button: clickable → opens partial exit pre-filled with tranche qty
+    // Stale: clickable but will show loss warning
+    const isClickable = (isNext || isStale) && trade.id && posIdx !== undefined;
+    const nowClick = isClickable
+      ? `onclick="openTrancheExit('${trade.id}',${posIdx},${tr.qty},'${tr.id}','${(tr.tslAction||'').replace(/'/g,'')}')" title="${isStale ? 'Stale — trade is in loss. Click to exit (will show warning)' : 'Click to execute ' + tr.label + ' exit (' + tr.qty + ' shares)'}"`
       : '';
 
     return `<div class="ep-tranche-row ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}" ${isStar && !isDone ? 'style="background:rgba(255,69,96,.06);border-radius:6px;padding:4px 6px;margin:0 -6px"' : ''}>
       <span class="ep-tr-tag" style="background:${tr.color}22;color:${tr.color}">${tr.label}</span>
-      <span class="ep-tr-trigger" style="color:${isStar ? 'var(--r)' : isNext ? 'var(--y)' : 'var(--t2)'}">${triggerLabel}${starNote}</span>
+      <span class="ep-tr-trigger" style="color:${isStale ? 'var(--r)' : isStar ? 'var(--r)' : isNext ? 'var(--y)' : 'var(--t2)'}">${triggerLabel}${starNote}${isStale ? ' <span style="font-size:7px">outdated</span>' : ''}</span>
       <span class="ep-tr-qty">${tr.qty} qty</span>
       <span class="ep-tr-tsl">${tr.tslAction}</span>
-      <span class="ep-tr-status" ${nowClick} style="color:${statusColor}${isNext ? ';cursor:pointer;text-decoration:underline;text-underline-offset:2px' : ''}">${statusIcon} ${statusLabel}</span>
+      <span class="ep-tr-status" ${nowClick} style="color:${statusColor}${isClickable ? ';cursor:pointer;text-decoration:underline;text-underline-offset:2px' : ''}">${statusIcon} ${statusLabel}</span>
     </div>`;
   }).join('');
 }
@@ -1399,28 +1411,60 @@ function openTrancheExit(tradeId, posIdx, qty, trancheId, tslAction) {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
   const trade = trades.find(t => t.id === tradeId);
   if (!trade) return;
-  _partialTradeId = tradeId;
-  _partialPosIdx = posIdx;
   const nt = normalizeTrade(trade);
   const p = _mergedPositions[posIdx] || TE.exec.positions[posIdx];
   const cmp = p ? (p.last_price || p.lastPrice || p.ltp || 0) : 0;
+  const avg = nt._n.avgEntry || 0;
+  const pnlPct = avg > 0 ? ((cmp - avg) / avg * 100) : 0;
+  const riskPerShare = nt._n.riskPerShare || (avg * 0.05);
+  const rMultiple = riskPerShare > 0 ? (cmp - avg) / riskPerShare : 0;
+
+  // ── Warning: exiting at a loss ──
+  if (pnlPct < 0) {
+    const proceed = confirm(
+      `⚠️ ${trade.symbol} is at ${pnlPct.toFixed(1)}% LOSS (${rMultiple.toFixed(2)}R)\n` +
+      `CMP ₹${cmp.toFixed(0)} is below your entry ₹${avg.toFixed(0)}.\n\n` +
+      `This is NOT a sell-into-strength exit.\n` +
+      `Tranche ${trancheId.toUpperCase()} trigger (₹${(trade._epTranches?.find(t => t.id === trancheId)?.trigger || 0).toFixed(0)}) may be stale.\n\n` +
+      `Consider:\n` +
+      `• Closing via SL breach (discipline exit)\n` +
+      `• Resetting tranches to current ATR via SL/Tgt modal\n\n` +
+      `Open partial exit anyway?`
+    );
+    if (!proceed) return;
+  }
+
+  // ── Warning: CMP far below tranche trigger (stale tranche) ──
+  const tranche = trade._epTranches?.find(t => t.id === trancheId);
+  if (tranche && cmp > 0 && tranche.trigger > 0) {
+    const triggerDist = ((cmp - tranche.trigger) / tranche.trigger * 100);
+    if (triggerDist < -10) {
+      toast(`⚠️ ${trade.symbol}: ${trancheId.toUpperCase()} trigger ₹${tranche.trigger.toFixed(0)} is ${Math.abs(triggerDist).toFixed(0)}% above CMP — consider resetting tranches`, '⚠️');
+    }
+  }
+
+  _partialTradeId = tradeId;
+  _partialPosIdx = posIdx;
 
   document.getElementById('partial-sym').textContent = trade.symbol;
   document.getElementById('partial-total-qty').value = nt._n.remainingQty;
   document.getElementById('partial-exit-qty').value = qty;
   document.getElementById('partial-price').value = cmp ? cmp.toFixed(2) : '';
 
-  // Auto-select reason based on tranche
+  // Auto-select reason based on tranche (but override to risk_reduce if losing)
   const reasonMap = { t1: 'atr_5x', t2: 'atr_6x', t3: 'atr_7x', t4: 'manual' };
   const reasonEl = document.getElementById('partial-reason');
-  if (reasonEl && reasonMap[trancheId]) reasonEl.value = reasonMap[trancheId];
+  if (reasonEl) {
+    if (pnlPct < 0) reasonEl.value = 'risk_reduce';
+    else if (reasonMap[trancheId]) reasonEl.value = reasonMap[trancheId];
+  }
 
   updatePartialSummary();
   openM('m-partial');
   playSwoopClick();
 
-  // Toast hint about TSL action
-  if (tslAction) {
+  // Toast with TSL action (only for profitable exits)
+  if (tslAction && pnlPct >= 0) {
     toast(`${trade.symbol} ${trancheId.toUpperCase()}: After exit → ${tslAction}`, '📊');
   }
 }
@@ -2597,6 +2641,10 @@ function checkTrancheAlerts() {
     const tranches = getTranches(trade);
     const nt = normalizeTrade(trade);
     const exitedQty = nt?._n?.totalExitQty || 0;
+    const avgEntry = nt?._n?.avgEntry || 0;
+
+    // Skip tranche alerts entirely if trade is in loss (stale triggers)
+    if (avgEntry > 0 && cmp < avgEntry) return;
 
     tranches.forEach((tr, i) => {
       if (tr.id === 't4') return; // Runner has no price trigger
