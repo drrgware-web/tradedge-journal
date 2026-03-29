@@ -580,6 +580,13 @@ window.EdgeCloud = (function () {
 
     // Cloud width vs ATR ratio — adjust TSL buffer
     const currentATR = atr[last] || 0;
+
+    // ── ATR Sell-Into-Strength: Today's Range vs ATR(14) ─────────────
+    const todayHigh = bars[last].h;
+    const todayLow = bars[last].l;
+    const todayRange = todayHigh - todayLow;
+    const atrSellRatio = currentATR > 0 ? todayRange / currentATR : 0;
+
     const cwAtrRatio = currentATR > 0 ? currentCW / currentATR : 1;
     if (cwAtrRatio < 0.5 && currentState !== 'strong_bull') {
       // Cloud converging, trend may be weakening — add buffer
@@ -652,6 +659,10 @@ window.EdgeCloud = (function () {
         actionLabel: actionLabel,
         actionColor: actionColor,
         atr: Math.round((atr[last] || 0) * 100) / 100,
+        todayHigh: Math.round(todayHigh * 100) / 100,
+        todayLow: Math.round(todayLow * 100) / 100,
+        todayRange: Math.round(todayRange * 100) / 100,
+        atrSellRatio: Math.round(atrSellRatio * 100) / 100,
       },
 
       // Recent signals for alerts
@@ -967,6 +978,10 @@ window.EdgeCloud = (function () {
     trade._ecAction = ec.current.actionLabel;
     trade._ecActionColor = ec.current.actionColor;
     trade._ecAtr = ec.current.atr;
+    trade._ecTodayHigh = ec.current.todayHigh;
+    trade._ecTodayLow = ec.current.todayLow;
+    trade._ecTodayRange = ec.current.todayRange;
+    trade._ecAtrSellRatio = ec.current.atrSellRatio;
     trade._ecConfig = ec.config;
     trade._ecUpdated = new Date().toISOString();
 
@@ -1403,13 +1418,9 @@ window.EdgeCloud = (function () {
     });
 
     // ── Derive learned weight adjustments ────────────────────────────
-    // Factors with positive edge → boost weight. Negative edge → reduce.
-    // Only adjust factors with statistical significance (3+ samples each side)
-
     const learnedWeights = { ...DEFAULT_WEIGHTS };
     const adjustments = {};
 
-    // Map factor analysis back to weight keys
     const factorToWeight = {
       'had_pullback_signal': ['p_cloudResidence', 'p_volumeContraction', 'p_reentryBarQuality'],
       'p_high_score': ['p_cloudResidence', 'p_reentryBarQuality'],
@@ -1429,7 +1440,6 @@ window.EdgeCloud = (function () {
       const fa = factorAnalysis[factor];
       if (!fa || !fa.significant) return;
 
-      // Scale adjustment: +/- up to 30% of original weight
       const adjustPct = Math.max(-0.3, Math.min(0.3, fa.rEdge * 0.15));
 
       weightKeys.forEach(wk => {
@@ -1451,7 +1461,6 @@ window.EdgeCloud = (function () {
     const winRate = Math.round(wins / totalTrades * 100);
     const avgHoldDays = Math.round(results.reduce((s, r) => s + r.holdingDays, 0) / totalTrades);
 
-    // Expectancy = (winRate × avgWin) - (lossRate × avgLoss)
     const winRs = results.filter(r => r.isWin).map(r => r.rMultiple);
     const lossRs = results.filter(r => !r.isWin).map(r => Math.abs(r.rMultiple));
     const avgWinR = winRs.length ? winRs.reduce((s, v) => s + v, 0) / winRs.length : 0;
@@ -1621,7 +1630,7 @@ window.EdgeCloud = (function () {
     calcJdK: calcJdK,
 
     // Version
-    VERSION: '3.0.0',
+    VERSION: '3.1.0',
     NAME: 'EdgeCloud',
   };
 
