@@ -1331,7 +1331,7 @@ function renderCapitalBar() {
 
 async function supabaseUpsert(table, data) {
   try {
-    const res = await fetch(`${EP_CONFIG.supabaseUrl}/rest/v1/${table}`, {
+   const res = await fetch(`${EP_CONFIG.supabaseUrl}/rest/v1/${table}?on_conflict=key`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1375,11 +1375,12 @@ async function syncTradeToSupabase(trade) {
 
   // Issue 7: Use te_store JSON blob approach (works with existing table schema)
   // instead of assuming tradedge_trades has EP columns
-  const payload = {
-    id: trade.id,
-    data: JSON.stringify(trade),
+  
+   const payload = {
+    key: trade.id,
+    value: JSON.stringify(trade),
     updated_at: new Date().toISOString()
-  };
+};
 
   // Try primary sync to te_store (safe — JSON blob, no schema issues)
   const ok = await supabaseUpsert('te_store', payload);
