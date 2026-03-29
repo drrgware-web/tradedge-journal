@@ -786,6 +786,7 @@ document.addEventListener('click', function(e) {
 </div>
 
 <!-- Scripts -->
+<script src="js/openalgo.js"></script>
 <script src="js/core.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/journal-sync.js"></script>
@@ -2432,6 +2433,34 @@ function runNudges() {
 // ═══════════════════════════════════════════════════════════════
 
 async function placeOrder() {
+  // ── TRY OPENALGO FIRST ──
+  if (window.OpenAlgo && OpenAlgo.isConfigured()) {
+    const _sym = (document.getElementById('exec-sym').value || '').trim().toUpperCase();
+    const _qty = +document.getElementById('exec-qty').value || 0;
+    const _price = +document.getElementById('exec-price').value || 0;
+    const _product = document.getElementById('exec-product').value;
+    if (_sym && _qty) {
+      try {
+        const oaResult = await OpenAlgo.placeOrder({
+          symbol: _sym,
+          action: TE.exec.side,
+          quantity: _qty,
+          priceType: TE.exec.otype,
+          product: _product,
+          price: _price,
+          strategy: 'TradEdge',
+        });
+        if (oaResult.status === 'success') {
+          document.getElementById('order-status').innerHTML = `<span style="color:var(--g)">✅ OpenAlgo: ${oaResult.orderid}</span>`;
+          playSuccessChime();
+          // Continue with journal logging (don't return — let existing code handle bracket + journal)
+        }
+      } catch (e) {
+        console.warn('[Execution] OpenAlgo failed, using default:', e.message);
+      }
+    }
+  }
+  // ── EXISTING CODE CONTINUES BELOW ──
   const sym = (document.getElementById('exec-sym').value || '').trim().toUpperCase();
   const qty = +document.getElementById('exec-qty').value || 0;
   const price = +document.getElementById('exec-price').value || 0;
