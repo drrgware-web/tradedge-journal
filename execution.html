@@ -1667,8 +1667,13 @@ function updateSLTgtPreview() {
   if (!trade) return;
   const nt = normalizeTrade(trade);
   const avg = nt._n.avgEntry;
-  const newSL = +document.getElementById('sl-move-new').value || +document.getElementById('sl-move-current').value || 0;
-  const newTgt = +document.getElementById('tgt-new').value || +document.getElementById('tgt-current').value || 0;
+  // SL priority: new input > current input > trade.sl > 0
+  const newSlInput = document.getElementById('sl-move-new').value;
+  const curSlInput = document.getElementById('sl-move-current').value;
+  const newSL = newSlInput !== '' ? +newSlInput : curSlInput !== '' && +curSlInput > 0 ? +curSlInput : (+trade.sl || 0);
+  const newTgtInput = document.getElementById('tgt-new').value;
+  const curTgtInput = document.getElementById('tgt-current').value;
+  const newTgt = newTgtInput !== '' ? +newTgtInput : curTgtInput !== '' && +curTgtInput > 0 ? +curTgtInput : 0;
   const mp = _mergedPositions.find(m => m.symbol === trade.symbol);
   const cmp = mp ? mp.last_price : avg;
   const preview = document.getElementById('sl-tgt-preview');
@@ -1679,19 +1684,21 @@ function updateSLTgtPreview() {
   }
 
   const risk = avg - newSL;
-  const reward = newTgt - avg;
-  const rrRatio = risk > 0 && newTgt > 0 ? (reward / risk).toFixed(2) : '—';
-  const riskPct = avg > 0 ? ((risk / avg) * 100).toFixed(1) : '—';
+  const reward = newTgt > 0 ? newTgt - avg : 0;
+  const hasSL = newSL > 0 && risk > 0;
+  const rrRatio = hasSL && newTgt > 0 ? (reward / risk).toFixed(2) : '—';
+  const riskPct = hasSL && avg > 0 ? ((risk / avg) * 100).toFixed(1) : '—';
   const rewardPct = avg > 0 && newTgt > 0 ? ((reward / avg) * 100).toFixed(1) : '—';
-  const currentR = risk > 0 ? ((cmp - avg) / risk).toFixed(2) : '—';
-  const rrColor = rrRatio >= 3 ? 'var(--g)' : rrRatio >= 2 ? 'var(--c)' : rrRatio >= 1 ? 'var(--y)' : 'var(--r)';
+  const currentR = hasSL ? ((cmp - avg) / risk).toFixed(2) : '—';
+  const rrColor = rrRatio !== '—' && +rrRatio >= 3 ? 'var(--g)' : rrRatio !== '—' && +rrRatio >= 2 ? 'var(--c)' : rrRatio !== '—' && +rrRatio >= 1 ? 'var(--y)' : 'var(--r)';
+  const noSlWarn = !hasSL ? '<div style="color:var(--y);font-size:9px;margin-bottom:4px">Set SL to calculate R:R</div>' : '';
 
-  preview.innerHTML = `
+  preview.innerHTML = `${noSlWarn}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center">
       <div><div style="font-size:9px;color:var(--t3)">Risk</div><div style="font-size:12px;font-weight:700;color:var(--r);font-family:'IBM Plex Mono',monospace">${riskPct}%</div></div>
       <div><div style="font-size:9px;color:var(--t3)">Reward</div><div style="font-size:12px;font-weight:700;color:var(--g);font-family:'IBM Plex Mono',monospace">${rewardPct}%</div></div>
-      <div><div style="font-size:9px;color:var(--t3)">R:R</div><div style="font-size:12px;font-weight:700;color:${rrColor};font-family:'IBM Plex Mono',monospace">1:${rrRatio}</div></div>
-      <div><div style="font-size:9px;color:var(--t3)">Current R</div><div style="font-size:12px;font-weight:700;color:var(--c);font-family:'IBM Plex Mono',monospace">${currentR}R</div></div>
+      <div><div style="font-size:9px;color:var(--t3)">R:R</div><div style="font-size:12px;font-weight:700;color:${rrColor};font-family:'IBM Plex Mono',monospace">${rrRatio !== '—' ? '1:' + rrRatio : '—'}</div></div>
+      <div><div style="font-size:9px;color:var(--t3)">Current R</div><div style="font-size:12px;font-weight:700;color:var(--c);font-family:'IBM Plex Mono',monospace">${currentR !== '—' ? currentR + 'R' : '—'}</div></div>
     </div>`;
 }
 
