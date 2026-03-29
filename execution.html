@@ -1063,7 +1063,7 @@ function updateTrancheStatuses(tranches, cmp, exitedQty) {
   });
 }
 
-function renderTrancheQuickView(trade, cmp) {
+function renderTrancheQuickView(trade, cmp, posIdx) {
   if (!trade) return '';
   const nt = normalizeTrade(trade);
   if (!nt || !nt._n) return '';
@@ -1081,12 +1081,17 @@ function renderTrancheQuickView(trade, cmp) {
     const triggerLabel = tr.trigger > 0 ? `₹${tr.trigger.toFixed(0)}` : 'TSL hit';
     const starNote = isStar ? `<span style="font-size:8px;color:var(--r)" title="Star L${tr._starLevel} override — was ₹${(tr._origTrigger||0).toFixed(0)}"> ★</span>` : '';
 
+    // NOW button: clickable → opens partial exit pre-filled with tranche qty + reason
+    const nowClick = isNext && trade.id && posIdx !== undefined
+      ? `onclick="openTrancheExit('${trade.id}',${posIdx},${tr.qty},'${tr.id}','${(tr.tslAction||'').replace(/'/g,'')}')" style="cursor:pointer" title="Click to execute ${tr.label} exit (${tr.qty} shares)"`
+      : '';
+
     return `<div class="ep-tranche-row ${isDone ? 'done' : ''} ${isNext ? 'next' : ''}" ${isStar && !isDone ? 'style="background:rgba(255,69,96,.06);border-radius:6px;padding:4px 6px;margin:0 -6px"' : ''}>
       <span class="ep-tr-tag" style="background:${tr.color}22;color:${tr.color}">${tr.label}</span>
       <span class="ep-tr-trigger" style="color:${isStar ? 'var(--r)' : isNext ? 'var(--y)' : 'var(--t2)'}">${triggerLabel}${starNote}</span>
       <span class="ep-tr-qty">${tr.qty} qty</span>
       <span class="ep-tr-tsl">${tr.tslAction}</span>
-      <span class="ep-tr-status" style="color:${statusColor}">${statusIcon} ${statusLabel}</span>
+      <span class="ep-tr-status" ${nowClick} style="color:${statusColor}${isNext ? ';cursor:pointer;text-decoration:underline;text-underline-offset:2px' : ''}">${statusIcon} ${statusLabel}</span>
     </div>`;
   }).join('');
 }
@@ -1388,6 +1393,37 @@ function scheduleRetry() {
 // ═══════════════════════════════════════════════════════════════
 // PARTIAL EXIT SYSTEM
 // ═══════════════════════════════════════════════════════════════
+
+// Quick tranche exit — called from NOW button on tranche quick view
+function openTrancheExit(tradeId, posIdx, qty, trancheId, tslAction) {
+  const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+  const trade = trades.find(t => t.id === tradeId);
+  if (!trade) return;
+  _partialTradeId = tradeId;
+  _partialPosIdx = posIdx;
+  const nt = normalizeTrade(trade);
+  const p = _mergedPositions[posIdx] || TE.exec.positions[posIdx];
+  const cmp = p ? (p.last_price || p.lastPrice || p.ltp || 0) : 0;
+
+  document.getElementById('partial-sym').textContent = trade.symbol;
+  document.getElementById('partial-total-qty').value = nt._n.remainingQty;
+  document.getElementById('partial-exit-qty').value = qty;
+  document.getElementById('partial-price').value = cmp ? cmp.toFixed(2) : '';
+
+  // Auto-select reason based on tranche
+  const reasonMap = { t1: 'atr_5x', t2: 'atr_6x', t3: 'atr_7x', t4: 'manual' };
+  const reasonEl = document.getElementById('partial-reason');
+  if (reasonEl && reasonMap[trancheId]) reasonEl.value = reasonMap[trancheId];
+
+  updatePartialSummary();
+  openM('m-partial');
+  playSwoopClick();
+
+  // Toast hint about TSL action
+  if (tslAction) {
+    toast(`${trade.symbol} ${trancheId.toUpperCase()}: After exit → ${tslAction}`, '📊');
+  }
+}
 
 function openPartialSell(tradeId, posIdx) {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
@@ -3345,7 +3381,7 @@ function renderPositions() {
       <!-- Tranche Exit Plan (quick view) -->
       ${trade ? `<div class="ep-pos-section">
         <div class="ep-section-label">Exit Plan</div>
-        ${renderTrancheQuickView(trade, ltp)}
+        ${renderTrancheQuickView(trade, ltp, i)}
       </div>` : ''}
 
       <!-- Pyramid -->
