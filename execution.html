@@ -862,7 +862,7 @@ function normalizeTrade(t) {
 
 function getOpenPositions(symbol) {
   const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-  return trades.filter(t => t.symbol === symbol && t.status === 'Open' || t.status === 'Partial').map(normalizeTrade).filter(Boolean);
+return trades.filter(t => t.symbol === symbol && (t.status === 'Open' || t.status === 'Partial')).map(normalizeTrade).filter(Boolean);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3232,7 +3232,7 @@ async function buildMergedPositions() {
           if (techData) {
             _atrCache[sym] = techData.atr14;
             const allTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-            const tIdx = allTrades.findIndex(t => t.symbol === sym && t.status === 'Open' || t.status === 'Partial');
+            const tIdx = allTrades.findIndex(t => t.symbol === sym && (t.status === 'Open' || t.status === 'Partial'));
             if (tIdx >= 0) {
               allTrades[tIdx]._epAtr14 = techData.atr14;
               allTrades[tIdx]._epEma8 = techData.ema8;
@@ -3280,7 +3280,7 @@ async function buildMergedPositions() {
               const ec = await ecFn(sym, { stMultiplier: ecMultiplier }, tradeSector);
               if (ec && ec.current) {
                 const ecTrades = JSON.parse(localStorage.getItem('te_trades') || '[]');
-                const ecIdx = ecTrades.findIndex(t => t.symbol === sym && t.status === 'Open' || t.status === 'Partial');
+                const ecIdx = ecTrades.findIndex(t => t.symbol === sym && (t.status === 'Open' || t.status === 'Partial'));
                 if (ecIdx >= 0) {
                   EdgeCloud.storeOnTrade(ecTrades[ecIdx], ec);
                   localStorage.setItem('te_trades', JSON.stringify(ecTrades));
