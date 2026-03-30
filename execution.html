@@ -3476,7 +3476,8 @@ function renderPositions() {
         <div class="ep-metric"><div class="ep-metric-label">Risk%</div><div class="ep-metric-val" style="color:${riskPct > 10 ? 'var(--r)' : riskPct > 5 ? 'var(--y)' : 'var(--t2)'}">${riskPct.toFixed(1)}%</div></div>
         <div class="ep-metric"><div class="ep-metric-label">Qty</div><div class="ep-metric-val" style="color:var(--t2)">${Math.abs(qty)}</div></div>
       </div>
-
+     <div style="text-align:center;margin:-4px 0 2px"><button onclick="const d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=this.textContent==='▼'?'▲':'▼'" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:10px;padding:2px 12px">▼</button></div>
+      <div class="ep-pos-details" style="display:none">
       <!-- Lifecycle -->
       <div class="ep-pos-section">
         <div class="ep-section-label">Lifecycle</div>
@@ -3510,7 +3511,7 @@ function renderPositions() {
         <div class="ep-section-label">Pyramid</div>
         ${renderPyramidIndicator(trade || { entries: [{ date: '', price: avg, qty: Math.abs(qty) }] })}
       </div>
-
+      </div>
       <!-- Actions -->
       <div class="ep-pos-actions">
         <button class="ep-act-btn" onclick="quickPartial('${sym}',${i},25)">25%</button>
