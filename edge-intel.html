@@ -2378,7 +2378,10 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </button>
       </div>
 
-      {/* ═══ TRADE EXECUTION PANEL — REDESIGNED ═══ */}
+      {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
+      </>}
+
+      {/* ═══ TRADE EXECUTION PANEL — Renders for BOTH existing and new positions ═══ */}
       {showExecution&&<div ref={execPanelRef} className="fade-in" style={{background:'linear-gradient(135deg,rgba(6,8,12,0.98),rgba(12,16,24,0.98))',border:'1px solid var(--border-med)',borderRadius:16,padding:0,marginBottom:20,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.05)'}}>
         
         {/* Header */}
@@ -2716,9 +2719,6 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </div>
       </div>}
 
-      {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
-      </>}
-      
       {/* AI Analysis for existing positions */}
       {isExistingPosition && analysis && <div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
     </div>
