@@ -48,4 +48,5 @@ jobs:
           git config user.email "bot@tradedge.dev"
           git add data/rrm_scanner.json
           git diff --cached --quiet || git commit -m "RRM Scanner $(date +'%Y-%m-%d %H:%M IST')"
+          git pull --rebase origin main
           git push
