@@ -360,7 +360,12 @@ def process_stock(symbol: str, bench: dict) -> dict:
 
         # RSI for this timeframe
         result[f"{tf_label}_rsi"] = calc_rsi(closes, 14)
-
+        # Store CMP and change% from daily closes
+        if tf_key == "d" and len(closes) >= 2:
+            result["close"] = round(closes[-1], 2)
+            result["cmp"] = round(closes[-1], 2)
+            prev = closes[-2]
+            result["change_pct"] = round((closes[-1] - prev) / prev * 100, 2) if prev > 0 else 0
     # Signal & Score
     result["signal"] = compute_signal(
         result.get("d_quad", "Unknown"),
