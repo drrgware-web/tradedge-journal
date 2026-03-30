@@ -3569,7 +3569,25 @@ const EdgeIntel=()=>{
     setLoading(false);
   };
 
-    const handleSubmit=e=>{e.preventDefault();loadStock(inputSymbol)};
+    const handleSubmit=e=>{
+      e.preventDefault();
+      if(!inputSymbol) return;
+      const q = inputSymbol.toUpperCase().trim();
+      // If user typed a name (not a symbol), resolve from suggestions or stock list
+      const exactSymbol = FULL_STOCK_LIST.find(s => s.s === q);
+      if(exactSymbol) { loadStock(q); return; }
+      // Try matching by name (case-insensitive)
+      const byName = FULL_STOCK_LIST.find(s => s.n.toUpperCase() === q || s.n.toUpperCase().includes(q));
+      if(byName) { setInputSymbol(byName.s); loadStock(byName.s); return; }
+      // Try without spaces
+      const noSpace = q.replace(/\s+/g, '');
+      const byNoSpace = FULL_STOCK_LIST.find(s => s.s === noSpace);
+      if(byNoSpace) { setInputSymbol(byNoSpace.s); loadStock(byNoSpace.s); return; }
+      // If current suggestions have a match, use the first one
+      if(suggestions.length > 0) { setInputSymbol(suggestions[0].s); loadStock(suggestions[0].s); return; }
+      // Last resort: pass as-is (loadStock will try Yahoo)
+      loadStock(inputSymbol);
+    };
 
   // Close suggestions when clicking outside
   useEffect(()=>{
