@@ -3450,7 +3450,7 @@ function renderPositions() {
 
     return `<div class="ep-pos-card" data-symbol="${sym}">
       <!-- Header -->
-      <div class="ep-pos-header">
+      <div class="ep-pos-header" onclick="const d=this.parentElement.querySelector('.ep-pos-details');if(d){d.style.display=d.style.display==='none'?'block':'none';this.querySelector('.ep-toggle').textContent=d.style.display==='none'?'▼':'▲'}" style="cursor:pointer">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="ep-pos-sym">${sym}</span>
           ${brokerDot}
@@ -3460,6 +3460,7 @@ function renderPositions() {
           ${days ? `<span style="font-size:9px;color:var(--t4)">Day ${days}</span>` : ''}
         </div>
         <div>
+         <span class="ep-toggle" style="color:var(--t3);font-size:11px;margin-right:4px">▼</span>
           <span class="ep-badge ep-badge-grade" style="color:${gradeColor}">${grade}</span>
           <div style="text-align:right;margin-top:2px">
             <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pnlColor}">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div>
@@ -3476,7 +3477,7 @@ function renderPositions() {
         <div class="ep-metric"><div class="ep-metric-label">Risk%</div><div class="ep-metric-val" style="color:${riskPct > 10 ? 'var(--r)' : riskPct > 5 ? 'var(--y)' : 'var(--t2)'}">${riskPct.toFixed(1)}%</div></div>
         <div class="ep-metric"><div class="ep-metric-label">Qty</div><div class="ep-metric-val" style="color:var(--t2)">${Math.abs(qty)}</div></div>
       </div>
-     <div style="text-align:center;margin:-4px 0 2px"><button onclick="const d=this.parentElement.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none';this.textContent=this.textContent==='▼'?'▲':'▼'" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:10px;padding:2px 12px">▼</button></div>
+     
       <div class="ep-pos-details" style="display:none">
       <!-- Lifecycle -->
       <div class="ep-pos-section">
