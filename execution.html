@@ -9,7 +9,7 @@
 <style>
 /* ═══ Edge Pilot Inline Styles ═══ */
 .ep-lifecycle { display:flex; gap:2px; align-items:center; margin:6px 0; }
-.ep-lc-step { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; border:1.5px solid var(--b1); color:var(--t4); background:var(--bg3); transition:all .3s; }
+.ep-lc-step { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; border:1.5px solid var(--b1); color:var(--t3); background:var(--bg3); transition:all .3s; }
 .ep-lc-step.done { background:rgba(0,229,160,.15); border-color:var(--g); color:var(--g); }
 .ep-lc-step.active { background:rgba(0,187,255,.15); border-color:var(--c); color:var(--c); animation:ep-pulse 1.5s ease infinite; }
 .ep-lc-step.pending { opacity:.4; }
@@ -71,14 +71,14 @@
 /* SL Move Modal */
 .ep-sl-history { max-height:150px; overflow-y:auto; margin-top:8px; }
 .ep-sl-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.03); font-size:11px; }
-.ep-sl-row .sl-date { color:var(--t4); min-width:65px; font-family:'IBM Plex Mono',monospace; }
+.ep-sl-row .sl-date { color:var(--t2); min-width:65px; font-family:'IBM Plex Mono',monospace; }
 .ep-sl-row .sl-from { color:var(--r); }
 .ep-sl-row .sl-to { color:var(--g); }
 .ep-sl-row .sl-reason { color:var(--t3); margin-left:auto; font-style:italic; }
 
 /* Order Builder Modal Tabs */
 .ep-ob-tabs { display:flex; gap:0; border:1px solid var(--b1); border-radius:8px; overflow:hidden; margin-bottom:12px; }
-.ep-ob-tab { flex:1; padding:8px; font-size:11px; font-weight:700; border:none; cursor:pointer; background:var(--bg3); color:var(--t4); font-family:'Outfit',sans-serif; transition:all .15s; }
+.ep-ob-tab { flex:1; padding:8px; font-size:11px; font-weight:700; border:none; cursor:pointer; background:var(--bg3); color:var(--t2); font-family:'Outfit',sans-serif; transition:all .15s; }
 .ep-ob-tab.active { background:rgba(0,187,255,.1); color:var(--c); }
 
 /* Capital Bar */
@@ -196,8 +196,8 @@ document.addEventListener('click', function(e) {
     <div style="font-size:12px;color:var(--t3);margin-top:3px">Place orders · manage positions · auto-trail · iceberg · bracket · live P&L</div>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    <div id="broker-status" style="font-size:11px;color:var(--t3)"></div>
-    <div id="live-indicator" style="font-size:10px;color:var(--t4);display:none"><span class="exec-live-dot"></span>Live</div>
+    <div id="broker-status" style="font-size:11px;color:var(--t2)"></div>
+    <div id="live-indicator" style="font-size:10px;color:var(--t2);display:none"><span class="exec-live-dot"></span>Live</div>
     <button class="btn btn-ghost btn-sm" onclick="refreshAll()">↻ Refresh</button>
   </div>
 </div>
@@ -236,7 +236,7 @@ document.addEventListener('click', function(e) {
   <div style="padding:8px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
     <div style="font-size:11px;font-weight:700;color:var(--t2)">📊 Exposure Heatmap</div>
   </div>
-  <div style="padding:8px" id="heatmap"><div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">Load positions to see heatmap</div></div>
+  <div style="padding:8px" id="heatmap"><div style="padding:20px;text-align:center;color:var(--t2);font-size:11px">Load positions to see heatmap</div></div>
 </div>
 
 <!-- Square Off All -->
@@ -274,7 +274,7 @@ document.addEventListener('click', function(e) {
       <!-- Side Toggle -->
       <div style="display:flex;gap:0;border:1.5px solid var(--b1);border-radius:10px;overflow:hidden">
         <button id="side-buy" onclick="setSide('BUY')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--gd);color:var(--g);font-family:'Outfit',sans-serif">BUY</button>
-        <button id="side-sell" onclick="setSide('SELL')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t4);font-family:'Outfit',sans-serif">SELL</button>
+        <button id="side-sell" onclick="setSide('SELL')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:var(--bg3);color:var(--t2);font-family:'Outfit',sans-serif">SELL</button>
       </div>
 
       <!-- Order Type -->
@@ -363,7 +363,7 @@ document.addEventListener('click', function(e) {
         </div>
       </div>
       <div id="positions" style="max-height:none;overflow-y:auto;padding:8px">
-        <div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">Click ↻ Refresh to load positions from journal</div>
+        <div style="padding:30px;text-align:center;color:var(--t2);font-size:12px">Click ↻ Refresh to load positions from journal</div>
       </div>
     </div>
 
@@ -374,7 +374,7 @@ document.addEventListener('click', function(e) {
         <button class="btn btn-ghost btn-xs" onclick="refreshOrders()">↻</button>
       </div>
       <div id="orders" style="max-height:300px;overflow-y:auto">
-        <div style="padding:20px;text-align:center;color:var(--t4);font-size:12px">No orders</div>
+        <div style="padding:20px;text-align:center;color:var(--t2);font-size:12px">No orders</div>
       </div>
     </div>
   </div>
@@ -399,7 +399,7 @@ document.addEventListener('click', function(e) {
   </div>
   <div class="card" style="border-radius:0 0 10px 10px;border-top:none">
     <div id="gtt-list" style="min-height:60px;max-height:450px;overflow-y:auto">
-      <div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">🎯 No GTT orders</div>
+      <div style="padding:28px;text-align:center;color:var(--t2);font-size:12px">🎯 No GTT orders</div>
     </div>
   </div>
 </div>
@@ -424,14 +424,14 @@ document.addEventListener('click', function(e) {
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
             <span style="font-size:14px">🤖</span>
             <span style="font-size:11px;font-weight:600;color:var(--t1)">Groq AI Key</span>
-            <span id="groq-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+            <span id="groq-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t2)">Not set</span>
           </div>
           <div style="display:flex;gap:8px">
             <input type="password" id="groq-key-input" placeholder="gsk_xxxxx..." style="flex:1;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:11px">
             <button class="btn btn-ghost btn-xs" onclick="toggleGroqKeyVisibility()" id="groq-eye-btn" style="padding:8px">👁️</button>
             <button class="btn btn-xs" onclick="saveGroqKey()" style="background:var(--g);color:#000;font-weight:600;padding:8px 12px">Save</button>
           </div>
-          <div style="font-size:9px;color:var(--t4);margin-top:6px">
+          <div style="font-size:9px;color:var(--t2);margin-top:6px">
             Get free key from <a href="https://console.groq.com/keys" target="_blank" style="color:var(--b)">console.groq.com/keys</a>
           </div>
         </div>
@@ -441,7 +441,7 @@ document.addEventListener('click', function(e) {
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
             <span style="font-size:14px">📱</span>
             <span style="font-size:11px;font-weight:600;color:var(--t1)">Telegram Alerts</span>
-            <span id="telegram-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+            <span id="telegram-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t2)">Not set</span>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <div>
@@ -464,7 +464,7 @@ document.addEventListener('click', function(e) {
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
             <span style="font-size:14px">📊</span>
             <span style="font-size:11px;font-weight:600;color:var(--t1)">Dhan API</span>
-            <span id="dhan-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t4)">Not set</span>
+            <span id="dhan-status" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg2);color:var(--t2)">Not set</span>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <div>
@@ -501,7 +501,7 @@ document.addEventListener('click', function(e) {
             <button class="ep-act-btn" id="ec-st2-btn" onclick="setECMultiplier(2)" style="font-size:10px;padding:4px 10px">10, 2</button>
             <button class="ep-act-btn" id="ec-st3-btn" onclick="setECMultiplier(3)" style="font-size:10px;padding:4px 10px">10, 3</button>
           </div>
-          <div style="font-size:9px;color:var(--t4)">
+          <div style="font-size:9px;color:var(--t2)">
             Walking Line = SuperTrend (TSL) · Running Line = EMA(21) · Cloud = zone between them<br>
             10,2 = tighter TSL, more responsive · 10,3 = wider TSL, fewer whipsaws
           </div>
@@ -649,7 +649,7 @@ document.addEventListener('click', function(e) {
 
       <!-- R:R Preview -->
       <div style="background:var(--bg3);border-radius:8px;padding:10px" id="sl-tgt-preview">
-        <div style="color:var(--t4);font-size:10px">Set SL and Target to see R:R preview</div>
+        <div style="color:var(--t2);font-size:10px">Set SL and Target to see R:R preview</div>
       </div>
 
       <!-- Tranche Exit Plan Editor -->
@@ -662,7 +662,7 @@ document.addEventListener('click', function(e) {
           <span></span><span>TRIGGER ₹</span><span>QTY</span><span>TSL AFTER EXIT</span><span></span>
         </div>
         <div id="tranche-editor">
-          <div style="color:var(--t4);font-size:10px;padding:8px 0">Loading…</div>
+          <div style="color:var(--t3);font-size:10px;padding:8px 0">Loading…</div>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="btn btn-sm" style="background:var(--c);color:#000;font-weight:700;flex:1" onclick="saveTrancheEdits(_slMoveTradeId)">Save Plan</button>
@@ -676,7 +676,7 @@ document.addEventListener('click', function(e) {
       <div>
         <div class="ep-section-label" style="margin-top:4px">SL Move History</div>
         <div class="ep-sl-history" id="sl-move-history">
-          <div style="color:var(--t4);font-size:10px;padding:4px 0">No history</div>
+          <div style="color:var(--t3);font-size:10px;padding:4px 0">No history</div>
         </div>
       </div>
     </div>
@@ -742,7 +742,7 @@ document.addEventListener('click', function(e) {
       </div>
       <!-- P&L Summary -->
       <div style="background:var(--bg3);border-radius:8px;padding:10px;font-size:11px" id="partial-summary">
-        <div style="color:var(--t4)">Fill details to see P&L impact</div>
+        <div style="color:var(--t2)">Fill details to see P&L impact</div>
       </div>
     </div>
     <div class="m-foot">
@@ -1126,7 +1126,7 @@ function renderTrancheEditor(trade) {
         <option value="10 DMA" ${tr.tslAction.includes('10 DMA') ? 'selected' : ''}>SL → 10 DMA</option>
         <option value="Chandelier 3ATR" ${tr.tslAction.includes('Chandelier') ? 'selected' : ''}>SL → Chand 3ATR</option>
       </select>
-      <span style="font-size:9px;color:var(--t4)">${tr.pct ? tr.pct + '%' : '🏃'}</span>
+      <span style="font-size:9px;color:var(--t3)">${tr.pct ? tr.pct + '%' : '🏃'}</span>
     </div>`).join('')}
   </div>`;
 }
@@ -1157,10 +1157,10 @@ function saveTrancheEdits(tradeId) {
 
 function renderSLLadder(trade, cmp) {
   const t = normalizeTrade(trade);
-  if (!t || !t._n || !t._n.avgEntry) return '<div style="font-size:9px;color:var(--t4)">No SL data</div>';
+  if (!t || !t._n || !t._n.avgEntry) return '<div style="font-size:9px;color:var(--t3)">No SL data</div>';
   const avg = t._n.avgEntry;
   const sl = +t.sl || 0;
-  if (!sl) return '<div style="font-size:9px;color:var(--t4)">Set SL to see ladder</div>';
+  if (!sl) return '<div style="font-size:9px;color:var(--t3)">Set SL to see ladder</div>';
   const slMoves = t._epSlMoves || [];
   const currentSL = slMoves.length ? +slMoves[slMoves.length - 1].to : sl;
   const hasTarget = t.target && +t.target > 0;
@@ -1182,7 +1182,7 @@ function renderSLLadder(trade, cmp) {
     <div class="ep-sl-fill" style="width:${avgPct}%;background:rgba(255,69,96,.08)"></div>
     <div class="ep-sl-fill" style="left:${avgPct}%;width:${profitWidth}%;background:rgba(0,229,160,.06)"></div>
     <div class="ep-sl-marker" style="left:${slPct}%;background:var(--r)"><div class="ep-sl-label">SL ₹${currentSL.toFixed(0)}</div></div>
-    <div class="ep-sl-marker" style="left:${avgPct}%;background:var(--t4);width:1px"><div class="ep-sl-label">Avg ₹${avg.toFixed(0)}</div></div>
+    <div class="ep-sl-marker" style="left:${avgPct}%;background:var(--t3);width:1px"><div class="ep-sl-label">Avg ₹${avg.toFixed(0)}</div></div>
     ${cmp ? `<div class="ep-sl-marker ep-sl-cmp" style="left:${cmpPct}%"></div>` : ''}
     ${tgtPct !== null ? `<div class="ep-sl-marker" style="left:${tgtPct}%;background:var(--g)"><div class="ep-sl-label">Tgt ₹${target.toFixed(0)}</div></div>` : ''}
   </div>`;
@@ -1261,7 +1261,7 @@ function renderPyramidIndicator(trade) {
   return `<div class="ep-pyr-row">
     <span class="ep-pyr-label" style="background:rgba(0,187,255,.1);color:var(--c)">${cfg?.label || 'P1'}</span>
     ${blocks}
-    <span style="font-size:9px;color:var(--t4)">${filledPct}% filled</span>
+    <span style="font-size:9px;color:var(--t3)">${filledPct}% filled</span>
   </div>`;
 }
 
@@ -1518,7 +1518,7 @@ function updatePartialSummary() {
   const exitQty = +document.getElementById('partial-exit-qty').value || 0;
   const exitPrice = +document.getElementById('partial-price').value || 0;
   if (!exitQty || !exitPrice) {
-    document.getElementById('partial-summary').innerHTML = '<div style="color:var(--t4)">Fill details to see P&L impact</div>';
+    document.getElementById('partial-summary').innerHTML = '<div style="color:var(--t3)">Fill details to see P&L impact</div>';
     return;
   }
   const avgEntry = nt._n.avgEntry;
@@ -1538,9 +1538,9 @@ function updatePartialSummary() {
   document.getElementById('partial-summary').innerHTML = `
     ${priceIsSuspect ? '<div style="color:var(--y);font-size:10px;font-weight:700;margin-bottom:6px;padding:4px 8px;background:rgba(245,158,11,.1);border-radius:6px">⚠ Price equals entry avg — live CMP may not be loaded. Verify price before submitting.</div>' : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
-      <div><div style="font-size:8px;color:var(--t4)">Exit P&L</div><div style="font-size:13px;font-weight:700;color:${pnlColor}">${pnl >= 0 ? '+' : ''}₹${Math.abs(pnl).toFixed(0)}</div></div>
-      <div><div style="font-size:8px;color:var(--t4)">R-Multiple</div><div style="font-size:13px;font-weight:700;color:${rMultiple >= 0 ? 'var(--g)' : 'var(--r)'}">${rMultiple.toFixed(2)}R</div></div>
-      <div><div style="font-size:8px;color:var(--t4)">Remaining</div><div style="font-size:13px;font-weight:700;color:var(--c)">${nt._n.remainingQty - exitQty}</div></div>
+      <div><div style="font-size:8px;color:var(--t3)">Exit P&L</div><div style="font-size:13px;font-weight:700;color:${pnlColor}">${pnl >= 0 ? '+' : ''}₹${Math.abs(pnl).toFixed(0)}</div></div>
+      <div><div style="font-size:8px;color:var(--t3)">R-Multiple</div><div style="font-size:13px;font-weight:700;color:${rMultiple >= 0 ? 'var(--g)' : 'var(--r)'}">${rMultiple.toFixed(2)}R</div></div>
+      <div><div style="font-size:8px;color:var(--t3)">Remaining</div><div style="font-size:13px;font-weight:700;color:var(--c)">${nt._n.remainingQty - exitQty}</div></div>
     </div>`;
 }
 
@@ -1676,7 +1676,7 @@ function openSLMove(tradeId) {
       `<button class="ep-act-btn" style="font-size:11px;color:var(--g)" onclick="document.getElementById('tgt-new').value='${b.value.toFixed(2)}';updateSLTgtPreview()">${b.label}</button>`
     ).join('');
   } else {
-    rrPresets.innerHTML = '<span style="font-size:9px;color:var(--t4)">Set SL first for R:R targets</span>';
+    rrPresets.innerHTML = '<span style="font-size:9px;color:var(--t3)">Set SL first for R:R targets</span>';
   }
 
   // ── Target ATR Sell-Into-Strength Presets ──
@@ -1715,12 +1715,12 @@ function openSLMove(tradeId) {
   // ── SL History ──
   const hist = document.getElementById('sl-move-history');
   if (!slMoves.length) {
-    hist.innerHTML = `<div style="color:var(--t4);font-size:10px;padding:4px 0">Initial SL: ₹${(+trade.sl || 0).toFixed(2)}</div>`;
+    hist.innerHTML = `<div style="color:var(--t3);font-size:10px;padding:4px 0">Initial SL: ₹${(+trade.sl || 0).toFixed(2)}</div>`;
   } else {
     hist.innerHTML = slMoves.map(m => `<div class="ep-sl-row">
       <span class="sl-date">${m.date || '—'}</span>
       <span class="sl-from">₹${(+m.from || 0).toFixed(0)}</span>
-      <span style="color:var(--t4)">→</span>
+      <span style="color:var(--t3)">→</span>
       <span class="sl-to">₹${(+m.to || 0).toFixed(0)}</span>
       <span class="sl-reason">${m.reason || ''}</span>
     </div>`).join('');
@@ -1777,7 +1777,7 @@ function updateSLTgtPreview() {
   const preview = document.getElementById('sl-tgt-preview');
 
   if (!newSL && !newTgt) {
-    preview.innerHTML = '<div style="color:var(--t4);font-size:10px">Set SL and Target to see R:R preview</div>';
+    preview.innerHTML = '<div style="color:var(--t3);font-size:10px">Set SL and Target to see R:R preview</div>';
     return;
   }
 
@@ -2001,7 +2001,7 @@ function updateGroqStatus() {
   const status = document.getElementById('groq-status');
   const key = localStorage.getItem('groq_key');
   if (key && key.startsWith('gsk_')) { status.textContent = '✓ Connected'; status.style.background = 'rgba(0,229,160,0.15)'; status.style.color = '#00E5A0'; }
-  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t4)'; }
+  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t3)'; }
 }
 
 function updateTelegramStatus() {
@@ -2009,7 +2009,7 @@ function updateTelegramStatus() {
   const bot = localStorage.getItem('te_tg_bot');
   const chat = localStorage.getItem('te_tg_chat');
   if (bot && chat) { status.textContent = '✓ Configured'; status.style.background = 'rgba(0,229,160,0.15)'; status.style.color = '#00E5A0'; }
-  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t4)'; }
+  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t3)'; }
 }
 
 function updateDhanStatus() {
@@ -2017,7 +2017,7 @@ function updateDhanStatus() {
   const id = localStorage.getItem('dhan_id');
   const token = localStorage.getItem('dhan_tk');
   if (id && token) { status.textContent = '✓ Connected'; status.style.background = 'rgba(0,229,160,0.15)'; status.style.color = '#00E5A0'; }
-  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t4)'; }
+  else { status.textContent = 'Not set'; status.style.background = 'var(--bg2)'; status.style.color = 'var(--t3)'; }
 }
 
 function toggleGroqKeyVisibility() {
@@ -3387,8 +3387,8 @@ function renderPositions() {
   if (!positions.length) {
     const openCount = JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open' || t.status === 'Partial').length;
     container.innerHTML = openCount
-      ? `<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px"><div class="spinner" style="width:20px;height:20px;border-width:2px;margin-bottom:8px"></div>Loading ${openCount} journal positions…<br><button class="btn btn-ghost btn-sm" onclick="refreshAll()" style="margin-top:8px">↻ Refresh</button></div>`
-      : '<div style="padding:30px;text-align:center;color:var(--t4);font-size:12px">No open positions in journal</div>';
+      ? `<div style="padding:30px;text-align:center;color:var(--t3);font-size:12px"><div class="spinner" style="width:20px;height:20px;border-width:2px;margin-bottom:8px"></div>Loading ${openCount} journal positions…<br><button class="btn btn-ghost btn-sm" onclick="refreshAll()" style="margin-top:8px">↻ Refresh</button></div>`
+      : '<div style="padding:30px;text-align:center;color:var(--t3);font-size:12px">No open positions in journal</div>';
     return;
   }
 
@@ -3432,7 +3432,7 @@ function renderPositions() {
     const cmpDot = cmpSrc === 'broker' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#00e5a0;vertical-align:middle" title="Live from broker"></span>'
       : cmpSrc === 'dhan' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#3b8bff;vertical-align:middle" title="Dhan LTP API"></span>'
       : cmpSrc === 'yahoo' ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;vertical-align:middle" title="Yahoo Finance"></span>'
-      : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t4);vertical-align:middle" title="Using entry price"></span>';
+      : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t3);vertical-align:middle" title="Using entry price"></span>';
 
     // RS rank
     const rsRank = trade?._epRsRank || null;
@@ -3481,7 +3481,7 @@ function renderPositions() {
       <div class="ep-pos-section">
         <div class="ep-section-label">Lifecycle</div>
         <div class="ep-lifecycle">${renderLifecycle(phases)}</div>
-        <div style="display:flex;gap:4px;font-size:8px;color:var(--t4)">${EP_CONFIG.lifecycle.map((l,j) => `<span style="flex:1;text-align:center;${phases[j] ? 'color:var(--g)' : ''}">${l}</span>`).join('')}</div>
+        <div style="display:flex;gap:4px;font-size:8px;color:var(--t3)">${EP_CONFIG.lifecycle.map((l,j) => `<span style="flex:1;text-align:center;${phases[j] ? 'color:var(--g)' : ''}">${l}</span>`).join('')}</div>
       </div>
 
       <!-- SL Ladder -->
@@ -3725,7 +3725,7 @@ function scrollToPosition(sym) {
 function renderHeatmap() {
   const c = document.getElementById('heatmap');
   const positions = _mergedPositions.length ? _mergedPositions : TE.exec.positions;
-  if (!positions.length) { c.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t4);font-size:11px">No positions</div>'; return; }
+  if (!positions.length) { c.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3);font-size:11px">No positions</div>'; return; }
   const total = positions.reduce((s, p) => s + Math.abs((p.quantity || p.netQty || 0) * (p.last_price || p.lastPrice || 0)), 0);
   c.innerHTML = '<div class="exec-heatmap">' + positions.map(p => {
     const sym = p.tradingsymbol || p.tradingSymbol || p.symbol || '';
@@ -3747,7 +3747,7 @@ function renderHeatmap() {
 async function refreshOrders() {
   const orders = await TE.exec.refreshOrders();
   const c = document.getElementById('orders');
-  if (!orders.length) { c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:12px">No orders</div>'; return; }
+  if (!orders.length) { c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t3);font-size:12px">No orders</div>'; return; }
   c.innerHTML = `<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr>
     <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1)">Time</th>
     <th style="padding:6px 10px;font-size:9px;color:var(--t3);border-bottom:1px solid var(--b1)">Symbol</th>
@@ -3882,7 +3882,7 @@ function renderGTTList() {
   document.getElementById('gtt-badge').textContent = activeCount + ' active';
   const container = document.getElementById('gtt-list');
   if (!filtered.length) {
-    container.innerHTML = `<div style="padding:28px;text-align:center;color:var(--t4);font-size:12px">🎯 No GTTs in this tab</div>`;
+    container.innerHTML = `<div style="padding:28px;text-align:center;color:var(--t3);font-size:12px">🎯 No GTTs in this tab</div>`;
     return;
   }
   container.innerHTML = filtered.map(g => {
@@ -3899,11 +3899,11 @@ function renderGTTList() {
           <span class="gtt-sym">${g.symbol}</span>
           <span class="gtt-type ${isOCO ? 'gtt-type-oco' : 'gtt-type-single'}">${isOCO ? 'OCO' : 'Single'}</span>
           <span class="gtt-status ${stClass}">${g.source === 'local' ? '📌' : '⚡'} ${stLabel}</span>
-          <span style="font-size:10px;color:var(--t4)">${g.side} × ${g.qty}</span>
+          <span style="font-size:10px;color:var(--t3)">${g.side} × ${g.qty}</span>
         </div>
         <div class="gtt-level">${levels}</div>
-        ${g.note ? `<div style="font-size:10px;color:var(--t4);margin-top:3px">${g.note}</div>` : ''}
-        <div style="font-size:9px;color:var(--t4);margin-top:2px">${date}</div>
+        ${g.note ? `<div style="font-size:10px;color:var(--t3);margin-top:3px">${g.note}</div>` : ''}
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">${date}</div>
       </div>
       <div style="display:flex;gap:4px">
         ${g.status === 'active' ? `<button class="btn btn-ghost btn-xs" onclick="gttCancel('${g.id}')" style="color:var(--r)">✕</button>` : `<button class="btn btn-ghost btn-xs" onclick="gttDelete('${g.id}')" style="color:var(--r)">🗑</button>`}
