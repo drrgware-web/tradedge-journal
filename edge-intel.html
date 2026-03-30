@@ -82,7 +82,7 @@ const{useState,useEffect,useMemo,useCallback,useRef,Fragment}=React;
 // EDGE INTEL — 3-in-1 Professional Stock Analysis
 // ═══════════════════════════════════════════════════════════════
 
-const GROQ_API_KEY=localStorage.getItem('groq_api_key')||'';
+const GROQ_API_KEY=localStorage.getItem('groq_api_key')||localStorage.getItem('te_groq_key')||'';
 const GROQ_MODEL='llama-3.3-70b-versatile';
 
 // ═══ SUPABASE CONFIG ═══
@@ -443,21 +443,43 @@ const NSE_STOCKS=[
   {s:"STARHEALTH",n:"Star Health",sec:"Insurance"},
   {s:"NIACL",n:"New India Assurance",sec:"Insurance"},
   {s:"GICRE",n:"General Insurance",sec:"Insurance"},
+  {s:"CCL",n:"CCL Products",sec:"FMCG"},
+  {s:"CCLPRODUCTS",n:"CCL Products India",sec:"FMCG"},
 ].sort((a,b)=>a.s.localeCompare(b.s));
 
-// Load more stocks from scanner if available
+// ═══ FIX 2: Load stocks from scanner + Dhan symbol map ═══
 let FULL_STOCK_LIST=[...NSE_STOCKS];
-fetch('./data/scanner_results.json').then(r=>r.json()).then(d=>{
-  if(d?.stocks){
-    const existing=new Set(NSE_STOCKS.map(s=>s.s));
-    d.stocks.forEach(st=>{
-      if(!existing.has(st.symbol)){
-        FULL_STOCK_LIST.push({s:st.symbol,n:st.name||st.symbol,sec:st.sector||''});
+const _loadExtraStocks = async () => {
+  const existing = new Set(NSE_STOCKS.map(s => s.s));
+  // 1. Try scanner_results.json
+  try {
+    const r = await fetch('./data/scanner_results.json');
+    if (r.ok) {
+      const d = await r.json();
+      const stocks = d?.stocks || d?.scan_results || [];
+      stocks.forEach(st => {
+        const sym = st.symbol || st.s;
+        if (sym && !existing.has(sym)) {
+          existing.add(sym);
+          FULL_STOCK_LIST.push({ s: sym, n: st.name || st.n || sym, sec: st.sector || st.sec || '' });
+        }
+      });
+    }
+  } catch (e) { console.log('Scanner load skipped'); }
+  // 2. Load Dhan symbol map from localStorage (8,819 stocks)
+  try {
+    const dhanMap = JSON.parse(localStorage.getItem('dhan_symbol_map') || '{}');
+    Object.entries(dhanMap).forEach(([sym, id]) => {
+      if (!existing.has(sym) && sym.length > 0 && sym.length < 30 && /^[A-Z]/.test(sym)) {
+        existing.add(sym);
+        FULL_STOCK_LIST.push({ s: sym, n: sym, sec: '' });
       }
     });
-    FULL_STOCK_LIST.sort((a,b)=>a.s.localeCompare(b.s));
-  }
-}).catch(()=>{});
+  } catch (e) { console.log('Dhan map load skipped'); }
+  FULL_STOCK_LIST.sort((a, b) => a.s.localeCompare(b.s));
+  console.log('✓ Stock list loaded:', FULL_STOCK_LIST.length, 'symbols');
+};
+_loadExtraStocks();
 
 const callGroqAI=async(prompt,systemPrompt="You are an expert equity research analyst.")=>{
   if(!GROQ_API_KEY)throw new Error('Set groq_api_key in localStorage');
@@ -466,7 +488,10 @@ const callGroqAI=async(prompt,systemPrompt="You are an expert equity research an
     headers:{'Authorization':`Bearer ${GROQ_API_KEY}`,'Content-Type':'application/json'},
     body:JSON.stringify({model:GROQ_MODEL,messages:[{role:'system',content:systemPrompt},{role:'user',content:prompt}],temperature:0.7,max_tokens:2000})
   });
-  if(!res.ok)throw new Error('API Error: '+res.status);
+  if(!res.ok){
+    if(res.status===401) throw new Error('API Error: 401 — Groq key invalid/expired. Run: localStorage.setItem("groq_api_key","YOUR_NEW_KEY") in console');
+    throw new Error('API Error: '+res.status);
+  }
   const data=await res.json();
   return data.choices?.[0]?.message?.content||'No response';
 };
@@ -3293,9 +3318,10 @@ const EdgeIntel=()=>{
   useEffect(()=>{
     if(inputSymbol.length>=1){
       const q=inputSymbol.toUpperCase();
-      const matches=FULL_STOCK_LIST.filter(s=>
-        s.s.startsWith(q)||s.n.toUpperCase().includes(q)
-      ).slice(0,12);
+      // FIX 3: Exact prefix first, then substring
+      const exactPrefix = FULL_STOCK_LIST.filter(s => s.s.startsWith(q));
+      const substring = FULL_STOCK_LIST.filter(s => !s.s.startsWith(q) && (s.s.includes(q) || s.n.toUpperCase().includes(q)));
+      const matches = [...exactPrefix, ...substring].slice(0, 15);
       setSuggestions(matches);
       setShowSuggestions(matches.length>0);
     }else{
@@ -3420,51 +3446,126 @@ const EdgeIntel=()=>{
 
   const loadStock=async(sym)=>{
     if(!sym)return;
+    const cleanSym = sym.replace('.NS','').replace('.BO','').toUpperCase().trim();
     setLoading(true);
     setShowSuggestions(false);
+    setSymbol(cleanSym);
     try{
       let data = null;
       
-      // Try stock_details first
-      const res=await fetch(`./data/stock_details/${sym.toUpperCase()}.json?t=${Date.now()}`);
-      if(res.ok){
-        data=await res.json();
-      }else{
-        // Try scanner results
-        const scanRes=await fetch(`./data/scanner_results.json?t=${Date.now()}`);
-        if(scanRes.ok){
-          const scanData=await scanRes.json();
-          const found=scanData.stocks?.find(s=>s.symbol.toUpperCase()===sym.toUpperCase());
-          if(found) data = found;
+      // 1. Try stock_details JSON first
+      try {
+        const res=await fetch(`./data/stock_details/${cleanSym}.json?t=${Date.now()}`);
+        if(res.ok) data=await res.json();
+      } catch(e) {}
+      
+      // 2. Try scanner results
+      if(!data) {
+        try {
+          const scanRes=await fetch(`./data/scanner_results.json?t=${Date.now()}`);
+          if(scanRes.ok){
+            const scanData=await scanRes.json();
+            const stocks = scanData?.stocks || scanData?.scan_results || [];
+            const found=stocks.find(s=>(s.symbol||s.s||'').toUpperCase()===cleanSym);
+            if(found) data = { ...found, symbol: cleanSym, name: found.name || found.n || cleanSym };
+          }
+        } catch(e) {}
+      }
+      
+      // 3. FIX 4: Yahoo Finance fallback — works for ANY NSE stock
+      if(!data) {
+        console.log('JSON not found for', cleanSym, '→ trying Yahoo Finance...');
+        const wUrl = localStorage.getItem('zd_worker_url');
+        if(wUrl) {
+          try {
+            const res = await fetch(wUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
+              body: JSON.stringify({ ticker: `${cleanSym}.NS`, range: '3mo', interval: '1d' })
+            });
+            const yData = await res.json();
+            const result = yData?.chart?.result?.[0];
+            if(result) {
+              const meta = result.meta || {};
+              const quotes = result.indicators?.quote?.[0] || {};
+              const closes = (quotes.close || []).filter(c => c != null && c > 0);
+              const lastClose = closes.length > 0 ? closes[closes.length - 1] : 0;
+              const prevClose = closes.length > 1 ? closes[closes.length - 2] : lastClose;
+              const livePrice = meta.regularMarketPrice || lastClose;
+              const changePct = prevClose > 0 ? ((livePrice - prevClose) / prevClose * 100) : 0;
+              const listEntry = FULL_STOCK_LIST.find(s => s.s === cleanSym);
+              data = {
+                symbol: cleanSym,
+                name: meta.shortName || meta.longName || listEntry?.n || cleanSym,
+                sector: listEntry?.sec || '',
+                price: +livePrice.toFixed(2),
+                change_pct: +changePct.toFixed(2),
+                fundamentals: { pe_ratio: null, market_cap_cr: null },
+                source: 'yahoo'
+              };
+              console.log('✓ Yahoo Finance loaded:', cleanSym, '₹' + data.price);
+              addToast('Loaded ' + cleanSym + ' via Yahoo Finance', 'info', 2000);
+            }
+          } catch(e) { console.log('Yahoo fetch failed:', e.message); }
+        } else {
+          console.log('No zd_worker_url set — cannot use Yahoo fallback');
+        }
+      }
+      
+      // 4. Dhan LTP fallback
+      if(!data) {
+        const wUrl = localStorage.getItem('zd_worker_url');
+        const dhanToken = localStorage.getItem('dhan_token');
+        const dhanId = localStorage.getItem('dhan_client_id');
+        const dhanMap = JSON.parse(localStorage.getItem('dhan_symbol_map') || '{}');
+        const secId = dhanMap[cleanSym];
+        if(wUrl && dhanToken && secId) {
+          try {
+            const res = await fetch(wUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'dhan-ltp', 'X-Dhan-Token': dhanToken, 'X-Dhan-ID': dhanId || '' },
+              body: JSON.stringify({ security_id: secId, exchange: 'NSE_EQ' })
+            });
+            const dData = await res.json();
+            if(dData?.data?.last_price || dData?.last_price) {
+              const ltp = dData?.data?.last_price || dData?.last_price;
+              const listEntry = FULL_STOCK_LIST.find(s => s.s === cleanSym);
+              data = { symbol: cleanSym, name: listEntry?.n || cleanSym, sector: listEntry?.sec || '', price: +ltp, change_pct: 0, fundamentals: {}, source: 'dhan' };
+              addToast('Loaded ' + cleanSym + ' via Dhan LTP', 'info', 2000);
+            }
+          } catch(e) { console.log('Dhan LTP failed:', e.message); }
         }
       }
       
       if(data){
-        // Fetch live ATR and Swing Lows if not already present
         if(!data.atr || !data.atr_pct){
-          console.log('Fetching live ATR for', sym);
-          const atrData = await fetchLiveATR(sym.toUpperCase());
+          console.log('Fetching live ATR for', cleanSym);
+          const atrData = await fetchLiveATR(cleanSym);
           if(atrData){
             data.atr = atrData.atr;
             data.atr_pct = atrData.atr_pct;
             data.volatility = atrData.volatility;
             data.swingLows = atrData.swingLows;
-            // ALWAYS use live price from Yahoo (overwrite stale JSON data)
             if(atrData.price > 0) data.price = atrData.price;
             console.log('Live ATR + Swing Lows:', atrData);
           }
         }
         setStockData(data);
-        setSymbol(sym.toUpperCase());
       }else{
-        alert('Stock not found');
+        addToast('"' + cleanSym + '" not found. Ensure zd_worker_url is set for Yahoo fallback.', 'error', 5000);
         setStockData(null);
+        setSymbol('');
       }
-    }catch(e){console.error(e);setStockData(null)}
+    }catch(e){
+      console.error(e);
+      addToast('Error loading ' + cleanSym + ': ' + e.message, 'error', 4000);
+      setStockData(null);
+      setSymbol('');
+    }
     setLoading(false);
   };
 
-  const handleSubmit=e=>{e.preventDefault();loadStock(inputSymbol)};
+    const handleSubmit=e=>{e.preventDefault();loadStock(inputSymbol)};
 
   // Close suggestions when clicking outside
   useEffect(()=>{
