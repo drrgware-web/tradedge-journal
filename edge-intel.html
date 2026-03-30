@@ -3338,7 +3338,7 @@ const EdgeIntel=()=>{
 
   // Fetch live ATR and Swing Lows from Yahoo via worker
   const fetchLiveATR = async (sym) => {
-    const wUrl = localStorage.getItem('zd_worker_url');
+    const wUrl = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
     if (!wUrl) return null;
     
     try {
@@ -3446,7 +3446,15 @@ const EdgeIntel=()=>{
 
   const loadStock=async(sym)=>{
     if(!sym)return;
-    const cleanSym = sym.replace('.NS','').replace('.BO','').toUpperCase().trim();
+    let cleanSym = sym.replace('.NS','').replace('.BO','').toUpperCase().trim();
+    // Strip spaces: "CCL PRODUCTS" → "CCLPRODUCTS"  
+    const noSpaceSym = cleanSym.replace(/\s+/g, '');
+    // Resolve typed name → actual NSE symbol (e.g. "CCL PRODUCTS" → "CCLPRODUCTS")
+    const nameMatch = FULL_STOCK_LIST.find(s => 
+      s.s === cleanSym || s.s === noSpaceSym || s.n.toUpperCase() === cleanSym
+    );
+    if (nameMatch) cleanSym = nameMatch.s;
+    else if (noSpaceSym !== cleanSym) cleanSym = noSpaceSym; // fallback: just remove spaces
     setLoading(true);
     setShowSuggestions(false);
     setSymbol(cleanSym);
@@ -3475,9 +3483,8 @@ const EdgeIntel=()=>{
       // 3. FIX 4: Yahoo Finance fallback — works for ANY NSE stock
       if(!data) {
         console.log('JSON not found for', cleanSym, '→ trying Yahoo Finance...');
-        const wUrl = localStorage.getItem('zd_worker_url');
-        if(wUrl) {
-          try {
+        const wUrl = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
+        try {
             const res = await fetch(wUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
@@ -3507,21 +3514,18 @@ const EdgeIntel=()=>{
               addToast('Loaded ' + cleanSym + ' via Yahoo Finance', 'info', 2000);
             }
           } catch(e) { console.log('Yahoo fetch failed:', e.message); }
-        } else {
-          console.log('No zd_worker_url set — cannot use Yahoo fallback');
-        }
       }
       
       // 4. Dhan LTP fallback
       if(!data) {
-        const wUrl = localStorage.getItem('zd_worker_url');
+        const wUrl2 = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
         const dhanToken = localStorage.getItem('dhan_token');
         const dhanId = localStorage.getItem('dhan_client_id');
         const dhanMap = JSON.parse(localStorage.getItem('dhan_symbol_map') || '{}');
         const secId = dhanMap[cleanSym];
-        if(wUrl && dhanToken && secId) {
+        if(dhanToken && secId) {
           try {
-            const res = await fetch(wUrl, {
+            const res = await fetch(wUrl2, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'dhan-ltp', 'X-Dhan-Token': dhanToken, 'X-Dhan-ID': dhanId || '' },
               body: JSON.stringify({ security_id: secId, exchange: 'NSE_EQ' })
