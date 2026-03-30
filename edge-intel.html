@@ -1952,17 +1952,17 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </div>
         
         {/* Action Buttons */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
-          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'10px',background:'rgba(255,170,0,0.1)',border:'1px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12,position:'relative',zIndex:10}}>
+          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('GTT clicked');setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'12px 10px',background:'rgba(255,170,0,0.1)',border:'2px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
             🛡️ Set GTT
           </button>
-          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(Math.floor(existingQty*partialExitPct/100));setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('Partial clicked');setShowExecution(true);setTxnType('SELL');setQty(Math.floor(existingQty*partialExitPct/100));setEntry(currentPrice)}} style={{padding:'12px 10px',background:'rgba(0,200,255,0.1)',border:'2px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
             📤 Partial ({partialExitPct}%)
           </button>
-          <button onClick={()=>{setShowExecution(true);setTxnType('BUY');setEntry(currentPrice);setQty(Math.floor(existingQty*0.5))}} style={{padding:'10px',background:'rgba(0,255,136,0.1)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('Pyramid clicked');setShowExecution(true);setTxnType('BUY');setEntry(currentPrice);setQty(Math.floor(existingQty*0.5))}} style={{padding:'12px 10px',background:'rgba(0,255,136,0.1)',border:'2px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
             📈 Pyramid
           </button>
-          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(existingQty);setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(255,68,85,0.1)',border:'1px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
+          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('Full Exit clicked');setShowExecution(true);setTxnType('SELL');setQty(existingQty);setEntry(currentPrice)}} style={{padding:'12px 10px',background:'rgba(255,68,85,0.1)',border:'2px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
             🚪 Full Exit
           </button>
         </div>
