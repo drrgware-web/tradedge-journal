@@ -1,0 +1,42 @@
+# .github/workflows/pattern-scanners.yml
+# Runs Darvas Box + Trendline Breakout scanners daily after IST market close
+
+name: 📐 Pattern Scanners (Darvas + Trendline)
+
+on:
+  schedule:
+    - cron: '0 12 * * 1-5'   # 5:30 PM IST (12:00 UTC) Mon-Fri
+  workflow_dispatch:            # Manual trigger
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance numpy pandas
+
+      - name: Run Darvas Box Scanner
+        run: python scripts/darvas_scanner.py
+        continue-on-error: true
+
+      - name: Run Trendline Breakout Scanner
+        run: python scripts/trendline_scanner.py
+        continue-on-error: true
+
+      - name: Commit results
+        run: |
+          git config user.name "TradEdge Bot"
+          git config user.email "bot@tradedge.local"
+          git add data/darvas_breakouts.json data/trendline_breakouts.json
+          git diff --cached --quiet || git commit -m "📐 Pattern scan: $(date -u +%Y-%m-%d) — Darvas + Trendline"
+          git push
