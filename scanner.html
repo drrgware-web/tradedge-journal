@@ -440,6 +440,7 @@
                     const s = NSEMaster.stats();
                     document.getElementById('stockCount').textContent = s.total;
                     document.getElementById('totalScanned').textContent = s.total;
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
                     btn.textContent = '✓ ' + s.total + ' stocks';
                     setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 3000);
                 } else {
@@ -491,10 +492,16 @@
                 if (tr?.ok) trendlineData = await tr.json();
                 if (!presetsData && !categoriesData) throw new Error('No data');
                 
-                // Init NSEMaster (non-blocking)
+                // Init NSEMaster (non-blocking) — updates count when ready
                 if (window.NSEMaster) {
                     NSEMaster.init().then(() => {
                         const s = NSEMaster.stats();
+                        document.getElementById('stockCount').textContent = s.total;
+                        document.getElementById('totalScanned').textContent = s.total;
+                        // Update date to now if on Live tab
+                        if (currentTab === 'live') {
+                            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+                        }
                         console.log('NSEMaster ready:', s.total, 'stocks | IPO 1Y:', s.ipo1y, '| 2Y:', s.ipo2y, '| 3Y:', s.ipo3y);
                     });
                 }
@@ -513,11 +520,27 @@
 
         function updateMeta() {
             const d = presetsData || categoriesData;
-            if (!d?.meta) return;
-            const dt = new Date(d.meta.generated_at);
-            document.getElementById('lastUpdate').textContent = dt.toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-            document.getElementById('stockCount').textContent = d.meta.total_stocks;
-            document.getElementById('totalScanned').textContent = d.meta.total_stocks;
+            
+            // Find the most recent date across all data sources
+            const dates = [];
+            if (d?.meta?.generated_at) dates.push(new Date(d.meta.generated_at));
+            if (darvasData?.generated_at) dates.push(new Date(darvasData.generated_at));
+            if (trendlineData?.generated_at) dates.push(new Date(trendlineData.generated_at));
+            
+            if (dates.length > 0) {
+                const latest = new Date(Math.max(...dates));
+                document.getElementById('lastUpdate').textContent = latest.toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+            }
+            
+            // Stock count: use NSEMaster if available, else fallback to scanner meta
+            if (window.NSEMaster && NSEMaster.ready) {
+                const nseCount = NSEMaster.count();
+                document.getElementById('stockCount').textContent = nseCount;
+                document.getElementById('totalScanned').textContent = nseCount;
+            } else if (d?.meta?.total_stocks) {
+                document.getElementById('stockCount').textContent = d.meta.total_stocks;
+                document.getElementById('totalScanned').textContent = d.meta.total_stocks;
+            }
         }
 
         function setupTabs() {
@@ -526,6 +549,12 @@
                     currentTab = b.dataset.tab;
                     document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
                     b.classList.add('active');
+                    // Update date display based on tab
+                    if (currentTab === 'live') {
+                        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+                    } else {
+                        updateMeta(); // Restore original date from scanner data
+                    }
                     renderSidebar(); selectFirstScan();
                 });
             });
