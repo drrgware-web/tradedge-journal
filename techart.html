@@ -363,7 +363,7 @@ function calcSuperTrend(ohlc,period,mult){
 
 function calcEdgeCloud(ohlc,cfg){
   const c=cfg||{};
-  const st1=calcSuperTrend(ohlc,c.stPeriod||10,c.stMult1||2);
+  const st1=calcSuperTrend(ohlc,c.stPeriod||10,c.stMult1||3);
   const st2=calcSuperTrend(ohlc,c.stPeriod||10,c.stMult2||3);
   const walking=st1.values.map((v,i)=>(v!=null&&st2.values[i]!=null)?(v+st2.values[i])/2:null);
   const walkDir=st1.direction.map((v,i)=>(v===1&&st2.direction[i]===1)?1:(v===-1&&st2.direction[i]===-1)?-1:v);
@@ -371,7 +371,7 @@ function calcEdgeCloud(ohlc,cfg){
   const running=calcEMA(closes,c.emaPeriod||21);
   return{walking,walkDir,running,st1,st2};
 }
-const EC_DEFAULTS={stPeriod:10,stMult1:2,stMult2:3,emaPeriod:21,wlColor:'#FFA000',wlWidth:2,wlStyle:'dashed',rlColor:'#42A5F5',rlWidth:2,rlStyle:'solid',showCloud:true};
+const EC_DEFAULTS={stPeriod:10,stMult1:3,stMult2:3,emaPeriod:21,wlColor:'#FFA000',wlWidth:2,wlStyle:'dashed',rlColor:'#42A5F5',rlWidth:2,rlStyle:'solid',showCloud:true};
 
 function calcRSI(closes,period){
   const out=new Array(closes.length).fill(null);let avgG=0,avgL=0;
@@ -538,11 +538,24 @@ function LWChart({symbol,w,h,mode,isDark}){
       const fusionStates=calcAllFusionStates(ohlc);
       fusionRef.current=fusionStates;
 
-      // Cloud fill by fusion state (if enabled)
-      const stateGroups={};
-      if(!ecCfg.showCloud){/* skip cloud */}else{
-      for(let i=0;i<ohlc.length;i++){if(walking[i]==null||running[i]==null)continue;const st=fusionStates[i]?.state||'DRIFT';if(!stateGroups[st])stateGroups[st]=[];stateGroups[st].push({time:ohlc[i].time,top:Math.max(walking[i],running[i]),bot:Math.min(walking[i],running[i])})}
-      for(const[st,pts] of Object.entries(stateGroups)){const col=FUSION_CLOUD[st]||'rgba(97,97,97,0.10)';const s=chart.addAreaSeries({topColor:col,bottomColor:'transparent',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});s.setData(pts.map(p=>({time:p.time,value:p.top})))}}
+      // Cloud fill BETWEEN Walking Line and Running Line
+      if(ecCfg.showCloud){
+        const cloudTopD=[],cloudBotD=[];
+        for(let i=0;i<ohlc.length;i++){
+          if(walking[i]==null||running[i]==null)continue;
+          const t=ohlc[i].time;
+          cloudTopD.push({time:t,value:Math.max(walking[i],running[i])});
+          cloudBotD.push({time:t,value:Math.min(walking[i],running[i])});
+        }
+        const bullish=ohlc.length>0&&walking[ohlc.length-1]!=null&&running[ohlc.length-1]!=null&&walking[ohlc.length-1]>running[ohlc.length-1];
+        const cloudCol=bullish?'rgba(0,230,118,0.15)':'rgba(239,83,80,0.15)';
+        // Upper line area fills down with cloud color
+        const cTop=chart.addAreaSeries({topColor:cloudCol,bottomColor:cloudCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        cTop.setData(cloudTopD);
+        // Lower line area fills down with chart bg — masks everything below the lower line
+        const cBot=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        cBot.setData(cloudBotD);
+      }
 
       // ── Donchian Channel (20) ──
       const dcPeriod=20;const dcUpper=[],dcLower=[];
