@@ -127,11 +127,15 @@ class YahooFetcher:
         return None
     
     def _fetch_via_worker(self, yahoo_symbol: str) -> Optional[Dict]:
-        """Fetch via Cloudflare Worker."""
+        """Fetch via Cloudflare Worker (POST with X-Kite-Action header)."""
         try:
-            response = self.session.get(
-                f"{YAHOO_WORKER}/quote/{yahoo_symbol}",
-                params={"range": "1y", "interval": "1d"},
+            response = self.session.post(
+                YAHOO_WORKER,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Kite-Action": "yahoo-proxy"
+                },
+                json={"ticker": yahoo_symbol, "range": "1y", "interval": "1d"},
                 timeout=30
             )
             
@@ -189,8 +193,12 @@ class YahooFetcher:
                 volumes = [v for v in volumes if v is not None]
                 
                 if closes:
-                    current = closes[-1]
-                    prev_close = closes[-2] if len(closes) > 1 else current
+                    # Priority 1: regularMarketPrice from meta (most accurate, real-time)
+                    # Priority 2: last close from daily candles (may be previous day if market open)
+                    current = meta.get("regularMarketPrice") or closes[-1]
+                    
+                    # For previous close: use meta.previousClose or second-to-last candle
+                    prev_close = meta.get("previousClose") or meta.get("chartPreviousClose") or (closes[-2] if len(closes) > 1 else current)
                     
                     data["technical"] = {
                         "close": round(current, 2),
