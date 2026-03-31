@@ -400,7 +400,7 @@
 
         // ═══ CHARTINK LIVE SCAN PRESETS ═══
         // Syntax: ChartInk uses 'latest' for [0], '1 day ago' for [-1]
-        // Stochastic: latest Stochastic %k( 5 , 3 , 3 )
+        // Stochastic: latest Slow Stochastic %K( 5,3 ) / %D( 5,3 )  — capital %K, 2 params only
         // EMA: latest ema( close , 10 )
         // Max: latest max( 20 , latest high )
         const LIVE_SCANS = {
@@ -414,10 +414,10 @@
             },
             'STOCHASTIC SCANS': {
                 icon: '📊', scans: [
-                    { id: 'stoch_oversold_plain', name: 'Stoch Leaving Oversold', desc: 'Stoch(5,3,3) %K crossing above %D from below 20', clause: "( {cash} ( latest Stochastic %k( 5 , 3 , 3 ) > latest Stochastic %d( 5 , 3 , 3 ) and 1 day ago Stochastic %k( 5 , 3 , 3 ) <= 1 day ago Stochastic %d( 5 , 3 , 3 ) and 1 day ago Stochastic %k( 5 , 3 , 3 ) < 20 ) ) " },
-                    { id: 'stoch_oversold_ema', name: 'Stoch Oversold + EMA Sync', desc: 'Stoch(5,3,3) leaving oversold + all EMAs aligned', clause: "( {cash} ( latest Stochastic %k( 5 , 3 , 3 ) > latest Stochastic %d( 5 , 3 , 3 ) and 1 day ago Stochastic %k( 5 , 3 , 3 ) <= 1 day ago Stochastic %d( 5 , 3 , 3 ) and 1 day ago Stochastic %k( 5 , 3 , 3 ) < 20 and latest ema( close , 10 ) > latest ema( close , 20 ) and latest ema( close , 20 ) > latest ema( close , 50 ) and latest ema( close , 50 ) > latest ema( close , 200 ) ) ) " },
-                    { id: 'stoch_midrange', name: 'Stoch Mid-range Crossover', desc: 'Stoch crossing bullish in 40-60 zone', clause: "( {cash} ( latest Stochastic %k( 5 , 3 , 3 ) > latest Stochastic %d( 5 , 3 , 3 ) and 1 day ago Stochastic %k( 5 , 3 , 3 ) <= 1 day ago Stochastic %d( 5 , 3 , 3 ) and latest Stochastic %k( 5 , 3 , 3 ) >= 40 and latest Stochastic %k( 5 , 3 , 3 ) <= 65 ) ) " },
-                    { id: 'stoch_bullish_above80', name: 'Stoch Strong Momentum (>80)', desc: 'Stoch %K > 80 and %K > %D — strong uptrend', clause: "( {cash} ( latest Stochastic %k( 5 , 3 , 3 ) > 80 and latest Stochastic %k( 5 , 3 , 3 ) > latest Stochastic %d( 5 , 3 , 3 ) and latest close > latest ema( close , 20 ) ) ) " }
+                    { id: 'stoch_oversold_plain', name: 'Stoch Leaving Oversold', desc: 'Slow Stoch(5,3) %K crossing above %D from below 20', clause: "( {cash} ( latest Slow Stochastic %K( 5,3 ) > latest Slow Stochastic %D( 5,3 ) and 1 day ago Slow Stochastic %K( 5,3 ) <= 1 day ago Slow Stochastic %D( 5,3 ) and 1 day ago Slow Stochastic %K( 5,3 ) < 20 ) ) " },
+                    { id: 'stoch_oversold_ema', name: 'Stoch Oversold + EMA Sync', desc: 'Slow Stoch leaving oversold + all EMAs aligned', clause: "( {cash} ( latest Slow Stochastic %K( 5,3 ) > latest Slow Stochastic %D( 5,3 ) and 1 day ago Slow Stochastic %K( 5,3 ) <= 1 day ago Slow Stochastic %D( 5,3 ) and 1 day ago Slow Stochastic %K( 5,3 ) < 20 and latest ema( close , 10 ) > latest ema( close , 20 ) and latest ema( close , 20 ) > latest ema( close , 50 ) and latest ema( close , 50 ) > latest ema( close , 200 ) ) ) " },
+                    { id: 'stoch_midrange', name: 'Stoch Mid-range Crossover', desc: 'Stoch crossing bullish in 40-60 zone', clause: "( {cash} ( latest Slow Stochastic %K( 5,3 ) > latest Slow Stochastic %D( 5,3 ) and 1 day ago Slow Stochastic %K( 5,3 ) <= 1 day ago Slow Stochastic %D( 5,3 ) and latest Slow Stochastic %K( 5,3 ) >= 40 and latest Slow Stochastic %K( 5,3 ) <= 65 ) ) " },
+                    { id: 'stoch_bullish_above80', name: 'Stoch Strong Momentum (>80)', desc: 'Stoch %K > 80 and %K > %D — strong uptrend', clause: "( {cash} ( latest Slow Stochastic %K( 5,3 ) > 80 and latest Slow Stochastic %K( 5,3 ) > latest Slow Stochastic %D( 5,3 ) and latest close > latest ema( close , 20 ) ) ) " }
                 ]
             },
             'EMA SCANS': {
