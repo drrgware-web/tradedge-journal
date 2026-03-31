@@ -36,7 +36,7 @@ body{font-family:var(--fm);background:var(--bg0);color:var(--t1);overflow:hidden
 
 .app{display:flex;height:calc(100vh - 42px)}
 .lp{width:196px;flex-shrink:0;border-right:1px solid var(--bdr);background:var(--bg1);display:flex;flex-direction:column;overflow:hidden}
-.ct{flex:1;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;min-width:0}
+.ct{flex:1;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;min-width:0;padding-bottom:20px}
 .rp{position:fixed;right:0;top:42px;width:240px;height:calc(100vh - 42px);background:var(--bg1);border-left:1px solid var(--bdr);overflow-y:auto;z-index:50;transform:translateX(100%);transition:transform .2s ease}
 .rp.open{transform:translateX(0)}
 
@@ -102,7 +102,7 @@ body{font-family:var(--fm);background:var(--bg0);color:var(--t1);overflow:hidden
     <a class="na" href="mps-dashboard.html">MPS</a><a class="na" href="index.html">Journal</a>
     <a class="na" href="watchlist.html">Watchlist</a><a class="na on" href="techart.html">TEchart</a>
   </div>
-  <div class="nr"><div class="sp"><div class="sd" id="sd" style="background:var(--t4)"></div><span id="sl">—</span></div></div>
+  <div class="nr"><button id="theme-btn" style="background:none;border:1px solid var(--bdr);border-radius:4px;padding:2px 8px;font-size:14px;cursor:pointer;color:var(--t2);margin-right:8px" onclick="document.dispatchEvent(new Event('te-toggle-theme'))">☾</button><div class="sp"><div class="sd" id="sd" style="background:var(--t4)"></div><span id="sl">—</span></div></div>
 </nav>
 <div id="root"></div>
 <script type="text/babel" data-type="module">
@@ -437,7 +437,7 @@ function calcAllFusionStates(ohlc){
 }
 
 // ═══ LW CHART COMPONENT (Bar + Line + EdgeCloud + Fusion + Weekly) ═══
-function LWChart({symbol,w,h,mode}){
+function LWChart({symbol,w,h,mode,isDark}){
   const containerRef=useRef(null);const chartObjRef=useRef(null);const ohlcRef=useRef([]);const fusionRef=useRef([]);const walkRef=useRef([]);const runRef=useRef([]);
   const[loading,setLoading]=useState(false);const[err,setErr]=useState(null);
   const[range,setRange]=useState('6mo');
@@ -465,17 +465,22 @@ function LWChart({symbol,w,h,mode}){
       if(!ohlc.length)throw new Error('Empty OHLCV');
       ohlcRef.current=ohlc;
 
-      const bgCol='#0d1117';
-      const gridCol='rgba(255,255,255,0.04)';
-      const txtCol='#888';
-      const crossBg='#1a2030';
-      const bdr='rgba(255,255,255,0.08)';
+      const dk=isDark!==false;
+      const bgCol=dk?'#0d1117':'#ffffff';
+      const gridCol=dk?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
+      const txtCol=dk?'#888':'#333333';
+      const crossBg=dk?'#1a2030':'#e8e8e8';
+      const bdr=dk?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)';
 
+      const chartH=Math.max(h||500,500);
+      // Wait for layout to settle, then measure true width
+      await new Promise(r=>requestAnimationFrame(r));
+      const chartW=containerRef.current.clientWidth||w||800;
       const chart=LightweightCharts.createChart(containerRef.current,{
-        width:w||800,height:Math.max(h||400,400),
+        width:chartW,height:chartH,
         layout:{background:{color:bgCol},textColor:txtCol,fontFamily:'IBM Plex Mono'},
         grid:{vertLines:{color:gridCol},horzLines:{color:gridCol}},
-        crosshair:{mode:0,vertLine:{color:'rgba(255,255,255,0.15)',labelBackgroundColor:crossBg},horzLine:{color:'rgba(255,255,255,0.15)',labelBackgroundColor:crossBg}},
+        crosshair:{mode:0,vertLine:{color:dk?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.15)',labelBackgroundColor:crossBg},horzLine:{color:dk?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.15)',labelBackgroundColor:crossBg}},
         rightPriceScale:{borderColor:bdr},
         timeScale:{borderColor:bdr,timeVisible:false},
       });
@@ -483,7 +488,7 @@ function LWChart({symbol,w,h,mode}){
 
       let mainSeries;
       if(mode==='line'){
-        mainSeries=chart.addAreaSeries({topColor:'rgba(66,165,245,0.15)',bottomColor:'transparent',lineColor:'#42A5F5',lineWidth:2,crosshairMarkerRadius:4});
+        mainSeries=chart.addAreaSeries({topColor:dk?'rgba(66,165,245,0.15)':'rgba(33,150,243,0.12)',bottomColor:'transparent',lineColor:'#2196F3',lineWidth:2,crosshairMarkerRadius:4});
         mainSeries.setData(ohlc.map(d=>({time:d.time,value:d.close})));
       }else{
         // HLC bars: vertical line High→Low + close tick on right
@@ -509,7 +514,7 @@ function LWChart({symbol,w,h,mode}){
           if(maxDownVol>0&&d.volume>maxDownVol)isPP=true;
         }
         if(isPP)ppFlags.push(i);
-        return{time:d.time,value:d.volume,color:isPP?'rgba(33,150,243,0.55)':isUp?'rgba(38,166,154,0.35)':'rgba(239,83,80,0.35)'};
+        return{time:d.time,value:d.volume,color:isPP?(dk?'rgba(33,150,243,0.55)':'rgba(33,150,243,0.7)'):isUp?(dk?'rgba(38,166,154,0.35)':'rgba(38,166,154,0.5)'):(dk?'rgba(239,83,80,0.35)':'rgba(239,83,80,0.5)')};
       });
       vs.setData(volData);
 
@@ -530,15 +535,87 @@ function LWChart({symbol,w,h,mode}){
       for(let i=0;i<ohlc.length;i++){if(walking[i]==null||running[i]==null)continue;const st=fusionStates[i]?.state||'DRIFT';if(!stateGroups[st])stateGroups[st]=[];stateGroups[st].push({time:ohlc[i].time,top:Math.max(walking[i],running[i]),bot:Math.min(walking[i],running[i])})}
       for(const[st,pts] of Object.entries(stateGroups)){const col=FUSION_CLOUD[st]||'rgba(97,97,97,0.10)';const s=chart.addAreaSeries({topColor:col,bottomColor:'transparent',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});s.setData(pts.map(p=>({time:p.time,value:p.top})))}
 
-      // Markers — smaller text
+      // ── Donchian Channel (20) ──
+      const dcPeriod=20;const dcUpper=[],dcLower=[];
+      for(let i=0;i<ohlc.length;i++){
+        if(i<dcPeriod-1){dcUpper.push(null);dcLower.push(null);continue}
+        let hh=-Infinity,ll=Infinity;for(let j=i-dcPeriod+1;j<=i;j++){if(ohlc[j].high>hh)hh=ohlc[j].high;if(ohlc[j].low<ll)ll=ohlc[j].low}
+        dcUpper.push(hh);dcLower.push(ll);
+      }
+      const dcUpSeries=chart.addLineSeries({color:'rgba(0,188,212,0.3)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,lastValueVisible:false,priceLineVisible:false});
+      const dcDnSeries=chart.addLineSeries({color:'rgba(0,188,212,0.3)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,lastValueVisible:false,priceLineVisible:false});
+      const dcUpD=[],dcDnD=[];
+      for(let i=0;i<ohlc.length;i++){if(dcUpper[i]!=null){dcUpD.push({time:ohlc[i].time,value:dcUpper[i]});dcDnD.push({time:ohlc[i].time,value:dcLower[i]})}}
+      dcUpSeries.setData(dcUpD);dcDnSeries.setData(dcDnD);
+
+      // Donchian breakout detection (first bar only)
+      const boFlags=[];let inBullBO=false,inBearBO=false;
+      for(let i=dcPeriod;i<ohlc.length;i++){
+        if(dcUpper[i-1]!=null&&ohlc[i].close>dcUpper[i-1]&&!inBullBO){boFlags.push({idx:i,type:'bull'});inBullBO=true;inBearBO=false}
+        else if(dcLower[i-1]!=null&&ohlc[i].close<dcLower[i-1]&&!inBearBO){boFlags.push({idx:i,type:'bear'});inBearBO=true;inBullBO=false}
+        else{if(ohlc[i].close<=dcUpper[i-1])inBullBO=false;if(ohlc[i].close>=dcLower[i-1])inBearBO=false}
+      }
+
+      // ── Pullback detection ──
+      const pbFlags=[];
+      for(let i=3;i<ohlc.length;i++){
+        if(walking[i]==null||running[i]==null)continue;
+        const cloudTop=Math.max(walking[i],running[i]);const cloudBot=Math.min(walking[i],running[i]);
+        const bullCloud=walking[i]>running[i];const fs=fusionStates[i]?.state;
+        if(fs==='FADE')continue; // skip counter-trend
+        if(bullCloud){
+          // Check: was above cloud recently, dipped into cloud, closed back above
+          let wasAbove=false;for(let j=Math.max(0,i-5);j<i;j++){if(ohlc[j].close>Math.max(walking[j]||0,running[j]||0))wasAbove=true}
+          if(wasAbove&&ohlc[i].low<=cloudTop&&ohlc[i].close>=cloudBot&&ohlc[i].close>ohlc[i].open){
+            pbFlags.push(i);
+          }
+        }else{
+          let wasBelow=false;for(let j=Math.max(0,i-5);j<i;j++){if(ohlc[j].close<Math.min(walking[j]||Infinity,running[j]||Infinity))wasBelow=true}
+          if(wasBelow&&ohlc[i].high>=cloudBot&&ohlc[i].close<=cloudTop&&ohlc[i].close<ohlc[i].open){
+            pbFlags.push(i);
+          }
+        }
+      }
+
+      // ── BB Squeeze markers ──
+      const closes=ohlc.map(d=>d.close);
+      const bbwArr=calcBollingerWidth(closes,20);
+      const sqFlags=[];let wasSqueeze=false;
+      for(let i=1;i<ohlc.length;i++){
+        if(bbwArr[i]==null)continue;
+        const isSq=bbwArr[i]<10;
+        if(isSq&&!wasSqueeze)sqFlags.push({idx:i,type:'enter'}); // squeeze starts
+        if(!isSq&&wasSqueeze)sqFlags.push({idx:i,type:'fire'}); // squeeze fires
+        wasSqueeze=isSq;
+      }
+
+      // ── BB Width overlay panel ──
+      const bbwSeries=chart.addLineSeries({priceScaleId:'bbw',color:'#FFD700',lineWidth:1,lastValueVisible:true,priceLineVisible:false,title:'BBW%'});
+      bbwSeries.priceScale().applyOptions({scaleMargins:{top:0.92,bottom:0},visible:false});
+      const bbwD=[];for(let i=0;i<ohlc.length;i++){if(bbwArr[i]!=null)bbwD.push({time:ohlc[i].time,value:bbwArr[i]})}
+      bbwSeries.setData(bbwD);
+
+      // ── All markers ──
       const markers=[];
+      // Fusion state transitions
       for(let i=1;i<fusionStates.length;i++){const prev=fusionStates[i-1].state;const cur=fusionStates[i].state;const t=ohlc[i].time;
         if(prev==='COIL'&&cur==='IGNITION')markers.push({time:t,position:'aboveBar',color:'#FFD700',shape:'circle',text:'I'});
         else if(prev==='IGNITION'&&cur==='THRUST')markers.push({time:t,position:'belowBar',color:'#00E676',shape:'arrowUp',text:'T'});
         else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'F'});
         else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
-      // Pocket Pivot markers
+      // Pocket Pivot
       ppFlags.forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#2196F3',shape:'arrowUp',text:'PP'})});
+      // Donchian breakouts
+      boFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
+        if(type==='bull')markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#FFEB3B80':'#FFEB3B',shape:'arrowUp',text:'BO'});
+        else markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#FFEB3B80':'#FFEB3B',shape:'arrowDown',text:'BD'})});
+      // Pullbacks
+      pbFlags.forEach(i=>{const fs=fusionStates[i]?.state;const bright=fs==='THRUST';
+        markers.push({time:ohlc[i].time,position:'belowBar',color:bright?'#26A69A':'#26A69A99',shape:'circle',text:'PB'})});
+      // BB Squeeze
+      sqFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;
+        if(type==='enter')markers.push({time:ohlc[idx].time,position:'belowBar',color:'#B388FF88',shape:'square',text:'SQ'});
+        else markers.push({time:ohlc[idx].time,position:'aboveBar',color:(fs==='IGNITION')?'#FFD700':'#B388FF',shape:'circle',text:'SQ'})});
       markers.sort((a,b)=>a.time-b.time);
       if(markers.length)mainSeries.setMarkers(markers);
 
@@ -593,7 +670,7 @@ function LWChart({symbol,w,h,mode}){
       if(showWeekly){fetchWeekly(wUrl,symbol)}
       setLoading(false);
     }catch(e){setErr(e.message);setLoading(false)}
-  },[symbol,w,h,mode,showWeekly]);
+  },[symbol,w,h,mode,showWeekly,isDark]);
 
   const fetchWeekly=useCallback(async(wUrl,sym)=>{
     try{
@@ -609,7 +686,16 @@ function LWChart({symbol,w,h,mode}){
   },[]);
 
   useEffect(()=>{fetchAndRender(range)},[fetchAndRender,range]);
-  useEffect(()=>{if(chartObjRef.current&&w)chartObjRef.current.resize(w,Math.max(h||400,400))},[w,h]);
+  // Resize chart when container resizes (window resize, layout change, etc.)
+  useEffect(()=>{
+    if(!containerRef.current)return;
+    const ro=new ResizeObserver(()=>{if(chartObjRef.current&&containerRef.current){const cw=containerRef.current.clientWidth;if(cw>0)chartObjRef.current.resize(cw,500)}});
+    ro.observe(containerRef.current);
+    // Also handle window resize as fallback
+    const onResize=()=>{if(chartObjRef.current&&containerRef.current){chartObjRef.current.resize(containerRef.current.clientWidth,500)}};
+    window.addEventListener('resize',onResize);
+    return()=>{ro.disconnect();window.removeEventListener('resize',onResize)};
+  },[]);
 
   // Display values: hovered bar overrides latest
   const dv=hovered||fusion;
@@ -636,10 +722,10 @@ function LWChart({symbol,w,h,mode}){
   const sep=()=><div style={{height:1,background:'var(--bdr)',margin:'16px 0'}}/>;
 
   if(err)return<div style={{padding:40,textAlign:'center',color:'#ff3d5a',font:'500 12px var(--fm)'}}>{err}</div>;
-  return<div style={{animation:'fadeIn .3s ease-out'}}>
+  return<div style={{animation:'fadeIn .3s ease-out',width:'100%',padding:'0 8px 20px'}}>
     <div style={{position:'relative'}}>
-      {loading&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:5,background:'rgba(13,17,23,.9)',backdropFilter:'blur(4px)'}}><div style={{width:32,height:32,border:'3px solid rgba(66,165,245,.12)',borderTop:'3px solid #42A5F5',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/></div>}
-      <div ref={containerRef} style={{width:'100%',height:Math.max(h||400,400),transition:'opacity .2s'}}/>
+      {loading&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:5,background:isDark?'rgba(13,17,23,.9)':'rgba(255,255,255,.9)',backdropFilter:'blur(4px)'}}><div style={{width:32,height:32,border:'3px solid rgba(66,165,245,.12)',borderTop:'3px solid #42A5F5',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/></div>}
+      <div ref={containerRef} style={{width:'100%',minWidth:0,height:500,transition:'opacity .2s'}}/>
       {/* Top-left controls */}
       <div style={{position:'absolute',top:6,left:8,display:'flex',gap:6,alignItems:'center',zIndex:2}}>
         <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
@@ -648,6 +734,9 @@ function LWChart({symbol,w,h,mode}){
         <span style={{font:'600 7px var(--fm)',color:'#FFA000',opacity:.7}}>╌ WL</span>
         <span style={{font:'600 7px var(--fm)',color:'#42A5F5',opacity:.7}}>— RL</span>
         <span style={{font:'600 7px var(--fm)',color:'#2196F3',opacity:.7}}>▲ PP</span>
+        <span style={{font:'600 7px var(--fm)',color:'#FFEB3B',opacity:.7}}>▲ BO</span>
+        <span style={{font:'600 7px var(--fm)',color:'#26A69A',opacity:.7}}>● PB</span>
+        <span style={{font:'600 7px var(--fm)',color:'#B388FF',opacity:.7}}>◆ SQ</span>
       </div>
       {/* Top-right weekly badge */}
       {showWeekly&&weeklyState&&<div style={{position:'absolute',top:6,right:8,zIndex:2,font:'700 9px var(--fm)',color:weeklyState.color,padding:'3px 10px',background:`${weeklyState.color}15`,border:`1px solid ${weeklyState.color}30`,borderRadius:4,backdropFilter:'blur(4px)'}}>Wkly: {weeklyState.state}</div>}
@@ -667,14 +756,14 @@ function LWChart({symbol,w,h,mode}){
       {hovered.cloudBull!=null&&<span style={{font:'600 8px var(--fm)',color:hovered.cloudBull?'#26A69A':'#EF5350'}}>{hovered.cloudBull?'Bull':'Bear'}</span>}
     </div>}
 
-    {dv&&<div style={{padding:'0'}}>
+    <div style={{padding:'0'}}>
       {sep()}
-      {/* Metric cards */}
+      {/* Metric cards — always show, with loading fallback */}
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
-        {mCard('BB Width',dv.bbw!=null?dv.bbw.toFixed(1)+'%':'—',dv.bbw!=null&&dv.bbw<10?'#B388FF':'var(--t1)',dv.bbw!=null&&dv.bbw<10?'Squeeze active':'Normal')}
-        {mCard('Adaptive RSI',dv.rsi!=null?dv.rsi.toFixed(1):'—',dv.rsi!=null?(dv.rsi>55?'#00E676':dv.rsi<45?'#FF5252':'var(--t2)'):'var(--t3)',dv.rsi!=null?(dv.rsi>70?'Overbought':dv.rsi>55?'Bullish':dv.rsi<30?'Oversold':dv.rsi<45?'Bearish':'Neutral'):'—')}
-        {mCard('ADX (14)',dv.adx!=null?dv.adx.toFixed(1):'—',dv.adx!=null&&dv.adx>25?'#FFA000':'var(--t3)',(dv.adx!=null?(dv.adx>25?'Trending':'Ranging'):'')+' · DI+ '+(dv.diP||0).toFixed(1)+' / DI- '+(dv.diM||0).toFixed(1))}
-        {mCard('Fusion State',dv.state||'—',dv.color||'var(--t3)',FUSION_DESC[dv.state]||'',dv.color)}
+        {mCard('BB Width',dv?.bbw!=null?dv.bbw.toFixed(1)+'%':'—',dv?.bbw!=null&&dv.bbw<10?'#B388FF':'var(--t1)',dv?.bbw!=null&&dv.bbw<10?'Squeeze active':dv?'Normal':'Loading...')}
+        {mCard('Adaptive RSI',dv?.rsi!=null?dv.rsi.toFixed(1):'—',dv?.rsi!=null?(dv.rsi>55?'#00E676':dv.rsi<45?'#FF5252':'var(--t2)'):'var(--t3)',dv?.rsi!=null?(dv.rsi>70?'Overbought':dv.rsi>55?'Bullish':dv.rsi<30?'Oversold':dv.rsi<45?'Bearish':'Neutral'):dv?'—':'Loading...')}
+        {mCard('ADX (14)',dv?.adx!=null?dv.adx.toFixed(1):'—',dv?.adx!=null&&dv.adx>25?'#FFA000':'var(--t3)',dv?.adx!=null?(dv.adx>25?'Trending':'Ranging')+' · DI+ '+(dv.diP||0).toFixed(1)+' / DI- '+(dv.diM||0).toFixed(1):dv?'—':'Loading...')}
+        {mCard('Fusion State',dv?.state||'—',dv?.color||'var(--t3)',FUSION_DESC[dv?.state]||(!dv?'Loading...':''),dv?.color)}
       </div>
 
       {sep()}
@@ -769,7 +858,7 @@ function LWChart({symbol,w,h,mode}){
           </tbody></table>
         </div>
       </div>
-    </div>}
+    </div>
   </div>;
 }
 
@@ -778,10 +867,11 @@ function App(){
   const[sel,setSel]=useState(null);const[bi,setBi]=useState(2);const[mt,setMt]=useState('close');const[trd,setTrd]=useState([]);
   const[pv,setPv]=useState(()=>{const o={};PATS.forEach(p=>o[p.tp]=true);return o});
   const[tv2,setTv]=useState({anc:true,t45:false,vc:true,ma:true});
-  const[zoom,setZoom]=useState(2);const[tab,setTab]=useState('bar');// bar | line
+  const[zoom,setZoom]=useState(2);const[tab,setTab]=useState('bar');// chart | bar | line
   const[liveData,setLiveData]=useState(null);const[isLive,setIsLive]=useState(false);
   const[wlOpen,setWlOpen]=useState(false);
-  const chartRef=useRef(null);const[cW,setCW]=useState(800);const[cH,setCH]=useState(400);
+  const[isDark,setIsDark]=useState(()=>localStorage.getItem('te_theme')!=='light');
+  const chartRef=useRef(null);const ctRef=useRef(null);const[cW,setCW]=useState(800);const[cH,setCH]=useState(400);
 
   // Load data
   useEffect(()=>{
@@ -794,7 +884,20 @@ function App(){
     fS().then(m=>setTrd(m||[]));
   },[]);
 
-  useEffect(()=>{const ro=new ResizeObserver(e=>{for(const en of e){setCW(en.contentRect.width);setCH(en.contentRect.height)}});if(chartRef.current)ro.observe(chartRef.current);return()=>ro.disconnect()},[]);
+  useEffect(()=>{const ro=new ResizeObserver(e=>{for(const en of e){setCW(en.contentRect.width);setCH(en.contentRect.height)}});if(chartRef.current)ro.observe(chartRef.current);if(ctRef.current)ro.observe(ctRef.current);return()=>ro.disconnect()},[]);
+
+  // Theme toggle listener
+  useEffect(()=>{const fn=()=>setIsDark(d=>!d);document.addEventListener('te-toggle-theme',fn);return()=>document.removeEventListener('te-toggle-theme',fn)},[]);
+  // Theme apply
+  useEffect(()=>{
+    localStorage.setItem('te_theme',isDark?'dark':'light');
+    const s=document.documentElement.style;
+    if(isDark){s.setProperty('--bg0','#050709');s.setProperty('--bg1','#0a0d12');s.setProperty('--bg2','#161b22');s.setProperty('--bg3','#131822');s.setProperty('--bgh','#1a2030');s.setProperty('--bdr','rgba(255,255,255,0.08)');s.setProperty('--bdl','rgba(255,255,255,0.12)');s.setProperty('--t1','#e0e0e0');s.setProperty('--t2','#99a3b8');s.setProperty('--t3','#566178');s.setProperty('--t4','#3a4358');document.body.style.background='#050709';document.body.style.color='#e0e0e0'}
+    else{s.setProperty('--bg0','#f5f5f5');s.setProperty('--bg1','#ffffff');s.setProperty('--bg2','#f8f9fa');s.setProperty('--bg3','#f0f1f3');s.setProperty('--bgh','#e8eaed');s.setProperty('--bdr','rgba(0,0,0,0.08)');s.setProperty('--bdl','#e0e0e0');s.setProperty('--t1','#1a1a2e');s.setProperty('--t2','#444');s.setProperty('--t3','#666');s.setProperty('--t4','#999');document.body.style.background='#f5f5f5';document.body.style.color='#1a1a2e'}
+    // Render toggle button
+    const el=document.getElementById('theme-btn');
+    if(el){el.textContent=isDark?'☾':'☀';el.title=isDark?'Switch to light':'Switch to dark'}
+  },[isDark]);
 
 
   const bv=BVS[bi];
@@ -839,8 +942,8 @@ function App(){
 
   return(
   <div className="app">
-    {/* LEFT */}
-    <div className="lp">
+    {/* LEFT — only show for Renko tab */}
+    {tab==='chart'&&<div className="lp">
       <div className="ph">PATTERNS & AUTO TOOLS</div>
       <div className="pl">
         {PATS.map(p=><div key={p.tp} className="pi" onClick={()=>setPv(v=>({...v,[p.tp]:!v[p.tp]}))}>
@@ -870,10 +973,10 @@ function App(){
         </div>
         {trd.slice(0,3).map(t=><div key={t.id} style={{font:'400 8px var(--fm)',color:t.action==='BUY'?'#00e676':'#ff3d5a',padding:'2px 0',marginTop:2}}>{t.action} {t.symbol} ₹{t.price}</div>)}
       </div>
-    </div>
+    </div>}
 
     {/* CENTER */}
-    <div className="ct">
+    <div className="ct" ref={ctRef}>
       <div className="ib">
         <span style={{font:'800 15px var(--fu)',color:'var(--t1)'}}>{sel.s}</span>
         <span style={{font:'500 11px var(--fm)',color:'var(--cyn)'}}>({bv.l} × 3)</span>
@@ -888,6 +991,7 @@ function App(){
       </div>
       <div className="ctrl">
         <div className="pg">
+          <button className={`pb ${tab==='chart'?'ow':''}`} onClick={()=>setTab('chart')}>Renko</button>
           <button className={`pb ${tab==='bar'?'ow':''}`} onClick={()=>setTab('bar')}>Bar</button>
           <button className={`pb ${tab==='line'?'ow':''}`} onClick={()=>setTab('line')}>Line</button>
         </div>
@@ -895,7 +999,11 @@ function App(){
         <button className="pb" onClick={()=>setWlOpen(w=>!w)} style={{fontSize:9}}>☰ Watchlist</button>
       </div>
 
-      <div className="ca" ref={chartRef} style={{height:500,flex:'none'}}><LWChart symbol={sel.s} w={cW||800} h={500} mode={tab}/></div>
+      {tab==='chart'&&<>
+        <div className="ca" ref={chartRef}><PnFC cols={cols} sigs={sigs} ma={ma} w={cW||800} h={cH||400} sym={sel.s} pv={pv} tv={tv2} zoom={zoom}/></div>
+        <div className="ds"><DSm cols={cols} w={cW||800} h={76}/></div>
+      </>}
+      {(tab==='bar'||tab==='line')&&<LWChart symbol={sel.s} w={cW||800} h={500} mode={tab} isDark={isDark}/>}
     </div>
 
     {/* WATCHLIST OVERLAY */}
