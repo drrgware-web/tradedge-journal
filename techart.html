@@ -979,14 +979,13 @@ function App(){
     <div className="ct" ref={ctRef}>
       <div className="ib">
         <span style={{font:'800 15px var(--fu)',color:'var(--t1)'}}>{sel.s}</span>
-        <span style={{font:'500 11px var(--fm)',color:'var(--cyn)'}}>({bv.l} × 3)</span>
+        {tab==='chart'&&<span style={{font:'500 11px var(--fm)',color:'var(--cyn)'}}>({bv.l} × 3)</span>}
         <span style={{font:'500 10px var(--fu)',color:'var(--t3)'}}>Daily</span>
         <span style={{font:'600 12px var(--fm)',color:'var(--t1)'}}>CMP: <b>{lp.toFixed(2)}</b></span>
-        <span style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Cnt: {cols.length}</span>
+        {tab==='chart'&&<span style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Cnt: {cols.length}</span>}
         {isLive&&<span style={{font:'500 8px var(--fm)',color:'var(--grn)',background:'rgba(0,230,118,.08)',padding:'1px 5px',borderRadius:3}}>LIVE</span>}
-        <span style={{font:'400 9px var(--fm)',color:'var(--t3)',marginLeft:'auto'}}>{freshN} fresh · {sigs.filter(s=>!s.isL).length} patterns</span>
-        {/* Deep links */}
-        <a href={tvLink(sel.s)} target="_blank" rel="noopener" style={{font:'500 9px var(--fu)',color:'var(--cyn)',textDecoration:'none',padding:'2px 6px',borderRadius:3,border:'1px solid rgba(24,214,224,.2)'}}>TV Pro</a>
+        {tab==='chart'&&<span style={{font:'400 9px var(--fm)',color:'var(--t3)',marginLeft:'auto'}}>{freshN} fresh · {sigs.filter(s=>!s.isL).length} patterns</span>}
+        <a href={tvLink(sel.s)} target="_blank" rel="noopener" style={{font:'500 9px var(--fu)',color:'var(--cyn)',textDecoration:'none',padding:'2px 6px',borderRadius:3,border:'1px solid rgba(24,214,224,.2)',marginLeft:tab!=='chart'?'auto':undefined}}>TV Pro</a>
         <a href={rzLink(sel.s)} target="_blank" rel="noopener" style={{font:'500 9px var(--fu)',color:'var(--ora)',textDecoration:'none',padding:'2px 6px',borderRadius:3,border:'1px solid rgba(255,145,0,.2)'}}>RZone</a>
       </div>
       <div className="ctrl">
