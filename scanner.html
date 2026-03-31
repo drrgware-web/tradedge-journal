@@ -438,10 +438,11 @@
                 if (window.NSEMaster) {
                     await NSEMaster.refresh();
                     const s = NSEMaster.stats();
-                    document.getElementById('stockCount').textContent = s.total;
-                    document.getElementById('totalScanned').textContent = s.total;
+                    const realCount = s.withListingDate || 3045;
+                    document.getElementById('stockCount').textContent = realCount;
+                    document.getElementById('totalScanned').textContent = realCount;
                     document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-                    btn.textContent = '✓ ' + s.total + ' stocks';
+                    btn.textContent = '✓ ' + realCount + ' stocks';
                     setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 3000);
                 } else {
                     btn.textContent = '⚠ NSEMaster not loaded';
@@ -492,17 +493,16 @@
                 if (tr?.ok) trendlineData = await tr.json();
                 if (!presetsData && !categoriesData) throw new Error('No data');
                 
-                // Init NSEMaster (non-blocking) — updates count when ready
+                // Init NSEMaster (non-blocking)
                 if (window.NSEMaster) {
                     NSEMaster.init().then(() => {
                         const s = NSEMaster.stats();
-                        document.getElementById('stockCount').textContent = s.total;
-                        document.getElementById('totalScanned').textContent = s.total;
-                        // Update date to now if on Live tab
-                        if (currentTab === 'live') {
-                            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-                        }
-                        console.log('NSEMaster ready:', s.total, 'stocks | IPO 1Y:', s.ipo1y, '| 2Y:', s.ipo2y, '| 3Y:', s.ipo3y);
+                        // Use withListingDate as proxy for real NSE equity count (not Dhan inflated)
+                        const realCount = s.withListingDate || 3045;
+                        document.getElementById('stockCount').textContent = realCount;
+                        document.getElementById('totalScanned').textContent = realCount;
+                        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+                        console.log('NSEMaster ready:', s.total, 'total |', realCount, 'NSE equities | IPO 1Y:', s.ipo1y, '| 2Y:', s.ipo2y, '| 3Y:', s.ipo3y);
                     });
                 }
 
@@ -519,10 +519,9 @@
         }
 
         function updateMeta() {
-            const d = presetsData || categoriesData;
-            
-            // Find the most recent date across all data sources
+            // Date: show most recent across ALL data sources
             const dates = [];
+            const d = presetsData || categoriesData;
             if (d?.meta?.generated_at) dates.push(new Date(d.meta.generated_at));
             if (darvasData?.generated_at) dates.push(new Date(darvasData.generated_at));
             if (trendlineData?.generated_at) dates.push(new Date(trendlineData.generated_at));
@@ -532,15 +531,11 @@
                 document.getElementById('lastUpdate').textContent = latest.toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
             }
             
-            // Stock count: use NSEMaster if available, else fallback to scanner meta
-            if (window.NSEMaster && NSEMaster.ready) {
-                const nseCount = NSEMaster.count();
-                document.getElementById('stockCount').textContent = nseCount;
-                document.getElementById('totalScanned').textContent = nseCount;
-            } else if (d?.meta?.total_stocks) {
-                document.getElementById('stockCount').textContent = d.meta.total_stocks;
-                document.getElementById('totalScanned').textContent = d.meta.total_stocks;
-            }
+            // Stock count: use nse_symbols.json count (3045), NOT Dhan inflated count
+            // NSEMaster.getAll() includes Dhan extras — use the base count from local JSON
+            const baseCount = d?.meta?.total_stocks || 3045;
+            document.getElementById('stockCount').textContent = baseCount;
+            document.getElementById('totalScanned').textContent = baseCount;
         }
 
         function setupTabs() {
