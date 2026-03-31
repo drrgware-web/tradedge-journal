@@ -3741,7 +3741,7 @@ function renderHeatmap() {
     const width = Math.max(pctTotal, 8);
     const bg = pnl >= 0 ? `hsl(${145 + Math.min(pnlPct * 3, 30)},70%,${25 + Math.min(pnlPct * 2, 20)}%)` : `hsl(0,${60 + Math.min(Math.abs(pnlPct) * 3, 30)}%,${25 + Math.min(Math.abs(pnlPct), 15)}%)`;
     return `<div class="exec-hm-block" style="flex:${width};background:${bg};cursor:pointer" title="${sym}: ${TE.fmt(pnl)} (${pnlPct.toFixed(1)}%) — Click to manage" onclick="scrollToPosition('${sym}')">
-      <div class="hm-sym">${sym}</div><div class="hm-pnl">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div></div>`;
+      <div class="hm-sym">${sym}</div><div class="hm-pnl">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)} (${pnl>=0?'+':''}${pnlPct.toFixed(1)}%)</div></div>`;
   }).join('') + '</div>';
 }
 
