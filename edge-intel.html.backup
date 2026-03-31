@@ -82,7 +82,7 @@ const{useState,useEffect,useMemo,useCallback,useRef,Fragment}=React;
 // EDGE INTEL — 3-in-1 Professional Stock Analysis
 // ═══════════════════════════════════════════════════════════════
 
-const GROQ_API_KEY=localStorage.getItem('groq_api_key')||localStorage.getItem('te_groq_key')||'';
+const GROQ_API_KEY=localStorage.getItem('groq_api_key')||'';
 const GROQ_MODEL='llama-3.3-70b-versatile';
 
 // ═══ SUPABASE CONFIG ═══
@@ -443,43 +443,21 @@ const NSE_STOCKS=[
   {s:"STARHEALTH",n:"Star Health",sec:"Insurance"},
   {s:"NIACL",n:"New India Assurance",sec:"Insurance"},
   {s:"GICRE",n:"General Insurance",sec:"Insurance"},
-  {s:"CCL",n:"CCL Products",sec:"FMCG"},
-  {s:"CCLPRODUCTS",n:"CCL Products India",sec:"FMCG"},
 ].sort((a,b)=>a.s.localeCompare(b.s));
 
-// ═══ FIX 2: Load stocks from scanner + Dhan symbol map ═══
+// Load more stocks from scanner if available
 let FULL_STOCK_LIST=[...NSE_STOCKS];
-const _loadExtraStocks = async () => {
-  const existing = new Set(NSE_STOCKS.map(s => s.s));
-  // 1. Try scanner_results.json
-  try {
-    const r = await fetch('./data/scanner_results.json');
-    if (r.ok) {
-      const d = await r.json();
-      const stocks = d?.stocks || d?.scan_results || [];
-      stocks.forEach(st => {
-        const sym = st.symbol || st.s;
-        if (sym && !existing.has(sym)) {
-          existing.add(sym);
-          FULL_STOCK_LIST.push({ s: sym, n: st.name || st.n || sym, sec: st.sector || st.sec || '' });
-        }
-      });
-    }
-  } catch (e) { console.log('Scanner load skipped'); }
-  // 2. Load Dhan symbol map from localStorage (8,819 stocks)
-  try {
-    const dhanMap = JSON.parse(localStorage.getItem('dhan_symbol_map') || '{}');
-    Object.entries(dhanMap).forEach(([sym, id]) => {
-      if (!existing.has(sym) && sym.length > 0 && sym.length < 30 && /^[A-Z]/.test(sym)) {
-        existing.add(sym);
-        FULL_STOCK_LIST.push({ s: sym, n: sym, sec: '' });
+fetch('./data/scanner_results.json').then(r=>r.json()).then(d=>{
+  if(d?.stocks){
+    const existing=new Set(NSE_STOCKS.map(s=>s.s));
+    d.stocks.forEach(st=>{
+      if(!existing.has(st.symbol)){
+        FULL_STOCK_LIST.push({s:st.symbol,n:st.name||st.symbol,sec:st.sector||''});
       }
     });
-  } catch (e) { console.log('Dhan map load skipped'); }
-  FULL_STOCK_LIST.sort((a, b) => a.s.localeCompare(b.s));
-  console.log('✓ Stock list loaded:', FULL_STOCK_LIST.length, 'symbols');
-};
-_loadExtraStocks();
+    FULL_STOCK_LIST.sort((a,b)=>a.s.localeCompare(b.s));
+  }
+}).catch(()=>{});
 
 const callGroqAI=async(prompt,systemPrompt="You are an expert equity research analyst.")=>{
   if(!GROQ_API_KEY)throw new Error('Set groq_api_key in localStorage');
@@ -488,10 +466,7 @@ const callGroqAI=async(prompt,systemPrompt="You are an expert equity research an
     headers:{'Authorization':`Bearer ${GROQ_API_KEY}`,'Content-Type':'application/json'},
     body:JSON.stringify({model:GROQ_MODEL,messages:[{role:'system',content:systemPrompt},{role:'user',content:prompt}],temperature:0.7,max_tokens:2000})
   });
-  if(!res.ok){
-    if(res.status===401) throw new Error('API Error: 401 — Groq key invalid/expired. Run: localStorage.setItem("groq_api_key","YOUR_NEW_KEY") in console');
-    throw new Error('API Error: '+res.status);
-  }
+  if(!res.ok)throw new Error('API Error: '+res.status);
   const data=await res.json();
   return data.choices?.[0]?.message?.content||'No response';
 };
@@ -1072,14 +1047,6 @@ const SmartTradeSetup=({symbol,stockData})=>{
   // Auto-update qty when positionSize changes (for new trades only)
   // Using a ref to prevent infinite loops
   const lastCalcSize = useRef(0);
-  const execPanelRef = useRef(null);
-  
-  // Auto-scroll to execution panel when opened
-  useEffect(() => {
-    if (showExecution && execPanelRef.current) {
-      setTimeout(() => execPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-    }
-  }, [showExecution]);
   useEffect(() => {
     if(!isExistingPosition && positionSize > 0 && positionSize !== lastCalcSize.current) {
       lastCalcSize.current = positionSize;
@@ -1960,17 +1927,17 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </div>
         
         {/* Action Buttons */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12,position:'relative',zIndex:10}}>
-          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('GTT clicked');setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'12px 10px',background:'rgba(255,170,0,0.1)',border:'2px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setEnableGTT(true);setEnableBracket(false);setEnableAMO(false);setEnableGTTEntry(false)}} style={{padding:'10px',background:'rgba(255,170,0,0.1)',border:'1px solid #ffaa00',borderRadius:8,color:'#ffaa00',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
             🛡️ Set GTT
           </button>
-          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('Partial clicked');setShowExecution(true);setTxnType('SELL');setQty(Math.floor(existingQty*partialExitPct/100));setEntry(currentPrice)}} style={{padding:'12px 10px',background:'rgba(0,200,255,0.1)',border:'2px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(Math.floor(existingQty*partialExitPct/100));setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(0,200,255,0.1)',border:'1px solid var(--accent2)',borderRadius:8,color:'var(--accent2)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
             📤 Partial ({partialExitPct}%)
           </button>
-          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('Pyramid clicked');setShowExecution(true);setTxnType('BUY');setEntry(currentPrice);setQty(Math.floor(existingQty*0.5))}} style={{padding:'12px 10px',background:'rgba(0,255,136,0.1)',border:'2px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
+          <button onClick={()=>{setShowExecution(true);setTxnType('BUY');setEntry(currentPrice);setQty(Math.floor(existingQty*0.5))}} style={{padding:'10px',background:'rgba(0,255,136,0.1)',border:'1px solid var(--accent)',borderRadius:8,color:'var(--accent)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
             📈 Pyramid
           </button>
-          <button type="button" onClick={(e)=>{e.stopPropagation();console.log('Full Exit clicked');setShowExecution(true);setTxnType('SELL');setQty(existingQty);setEntry(currentPrice)}} style={{padding:'12px 10px',background:'rgba(255,68,85,0.1)',border:'2px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)',pointerEvents:'auto',userSelect:'none',WebkitTapHighlightColor:'transparent'}}>
+          <button onClick={()=>{setShowExecution(true);setTxnType('SELL');setQty(existingQty);setEntry(currentPrice)}} style={{padding:'10px',background:'rgba(255,68,85,0.1)',border:'1px solid var(--red)',borderRadius:8,color:'var(--red)',fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-mono)'}}>
             🚪 Full Exit
           </button>
         </div>
@@ -2378,11 +2345,8 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </button>
       </div>
 
-      {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
-      </>}
-
-      {/* ═══ TRADE EXECUTION PANEL — Renders for BOTH existing and new positions ═══ */}
-      {showExecution&&<div ref={execPanelRef} className="fade-in" style={{background:'linear-gradient(135deg,rgba(6,8,12,0.98),rgba(12,16,24,0.98))',border:'1px solid var(--border-med)',borderRadius:16,padding:0,marginBottom:20,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.05)'}}>
+      {/* ═══ TRADE EXECUTION PANEL — REDESIGNED ═══ */}
+      {showExecution&&<div className="fade-in" style={{background:'linear-gradient(135deg,rgba(6,8,12,0.98),rgba(12,16,24,0.98))',border:'1px solid var(--border-med)',borderRadius:16,padding:0,marginBottom:20,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.05)'}}>
         
         {/* Header */}
         <div style={{background:'linear-gradient(90deg,rgba(0,255,136,0.08),rgba(0,200,255,0.05),rgba(136,68,255,0.08))',padding:'16px 20px',borderBottom:'1px solid var(--border-dim)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -2719,6 +2683,9 @@ Rate this setup: A+ / A / B+ / B / C (with reasoning)`;
         </div>
       </div>}
 
+      {analysis&&<div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
+      </>}
+      
       {/* AI Analysis for existing positions */}
       {isExistingPosition && analysis && <div className="ai-response glow-border" style={{marginTop:20}} dangerouslySetInnerHTML={{__html:formatAIResponse(analysis)}}/>}
     </div>
@@ -3322,36 +3289,13 @@ const EdgeIntel=()=>{
   const[suggestions,setSuggestions]=useState([]);
   const inputRef=useRef(null);
 
-  const[liveCMP,setLiveCMP]=useState(0);
-
-  // ═══ LIVE PRICE FIX: Auto-refresh CMP every 30s in main app ═══
-  useEffect(()=>{
-    if(!symbol) return;
-    const wUrl=localStorage.getItem('zd_worker_url');
-    if(!wUrl) return;
-    const fetchLive=async()=>{
-      try{
-        const res=await fetch(wUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker:`${symbol}.NS`,range:'1d',interval:'1m'})});
-        const d=await res.json();const r=d?.chart?.result?.[0];
-        const mp=r?.meta?.regularMarketPrice;
-        if(mp&&mp>0){setLiveCMP(+mp.toFixed(2));setStockData(prev=>prev?{...prev,price:+mp.toFixed(2)}:prev);return;}
-        const c=r?.indicators?.quote?.[0]?.close?.filter(x=>x!=null&&x>0);
-        if(c&&c.length>0){const p=+(c[c.length-1]).toFixed(2);setLiveCMP(p);setStockData(prev=>prev?{...prev,price:p}:prev);}
-      }catch(e){}
-    };
-    fetchLive();
-    const iv=setInterval(fetchLive,30000);
-    return()=>clearInterval(iv);
-  },[symbol]);
-
   // Autocomplete filter
   useEffect(()=>{
     if(inputSymbol.length>=1){
       const q=inputSymbol.toUpperCase();
-      // FIX 3: Exact prefix first, then substring
-      const exactPrefix = FULL_STOCK_LIST.filter(s => s.s.startsWith(q));
-      const substring = FULL_STOCK_LIST.filter(s => !s.s.startsWith(q) && (s.s.includes(q) || s.n.toUpperCase().includes(q)));
-      const matches = [...exactPrefix, ...substring].slice(0, 15);
+      const matches=FULL_STOCK_LIST.filter(s=>
+        s.s.startsWith(q)||s.n.toUpperCase().includes(q)
+      ).slice(0,12);
       setSuggestions(matches);
       setShowSuggestions(matches.length>0);
     }else{
@@ -3368,7 +3312,7 @@ const EdgeIntel=()=>{
 
   // Fetch live ATR and Swing Lows from Yahoo via worker
   const fetchLiveATR = async (sym) => {
-    const wUrl = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
+    const wUrl = localStorage.getItem('zd_worker_url');
     if (!wUrl) return null;
     
     try {
@@ -3476,234 +3420,51 @@ const EdgeIntel=()=>{
 
   const loadStock=async(sym)=>{
     if(!sym)return;
-    let cleanSym = sym.replace('.NS','').replace('.BO','').toUpperCase().trim();
-    const originalInput = cleanSym; // Keep original for search-by-name later
-    // Strip spaces: "CCL PRODUCTS" → "CCLPRODUCTS"  
-    const noSpaceSym = cleanSym.replace(/\s+/g, '');
-    // Resolve typed name → actual NSE symbol
-    // Try: exact symbol, no-space symbol, exact name, partial name match
-    const nameMatch = FULL_STOCK_LIST.find(s => 
-      s.s === cleanSym || s.s === noSpaceSym || s.n.toUpperCase() === cleanSym
-    ) || FULL_STOCK_LIST.find(s =>
-      s.n.toUpperCase().includes(cleanSym) || cleanSym.includes(s.s)
-    );
-    if (nameMatch) cleanSym = nameMatch.s;
-    else if (noSpaceSym !== cleanSym) cleanSym = noSpaceSym;
     setLoading(true);
     setShowSuggestions(false);
-    setSymbol(cleanSym);
     try{
       let data = null;
       
-      // 1. Try stock_details JSON first
-      try {
-        const res=await fetch(`./data/stock_details/${cleanSym}.json?t=${Date.now()}`);
-        if(res.ok) data=await res.json();
-      } catch(e) {}
-      
-      // 2. Try scanner results
-      if(!data) {
-        try {
-          const scanRes=await fetch(`./data/scanner_results.json?t=${Date.now()}`);
-          if(scanRes.ok){
-            const scanData=await scanRes.json();
-            const stocks = scanData?.stocks || scanData?.scan_results || [];
-            const found=stocks.find(s=>(s.symbol||s.s||'').toUpperCase()===cleanSym);
-            if(found) data = { ...found, symbol: cleanSym, name: found.name || found.n || cleanSym };
-          }
-        } catch(e) {}
-      }
-      
-      // 3. FIX 4: Yahoo Finance fallback — works for ANY NSE stock
-      if(!data) {
-        console.log('JSON not found for', cleanSym, '→ trying Yahoo Finance...');
-        const wUrl = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
-        try {
-            const res = await fetch(wUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
-              body: JSON.stringify({ ticker: `${cleanSym}.NS`, range: '3mo', interval: '1d' })
-            });
-            const yData = await res.json();
-            const result = yData?.chart?.result?.[0];
-            if(result) {
-              const meta = result.meta || {};
-              const quotes = result.indicators?.quote?.[0] || {};
-              const closes = (quotes.close || []).filter(c => c != null && c > 0);
-              const lastClose = closes.length > 0 ? closes[closes.length - 1] : 0;
-              const prevClose = closes.length > 1 ? closes[closes.length - 2] : lastClose;
-              const livePrice = meta.regularMarketPrice || lastClose;
-              const changePct = prevClose > 0 ? ((livePrice - prevClose) / prevClose * 100) : 0;
-              const listEntry = FULL_STOCK_LIST.find(s => s.s === cleanSym);
-              data = {
-                symbol: cleanSym,
-                name: meta.shortName || meta.longName || listEntry?.n || cleanSym,
-                sector: listEntry?.sec || '',
-                price: +livePrice.toFixed(2),
-                change_pct: +changePct.toFixed(2),
-                fundamentals: { pe_ratio: null, market_cap_cr: null },
-                source: 'yahoo'
-              };
-              console.log('✓ Yahoo Finance loaded:', cleanSym, '₹' + data.price);
-              addToast('Loaded ' + cleanSym + ' via Yahoo Finance', 'info', 2000);
-            }
-          } catch(e) { console.log('Yahoo fetch failed:', e.message); }
-      }
-      
-      // 3b. Yahoo Finance SEARCH by name — resolve company name to ticker
-      if(!data && originalInput.length > 2) {
-        console.log('Trying Yahoo search by name:', originalInput);
-        const searchQuery = sym.trim().replace(/\s+/g, ' ');
-        let resolvedSym = null;
-        
-        // Try direct Yahoo autocomplete API (public, no proxy needed)
-        try {
-          const acUrl = 'https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(searchQuery) + '&quotesCount=6&newsCount=0&region=IN&lang=en-IN';
-          const acRes = await fetch(acUrl);
-          if(acRes.ok) {
-            const acData = await acRes.json();
-            const quotes = acData?.quotes || [];
-            const nsMatch = quotes.find(q => q.symbol?.endsWith('.NS') || q.exchange === 'NSI') 
-                         || quotes.find(q => q.symbol?.endsWith('.BO') || q.exchange === 'BSE');
-            if(nsMatch) {
-              resolvedSym = nsMatch.symbol.replace('.NS','').replace('.BO','').toUpperCase();
-              console.log('Yahoo autocomplete resolved:', searchQuery, '→', resolvedSym);
-            }
-          }
-        } catch(e) { console.log('Yahoo direct search failed (CORS expected):', e.message); }
-        
-        // Fallback: Try via worker proxy
-        if(!resolvedSym) {
-          const wUrl3 = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
-          try {
-            const searchRes = await fetch(wUrl3, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-search' },
-              body: JSON.stringify({ query: searchQuery })
-            });
-            if(searchRes.ok) {
-              const searchData = await searchRes.json();
-              const quotes = searchData?.quotes || searchData?.ResultSet?.Result || searchData?.data || [];
-              const nsMatch = quotes.find(q => 
-                (q.symbol || '').endsWith('.NS') || q.exchange === 'NSI' || q.exchange === 'NSE'
-              ) || quotes.find(q => (q.symbol || '').endsWith('.BO'));
-              if(nsMatch) {
-                resolvedSym = (nsMatch.symbol || '').replace('.NS','').replace('.BO','').toUpperCase();
-                console.log('Worker search resolved:', searchQuery, '→', resolvedSym);
-              }
-            }
-          } catch(e) { console.log('Worker search failed:', e.message); }
-        }
-        
-        // If resolved, retry Yahoo quote with the correct symbol
-        if(resolvedSym) {
-          addToast('Resolved → ' + resolvedSym, 'info', 2000);
-          cleanSym = resolvedSym;
-          setSymbol(resolvedSym);
-          const wUrl4 = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
-          try {
-            const retryRes = await fetch(wUrl4, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'yahoo-proxy' },
-              body: JSON.stringify({ ticker: resolvedSym + '.NS', range: '3mo', interval: '1d' })
-            });
-            const retryData = await retryRes.json();
-            const retryResult = retryData?.chart?.result?.[0];
-            if(retryResult) {
-              const meta = retryResult.meta || {};
-              const quotes2 = retryResult.indicators?.quote?.[0] || {};
-              const closes = (quotes2.close || []).filter(c => c != null && c > 0);
-              const lastClose = closes.length > 0 ? closes[closes.length - 1] : 0;
-              const prevClose = closes.length > 1 ? closes[closes.length - 2] : lastClose;
-              const livePrice = meta.regularMarketPrice || lastClose;
-              const changePct = prevClose > 0 ? ((livePrice - prevClose) / prevClose * 100) : 0;
-              data = {
-                symbol: resolvedSym,
-                name: meta.shortName || meta.longName || resolvedSym,
-                sector: '',
-                price: +livePrice.toFixed(2),
-                change_pct: +changePct.toFixed(2),
-                fundamentals: { pe_ratio: null, market_cap_cr: null },
-                source: 'yahoo-search'
-              };
-              console.log('✓ Yahoo search+quote loaded:', resolvedSym, '₹' + data.price);
-            }
-          } catch(e2) { console.log('Yahoo retry failed:', e2.message); }
-        }
-      }
-      
-      // 4. Dhan LTP fallback
-      if(!data) {
-        const wUrl2 = localStorage.getItem('zd_worker_url') || localStorage.getItem('te_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev';
-        const dhanToken = localStorage.getItem('dhan_token');
-        const dhanId = localStorage.getItem('dhan_client_id');
-        const dhanMap = JSON.parse(localStorage.getItem('dhan_symbol_map') || '{}');
-        const secId = dhanMap[cleanSym];
-        if(dhanToken && secId) {
-          try {
-            const res = await fetch(wUrl2, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Kite-Action': 'dhan-ltp', 'X-Dhan-Token': dhanToken, 'X-Dhan-ID': dhanId || '' },
-              body: JSON.stringify({ security_id: secId, exchange: 'NSE_EQ' })
-            });
-            const dData = await res.json();
-            if(dData?.data?.last_price || dData?.last_price) {
-              const ltp = dData?.data?.last_price || dData?.last_price;
-              const listEntry = FULL_STOCK_LIST.find(s => s.s === cleanSym);
-              data = { symbol: cleanSym, name: listEntry?.n || cleanSym, sector: listEntry?.sec || '', price: +ltp, change_pct: 0, fundamentals: {}, source: 'dhan' };
-              addToast('Loaded ' + cleanSym + ' via Dhan LTP', 'info', 2000);
-            }
-          } catch(e) { console.log('Dhan LTP failed:', e.message); }
+      // Try stock_details first
+      const res=await fetch(`./data/stock_details/${sym.toUpperCase()}.json?t=${Date.now()}`);
+      if(res.ok){
+        data=await res.json();
+      }else{
+        // Try scanner results
+        const scanRes=await fetch(`./data/scanner_results.json?t=${Date.now()}`);
+        if(scanRes.ok){
+          const scanData=await scanRes.json();
+          const found=scanData.stocks?.find(s=>s.symbol.toUpperCase()===sym.toUpperCase());
+          if(found) data = found;
         }
       }
       
       if(data){
+        // Fetch live ATR and Swing Lows if not already present
         if(!data.atr || !data.atr_pct){
-          console.log('Fetching live ATR for', cleanSym);
-          const atrData = await fetchLiveATR(cleanSym);
+          console.log('Fetching live ATR for', sym);
+          const atrData = await fetchLiveATR(sym.toUpperCase());
           if(atrData){
             data.atr = atrData.atr;
             data.atr_pct = atrData.atr_pct;
             data.volatility = atrData.volatility;
             data.swingLows = atrData.swingLows;
+            // ALWAYS use live price from Yahoo (overwrite stale JSON data)
             if(atrData.price > 0) data.price = atrData.price;
             console.log('Live ATR + Swing Lows:', atrData);
           }
         }
         setStockData(data);
+        setSymbol(sym.toUpperCase());
       }else{
-        addToast('"' + sym.trim() + '" not found on NSE. Try the exact ticker symbol (e.g. RELIANCE, TCS).', 'error', 5000);
+        alert('Stock not found');
         setStockData(null);
-        setSymbol('');
       }
-    }catch(e){
-      console.error(e);
-      addToast('Error loading ' + cleanSym + ': ' + e.message, 'error', 4000);
-      setStockData(null);
-      setSymbol('');
-    }
+    }catch(e){console.error(e);setStockData(null)}
     setLoading(false);
   };
 
-    const handleSubmit=e=>{
-      e.preventDefault();
-      if(!inputSymbol) return;
-      const q = inputSymbol.toUpperCase().trim();
-      // If user typed a name (not a symbol), resolve from suggestions or stock list
-      const exactSymbol = FULL_STOCK_LIST.find(s => s.s === q);
-      if(exactSymbol) { loadStock(q); return; }
-      // Try matching by name (case-insensitive)
-      const byName = FULL_STOCK_LIST.find(s => s.n.toUpperCase() === q || s.n.toUpperCase().includes(q));
-      if(byName) { setInputSymbol(byName.s); loadStock(byName.s); return; }
-      // Try without spaces
-      const noSpace = q.replace(/\s+/g, '');
-      const byNoSpace = FULL_STOCK_LIST.find(s => s.s === noSpace);
-      if(byNoSpace) { setInputSymbol(byNoSpace.s); loadStock(byNoSpace.s); return; }
-      // If current suggestions have a match, use the first one
-      if(suggestions.length > 0) { setInputSymbol(suggestions[0].s); loadStock(suggestions[0].s); return; }
-      // Last resort: pass as-is (loadStock will try Yahoo)
-      loadStock(inputSymbol);
-    };
+  const handleSubmit=e=>{e.preventDefault();loadStock(inputSymbol)};
 
   // Close suggestions when clicking outside
   useEffect(()=>{
@@ -3781,9 +3542,9 @@ const EdgeIntel=()=>{
               {stockData.sector&&<span style={{fontSize:10,padding:'3px 8px',borderRadius:4,background:'rgba(0,200,255,0.1)',color:'#00c8ff',marginLeft:8,fontFamily:'var(--font-mono)'}}>{stockData.sector}</span>}
             </div>
             <div style={{textAlign:'right'}}>
-              <div style={{fontSize:24,fontWeight:800,fontFamily:'var(--font-mono)',color:'#fff'}}>₹{(liveCMP||stockData.price)?.toLocaleString()}</div>
+              <div style={{fontSize:24,fontWeight:800,fontFamily:'var(--font-mono)',color:'#fff'}}>₹{stockData.price?.toLocaleString()}</div>
               <div style={{fontSize:13,fontFamily:'var(--font-mono)',fontWeight:700,color:stockData.change_pct>=0?'#00ff88':'#ff4455'}}>
-                {(()=>{const curr=liveCMP||stockData.price;const prev=stockData.price/(1+(stockData.change_pct||0)/100);const chg=prev>0?((curr-prev)/prev*100):(stockData.change_pct||0);return`${chg>=0?'▲':'▼'} ${chg>=0?'+':''}${chg.toFixed(2)}%`})()}
+                {stockData.change_pct>=0?'▲':'▼'} {stockData.change_pct>=0?'+':''}{stockData.change_pct?.toFixed(2)}%
               </div>
             </div>
           </div>

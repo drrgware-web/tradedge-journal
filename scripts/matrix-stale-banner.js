@@ -1,7 +1,7 @@
 /**
  * TradEdge MATRIX — Stale Data Banner v1.1
  * ──────────────────────────────────────────
- * Drop-in script for rrm-signals.html and matrix.html
+ * Drop-in script for matrix.html
  * 
  * How it works:
  *   1. Fetches rrm_data.json and reads metadata.date / metadata.generated_at
@@ -11,7 +11,7 @@
  *   5. Auto-dismisses after 60 seconds (or click ✕)
  *
  * Install:
- *   Add before </body> in rrm-signals.html and matrix.html:
+ *   Add before </body> in matrix.html:
  *   <script src="scripts/matrix-stale-banner.js"></script>
  */
 
