@@ -361,14 +361,17 @@ function calcSuperTrend(ohlc,period,mult){
   return{values:st,direction:dir};
 }
 
-function calcEdgeCloud(ohlc){
-  const st1=calcSuperTrend(ohlc,10,2);const st2=calcSuperTrend(ohlc,10,3);
+function calcEdgeCloud(ohlc,cfg){
+  const c=cfg||{};
+  const st1=calcSuperTrend(ohlc,c.stPeriod||10,c.stMult1||2);
+  const st2=calcSuperTrend(ohlc,c.stPeriod||10,c.stMult2||3);
   const walking=st1.values.map((v,i)=>(v!=null&&st2.values[i]!=null)?(v+st2.values[i])/2:null);
   const walkDir=st1.direction.map((v,i)=>(v===1&&st2.direction[i]===1)?1:(v===-1&&st2.direction[i]===-1)?-1:v);
   const closes=ohlc.map(d=>d.close);
-  const running=calcEMA(closes,21);
-  return{walking,walkDir,running};
+  const running=calcEMA(closes,c.emaPeriod||21);
+  return{walking,walkDir,running,st1,st2};
 }
+const EC_DEFAULTS={stPeriod:10,stMult1:2,stMult2:3,emaPeriod:21,wlColor:'#FFA000',wlWidth:2,wlStyle:'dashed',rlColor:'#42A5F5',rlWidth:2,rlStyle:'solid',showCloud:true};
 
 function calcRSI(closes,period){
   const out=new Array(closes.length).fill(null);let avgG=0,avgL=0;
@@ -446,6 +449,9 @@ function LWChart({symbol,w,h,mode,isDark}){
   const[weeklyState,setWeeklyState]=useState(null);
   const[showWeekly,setShowWeekly]=useState(false);
   const[showTrade,setShowTrade]=useState(false);
+  const[showSettings,setShowSettings]=useState(false);
+  const[ecCfg,setEcCfg]=useState(()=>{try{return{...EC_DEFAULTS,...JSON.parse(localStorage.getItem('te_ec_cfg')||'{}')}}catch{return{...EC_DEFAULTS}}});
+  const updateCfg=useCallback((k,v)=>{setEcCfg(prev=>{const n={...prev,[k]:v};localStorage.setItem('te_ec_cfg',JSON.stringify(n));return n})},[]);
 
   const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;ohlc.push({time:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
 
@@ -518,22 +524,25 @@ function LWChart({symbol,w,h,mode,isDark}){
       });
       vs.setData(volData);
 
-      const{walking,walkDir,running}=calcEdgeCloud(ohlc);
+      const{walking,walkDir,running,st1,st2}=calcEdgeCloud(ohlc,ecCfg);
       walkRef.current=walking;runRef.current=running;
-      const wkSeries=chart.addLineSeries({lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:false,priceLineVisible:false,color:'#FFA000'});
+      const wlStyle=ecCfg.wlStyle==='solid'?LightweightCharts.LineStyle.Solid:ecCfg.wlStyle==='dotted'?LightweightCharts.LineStyle.Dotted:LightweightCharts.LineStyle.Dashed;
+      const rlStyle=ecCfg.rlStyle==='dashed'?LightweightCharts.LineStyle.Dashed:ecCfg.rlStyle==='dotted'?LightweightCharts.LineStyle.Dotted:LightweightCharts.LineStyle.Solid;
+      const wkSeries=chart.addLineSeries({lineWidth:ecCfg.wlWidth,lineStyle:wlStyle,lastValueVisible:true,priceLineVisible:false,color:ecCfg.wlColor,title:'WL'});
       const wkD=[];for(let i=0;i<ohlc.length;i++){if(walking[i]!=null)wkD.push({time:ohlc[i].time,value:walking[i]})}
       wkSeries.setData(wkD);
-      const rnSeries=chart.addLineSeries({color:'#42A5F5',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Solid,lastValueVisible:false,priceLineVisible:false});
+      const rnSeries=chart.addLineSeries({color:ecCfg.rlColor,lineWidth:ecCfg.rlWidth,lineStyle:rlStyle,lastValueVisible:true,priceLineVisible:false,title:'RL'});
       const rnD=[];for(let i=0;i<ohlc.length;i++){if(running[i]!=null)rnD.push({time:ohlc[i].time,value:running[i]})}
       rnSeries.setData(rnD);
 
       const fusionStates=calcAllFusionStates(ohlc);
       fusionRef.current=fusionStates;
 
-      // Cloud fill by fusion state
+      // Cloud fill by fusion state (if enabled)
       const stateGroups={};
+      if(!ecCfg.showCloud){/* skip cloud */}else{
       for(let i=0;i<ohlc.length;i++){if(walking[i]==null||running[i]==null)continue;const st=fusionStates[i]?.state||'DRIFT';if(!stateGroups[st])stateGroups[st]=[];stateGroups[st].push({time:ohlc[i].time,top:Math.max(walking[i],running[i]),bot:Math.min(walking[i],running[i])})}
-      for(const[st,pts] of Object.entries(stateGroups)){const col=FUSION_CLOUD[st]||'rgba(97,97,97,0.10)';const s=chart.addAreaSeries({topColor:col,bottomColor:'transparent',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});s.setData(pts.map(p=>({time:p.time,value:p.top})))}
+      for(const[st,pts] of Object.entries(stateGroups)){const col=FUSION_CLOUD[st]||'rgba(97,97,97,0.10)';const s=chart.addAreaSeries({topColor:col,bottomColor:'transparent',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});s.setData(pts.map(p=>({time:p.time,value:p.top})))}}
 
       // ── Donchian Channel (20) ──
       const dcPeriod=20;const dcUpper=[],dcLower=[];
@@ -625,7 +634,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         const idx=ohlc.findIndex(d=>d.time===param.time);
         if(idx<0){setHovered(null);return}
         const d=ohlc[idx];const fs=fusionStates[idx];
-        setHovered({date:new Date(d.time*1000).toLocaleDateString('en-IN'),open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
+        setHovered({date:new Date(d.time*1000).toLocaleDateString('en-IN'),open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2.values[idx],st2Dir:st2.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
 
       // ── Trade overlay from te_trades ──
       let tradeOverlay=null;
@@ -670,7 +679,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       if(showWeekly){fetchWeekly(wUrl,symbol)}
       setLoading(false);
     }catch(e){setErr(e.message);setLoading(false)}
-  },[symbol,w,h,mode,showWeekly,isDark]);
+  },[symbol,w,h,mode,showWeekly,isDark,ecCfg]);
 
   const fetchWeekly=useCallback(async(wUrl,sym)=>{
     try{
@@ -731,13 +740,41 @@ function LWChart({symbol,w,h,mode,isDark}){
         <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
         <button onClick={()=>setShowWeekly(!showWeekly)} style={{padding:'3px 8px',fontSize:9,fontFamily:'var(--fm)',fontWeight:showWeekly?700:500,color:showWeekly?'#B388FF':'var(--t3)',background:showWeekly?'rgba(179,136,255,.12)':'transparent',border:`1px solid ${showWeekly?'rgba(179,136,255,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>Wkly</button>
         <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
-        <span style={{font:'600 7px var(--fm)',color:'#FFA000',opacity:.7}}>╌ WL</span>
-        <span style={{font:'600 7px var(--fm)',color:'#42A5F5',opacity:.7}}>— RL</span>
+        <span style={{font:'600 7px var(--fm)',color:ecCfg.wlColor,opacity:.7}}>╌ WL({ecCfg.stPeriod},{ecCfg.stMult1}+{ecCfg.stMult2})</span>
+        <span style={{font:'600 7px var(--fm)',color:ecCfg.rlColor,opacity:.7}}>— RL({ecCfg.emaPeriod})</span>
         <span style={{font:'600 7px var(--fm)',color:'#2196F3',opacity:.7}}>▲ PP</span>
         <span style={{font:'600 7px var(--fm)',color:'#FFEB3B',opacity:.7}}>▲ BO</span>
         <span style={{font:'600 7px var(--fm)',color:'#26A69A',opacity:.7}}>● PB</span>
         <span style={{font:'600 7px var(--fm)',color:'#B388FF',opacity:.7}}>◆ SQ</span>
+        <button onClick={()=>setShowSettings(s=>!s)} style={{padding:'2px 6px',fontSize:8,fontFamily:'var(--fm)',color:showSettings?'var(--t1)':'var(--t3)',background:showSettings?'var(--bg3)':'transparent',border:'1px solid var(--bdr)',borderRadius:3,cursor:'pointer',marginLeft:4}}>⚙</button>
       </div>
+      {/* Settings panel */}
+      {showSettings&&<div style={{position:'absolute',top:28,left:8,zIndex:10,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:10,width:280,boxShadow:'0 8px 24px rgba(0,0,0,.5)'}}>
+        <div style={{font:'700 9px var(--fm)',color:'var(--t2)',marginBottom:8,letterSpacing:'.08em'}}>EDGECLOUD SETTINGS</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,font:'400 9px var(--fm)',color:'var(--t3)'}}>
+          <label>ST Period<input type="number" value={ecCfg.stPeriod} min={2} max={50} onChange={e=>updateCfg('stPeriod',+e.target.value||10)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+          <label>EMA Period<input type="number" value={ecCfg.emaPeriod} min={2} max={100} onChange={e=>updateCfg('emaPeriod',+e.target.value||21)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+          <label>ST Mult 1<input type="number" value={ecCfg.stMult1} min={0.5} max={10} step={0.5} onChange={e=>updateCfg('stMult1',+e.target.value||2)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+          <label>ST Mult 2<input type="number" value={ecCfg.stMult2} min={0.5} max={10} step={0.5} onChange={e=>updateCfg('stMult2',+e.target.value||3)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+        </div>
+        <div style={{marginTop:8,font:'700 8px var(--fm)',color:'var(--t4)',marginBottom:4}}>WALKING LINE</div>
+        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Color<input type="color" value={ecCfg.wlColor} onChange={e=>updateCfg('wlColor',e.target.value)} style={{width:28,height:18,border:'none',background:'none',cursor:'pointer',verticalAlign:'middle',marginLeft:4}}/></label>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Width<select value={ecCfg.wlWidth} onChange={e=>updateCfg('wlWidth',+e.target.value)} style={{padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Style<select value={ecCfg.wlStyle} onChange={e=>updateCfg('wlStyle',e.target.value)} style={{padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}><option value="dashed">Dashed</option><option value="solid">Solid</option><option value="dotted">Dotted</option></select></label>
+        </div>
+        <div style={{marginTop:6,font:'700 8px var(--fm)',color:'var(--t4)',marginBottom:4}}>RUNNING LINE</div>
+        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Color<input type="color" value={ecCfg.rlColor} onChange={e=>updateCfg('rlColor',e.target.value)} style={{width:28,height:18,border:'none',background:'none',cursor:'pointer',verticalAlign:'middle',marginLeft:4}}/></label>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Width<select value={ecCfg.rlWidth} onChange={e=>updateCfg('rlWidth',+e.target.value)} style={{padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Style<select value={ecCfg.rlStyle} onChange={e=>updateCfg('rlStyle',e.target.value)} style={{padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>
+        </div>
+        <div style={{marginTop:8,display:'flex',gap:8,alignItems:'center'}}>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)',display:'flex',alignItems:'center',gap:4}}><input type="checkbox" checked={ecCfg.showCloud} onChange={e=>updateCfg('showCloud',e.target.checked)} style={{accentColor:'var(--grn)'}}/> Show Cloud</label>
+          <button onClick={()=>{setEcCfg({...EC_DEFAULTS});localStorage.setItem('te_ec_cfg',JSON.stringify(EC_DEFAULTS))}} style={{marginLeft:'auto',padding:'3px 8px',fontSize:8,fontFamily:'var(--fm)',color:'var(--t3)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,cursor:'pointer'}}>Reset</button>
+        </div>
+        <div style={{marginTop:6,font:'400 8px var(--fm)',color:'var(--t4)'}}>ST({ecCfg.stPeriod},{ecCfg.stMult1}) + ST({ecCfg.stPeriod},{ecCfg.stMult2}) avg = Walking · EMA({ecCfg.emaPeriod}) = Running</div>
+      </div>}
       {/* Top-right weekly badge */}
       {showWeekly&&weeklyState&&<div style={{position:'absolute',top:6,right:8,zIndex:2,font:'700 9px var(--fm)',color:weeklyState.color,padding:'3px 10px',background:`${weeklyState.color}15`,border:`1px solid ${weeklyState.color}30`,borderRadius:4,backdropFilter:'blur(4px)'}}>Wkly: {weeklyState.state}</div>}
     </div>
@@ -751,8 +788,10 @@ function LWChart({symbol,w,h,mode,isDark}){
       {hovered.bbw!=null&&<span style={{color:'var(--t3)'}}>BB <span style={{color:hovered.bbw<10?'#B388FF':'var(--t2)'}}>{hovered.bbw.toFixed(1)}%</span></span>}
       {hovered.rsi!=null&&<span style={{color:'var(--t3)'}}>RSI <span style={{color:hovered.rsi>55?'#00E676':hovered.rsi<45?'#FF5252':'var(--t2)'}}>{hovered.rsi.toFixed(1)}</span></span>}
       {hovered.adx!=null&&<span style={{color:'var(--t3)'}}>ADX <span style={{color:hovered.adx>25?'#FFA000':'var(--t2)'}}>{hovered.adx.toFixed(1)}</span></span>}
-      {hovered.walking!=null&&<span style={{color:'#FFA000',fontSize:8}}>WL {hovered.walking.toFixed(1)}</span>}
-      {hovered.running!=null&&<span style={{color:'#42A5F5',fontSize:8}}>RL {hovered.running.toFixed(1)}</span>}
+      {hovered.st1Val!=null&&<span style={{color:hovered.st1Dir===1?'#26A69A':'#EF5350',fontSize:8}}>ST1 {hovered.st1Val.toFixed(1)}</span>}
+      {hovered.st2Val!=null&&<span style={{color:hovered.st2Dir===1?'#26A69A':'#EF5350',fontSize:8}}>ST2 {hovered.st2Val.toFixed(1)}</span>}
+      {hovered.walking!=null&&<span style={{color:ecCfg.wlColor,fontSize:8}}>WL {hovered.walking.toFixed(1)}</span>}
+      {hovered.running!=null&&<span style={{color:ecCfg.rlColor,fontSize:8}}>RL {hovered.running.toFixed(1)}</span>}
       {hovered.cloudBull!=null&&<span style={{font:'600 8px var(--fm)',color:hovered.cloudBull?'#26A69A':'#EF5350'}}>{hovered.cloudBull?'Bull':'Bear'}</span>}
     </div>}
 
