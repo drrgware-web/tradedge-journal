@@ -308,7 +308,8 @@
             <span class="subtitle">Stock Screener</span>
         </div>
         <div class="header-right">
-            <button id="refreshBtn" onclick="refreshStockList()" style="padding:6px 14px;background:rgba(0,240,255,0.1);border:1px solid var(--accent-cyan);border-radius:6px;color:var(--accent-cyan);font-size:11px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all 0.2s" onmouseover="this.style.background='rgba(0,240,255,0.2)'" onmouseout="this.style.background='rgba(0,240,255,0.1)'">🔄 Refresh</button>
+            <button id="refreshBtn" onclick="handleRefresh()" style="padding:6px 14px;background:rgba(0,240,255,0.1);border:1px solid var(--accent-cyan);border-radius:6px;color:var(--accent-cyan);font-size:11px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all 0.2s" onmouseover="this.style.background='rgba(0,240,255,0.2)'" onmouseout="this.style.background='rgba(0,240,255,0.1)'">🔄 Refresh</button>
+            <span id="refreshStatus" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;display:none"></span>
             <div class="meta-info">Updated: <span id="lastUpdate">-</span> • <span id="stockCount">-</span> stocks</div>
             <nav class="nav-links">
                 <a href="dashboard.html" class="nav-link">Dashboard</a>
@@ -445,28 +446,211 @@
             }
         };
 
-        // ═══ REFRESH STOCK LIST ═══
-        async function refreshStockList() {
+        // ═══ REFRESH SYSTEM — Triggers GitHub Actions + polls for completion ═══
+        const GH_OWNER = 'drrgware-web';
+        const GH_REPO = 'tradedge-journal';
+        const GH_WORKFLOWS = {
+            presets: 'scanner-daily.yml',
+            categories: 'scanner-daily.yml',
+            patterns: 'pattern-scanners.yml',
+            live: null  // Live scans don't need GitHub Actions
+        };
+
+        function getGHToken() {
+            return localStorage.getItem('te_github_token') || localStorage.getItem('gh_token') || localStorage.getItem('github_token') || '';
+        }
+
+        async function handleRefresh() {
             const btn = document.getElementById('refreshBtn');
-            btn.textContent = '⏳ Refreshing...';
+            const status = document.getElementById('refreshStatus');
+
+            if (currentTab === 'live') {
+                // Live tab: just refresh NSEMaster stock list
+                btn.textContent = '⏳ Refreshing...';
+                btn.disabled = true;
+                try {
+                    if (window.NSEMaster) {
+                        await NSEMaster.refresh();
+                        const s = NSEMaster.stats();
+                        const realCount = s.withListingDate || 3045;
+                        document.getElementById('stockCount').textContent = realCount;
+                        document.getElementById('totalScanned').textContent = realCount;
+                        document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+                        btn.textContent = '✓ ' + realCount;
+                    }
+                } catch(e) { btn.textContent = '✗ Failed'; }
+                setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 3000);
+                return;
+            }
+
+            // Presets/Categories tab: trigger GitHub Actions workflow
+            const token = getGHToken();
+            if (!token) {
+                status.style.display = 'inline';
+                status.textContent = '⚠️ Set gh_token in localStorage';
+                status.style.color = '#ffaa00';
+                setTimeout(() => {
+                    status.innerHTML = '<span style="font-size:9px">Run in console: localStorage.setItem("gh_token","ghp_xxx")</span>';
+                }, 2000);
+                return;
+            }
+
+            const workflowFile = currentTab === 'presets' || currentTab === 'categories' 
+                ? GH_WORKFLOWS.presets 
+                : GH_WORKFLOWS.patterns;
+
+            if (!workflowFile) return;
+
+            btn.textContent = '⏳ Triggering...';
             btn.disabled = true;
+            status.style.display = 'inline';
+            status.textContent = '🚀 Starting workflow...';
+            status.style.color = 'var(--accent-cyan)';
+
             try {
-                if (window.NSEMaster) {
-                    await NSEMaster.refresh();
-                    const s = NSEMaster.stats();
-                    const realCount = s.withListingDate || 3045;
-                    document.getElementById('stockCount').textContent = realCount;
-                    document.getElementById('totalScanned').textContent = realCount;
-                    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-                    btn.textContent = '✓ ' + realCount + ' stocks';
-                    setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 3000);
-                } else {
-                    btn.textContent = '⚠ NSEMaster not loaded';
-                    setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 2000);
+                // 1. Trigger the workflow
+                const triggerRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${workflowFile}/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ref: 'main' })
+                });
+
+                if (!triggerRes.ok) {
+                    const err = await triggerRes.json().catch(() => ({}));
+                    throw new Error(err.message || 'HTTP ' + triggerRes.status);
                 }
+
+                status.textContent = '⏳ Workflow started — polling...';
+                btn.textContent = '⏳ Running...';
+
+                // 2. Poll for completion
+                await pollWorkflowStatus(token, workflowFile, status, btn);
+
             } catch(e) {
-                btn.textContent = '✗ Failed';
-                setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 2000);
+                console.error('Workflow trigger failed:', e);
+                status.textContent = '✗ ' + e.message;
+                status.style.color = '#ff4466';
+                btn.textContent = '🔄 Refresh';
+                btn.disabled = false;
+                setTimeout(() => { status.style.display = 'none'; }, 8000);
+            }
+        }
+
+        async function pollWorkflowStatus(token, workflowFile, statusEl, btn) {
+            const startTime = Date.now();
+            const maxWait = 15 * 60 * 1000; // 15 min max
+            const pollInterval = 10000; // every 10 sec
+
+            // Wait a few seconds for the run to appear
+            await new Promise(r => setTimeout(r, 5000));
+
+            const poll = async () => {
+                const elapsed = Date.now() - startTime;
+                if (elapsed > maxWait) {
+                    statusEl.textContent = '⏰ Timed out — check Actions tab';
+                    statusEl.style.color = '#ffaa00';
+                    btn.textContent = '🔄 Refresh';
+                    btn.disabled = false;
+                    return;
+                }
+
+                const mins = Math.floor(elapsed / 60000);
+                const secs = Math.floor((elapsed % 60000) / 1000);
+                const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+                try {
+                    const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${workflowFile}/runs?per_page=1&status=in_progress`, {
+                        headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+                    });
+                    const data = await res.json();
+
+                    // Check if still running
+                    if (data.total_count > 0) {
+                        const run = data.workflow_runs[0];
+                        statusEl.textContent = `⏳ Running... ${timeStr}`;
+                        statusEl.style.color = 'var(--accent-cyan)';
+                        // Animate the button
+                        btn.textContent = ['⏳','⌛'][Math.floor(elapsed/1000) % 2] + ' ' + timeStr;
+                        setTimeout(poll, pollInterval);
+                        return;
+                    }
+
+                    // Check latest completed run
+                    const latestRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${workflowFile}/runs?per_page=1`, {
+                        headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+                    });
+                    const latestData = await latestRes.json();
+                    const latestRun = latestData.workflow_runs?.[0];
+
+                    if (latestRun) {
+                        const runTime = new Date(latestRun.created_at);
+                        const isRecent = (Date.now() - runTime.getTime()) < maxWait;
+
+                        if (latestRun.conclusion === 'success' && isRecent) {
+                            statusEl.textContent = '✓ Complete! Reloading data...';
+                            statusEl.style.color = 'var(--accent-green)';
+                            btn.textContent = '✓ Done';
+
+                            // Wait for GitHub Pages to deploy (usually ~30-60s)
+                            await new Promise(r => setTimeout(r, 3000));
+
+                            // Reload the data
+                            await reloadScanData();
+
+                            statusEl.textContent = '✓ Updated!';
+                            setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
+                            btn.textContent = '🔄 Refresh';
+                            btn.disabled = false;
+                            return;
+                        } else if (latestRun.conclusion === 'failure' && isRecent) {
+                            statusEl.textContent = '✗ Workflow failed — check Actions tab';
+                            statusEl.style.color = '#ff4466';
+                            btn.textContent = '🔄 Refresh';
+                            btn.disabled = false;
+                            setTimeout(() => { statusEl.style.display = 'none'; }, 8000);
+                            return;
+                        }
+                    }
+
+                    // Still waiting for it to start or complete
+                    statusEl.textContent = `⏳ Waiting... ${timeStr}`;
+                    setTimeout(poll, pollInterval);
+
+                } catch(e) {
+                    console.error('Poll error:', e);
+                    statusEl.textContent = '⚠️ Poll failed — check Actions tab';
+                    statusEl.style.color = '#ffaa00';
+                    btn.textContent = '🔄 Refresh';
+                    btn.disabled = false;
+                }
+            };
+
+            poll();
+        }
+
+        async function reloadScanData() {
+            try {
+                const [pr, cr, dr, tr] = await Promise.all([
+                    fetch('data/scan_presets_results.json?t=' + Date.now()).catch(() => null),
+                    fetch('data/scanner_results.json?t=' + Date.now()).catch(() => null),
+                    fetch('data/darvas_breakouts.json?t=' + Date.now()).catch(() => null),
+                    fetch('data/trendline_breakouts.json?t=' + Date.now()).catch(() => null)
+                ]);
+                if (pr?.ok) presetsData = await pr.json();
+                if (cr?.ok) categoriesData = await cr.json();
+                if (dr?.ok) darvasData = await dr.json();
+                if (tr?.ok) trendlineData = await tr.json();
+                
+                updateMeta();
+                renderSidebar();
+                selectFirstScan();
+                console.log('✓ Scanner data reloaded');
+            } catch(e) {
+                console.error('Reload failed:', e);
             }
         }
 
