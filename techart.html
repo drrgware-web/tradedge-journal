@@ -21,6 +21,7 @@ body{font-family:var(--fm);background:var(--bg0);color:var(--t1);overflow:hidden
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
 @keyframes bk{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
 .nv{display:flex;align-items:center;height:42px;padding:0 16px;background:linear-gradient(180deg,#0d1018,var(--bg1));border-bottom:1px solid var(--bdr);position:relative;z-index:100}
 .nv::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(24,214,224,.12),rgba(0,230,118,.08),transparent)}
@@ -35,8 +36,9 @@ body{font-family:var(--fm);background:var(--bg0);color:var(--t1);overflow:hidden
 
 .app{display:flex;height:calc(100vh - 42px)}
 .lp{width:196px;flex-shrink:0;border-right:1px solid var(--bdr);background:var(--bg1);display:flex;flex-direction:column;overflow:hidden}
-.ct{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
-.rp{width:216px;flex-shrink:0;border-left:1px solid var(--bdr);background:var(--bg1);overflow-y:auto}
+.ct{flex:1;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;min-width:0}
+.rp{position:fixed;right:0;top:42px;width:240px;height:calc(100vh - 42px);background:var(--bg1);border-left:1px solid var(--bdr);overflow-y:auto;z-index:50;transform:translateX(100%);transition:transform .2s ease}
+.rp.open{transform:translateX(0)}
 
 .ib{padding:6px 14px;border-bottom:1px solid var(--bdr);background:var(--bg2);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .ctrl{padding:4px 14px;border-bottom:1px solid var(--bdr);background:var(--bg1);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
@@ -112,8 +114,8 @@ let sb=null;try{sb=window.supabase.createClient(SB_U,SB_K)}catch(e){}
 function uS(s,m){const d=document.getElementById('sd'),l=document.getElementById('sl');if(d)d.style.background=s==='ok'?'var(--grn)':s==='sync'?'var(--amb)':s==='err'?'var(--red)':'var(--t4)';if(l)l.textContent=m||''}
 function lG(){try{const d=JSON.parse(localStorage.getItem('te_trades')||'[]');return Array.isArray(d)?d:d.trades||[]}catch{return[]}}
 function lS(t){try{localStorage.setItem('te_trades',JSON.stringify(t))}catch{}}
-async function cP(t){if(!sb)return;try{await sb.from('te_store').upsert({key:'te_pnf_trades',value:JSON.stringify(t),updated_at:new Date().toISOString()},{onConflict:'key'});uS('ok','SYNCED')}catch{uS('err','FAIL')}}
-async function fS(){uS('sync','SYNC…');const lo=lG();if(!sb){uS('ok','LOCAL');return lo}try{const{data}=await sb.from('te_store').select('value').eq('key','te_pnf_trades').single();if(!data){if(lo.length)await cP(lo);uS('ok','SYNCED');return lo}const cl=JSON.parse(data.value);const m=new Map();lo.forEach(t=>m.set(t.id,t));cl.forEach(t=>m.set(t.id,t));const r=[...m.values()].sort((a,b)=>b.id-a.id);lS(r);await cP(r);return r}catch{uS('err','FAIL');return lo}}
+async function cP(t){if(!sb)return;try{await sb.from('te_store').upsert({key:'te_pnf_trades',value:JSON.stringify(t),updated_at:new Date().toISOString()},{onConflict:'key'});uS('ok','SYNCED')}catch{uS('ok','LOCAL')}}
+async function fS(){const lo=lG();if(!sb){uS('ok','LOCAL');return lo}uS('sync','SYNC…');try{const{data,error}=await sb.from('te_store').select('value').eq('key','te_pnf_trades').single();if(error||!data){if(lo.length)await cP(lo);uS('ok','SYNCED');return lo}const cl=JSON.parse(data.value);const m=new Map();lo.forEach(t=>m.set(t.id,t));cl.forEach(t=>m.set(t.id,t));const r=[...m.values()].sort((a,b)=>b.id-a.id);lS(r);await cP(r);return r}catch{uS('ok','LOCAL');return lo}}
 
 // ═══ DEEP LINKS ═══
 const TV_LAYOUT='8RFOgQZr';
@@ -121,19 +123,16 @@ const tvLink=s=>`https://in.tradingview.com/chart/${TV_LAYOUT}/?symbol=NSE:${s}`
 const rzLink=s=>`https://zone.definedge.com/chart?symbol=${s}&exchange=NSE&chartType=pnf`;
 
 // ═══ DATA LOADING ═══
-// Try loading live data from data/ohlc_daily.json, fallback to demo
 async function loadData(){
   try{
     const res=await fetch('data/ohlc_daily.json');
-    if(!res.ok)throw new Error('No data file');
+    if(!res.ok)throw new Error('skip');
     const json=await res.json();
     if(json.stocks&&Object.keys(json.stocks).length>0){
-      console.log(`Loaded live data: ${json.count} stocks, generated ${json.generated}`);
       return{stocks:json.stocks,live:true,generated:json.generated};
     }
-    throw new Error('Empty data');
+    throw new Error('empty');
   }catch(e){
-    console.log('Using demo data:',e.message);
     return{stocks:null,live:false};
   }
 }
@@ -437,18 +436,24 @@ function calcAllFusionStates(ohlc){
   return states;
 }
 
-// ═══ LW CHART COMPONENT (Bar + Line + EdgeCloud + Fusion) ═══
-function LWChart({symbol,w,h,mode,isDark}){
-  const containerRef=useRef(null);const chartObjRef=useRef(null);
+// ═══ LW CHART COMPONENT (Bar + Line + EdgeCloud + Fusion + Weekly) ═══
+function LWChart({symbol,w,h,mode}){
+  const containerRef=useRef(null);const chartObjRef=useRef(null);const ohlcRef=useRef([]);const fusionRef=useRef([]);const walkRef=useRef([]);const runRef=useRef([]);
   const[loading,setLoading]=useState(false);const[err,setErr]=useState(null);
   const[range,setRange]=useState('6mo');
   const[fusion,setFusion]=useState(null);
+  const[hovered,setHovered]=useState(null);
+  const[weeklyState,setWeeklyState]=useState(null);
+  const[showWeekly,setShowWeekly]=useState(false);
+  const[showTrade,setShowTrade]=useState(false);
+
+  const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;ohlc.push({time:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
 
   const fetchAndRender=useCallback(async(rng)=>{
     if(!symbol||!containerRef.current)return;
     const wUrl=localStorage.getItem('zd_worker_url');
     if(!wUrl){setErr('Set zd_worker_url in localStorage');return}
-    setLoading(true);setErr(null);
+    setLoading(true);setErr(null);setHovered(null);
     if(chartObjRef.current){chartObjRef.current.remove();chartObjRef.current=null}
     containerRef.current.innerHTML='';
     try{
@@ -456,211 +461,311 @@ function LWChart({symbol,w,h,mode,isDark}){
       if(!res.ok)throw new Error('HTTP '+res.status);
       const data=await res.json();
       const result=data?.chart?.result?.[0];if(!result)throw new Error('No data');
-      const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};
-      const ohlc=[];
-      for(let i=0;i<ts.length;i++){
-        if(q.close[i]==null)continue;
-        ohlc.push({time:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0});
-      }
+      const ohlc=parseOHLCV(result);
       if(!ohlc.length)throw new Error('Empty OHLCV');
+      ohlcRef.current=ohlc;
 
-      const dk=isDark!==false;
-      const bgCol=dk?'#0d1117':'#ffffff';
-      const gridCol=dk?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
-      const txtCol=dk?'#888':'#666';
-      const crossBg=dk?'#1a2030':'#e8e8e8';
+      const bgCol='#0d1117';
+      const gridCol='rgba(255,255,255,0.04)';
+      const txtCol='#888';
+      const crossBg='#1a2030';
+      const bdr='rgba(255,255,255,0.08)';
 
       const chart=LightweightCharts.createChart(containerRef.current,{
-        width:w||800,height:h||400,
+        width:w||800,height:Math.max(h||400,400),
         layout:{background:{color:bgCol},textColor:txtCol,fontFamily:'IBM Plex Mono'},
         grid:{vertLines:{color:gridCol},horzLines:{color:gridCol}},
-        crosshair:{mode:0,vertLine:{color:dk?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.15)',labelBackgroundColor:crossBg},horzLine:{color:dk?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.15)',labelBackgroundColor:crossBg}},
-        rightPriceScale:{borderColor:gridCol},
-        timeScale:{borderColor:gridCol,timeVisible:false},
+        crosshair:{mode:0,vertLine:{color:'rgba(255,255,255,0.15)',labelBackgroundColor:crossBg},horzLine:{color:'rgba(255,255,255,0.15)',labelBackgroundColor:crossBg}},
+        rightPriceScale:{borderColor:bdr},
+        timeScale:{borderColor:bdr,timeVisible:false},
       });
       chartObjRef.current=chart;
 
-      // Main series
       let mainSeries;
       if(mode==='line'){
-        mainSeries=chart.addAreaSeries({topColor:dk?'rgba(66,165,245,0.15)':'rgba(66,165,245,0.2)',bottomColor:'transparent',lineColor:'#42A5F5',lineWidth:2,crosshairMarkerRadius:4});
+        mainSeries=chart.addAreaSeries({topColor:'rgba(66,165,245,0.15)',bottomColor:'transparent',lineColor:'#42A5F5',lineWidth:2,crosshairMarkerRadius:4});
         mainSeries.setData(ohlc.map(d=>({time:d.time,value:d.close})));
       }else{
-        mainSeries=chart.addCandlestickSeries({upColor:'#26A69A',downColor:'#EF5350',borderUpColor:'#26A69A',borderDownColor:'#EF5350',wickUpColor:'#26A69Aaa',wickDownColor:'#EF5350aa'});
-        mainSeries.setData(ohlc.map(d=>({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close})));
+        // HLC bars: vertical line High→Low + close tick on right
+        mainSeries=chart.addBarSeries({upColor:'#26A69A',downColor:'#EF5350',thinBars:false,openVisible:false});
+        mainSeries.setData(ohlc.map((d,i)=>({time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close})));
       }
 
-      // Volume
+      // Volume with Pocket Pivot detection
+      const ppFlags=[];
       const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',color:'#26A69A'});
       vs.priceScale().applyOptions({scaleMargins:{top:0.8,bottom:0}});
-      vs.setData(ohlc.map(d=>({time:d.time,value:d.volume,color:d.close>=d.open?(dk?'rgba(38,166,154,0.35)':'rgba(38,166,154,0.5)'):(dk?'rgba(239,83,80,0.35)':'rgba(239,83,80,0.5)')})));
+      const volData=ohlc.map((d,i)=>{
+        const prevC=i>0?ohlc[i-1].close:d.close;
+        const isUp=d.close>prevC;
+        // Pocket Pivot: today up + volume > max down-day volume in prior 10 bars
+        let isPP=false;
+        if(isUp&&i>=2){
+          let maxDownVol=0;
+          for(let j=Math.max(0,i-10);j<i;j++){
+            const pC=j>0?ohlc[j-1].close:ohlc[j].close;
+            if(ohlc[j].close<pC&&ohlc[j].volume>maxDownVol)maxDownVol=ohlc[j].volume;
+          }
+          if(maxDownVol>0&&d.volume>maxDownVol)isPP=true;
+        }
+        if(isPP)ppFlags.push(i);
+        return{time:d.time,value:d.volume,color:isPP?'rgba(33,150,243,0.55)':isUp?'rgba(38,166,154,0.35)':'rgba(239,83,80,0.35)'};
+      });
+      vs.setData(volData);
 
-      // EdgeCloud lines
       const{walking,walkDir,running}=calcEdgeCloud(ohlc);
+      walkRef.current=walking;runRef.current=running;
       const wkSeries=chart.addLineSeries({lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:false,priceLineVisible:false,color:'#FFA000'});
       const wkD=[];for(let i=0;i<ohlc.length;i++){if(walking[i]!=null)wkD.push({time:ohlc[i].time,value:walking[i]})}
       wkSeries.setData(wkD);
-
       const rnSeries=chart.addLineSeries({color:'#42A5F5',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Solid,lastValueVisible:false,priceLineVisible:false});
       const rnD=[];for(let i=0;i<ohlc.length;i++){if(running[i]!=null)rnD.push({time:ohlc[i].time,value:running[i]})}
       rnSeries.setData(rnD);
 
-      // ── Fusion states per bar ──
       const fusionStates=calcAllFusionStates(ohlc);
+      fusionRef.current=fusionStates;
 
-      // Cloud fill colored by fusion state — use background tint histogram
-      const bgTint=chart.addHistogramSeries({priceFormat:{type:'price'},priceScaleId:'bgtint',color:'#616161',base:0,lastValueVisible:false,priceLineVisible:false});
-      bgTint.priceScale().applyOptions({scaleMargins:{top:0,bottom:0},visible:false});
-      // Use a line series pair for cloud shading between WL and RL
-      const cloudUpper=chart.addAreaSeries({lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false,lineColor:'transparent',topColor:'transparent',bottomColor:'transparent'});
-      const cloudLower=chart.addAreaSeries({lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false,lineColor:'transparent',topColor:'transparent',bottomColor:'transparent'});
-      const cUpD=[];const cDnD=[];
-      for(let i=0;i<ohlc.length;i++){
-        if(walking[i]==null||running[i]==null)continue;
-        const t=ohlc[i].time;const st=fusionStates[i]?.state||'DRIFT';
-        const col=FUSION_CLOUD[st];
-        cUpD.push({time:t,value:Math.max(walking[i],running[i])});
-        cDnD.push({time:t,value:Math.min(walking[i],running[i])});
-      }
-      cloudUpper.setData(cUpD);cloudLower.setData(cDnD);
-      // Apply fusion-state coloring via per-bar area — use multiple area overlays by state
+      // Cloud fill by fusion state
       const stateGroups={};
-      for(let i=0;i<ohlc.length;i++){
-        if(walking[i]==null||running[i]==null)continue;
-        const st=fusionStates[i]?.state||'DRIFT';
-        if(!stateGroups[st])stateGroups[st]=[];
-        stateGroups[st].push({time:ohlc[i].time,top:Math.max(walking[i],running[i]),bot:Math.min(walking[i],running[i])});
-      }
-      for(const[st,pts] of Object.entries(stateGroups)){
-        const col=FUSION_CLOUD[st]||'rgba(97,97,97,0.10)';
-        const s=chart.addAreaSeries({topColor:col,bottomColor:'transparent',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        s.setData(pts.map(p=>({time:p.time,value:p.top})));
-      }
+      for(let i=0;i<ohlc.length;i++){if(walking[i]==null||running[i]==null)continue;const st=fusionStates[i]?.state||'DRIFT';if(!stateGroups[st])stateGroups[st]=[];stateGroups[st].push({time:ohlc[i].time,top:Math.max(walking[i],running[i]),bot:Math.min(walking[i],running[i])})}
+      for(const[st,pts] of Object.entries(stateGroups)){const col=FUSION_CLOUD[st]||'rgba(97,97,97,0.10)';const s=chart.addAreaSeries({topColor:col,bottomColor:'transparent',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});s.setData(pts.map(p=>({time:p.time,value:p.top})))}
 
-      // ── Signal markers for state transitions ──
+      // Markers — smaller text
       const markers=[];
-      for(let i=1;i<fusionStates.length;i++){
-        const prev=fusionStates[i-1].state;const cur=fusionStates[i].state;const t=ohlc[i].time;
-        if(prev==='COIL'&&cur==='IGNITION')markers.push({time:t,position:'aboveBar',color:'#FFD700',shape:'circle',text:'IGN'});
-        else if(prev==='IGNITION'&&cur==='THRUST')markers.push({time:t,position:'belowBar',color:'#00E676',shape:'arrowUp',text:'THR'});
-        else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'FADE'});
-        else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'COIL'});
-      }
+      for(let i=1;i<fusionStates.length;i++){const prev=fusionStates[i-1].state;const cur=fusionStates[i].state;const t=ohlc[i].time;
+        if(prev==='COIL'&&cur==='IGNITION')markers.push({time:t,position:'aboveBar',color:'#FFD700',shape:'circle',text:'I'});
+        else if(prev==='IGNITION'&&cur==='THRUST')markers.push({time:t,position:'belowBar',color:'#00E676',shape:'arrowUp',text:'T'});
+        else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'F'});
+        else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
+      // Pocket Pivot markers
+      ppFlags.forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#2196F3',shape:'arrowUp',text:'PP'})});
+      markers.sort((a,b)=>a.time-b.time);
       if(markers.length)mainSeries.setMarkers(markers);
+
+      // Crosshair move → update hovered bar
+      chart.subscribeCrosshairMove(param=>{
+        if(!param||!param.time){setHovered(null);return}
+        const idx=ohlc.findIndex(d=>d.time===param.time);
+        if(idx<0){setHovered(null);return}
+        const d=ohlc[idx];const fs=fusionStates[idx];
+        setHovered({date:new Date(d.time*1000).toLocaleDateString('en-IN'),open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
+
+      // ── Trade overlay from te_trades ──
+      let tradeOverlay=null;
+      try{
+        const allTrades=JSON.parse(localStorage.getItem('te_trades')||'[]');
+        const match=allTrades.find(t=>t.symbol===symbol&&(t.status==='Open'||t.status==='Partial'));
+        if(match){
+          const entries=match.entries||[];const exits=match.exits||[];
+          const avgEntry=entries.length?entries.reduce((s,e)=>s+(+e.price)*(+e.qty),0)/entries.reduce((s,e)=>s+(+e.qty),0):+match.entry_price||0;
+          const sl=+match.sl||0;const days=entries.length?Math.floor((Date.now()-new Date(entries[0].date).getTime())/86400000):0;
+          const curClose=ohlc[ohlc.length-1].close;const pnlPct=avgEntry>0?((curClose-avgEntry)/avgEntry*100):0;
+          const riskPct=avgEntry>0&&sl>0?((avgEntry-sl)/avgEntry*100):0;
+          // Entry fusion state (find bar closest to first entry date)
+          let entryFusionState=null;
+          if(entries.length&&fusionStates.length){const ed=new Date(entries[0].date).getTime()/1000;const eIdx=ohlc.reduce((best,d,i)=>Math.abs(d.time-ed)<Math.abs(ohlc[best].time-ed)?i:best,0);entryFusionState=fusionStates[eIdx]?.state||null}
+          tradeOverlay={entries,exits,avgEntry,sl,days,pnlPct,riskPct,status:match.status,entryFusion:entryFusionState,curFusion:fusionStates[ohlc.length-1]?.state};
+          // Avg entry line — subtle
+          if(avgEntry>0){const avgLine=chart.addLineSeries({color:'rgba(0,188,212,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:true,priceLineVisible:false,title:'Avg'});avgLine.setData([{time:ohlc[0].time,value:avgEntry},{time:ohlc[ohlc.length-1].time,value:avgEntry}])}
+          // SL line — subtle
+          if(sl>0){const slLine=chart.addLineSeries({color:'rgba(255,82,82,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:true,priceLineVisible:false,title:'SL'});slLine.setData([{time:ohlc[0].time,value:sl},{time:ohlc[ohlc.length-1].time,value:sl}])}
+          // Entry/exit/pyramid markers on main series
+          const tm=[...markers];
+          entries.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs(d.time-ts)<Math.abs(ohlc[b].time-ts)?i:b,0);tm.push({time:ohlc[near].time,position:'belowBar',color:j===0?'#00E676':'#FF9800',shape:'arrowUp',text:j===0?'P1':j===1?'P2':'P3'})});
+          exits.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs(d.time-ts)<Math.abs(ohlc[b].time-ts)?i:b,0);const isProfit=(+e.price)>avgEntry;tm.push({time:ohlc[near].time,position:'aboveBar',color:isProfit?'#00E676':'#FF5252',shape:'arrowDown',text:j===0?'T1':j===1?'T2':j===2?'T3':'RUN'})});
+          tm.sort((a,b)=>a.time-b.time);
+          mainSeries.setMarkers(tm);
+        }
+      }catch(e){}
+      setFusion(prev=>({...(prev||{}),_tradeOverlay:tradeOverlay}));
 
       chart.timeScale().fitContent();
 
-      // ── Build fusion data for panel ──
+      // Build panel data
       const n=ohlc.length-1;const cur=fusionStates[n];
       const cloudBull=walking[n]!=null&&running[n]!=null?walking[n]>running[n]:null;
       const stripLen=Math.min(60,ohlc.length);
       const strip=fusionStates.slice(-stripLen);
       const bbwStrip=strip.map(s=>s.bbw);
-      setFusion({...cur,cloudBull,strip,bbwStrip});
+      setFusion({...cur,cloudBull,strip,bbwStrip,ohlcLen:ohlc.length,_tradeOverlay:tradeOverlay});
+
+      // Fetch weekly fusion state (async, non-blocking)
+      if(showWeekly){fetchWeekly(wUrl,symbol)}
       setLoading(false);
     }catch(e){setErr(e.message);setLoading(false)}
-  },[symbol,w,h,mode,isDark]);
+  },[symbol,w,h,mode,showWeekly]);
+
+  const fetchWeekly=useCallback(async(wUrl,sym)=>{
+    try{
+      const res=await fetch(wUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker:`${sym}.NS`,range:'2y',interval:'1wk'})});
+      if(!res.ok)return;const data=await res.json();
+      const result=data?.chart?.result?.[0];if(!result)return;
+      const ohlc=parseOHLCV(result);if(ohlc.length<30)return;
+      const states=calcAllFusionStates(ohlc);
+      const n=ohlc.length-1;const wk=states[n];
+      const stripLen=Math.min(30,ohlc.length);
+      setWeeklyState({...wk,strip:states.slice(-stripLen),cloudBull:ohlc.length>1});
+    }catch{}
+  },[]);
 
   useEffect(()=>{fetchAndRender(range)},[fetchAndRender,range]);
-  useEffect(()=>{if(chartObjRef.current&&w&&h)chartObjRef.current.resize(w,h)},[w,h]);
+  useEffect(()=>{if(chartObjRef.current&&w)chartObjRef.current.resize(w,Math.max(h||400,400))},[w,h]);
 
-  const tfBtn=(label,val)=><button key={val} onClick={()=>setRange(val)} style={{padding:'2px 8px',fontSize:8,fontFamily:'var(--fm)',fontWeight:range===val?700:500,color:range===val?'#42A5F5':'var(--t3)',background:range===val?'rgba(66,165,245,.12)':'transparent',border:`1px solid ${range===val?'rgba(66,165,245,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>{label}</button>;
+  // Display values: hovered bar overrides latest
+  const dv=hovered||fusion;
 
-  const mCard=(label,val,color,sub)=><div style={{background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:'8px 10px',flex:1,minWidth:100}}>
-    <div style={{font:'500 7px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:2}}>{label}</div>
-    <div style={{font:'700 16px var(--fm)',color:color||'var(--t1)'}}>{val}</div>
-    {sub&&<div style={{font:'400 7px var(--fm)',color:'var(--t3)',marginTop:1}}>{sub}</div>}
+  const tfBtn=(label,val)=><button key={val} onClick={()=>setRange(val)} style={{padding:'3px 10px',fontSize:9,fontFamily:'var(--fm)',fontWeight:range===val?700:500,color:range===val?'#42A5F5':'var(--t3)',background:range===val?'rgba(66,165,245,.12)':'transparent',border:`1px solid ${range===val?'rgba(66,165,245,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer',transition:'all .15s'}}>{label}</button>;
+
+  const mCard=(label,val,color,sub,borderColor)=><div style={{background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:8,padding:'16px 18px',flex:1,minWidth:140,minHeight:100,borderLeft:borderColor?`4px solid ${borderColor}`:undefined,boxShadow:borderColor?`inset 0 0 20px ${borderColor}08`:undefined}}>
+    <div style={{font:'600 12px var(--fm)',color:'var(--t4)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>{label}</div>
+    <div style={{font:'700 36px var(--fm)',color:color||'var(--t1)',lineHeight:1}}>{val}</div>
+    {sub&&<div style={{font:'400 13px var(--fm)',color:'var(--t3)',marginTop:6}}>{sub}</div>}
   </div>;
 
-  const entryRow=(sig,state,action,color)=><tr style={{borderBottom:'1px solid var(--bdr)'}}>
-    <td style={{padding:'3px 8px',font:'600 8px var(--fm)',color:'var(--t2)'}}>{sig}</td>
-    <td style={{padding:'3px 8px'}}><span style={{font:'700 8px var(--fm)',color:FUSION_COLORS[state]}}>{state}</span></td>
-    <td style={{padding:'3px 8px',font:'500 8px var(--fm)',color}}>{action}</td>
+  const entryRow=(sig,state,action,color,idx)=><tr style={{borderBottom:'1px solid var(--bdr)',background:idx%2?'var(--bg3)':'transparent'}}>
+    <td style={{padding:'12px 14px',font:'600 14px var(--fm)',color:'var(--t2)'}}>{sig}</td>
+    <td style={{padding:'12px 14px'}}><span style={{font:'700 13px var(--fm)',color:FUSION_COLORS[state],padding:'3px 10px',background:`${FUSION_COLORS[state]}18`,borderRadius:4}}>{state}</span></td>
+    <td style={{padding:'12px 14px',font:'500 14px var(--fm)',color}}>{action}</td>
   </tr>;
 
-  const exitRow=(transition,action,color)=><tr style={{borderBottom:'1px solid var(--bdr)'}}>
-    <td style={{padding:'3px 8px',font:'600 8px var(--fm)',color:'var(--t2)'}}>{transition}</td>
-    <td style={{padding:'3px 8px',font:'500 8px var(--fm)',color}}>{action}</td>
+  const exitRow=(transition,action,color,idx)=><tr style={{borderBottom:'1px solid var(--bdr)',background:idx%2?'var(--bg3)':'transparent'}}>
+    <td style={{padding:'12px 14px',font:'600 14px var(--fm)',color:'var(--t2)'}}>{transition}</td>
+    <td style={{padding:'12px 14px',font:color==='#FF5252'?'700 14px var(--fm)':'500 14px var(--fm)',color}}>{action}</td>
   </tr>;
 
-  if(err)return<div style={{padding:40,textAlign:'center',color:'#ff3d5a',font:'500 11px var(--fm)'}}>{err}</div>;
-  return<div>
+  const sep=()=><div style={{height:1,background:'var(--bdr)',margin:'16px 0'}}/>;
+
+  if(err)return<div style={{padding:40,textAlign:'center',color:'#ff3d5a',font:'500 12px var(--fm)'}}>{err}</div>;
+  return<div style={{animation:'fadeIn .3s ease-out'}}>
     <div style={{position:'relative'}}>
-      {loading&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:5,background:'rgba(13,17,23,.85)'}}><div style={{width:30,height:30,border:'3px solid rgba(66,165,245,.15)',borderTop:'3px solid #42A5F5',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/></div>}
-      <div ref={containerRef} style={{width:'100%',height:h||400}}/>
+      {loading&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:5,background:'rgba(13,17,23,.9)',backdropFilter:'blur(4px)'}}><div style={{width:32,height:32,border:'3px solid rgba(66,165,245,.12)',borderTop:'3px solid #42A5F5',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/></div>}
+      <div ref={containerRef} style={{width:'100%',height:Math.max(h||400,400),transition:'opacity .2s'}}/>
+      {/* Top-left controls */}
       <div style={{position:'absolute',top:6,left:8,display:'flex',gap:6,alignItems:'center',zIndex:2}}>
         <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
+        <button onClick={()=>setShowWeekly(!showWeekly)} style={{padding:'3px 8px',fontSize:9,fontFamily:'var(--fm)',fontWeight:showWeekly?700:500,color:showWeekly?'#B388FF':'var(--t3)',background:showWeekly?'rgba(179,136,255,.12)':'transparent',border:`1px solid ${showWeekly?'rgba(179,136,255,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>Wkly</button>
         <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
-        <span style={{font:'600 7px var(--fm)',color:'#FFA000'}}>╌ Walking</span>
-        <span style={{font:'600 7px var(--fm)',color:'#42A5F5'}}>— Running</span>
-        <span style={{font:'600 7px var(--fm)',color:'rgba(38,166,154,.6)'}}>■ Cloud</span>
+        <span style={{font:'600 7px var(--fm)',color:'#FFA000',opacity:.7}}>╌ WL</span>
+        <span style={{font:'600 7px var(--fm)',color:'#42A5F5',opacity:.7}}>— RL</span>
+        <span style={{font:'600 7px var(--fm)',color:'#2196F3',opacity:.7}}>▲ PP</span>
       </div>
+      {/* Top-right weekly badge */}
+      {showWeekly&&weeklyState&&<div style={{position:'absolute',top:6,right:8,zIndex:2,font:'700 9px var(--fm)',color:weeklyState.color,padding:'3px 10px',background:`${weeklyState.color}15`,border:`1px solid ${weeklyState.color}30`,borderRadius:4,backdropFilter:'blur(4px)'}}>Wkly: {weeklyState.state}</div>}
     </div>
 
-    {fusion&&<div style={{padding:'6px 0'}}>
+    {/* Crosshair tooltip */}
+    {hovered&&<div style={{display:'flex',gap:12,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:4,margin:'4px 0',font:'500 9px var(--fm)',flexWrap:'wrap',alignItems:'center'}}>
+      <span style={{color:'var(--t2)'}}>{hovered.date}</span>
+      <span style={{color:'var(--t3)'}}>O <span style={{color:'var(--t1)'}}>{hovered.open?.toFixed(2)}</span> H <span style={{color:'var(--t1)'}}>{hovered.high?.toFixed(2)}</span> L <span style={{color:'var(--t1)'}}>{hovered.low?.toFixed(2)}</span> C <span style={{color:'var(--t1)'}}>{hovered.close?.toFixed(2)}</span></span>
+      <span style={{color:'var(--t3)'}}>Vol <span style={{color:'var(--t2)'}}>{hovered.volume?(hovered.volume/1e6).toFixed(2)+'M':'—'}</span></span>
+      {hovered.state&&<span style={{font:'700 8px var(--fm)',color:hovered.color,padding:'1px 6px',background:`${hovered.color}18`,borderRadius:3}}>{hovered.state}</span>}
+      {hovered.bbw!=null&&<span style={{color:'var(--t3)'}}>BB <span style={{color:hovered.bbw<10?'#B388FF':'var(--t2)'}}>{hovered.bbw.toFixed(1)}%</span></span>}
+      {hovered.rsi!=null&&<span style={{color:'var(--t3)'}}>RSI <span style={{color:hovered.rsi>55?'#00E676':hovered.rsi<45?'#FF5252':'var(--t2)'}}>{hovered.rsi.toFixed(1)}</span></span>}
+      {hovered.adx!=null&&<span style={{color:'var(--t3)'}}>ADX <span style={{color:hovered.adx>25?'#FFA000':'var(--t2)'}}>{hovered.adx.toFixed(1)}</span></span>}
+      {hovered.walking!=null&&<span style={{color:'#FFA000',fontSize:8}}>WL {hovered.walking.toFixed(1)}</span>}
+      {hovered.running!=null&&<span style={{color:'#42A5F5',fontSize:8}}>RL {hovered.running.toFixed(1)}</span>}
+      {hovered.cloudBull!=null&&<span style={{font:'600 8px var(--fm)',color:hovered.cloudBull?'#26A69A':'#EF5350'}}>{hovered.cloudBull?'Bull':'Bear'}</span>}
+    </div>}
+
+    {dv&&<div style={{padding:'0'}}>
+      {sep()}
       {/* Metric cards */}
-      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:6}}>
-        {mCard('BB Width',fusion.bbw!=null?fusion.bbw.toFixed(1)+'%':'—',fusion.bbw!=null&&fusion.bbw<10?'#B388FF':'var(--t1)',fusion.bbw!=null&&fusion.bbw<10?'Squeeze active':'Normal')}
-        {mCard('Adaptive RSI',fusion.rsi!=null?fusion.rsi.toFixed(1):'—',fusion.rsi!=null?(fusion.rsi>55?'#00E676':fusion.rsi<45?'#FF5252':'var(--t2)'):'var(--t3)',fusion.rsi!=null?(fusion.rsi>70?'Overbought zone':fusion.rsi>55?'Bullish zone':fusion.rsi<30?'Oversold zone':fusion.rsi<45?'Bearish zone':'Neutral zone'):'—')}
-        {mCard('ADX (14)',fusion.adx!=null?fusion.adx.toFixed(1):'—',fusion.adx!=null&&fusion.adx>25?'#FFA000':'var(--t3)',(fusion.adx!=null?(fusion.adx>25?'Trending':'Ranging'):'')+' · DI+ '+(fusion.diP||0).toFixed(1)+' / DI- '+(fusion.diM||0).toFixed(1))}
-        {mCard('Fusion State',fusion.state,fusion.color,FUSION_DESC[fusion.state]||'')}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+        {mCard('BB Width',dv.bbw!=null?dv.bbw.toFixed(1)+'%':'—',dv.bbw!=null&&dv.bbw<10?'#B388FF':'var(--t1)',dv.bbw!=null&&dv.bbw<10?'Squeeze active':'Normal')}
+        {mCard('Adaptive RSI',dv.rsi!=null?dv.rsi.toFixed(1):'—',dv.rsi!=null?(dv.rsi>55?'#00E676':dv.rsi<45?'#FF5252':'var(--t2)'):'var(--t3)',dv.rsi!=null?(dv.rsi>70?'Overbought':dv.rsi>55?'Bullish':dv.rsi<30?'Oversold':dv.rsi<45?'Bearish':'Neutral'):'—')}
+        {mCard('ADX (14)',dv.adx!=null?dv.adx.toFixed(1):'—',dv.adx!=null&&dv.adx>25?'#FFA000':'var(--t3)',(dv.adx!=null?(dv.adx>25?'Trending':'Ranging'):'')+' · DI+ '+(dv.diP||0).toFixed(1)+' / DI- '+(dv.diM||0).toFixed(1))}
+        {mCard('Fusion State',dv.state||'—',dv.color||'var(--t3)',FUSION_DESC[dv.state]||'',dv.color)}
       </div>
 
-      {/* Fusion state strip */}
-      <div style={{marginBottom:4}}>
-        <div style={{font:'600 7px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:2}}>FUSION STATE ({fusion.strip.length} bars)</div>
-        <div style={{display:'flex',height:10,borderRadius:3,overflow:'hidden',border:'1px solid var(--bdr)'}}>
+      {sep()}
+      {/* Strips */}
+      {fusion&&<div style={{marginBottom:16}}>
+        <div style={{font:'600 11px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:6}}>FUSION STATES ({fusion.strip.length} bars)</div>
+        <div style={{display:'flex',height:12,borderRadius:6,overflow:'hidden',border:'1px solid var(--bdr)'}}>
           {fusion.strip.map((s,i)=><div key={i} style={{flex:1,background:FUSION_COLORS[s.state]||'#616161'}} title={s.state}/>)}
         </div>
-      </div>
+        <div style={{font:'600 11px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginTop:12,marginBottom:6}}>BB WIDTH</div>
+        <div style={{display:'flex',height:12,borderRadius:6,overflow:'hidden',border:'1px solid var(--bdr)'}}>
+          {fusion.bbwStrip.map((v,i)=><div key={i} style={{flex:1,background:v!=null?(v<10?'#FFD700cc':v<15?'#B388FF88':'#61616166'):'#1a1a1a'}} title={v!=null?v.toFixed(1)+'%':'—'}/>)}
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
+          {Object.entries(FUSION_COLORS).map(([k,c])=><span key={k} style={{font:'600 7px var(--fm)',color:c}}>{k}</span>)}
+        </div>
 
-      {/* BB Width strip */}
-      <div style={{marginBottom:6}}>
-        <div style={{font:'600 7px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:2}}>BB WIDTH</div>
-        <div style={{display:'flex',height:6,borderRadius:2,overflow:'hidden',border:'1px solid var(--bdr)'}}>
-          {fusion.bbwStrip.map((v,i)=><div key={i} style={{flex:1,background:v!=null?(v<10?'#FFD700':v<15?'#B388FF':'#616161'):'#2a2a2a'}} title={v!=null?v.toFixed(1)+'%':'—'}/>)}
-        </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
-          {Object.entries(FUSION_COLORS).map(([k,c])=><span key={k} style={{font:'600 6px var(--fm)',color:c}}>{k}</span>)}
-        </div>
-      </div>
+        {/* Weekly strip */}
+        {showWeekly&&weeklyState&&weeklyState.strip&&<div style={{marginTop:8}}>
+          <div style={{font:'600 9px var(--fm)',color:'#B388FF',letterSpacing:'.08em',marginBottom:4}}>Weekly fusion ({weeklyState.strip.length} bars)</div>
+          <div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',border:'1px solid rgba(179,136,255,0.2)'}}>
+            {weeklyState.strip.map((s,i)=><div key={i} style={{flex:1,background:FUSION_COLORS[s.state]||'#616161'}}/>)}
+          </div>
+          {fusion&&<div style={{marginTop:4,font:'600 9px var(--fm)'}}>
+            {fusion.state===weeklyState.state?<span style={{color:'#00E676'}}>✓ Daily + Weekly Aligned ({fusion.state})</span>:<span style={{color:'#FFA000'}}>⚠ Divergent — Daily: {fusion.state}, Weekly: {weeklyState.state}</span>}
+          </div>}
+        </div>}
+      </div>}
 
       {/* Current state + cloud */}
-      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
-        <div style={{font:'700 10px var(--fm)',color:fusion.color,padding:'3px 12px',background:`${fusion.color}18`,border:`1px solid ${fusion.color}40`,borderRadius:4}}>{fusion.state}</div>
-        <span style={{font:'400 8px var(--fm)',color:'var(--t3)'}}>{FUSION_DESC[fusion.state]}</span>
-        <div style={{marginLeft:'auto',font:'600 8px var(--fm)',color:fusion.cloudBull?'#26A69A':'#EF5350'}}>{fusion.cloudBull?'☁ BULLISH CLOUD':'☁ BEARISH CLOUD'}</div>
+      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16}}>
+        <div style={{font:'700 11px var(--fm)',color:fusion?.color||'var(--t3)',padding:'4px 14px',background:`${fusion?.color||'#616161'}18`,border:`1px solid ${fusion?.color||'#616161'}40`,borderRadius:5}}>{fusion?.state||'—'}</div>
+        <span style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>{FUSION_DESC[fusion?.state]||''}</span>
+        <div style={{marginLeft:'auto',font:'600 9px var(--fm)',color:fusion?.cloudBull?'#26A69A':'#EF5350'}}>{fusion?.cloudBull?'☁ BULLISH CLOUD':'☁ BEARISH CLOUD'}</div>
       </div>
 
+      {/* Trade Info Panel — collapsed by default */}
+      {fusion?._tradeOverlay&&<div style={{marginBottom:16}}>
+        <button onClick={()=>setShowTrade(s=>!s)} style={{font:'600 10px var(--fm)',color:'var(--t3)',background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:4,padding:'4px 10px',cursor:'pointer',marginBottom:showTrade?8:0}}>{showTrade?'▲ Hide':'▼ Trade'} ({symbol})</button>
+      </div>}
+      {fusion?._tradeOverlay&&showTrade&&(()=>{const t=fusion._tradeOverlay;const stateChanged=t.entryFusion&&t.curFusion&&t.entryFusion!==t.curFusion;
+        return<div style={{background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:8,padding:14,marginBottom:16}}>
+          <div style={{font:'700 11px var(--fm)',color:'var(--t2)',letterSpacing:'.08em',marginBottom:10}}>ACTIVE TRADE — {symbol}</div>
+          <div style={{display:'flex',gap:16,flexWrap:'wrap',font:'400 12px var(--fm)',color:'var(--t2)',lineHeight:1.8}}>
+            <div style={{flex:1,minWidth:180}}>
+              <div>Status: <span style={{color:'var(--grn)',fontWeight:700}}>{t.status}</span> · Day {t.days}</div>
+              <div>Avg Entry: <span style={{color:'#00BCD4',fontWeight:600}}>₹{t.avgEntry.toFixed(2)}</span></div>
+              <div>SL: <span style={{color:'#FF5252',fontWeight:600}}>{t.sl?'₹'+t.sl.toFixed(2):'—'}</span> · Risk: <span style={{color:t.riskPct>5?'#FF5252':'var(--t2)'}}>{t.riskPct.toFixed(1)}%</span></div>
+              <div>P&L: <span style={{color:t.pnlPct>=0?'#00E676':'#FF5252',fontWeight:700}}>{t.pnlPct>=0?'+':''}{t.pnlPct.toFixed(2)}%</span></div>
+            </div>
+            <div style={{flex:1,minWidth:180}}>
+              <div>Entries: {t.entries.map((e,j)=><span key={j} style={{marginRight:8}}><span style={{color:j===0?'#00E676':'#FF9800',fontWeight:600}}>P{j+1}</span> ₹{(+e.price).toFixed(0)} <span style={{color:'var(--t4)',fontSize:10}}>{e.date?.slice(0,10)}</span></span>)}</div>
+              {t.exits.length>0&&<div>Exits: {t.exits.map((e,j)=><span key={j} style={{marginRight:8}}><span style={{color:'#FF5252',fontWeight:600}}>T{j+1}</span> ₹{(+e.price).toFixed(0)}</span>)}</div>}
+              <div>Entry Fusion: <span style={{color:FUSION_COLORS[t.entryFusion]||'var(--t3)',fontWeight:600}}>{t.entryFusion||'—'}</span> → Current: <span style={{color:FUSION_COLORS[t.curFusion]||'var(--t3)',fontWeight:600}}>{t.curFusion||'—'}</span></div>
+              {stateChanged&&<div style={{color:t.curFusion==='FADE'?'#FF5252':t.curFusion==='DRIFT'?'#616161':'#FFA000',fontWeight:700,marginTop:2}}>
+                {t.curFusion==='FADE'?'Entered in '+t.entryFusion+', now FADE — consider exit':t.curFusion==='DRIFT'?'Entered in '+t.entryFusion+', now DRIFT — book profits':'State changed: '+t.entryFusion+' → '+t.curFusion}
+              </div>}
+            </div>
+          </div>
+        </div>})()}
+
+      {sep()}
       {/* Entry Decision Matrix + Exit Layer */}
-      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:220,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:8}}>
-          <div style={{font:'700 8px var(--fm)',color:'var(--t2)',letterSpacing:'.08em',marginBottom:4}}>ENTRY DECISION MATRIX</div>
+      <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+        <div style={{flex:1,minWidth:240,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:12}}>
+          <div style={{font:'700 12px var(--fm)',color:'var(--t2)',letterSpacing:'.1em',marginBottom:10}}>ENTRY DECISION MATRIX</div>
           <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid var(--bdl)'}}>
-            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Signal</th>
-            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>State</th>
-            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Signal</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>State</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
           </tr></thead><tbody>
-            {entryRow('Star','IGNITION','Full position (P1)','#FFD700')}
-            {entryRow('Star','THRUST','75% position','#00E676')}
-            {entryRow('Pullback','THRUST','Add tranche (P2)','#00E676')}
-            {entryRow('Pyramid','IGNITION','Aggressive add (P3)','#FFD700')}
-            {entryRow('Star','COIL','Watchlist only','#B388FF')}
-            {entryRow('Pullback','DRIFT','Skip','#616161')}
-            {entryRow('Pyramid','FADE','Tighten SL','#FF5252')}
+            {entryRow('Star','IGNITION','Full position (P1)','#FFD700',0)}
+            {entryRow('Star','THRUST','75% position','#00E676',1)}
+            {entryRow('Pullback','THRUST','Add tranche (P2)','#00E676',2)}
+            {entryRow('Pyramid','IGNITION','Aggressive add (P3)','#FFD700',3)}
+            {entryRow('Star','COIL','Watchlist only','#B388FF',4)}
+            {entryRow('Pullback','DRIFT','Skip','#616161',5)}
+            {entryRow('Pyramid','FADE','Tighten SL','#FF5252',6)}
           </tbody></table>
         </div>
-        <div style={{flex:1,minWidth:220,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:8}}>
-          <div style={{font:'700 8px var(--fm)',color:'var(--t2)',letterSpacing:'.08em',marginBottom:4}}>EXIT LAYER TABLE</div>
+        <div style={{flex:1,minWidth:240,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:12}}>
+          <div style={{font:'700 12px var(--fm)',color:'var(--t2)',letterSpacing:'.1em',marginBottom:10}}>EXIT LAYER TABLE</div>
           <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid var(--bdl)'}}>
-            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Transition</th>
-            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Transition</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
           </tr></thead><tbody>
-            {exitRow('THRUST','Trail EMA(21), let RUN ride','#00E676')}
-            {exitRow('IGN → THRUST','Breakeven fast, T1 at 1R','#FFD700')}
-            {exitRow('THRUST → FADE','Tighten to EMA(8), close T2/T3','#FF5252')}
-            {exitRow('THRUST → DRIFT','Close RUN, book profits','#616161')}
-            {exitRow('ANY → FADE','Hard exit all tranches','#FF5252')}
+            {exitRow('THRUST','Trail EMA(21), let RUN ride','#00E676',0)}
+            {exitRow('IGN → THRUST','Breakeven fast, T1 at 1R','#FFD700',1)}
+            {exitRow('THRUST → FADE','Tighten to EMA(8), close T2/T3','#FF5252',2)}
+            {exitRow('THRUST → DRIFT','Close RUN, book profits','#616161',3)}
+            {exitRow('ANY → FADE','Hard exit all tranches','#FF5252',4)}
           </tbody></table>
         </div>
       </div>
@@ -673,8 +778,9 @@ function App(){
   const[sel,setSel]=useState(null);const[bi,setBi]=useState(2);const[mt,setMt]=useState('close');const[trd,setTrd]=useState([]);
   const[pv,setPv]=useState(()=>{const o={};PATS.forEach(p=>o[p.tp]=true);return o});
   const[tv2,setTv]=useState({anc:true,t45:false,vc:true,ma:true});
-  const[zoom,setZoom]=useState(2);const[tab,setTab]=useState('chart');// chart | matrix
+  const[zoom,setZoom]=useState(2);const[tab,setTab]=useState('bar');// bar | line
   const[liveData,setLiveData]=useState(null);const[isLive,setIsLive]=useState(false);
+  const[wlOpen,setWlOpen]=useState(false);
   const chartRef=useRef(null);const[cW,setCW]=useState(800);const[cH,setCH]=useState(400);
 
   // Load data
@@ -689,6 +795,7 @@ function App(){
   },[]);
 
   useEffect(()=>{const ro=new ResizeObserver(e=>{for(const en of e){setCW(en.contentRect.width);setCH(en.contentRect.height)}});if(chartRef.current)ro.observe(chartRef.current);return()=>ro.disconnect()},[]);
+
 
   const bv=BVS[bi];
   const ohlc=useMemo(()=>{
@@ -780,70 +887,22 @@ function App(){
         <a href={rzLink(sel.s)} target="_blank" rel="noopener" style={{font:'500 9px var(--fu)',color:'var(--ora)',textDecoration:'none',padding:'2px 6px',borderRadius:3,border:'1px solid rgba(255,145,0,.2)'}}>RZone</a>
       </div>
       <div className="ctrl">
-        <div className="pg">{BVS.map((b,i)=><button key={b.l} className={`pb ${bi===i?'oc':''}`} onClick={()=>setBi(i)}>{b.l}</button>)}</div>
-        <div className="sep"/>
-        <div className="pg"><button className={`pb ${mt==='close'?'op':''}`} onClick={()=>setMt('close')}>CL</button><button className={`pb ${mt==='hl'?'op':''}`} onClick={()=>setMt('hl')}>HL</button></div>
-        <div className="sep"/>
         <div className="pg">
-          <button className={`pb ${tab==='chart'?'ow':''}`} onClick={()=>setTab('chart')}>CHART</button>
           <button className={`pb ${tab==='bar'?'ow':''}`} onClick={()=>setTab('bar')}>Bar</button>
           <button className={`pb ${tab==='line'?'ow':''}`} onClick={()=>setTab('line')}>Line</button>
-          <button className={`pb ${tab==='matrix'?'ow':''}`} onClick={()=>setTab('matrix')}>MATRIX</button>
         </div>
         <div className="sep"/>
-        <span className="stag">Slot {bv.s}</span>
+        <button className="pb" onClick={()=>setWlOpen(w=>!w)} style={{fontSize:9}}>☰ Watchlist</button>
       </div>
 
-      {tab==='chart'&&<>
-        <div className="ca" ref={chartRef}><PnFC cols={cols} sigs={sigs} ma={ma} w={cW||800} h={cH||400} sym={sel.s} pv={pv} tv={tv2} zoom={zoom}/></div>
-        <div className="ds"><DSm cols={cols} w={cW||800} h={76}/></div>
-      </>}
-
-      {(tab==='bar'||tab==='line')&&<div className="ca" ref={chartRef}><LWChart symbol={sel.s} w={cW||800} h={cH||400} mode={tab}/></div>}
-
-      {tab==='matrix'&&(
-        <div className="mx-wrap">
-          <div style={{font:'600 9px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:10}}>P&F PERFORMANCE MATRIX · 0.25% / 1% / 3% × 3 CL · {mxData.length} STOCKS</div>
-          <table className="mx-t"><thead><tr>
-            <th>Symbol</th><th style={{textAlign:'center'}}>0.25%</th><th style={{textAlign:'center'}}>1%</th><th style={{textAlign:'center'}}>3%</th><th style={{textAlign:'center'}}>Total</th><th>Status</th><th>Links</th>
-          </tr></thead><tbody>
-            {mxData.map(st=>{const stl=st.tot>=4?['STRONG BUY','#00e676']:st.tot>=2?['BUY','#18d6e0']:st.tot<=-4?['STRONG SELL','#ff3d5a']:st.tot<=-2?['SELL','#ffb300']:['NEUTRAL','#3a4358'];
-              return<tr key={st.s} onClick={()=>{setSel({s:st.s,n:st.n,x:'NSE'});setTab('chart')}}>
-                <td style={{fontWeight:700,fontFamily:'var(--fu)',fontSize:11}}>{st.s}<span style={{color:'var(--t4)',fontSize:9,marginLeft:4}}>₹{st.pr.toFixed(0)}</span></td>
-                {[.25,1,3].map(v=><td key={v} style={{textAlign:'center',fontWeight:800,fontSize:12,color:st.sc[v]>0?'#00e676':st.sc[v]<0?'#ff3d5a':'#3a4358'}}>{st.sc[v]>0?'+':''}{st.sc[v]}</td>)}
-                <td style={{textAlign:'center',fontWeight:900,fontSize:13,color:st.tot>2?'#00e676':st.tot<-2?'#ff3d5a':'var(--t3)'}}>{st.tot>0?'+':''}{st.tot}</td>
-                <td style={{fontWeight:700,fontSize:9,color:stl[1]}}>{stl[0]}</td>
-                <td><a href={tvLink(st.s)} target="_blank" rel="noopener" style={{color:'var(--cyn)',fontSize:9,marginRight:6,textDecoration:'none'}}>TV</a><a href={rzLink(st.s)} target="_blank" rel="noopener" style={{color:'var(--ora)',fontSize:9,textDecoration:'none'}}>RZ</a></td>
-              </tr>})}
-          </tbody></table>
-          <div className="bth">
-            <div className="bthc">
-              <div style={{font:'600 8px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:8}}>BREADTH</div>
-              <div style={{display:'flex',justifyContent:'space-around'}}>
-                {[['Bull',mxData.filter(x=>x.tot>0).length,'#00e676'],['Neut',mxData.filter(x=>x.tot===0).length,'#3a4358'],['Bear',mxData.filter(x=>x.tot<0).length,'#ff3d5a']].map(([l,n,c])=>
-                  <div key={l} style={{textAlign:'center'}}><div style={{font:'900 22px var(--fu)',color:c}}>{n}</div><div style={{font:'500 8px var(--fm)',color:'var(--t4)'}}>{l}</div></div>)}
-              </div>
-              <div style={{font:'400 9px var(--fu)',color:'var(--t2)',marginTop:6,lineHeight:1.5}}>DT%: {dtPct}% · {+dtPct>60?'⚠ Overbought':+dtPct<20?'⚠ Oversold':'✓ Neutral zone'}</div>
-            </div>
-            <div className="bthc">
-              <div style={{font:'600 8px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:8}}>SLOTS</div>
-              <div style={{font:'400 9px var(--fu)',color:'var(--t2)',lineHeight:1.7}}>
-                <div><b style={{color:'#18d6e0'}}>S1</b> 0.25-1%: Combos, Follow-throughs</div>
-                <div><b style={{color:'#a78bfa'}}>S2</b> 1-3%: Traps, Poles, Triple Tops</div>
-                <div><b style={{color:'#ffb300'}}>S3</b> 3-5%: Multi-col breakouts</div>
-                <div><b style={{color:'#00e676'}}>S4</b> 5%+: Col reversals, S/R</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="ca" ref={chartRef} style={{height:500,flex:'none'}}><LWChart symbol={sel.s} w={cW||800} h={500} mode={tab}/></div>
     </div>
 
-    {/* RIGHT: WATCHLIST */}
-    <div className="rp">
-      <div className="wh"><span>WATCHLIST</span><span style={{font:'400 8px var(--fm)'}}>PnF ({bv.l})</span></div>
+    {/* WATCHLIST OVERLAY */}
+    <div className={`rp${wlOpen?' open':''}`}>
+      <div className="wh"><span>WATCHLIST</span><button onClick={()=>setWlOpen(false)} style={{background:'none',border:'none',color:'var(--t3)',fontSize:16,cursor:'pointer',marginLeft:'auto'}}>×</button></div>
       {wlData.map(st=>(
-        <div key={st.s} className={`wi ${sel.s===st.s?'sl':''}`} onClick={()=>{setSel(st);setTab('chart')}}>
+        <div key={st.s} className={`wi ${sel.s===st.s?'sl':''}`} onClick={()=>{setSel(st);setTab('bar');setWlOpen(false)}}>
           <div className="wic">{st.s.slice(0,2)}</div>
           <div className="wii">
             <div className="win">{st.s}</div>
