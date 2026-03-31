@@ -40,6 +40,15 @@ jobs:
           else
             echo "Screener fetcher not found, skipping..."
           fi
+
+      - name: Regenerate scanner_results.json
+        run: |
+          if [ -f "scripts/generate_scanner_summary.py" ]; then
+            echo "Aggregating stock details into scanner_results.json..."
+            python scripts/generate_scanner_summary.py
+          else
+            echo "generate_scanner_summary.py not found, skipping..."
+          fi
       
       - name: Commit and push changes
         run: |
