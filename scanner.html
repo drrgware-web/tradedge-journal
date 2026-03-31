@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradEdge Scanner</title>
+<title>TradEdge EdgeScanner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -952,7 +952,7 @@ const ScannerDashboard=()=>{
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ SCANNER</h1>
+          <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ EDGESCANNER</h1>
           <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{meta.total_scanned||stocks.length} STOCKS • TEChart v5.0 Embedded • Click row to chart</div>
           {activeScans.size>0&&<div style={{fontSize:10,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700,marginTop:2}}>⟐ {activeScans.size===1?SCAN_PRESETS.find(p=>p.id===[...activeScans][0])?.name:`${activeScans.size} scans combined`} — {filteredStocks.length} matches <span style={{color:"var(--red)",cursor:"pointer",fontSize:8}} onClick={()=>setActiveScans(new Set())}>[clear all]</span></div>}
           {activeWL&&<div style={{fontSize:10,fontFamily:"var(--font-mono)",color:"#8844ff",fontWeight:700,marginTop:2}}>📋 {savedWLs.find(w=>w.id===activeWL)?.name} — {filteredStocks.length} matches <span style={{color:"var(--red)",cursor:"pointer",fontSize:8}} onClick={()=>setActiveWL(null)}>[clear]</span></div>}
@@ -1009,7 +1009,7 @@ const ScannerDashboard=()=>{
         </table>
       </div>{filteredStocks.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text-muted)"}}><div style={{fontSize:28,marginBottom:8}}>◇</div><div style={{fontSize:12}}>No stocks match</div></div>}</div>
 
-      <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}><span>TRADEDGE SCANNER v4.0 • TEChart EMBEDDED</span><span>⚡ CYBERPUNK</span></div>
+      <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}><span>TRADEDGE EDGESCANNER v4.0 • TEChart EMBEDDED</span><span>⚡ CYBERPUNK</span></div>
     </div></div>
     {orderDialog&&<OrderDialog symbol={orderDialog.symbol} type={orderDialog.type} lastPrice={orderDialog.price} onClose={()=>setOrderDialog(null)}/>}
     {showSaveModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={()=>setShowSaveModal(false)}>

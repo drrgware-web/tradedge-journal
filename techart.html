@@ -9,6 +9,7 @@
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -19,6 +20,7 @@
 body{font-family:var(--fm);background:var(--bg0);color:var(--t1);overflow:hidden;height:100vh}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
 @keyframes bk{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 .nv{display:flex;align-items:center;height:42px;padding:0 16px;background:linear-gradient(180deg,#0d1018,var(--bg1));border-bottom:1px solid var(--bdr);position:relative;z-index:100}
 .nv::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(24,214,224,.12),rgba(0,230,118,.08),transparent)}
@@ -336,6 +338,336 @@ function DSm({cols,w,h}){
   },[cols,w,h]);return <canvas ref={ref} style={{height:h,display:'block'}}/>;
 }
 
+// ═══ EDGECLOUD INDICATORS ═══
+function calcEMA(data,period){const k=2/(period+1);const out=[];let prev=null;for(const v of data){if(v==null){out.push(prev);continue}prev=prev==null?v:v*k+prev*(1-k);out.push(prev)}return out}
+function calcSMA(data,period){const out=[];let sum=0;for(let i=0;i<data.length;i++){sum+=data[i]||0;if(i>=period)sum-=data[i-period]||0;out.push(i>=period-1?sum/period:null)}return out}
+
+function calcATR(ohlc,period){
+  const tr=[];for(let i=0;i<ohlc.length;i++){const d=ohlc[i];const h=d.high,l=d.low,pc=i>0?ohlc[i-1].close:l;tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)))}
+  const out=[];let sum=0;for(let i=0;i<tr.length;i++){sum+=tr[i];if(i>=period){sum-=tr[i-period];out.push(sum/period)}else if(i===period-1){out.push(sum/period)}else{out.push(null)}}
+  return out;
+}
+
+function calcSuperTrend(ohlc,period,mult){
+  const len=ohlc.length;const st=new Array(len).fill(null);const dir=new Array(len).fill(1);
+  const atr=calcATR(ohlc,period);
+  let prevUp=0,prevDn=0,prevDir=1;
+  for(let i=0;i<len;i++){
+    if(atr[i]==null){st[i]=null;continue}
+    const d=ohlc[i];const mid=(d.high+d.low)/2;let up=mid-mult*atr[i];let dn=mid+mult*atr[i];
+    if(prevUp>0)up=Math.max(up,prevUp);if(prevDn>0)dn=Math.min(dn,prevDn);
+    const d2=d.close>prevDn?1:d.close<prevUp?-1:prevDir;
+    st[i]=d2===1?up:dn;dir[i]=d2;prevUp=up;prevDn=dn;prevDir=d2;
+  }
+  return{values:st,direction:dir};
+}
+
+function calcEdgeCloud(ohlc){
+  const st1=calcSuperTrend(ohlc,10,2);const st2=calcSuperTrend(ohlc,10,3);
+  const walking=st1.values.map((v,i)=>(v!=null&&st2.values[i]!=null)?(v+st2.values[i])/2:null);
+  const walkDir=st1.direction.map((v,i)=>(v===1&&st2.direction[i]===1)?1:(v===-1&&st2.direction[i]===-1)?-1:v);
+  const closes=ohlc.map(d=>d.close);
+  const running=calcEMA(closes,21);
+  return{walking,walkDir,running};
+}
+
+function calcRSI(closes,period){
+  const out=new Array(closes.length).fill(null);let avgG=0,avgL=0;
+  for(let i=1;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];const g=d>0?d:0;const l=d<0?-d:0;
+    if(i<=period){avgG+=g/period;avgL+=l/period;if(i===period)out[i]=avgL===0?100:100-100/(1+avgG/avgL)}
+    else{avgG=(avgG*(period-1)+g)/period;avgL=(avgL*(period-1)+l)/period;out[i]=avgL===0?100:100-100/(1+avgG/avgL)}
+  }
+  return out;
+}
+
+function calcBollingerWidth(closes,period){
+  const sma=calcSMA(closes,period);
+  const out=[];
+  for(let i=0;i<closes.length;i++){
+    if(sma[i]==null||i<period-1){out.push(null);continue}
+    let s2=0;for(let j=i-period+1;j<=i;j++){const d=closes[j]-sma[i];s2+=d*d}
+    const std=Math.sqrt(s2/period);const upper=sma[i]+2*std;const lower=sma[i]-2*std;
+    out.push(sma[i]>0?(upper-lower)/sma[i]*100:0);
+  }
+  return out;
+}
+
+function calcADX(ohlc,period){
+  const len=ohlc.length;const adx=new Array(len).fill(null);const diP=new Array(len).fill(null);const diM=new Array(len).fill(null);
+  const atr=calcATR(ohlc,period);
+  const dmP=[0],dmM=[0];
+  for(let i=1;i<len;i++){const upM=ohlc[i].high-ohlc[i-1].high;const dnM=ohlc[i-1].low-ohlc[i].low;dmP.push(upM>dnM&&upM>0?upM:0);dmM.push(dnM>upM&&dnM>0?dnM:0)}
+  const smDmP=calcEMA(dmP,period);const smDmM=calcEMA(dmM,period);const smAtr=calcEMA(atr.map(v=>v||0),period);
+  const dx=[];
+  for(let i=0;i<len;i++){
+    if(smAtr[i]==null||smAtr[i]===0){dx.push(null);continue}
+    const dp=smDmP[i]/smAtr[i]*100;const dm=smDmM[i]/smAtr[i]*100;
+    diP[i]=dp;diM[i]=dm;const s=dp+dm;dx.push(s===0?0:Math.abs(dp-dm)/s*100);
+  }
+  const adxLine=calcEMA(dx.map(v=>v||0),period);
+  for(let i=0;i<len;i++)adx[i]=adxLine[i];
+  return{adx,diP,diM};
+}
+
+function calcFusionState(bbw,rsi,adx,diP,diM,adxRising){
+  if(bbw==null||rsi==null||adx==null)return{state:'DRIFT',color:'#616161'};
+  if(bbw<10&&rsi>55&&adxRising)return{state:'IGNITION',color:'#FFD700'};
+  if(bbw>=10&&rsi>55&&adx>25&&diP>diM)return{state:'THRUST',color:'#00E676'};
+  if(bbw>=10&&rsi<45&&adx>25&&diM>diP)return{state:'FADE',color:'#FF5252'};
+  if(bbw<10&&adx<20)return{state:'COIL',color:'#B388FF'};
+  return{state:'DRIFT',color:'#616161'};
+}
+
+const FUSION_COLORS={IGNITION:'#FFD700',THRUST:'#00E676',FADE:'#FF5252',COIL:'#B388FF',DRIFT:'#616161'};
+const FUSION_CLOUD={IGNITION:'rgba(255,215,0,0.18)',THRUST:'rgba(0,230,118,0.15)',FADE:'rgba(255,82,82,0.15)',COIL:'rgba(179,136,255,0.12)',DRIFT:'rgba(97,97,97,0.10)'};
+const FUSION_BG={IGNITION:'rgba(255,215,0,0.06)',THRUST:'rgba(0,230,118,0.05)',FADE:'rgba(255,82,82,0.05)',COIL:'rgba(179,136,255,0.04)',DRIFT:'rgba(97,97,97,0.03)'};
+const FUSION_DESC={IGNITION:'Tight BB + momentum building — squeeze fire',THRUST:'Strong trend confirmed — ride the move',FADE:'Bearish pressure dominant — caution',COIL:'Low vol + low trend — spring loading',DRIFT:'No clear edge — range-bound'};
+
+function calcAllFusionStates(ohlc){
+  const closes=ohlc.map(d=>d.close);
+  const bbw=calcBollingerWidth(closes,20);
+  const rsi=calcRSI(closes,14);
+  const{adx,diP,diM}=calcADX(ohlc,14);
+  const states=[];
+  for(let i=0;i<ohlc.length;i++){
+    const adxRising=i>=3&&adx[i]!=null&&adx[i-3]!=null&&adx[i]>adx[i-3];
+    states.push({...calcFusionState(bbw[i],rsi[i],adx[i],diP[i],diM[i],adxRising),bbw:bbw[i],rsi:rsi[i],adx:adx[i],diP:diP[i],diM:diM[i]});
+  }
+  return states;
+}
+
+// ═══ LW CHART COMPONENT (Bar + Line + EdgeCloud + Fusion) ═══
+function LWChart({symbol,w,h,mode,isDark}){
+  const containerRef=useRef(null);const chartObjRef=useRef(null);
+  const[loading,setLoading]=useState(false);const[err,setErr]=useState(null);
+  const[range,setRange]=useState('6mo');
+  const[fusion,setFusion]=useState(null);
+
+  const fetchAndRender=useCallback(async(rng)=>{
+    if(!symbol||!containerRef.current)return;
+    const wUrl=localStorage.getItem('zd_worker_url');
+    if(!wUrl){setErr('Set zd_worker_url in localStorage');return}
+    setLoading(true);setErr(null);
+    if(chartObjRef.current){chartObjRef.current.remove();chartObjRef.current=null}
+    containerRef.current.innerHTML='';
+    try{
+      const res=await fetch(wUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker:`${symbol}.NS`,range:rng,interval:'1d'})});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const data=await res.json();
+      const result=data?.chart?.result?.[0];if(!result)throw new Error('No data');
+      const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};
+      const ohlc=[];
+      for(let i=0;i<ts.length;i++){
+        if(q.close[i]==null)continue;
+        ohlc.push({time:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0});
+      }
+      if(!ohlc.length)throw new Error('Empty OHLCV');
+
+      const dk=isDark!==false;
+      const bgCol=dk?'#0d1117':'#ffffff';
+      const gridCol=dk?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
+      const txtCol=dk?'#888':'#666';
+      const crossBg=dk?'#1a2030':'#e8e8e8';
+
+      const chart=LightweightCharts.createChart(containerRef.current,{
+        width:w||800,height:h||400,
+        layout:{background:{color:bgCol},textColor:txtCol,fontFamily:'IBM Plex Mono'},
+        grid:{vertLines:{color:gridCol},horzLines:{color:gridCol}},
+        crosshair:{mode:0,vertLine:{color:dk?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.15)',labelBackgroundColor:crossBg},horzLine:{color:dk?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.15)',labelBackgroundColor:crossBg}},
+        rightPriceScale:{borderColor:gridCol},
+        timeScale:{borderColor:gridCol,timeVisible:false},
+      });
+      chartObjRef.current=chart;
+
+      // Main series
+      let mainSeries;
+      if(mode==='line'){
+        mainSeries=chart.addAreaSeries({topColor:dk?'rgba(66,165,245,0.15)':'rgba(66,165,245,0.2)',bottomColor:'transparent',lineColor:'#42A5F5',lineWidth:2,crosshairMarkerRadius:4});
+        mainSeries.setData(ohlc.map(d=>({time:d.time,value:d.close})));
+      }else{
+        mainSeries=chart.addCandlestickSeries({upColor:'#26A69A',downColor:'#EF5350',borderUpColor:'#26A69A',borderDownColor:'#EF5350',wickUpColor:'#26A69Aaa',wickDownColor:'#EF5350aa'});
+        mainSeries.setData(ohlc.map(d=>({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close})));
+      }
+
+      // Volume
+      const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',color:'#26A69A'});
+      vs.priceScale().applyOptions({scaleMargins:{top:0.8,bottom:0}});
+      vs.setData(ohlc.map(d=>({time:d.time,value:d.volume,color:d.close>=d.open?(dk?'rgba(38,166,154,0.35)':'rgba(38,166,154,0.5)'):(dk?'rgba(239,83,80,0.35)':'rgba(239,83,80,0.5)')})));
+
+      // EdgeCloud lines
+      const{walking,walkDir,running}=calcEdgeCloud(ohlc);
+      const wkSeries=chart.addLineSeries({lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:false,priceLineVisible:false,color:'#FFA000'});
+      const wkD=[];for(let i=0;i<ohlc.length;i++){if(walking[i]!=null)wkD.push({time:ohlc[i].time,value:walking[i]})}
+      wkSeries.setData(wkD);
+
+      const rnSeries=chart.addLineSeries({color:'#42A5F5',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Solid,lastValueVisible:false,priceLineVisible:false});
+      const rnD=[];for(let i=0;i<ohlc.length;i++){if(running[i]!=null)rnD.push({time:ohlc[i].time,value:running[i]})}
+      rnSeries.setData(rnD);
+
+      // ── Fusion states per bar ──
+      const fusionStates=calcAllFusionStates(ohlc);
+
+      // Cloud fill colored by fusion state — use background tint histogram
+      const bgTint=chart.addHistogramSeries({priceFormat:{type:'price'},priceScaleId:'bgtint',color:'#616161',base:0,lastValueVisible:false,priceLineVisible:false});
+      bgTint.priceScale().applyOptions({scaleMargins:{top:0,bottom:0},visible:false});
+      // Use a line series pair for cloud shading between WL and RL
+      const cloudUpper=chart.addAreaSeries({lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false,lineColor:'transparent',topColor:'transparent',bottomColor:'transparent'});
+      const cloudLower=chart.addAreaSeries({lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false,lineColor:'transparent',topColor:'transparent',bottomColor:'transparent'});
+      const cUpD=[];const cDnD=[];
+      for(let i=0;i<ohlc.length;i++){
+        if(walking[i]==null||running[i]==null)continue;
+        const t=ohlc[i].time;const st=fusionStates[i]?.state||'DRIFT';
+        const col=FUSION_CLOUD[st];
+        cUpD.push({time:t,value:Math.max(walking[i],running[i])});
+        cDnD.push({time:t,value:Math.min(walking[i],running[i])});
+      }
+      cloudUpper.setData(cUpD);cloudLower.setData(cDnD);
+      // Apply fusion-state coloring via per-bar area — use multiple area overlays by state
+      const stateGroups={};
+      for(let i=0;i<ohlc.length;i++){
+        if(walking[i]==null||running[i]==null)continue;
+        const st=fusionStates[i]?.state||'DRIFT';
+        if(!stateGroups[st])stateGroups[st]=[];
+        stateGroups[st].push({time:ohlc[i].time,top:Math.max(walking[i],running[i]),bot:Math.min(walking[i],running[i])});
+      }
+      for(const[st,pts] of Object.entries(stateGroups)){
+        const col=FUSION_CLOUD[st]||'rgba(97,97,97,0.10)';
+        const s=chart.addAreaSeries({topColor:col,bottomColor:'transparent',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        s.setData(pts.map(p=>({time:p.time,value:p.top})));
+      }
+
+      // ── Signal markers for state transitions ──
+      const markers=[];
+      for(let i=1;i<fusionStates.length;i++){
+        const prev=fusionStates[i-1].state;const cur=fusionStates[i].state;const t=ohlc[i].time;
+        if(prev==='COIL'&&cur==='IGNITION')markers.push({time:t,position:'aboveBar',color:'#FFD700',shape:'circle',text:'IGN'});
+        else if(prev==='IGNITION'&&cur==='THRUST')markers.push({time:t,position:'belowBar',color:'#00E676',shape:'arrowUp',text:'THR'});
+        else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'FADE'});
+        else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'COIL'});
+      }
+      if(markers.length)mainSeries.setMarkers(markers);
+
+      chart.timeScale().fitContent();
+
+      // ── Build fusion data for panel ──
+      const n=ohlc.length-1;const cur=fusionStates[n];
+      const cloudBull=walking[n]!=null&&running[n]!=null?walking[n]>running[n]:null;
+      const stripLen=Math.min(60,ohlc.length);
+      const strip=fusionStates.slice(-stripLen);
+      const bbwStrip=strip.map(s=>s.bbw);
+      setFusion({...cur,cloudBull,strip,bbwStrip});
+      setLoading(false);
+    }catch(e){setErr(e.message);setLoading(false)}
+  },[symbol,w,h,mode,isDark]);
+
+  useEffect(()=>{fetchAndRender(range)},[fetchAndRender,range]);
+  useEffect(()=>{if(chartObjRef.current&&w&&h)chartObjRef.current.resize(w,h)},[w,h]);
+
+  const tfBtn=(label,val)=><button key={val} onClick={()=>setRange(val)} style={{padding:'2px 8px',fontSize:8,fontFamily:'var(--fm)',fontWeight:range===val?700:500,color:range===val?'#42A5F5':'var(--t3)',background:range===val?'rgba(66,165,245,.12)':'transparent',border:`1px solid ${range===val?'rgba(66,165,245,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>{label}</button>;
+
+  const mCard=(label,val,color,sub)=><div style={{background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:'8px 10px',flex:1,minWidth:100}}>
+    <div style={{font:'500 7px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:2}}>{label}</div>
+    <div style={{font:'700 16px var(--fm)',color:color||'var(--t1)'}}>{val}</div>
+    {sub&&<div style={{font:'400 7px var(--fm)',color:'var(--t3)',marginTop:1}}>{sub}</div>}
+  </div>;
+
+  const entryRow=(sig,state,action,color)=><tr style={{borderBottom:'1px solid var(--bdr)'}}>
+    <td style={{padding:'3px 8px',font:'600 8px var(--fm)',color:'var(--t2)'}}>{sig}</td>
+    <td style={{padding:'3px 8px'}}><span style={{font:'700 8px var(--fm)',color:FUSION_COLORS[state]}}>{state}</span></td>
+    <td style={{padding:'3px 8px',font:'500 8px var(--fm)',color}}>{action}</td>
+  </tr>;
+
+  const exitRow=(transition,action,color)=><tr style={{borderBottom:'1px solid var(--bdr)'}}>
+    <td style={{padding:'3px 8px',font:'600 8px var(--fm)',color:'var(--t2)'}}>{transition}</td>
+    <td style={{padding:'3px 8px',font:'500 8px var(--fm)',color}}>{action}</td>
+  </tr>;
+
+  if(err)return<div style={{padding:40,textAlign:'center',color:'#ff3d5a',font:'500 11px var(--fm)'}}>{err}</div>;
+  return<div>
+    <div style={{position:'relative'}}>
+      {loading&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:5,background:'rgba(13,17,23,.85)'}}><div style={{width:30,height:30,border:'3px solid rgba(66,165,245,.15)',borderTop:'3px solid #42A5F5',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/></div>}
+      <div ref={containerRef} style={{width:'100%',height:h||400}}/>
+      <div style={{position:'absolute',top:6,left:8,display:'flex',gap:6,alignItems:'center',zIndex:2}}>
+        <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
+        <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
+        <span style={{font:'600 7px var(--fm)',color:'#FFA000'}}>╌ Walking</span>
+        <span style={{font:'600 7px var(--fm)',color:'#42A5F5'}}>— Running</span>
+        <span style={{font:'600 7px var(--fm)',color:'rgba(38,166,154,.6)'}}>■ Cloud</span>
+      </div>
+    </div>
+
+    {fusion&&<div style={{padding:'6px 0'}}>
+      {/* Metric cards */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:6}}>
+        {mCard('BB Width',fusion.bbw!=null?fusion.bbw.toFixed(1)+'%':'—',fusion.bbw!=null&&fusion.bbw<10?'#B388FF':'var(--t1)',fusion.bbw!=null&&fusion.bbw<10?'Squeeze active':'Normal')}
+        {mCard('Adaptive RSI',fusion.rsi!=null?fusion.rsi.toFixed(1):'—',fusion.rsi!=null?(fusion.rsi>55?'#00E676':fusion.rsi<45?'#FF5252':'var(--t2)'):'var(--t3)',fusion.rsi!=null?(fusion.rsi>70?'Overbought zone':fusion.rsi>55?'Bullish zone':fusion.rsi<30?'Oversold zone':fusion.rsi<45?'Bearish zone':'Neutral zone'):'—')}
+        {mCard('ADX (14)',fusion.adx!=null?fusion.adx.toFixed(1):'—',fusion.adx!=null&&fusion.adx>25?'#FFA000':'var(--t3)',(fusion.adx!=null?(fusion.adx>25?'Trending':'Ranging'):'')+' · DI+ '+(fusion.diP||0).toFixed(1)+' / DI- '+(fusion.diM||0).toFixed(1))}
+        {mCard('Fusion State',fusion.state,fusion.color,FUSION_DESC[fusion.state]||'')}
+      </div>
+
+      {/* Fusion state strip */}
+      <div style={{marginBottom:4}}>
+        <div style={{font:'600 7px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:2}}>FUSION STATE ({fusion.strip.length} bars)</div>
+        <div style={{display:'flex',height:10,borderRadius:3,overflow:'hidden',border:'1px solid var(--bdr)'}}>
+          {fusion.strip.map((s,i)=><div key={i} style={{flex:1,background:FUSION_COLORS[s.state]||'#616161'}} title={s.state}/>)}
+        </div>
+      </div>
+
+      {/* BB Width strip */}
+      <div style={{marginBottom:6}}>
+        <div style={{font:'600 7px var(--fm)',color:'var(--t4)',letterSpacing:'.08em',marginBottom:2}}>BB WIDTH</div>
+        <div style={{display:'flex',height:6,borderRadius:2,overflow:'hidden',border:'1px solid var(--bdr)'}}>
+          {fusion.bbwStrip.map((v,i)=><div key={i} style={{flex:1,background:v!=null?(v<10?'#FFD700':v<15?'#B388FF':'#616161'):'#2a2a2a'}} title={v!=null?v.toFixed(1)+'%':'—'}/>)}
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
+          {Object.entries(FUSION_COLORS).map(([k,c])=><span key={k} style={{font:'600 6px var(--fm)',color:c}}>{k}</span>)}
+        </div>
+      </div>
+
+      {/* Current state + cloud */}
+      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+        <div style={{font:'700 10px var(--fm)',color:fusion.color,padding:'3px 12px',background:`${fusion.color}18`,border:`1px solid ${fusion.color}40`,borderRadius:4}}>{fusion.state}</div>
+        <span style={{font:'400 8px var(--fm)',color:'var(--t3)'}}>{FUSION_DESC[fusion.state]}</span>
+        <div style={{marginLeft:'auto',font:'600 8px var(--fm)',color:fusion.cloudBull?'#26A69A':'#EF5350'}}>{fusion.cloudBull?'☁ BULLISH CLOUD':'☁ BEARISH CLOUD'}</div>
+      </div>
+
+      {/* Entry Decision Matrix + Exit Layer */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <div style={{flex:1,minWidth:220,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:8}}>
+          <div style={{font:'700 8px var(--fm)',color:'var(--t2)',letterSpacing:'.08em',marginBottom:4}}>ENTRY DECISION MATRIX</div>
+          <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid var(--bdl)'}}>
+            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Signal</th>
+            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>State</th>
+            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
+          </tr></thead><tbody>
+            {entryRow('Star','IGNITION','Full position (P1)','#FFD700')}
+            {entryRow('Star','THRUST','75% position','#00E676')}
+            {entryRow('Pullback','THRUST','Add tranche (P2)','#00E676')}
+            {entryRow('Pyramid','IGNITION','Aggressive add (P3)','#FFD700')}
+            {entryRow('Star','COIL','Watchlist only','#B388FF')}
+            {entryRow('Pullback','DRIFT','Skip','#616161')}
+            {entryRow('Pyramid','FADE','Tighten SL','#FF5252')}
+          </tbody></table>
+        </div>
+        <div style={{flex:1,minWidth:220,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:8}}>
+          <div style={{font:'700 8px var(--fm)',color:'var(--t2)',letterSpacing:'.08em',marginBottom:4}}>EXIT LAYER TABLE</div>
+          <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid var(--bdl)'}}>
+            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Transition</th>
+            <th style={{padding:'3px 8px',font:'600 7px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
+          </tr></thead><tbody>
+            {exitRow('THRUST','Trail EMA(21), let RUN ride','#00E676')}
+            {exitRow('IGN → THRUST','Breakeven fast, T1 at 1R','#FFD700')}
+            {exitRow('THRUST → FADE','Tighten to EMA(8), close T2/T3','#FF5252')}
+            {exitRow('THRUST → DRIFT','Close RUN, book profits','#616161')}
+            {exitRow('ANY → FADE','Hard exit all tranches','#FF5252')}
+          </tbody></table>
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
 // ═══ APP ═══
 function App(){
   const[sel,setSel]=useState(null);const[bi,setBi]=useState(2);const[mt,setMt]=useState('close');const[trd,setTrd]=useState([]);
@@ -454,6 +786,8 @@ function App(){
         <div className="sep"/>
         <div className="pg">
           <button className={`pb ${tab==='chart'?'ow':''}`} onClick={()=>setTab('chart')}>CHART</button>
+          <button className={`pb ${tab==='bar'?'ow':''}`} onClick={()=>setTab('bar')}>Bar</button>
+          <button className={`pb ${tab==='line'?'ow':''}`} onClick={()=>setTab('line')}>Line</button>
           <button className={`pb ${tab==='matrix'?'ow':''}`} onClick={()=>setTab('matrix')}>MATRIX</button>
         </div>
         <div className="sep"/>
@@ -464,6 +798,8 @@ function App(){
         <div className="ca" ref={chartRef}><PnFC cols={cols} sigs={sigs} ma={ma} w={cW||800} h={cH||400} sym={sel.s} pv={pv} tv={tv2} zoom={zoom}/></div>
         <div className="ds"><DSm cols={cols} w={cW||800} h={76}/></div>
       </>}
+
+      {(tab==='bar'||tab==='line')&&<div className="ca" ref={chartRef}><LWChart symbol={sel.s} w={cW||800} h={cH||400} mode={tab}/></div>}
 
       {tab==='matrix'&&(
         <div className="mx-wrap">

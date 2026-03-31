@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="css/tradedge.css">
 <style>
 /* ═══ Edge Pilot Inline Styles ═══ */
+@keyframes fusionShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .ep-lifecycle { display:flex; gap:2px; align-items:center; margin:6px 0; }
 .ep-lc-step { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; border:1.5px solid var(--b1); color:var(--t3); background:var(--bg3); transition:all .3s; }
 .ep-lc-step.done { background:rgba(0,229,160,.15); border-color:var(--g); color:var(--g); }
@@ -229,6 +230,8 @@ document.addEventListener('click', function(e) {
   <div class="exec-pnl-card"><div class="pnl-label">Day P&L</div><div class="pnl-value" id="day-pnl" style="color:var(--t3)">—</div></div>
   <div class="exec-pnl-card"><div class="pnl-label">Deployed %</div><div class="pnl-value" id="margin" style="color:var(--y)">—</div></div>
   <div class="exec-pnl-card"><div class="pnl-label">SL Risk %</div><div class="pnl-value" id="risk-pct" style="color:var(--t3)">—</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">Edge Score</div><div class="pnl-value" id="edge-score" style="color:var(--t3)">—</div></div>
+  <div class="exec-pnl-card"><div class="pnl-label">With Edge</div><div class="pnl-value" id="edge-count" style="color:var(--t3)">—</div></div>
 </div>
 
 <!-- Heatmap -->
@@ -2816,6 +2819,32 @@ function autoTrailSL() {
       }
     }
 
+    // Fusion state awareness — tighten SL on FADE, suggest exit on DRIFT
+    const fusionData = _fusionCache[trade.symbol];
+    if (fusionData && pnlPct > 0) {
+      if (fusionData.state === 'FADE' && trade._epEma8 && +trade._epEma8 > currentSL) {
+        // FADE + profitable: tighten to EMA(8) instead of EMA(21)
+        const ema8SL = +trade._epEma8;
+        if (ema8SL > trailValue) {
+          trailValue = ema8SL;
+          trailSource = 'Fusion FADE → EMA(8) tighten';
+        }
+      }
+      if (fusionData.state === 'DRIFT' && pnlPct > 5) {
+        // THRUST→DRIFT: suggest closing RUN tranche
+        const driftKey = `fusion_drift_${trade.id}`;
+        if (!wasAlertSent(driftKey)) {
+          markAlertSent(driftKey);
+          sendTelegramAlert(
+            `⚠️ FUSION DRIFT — ${trade.symbol}\n` +
+            `State: ${fusionData.state} (no edge)\n` +
+            `CMP: ₹${cmp.toFixed(2)} | P&L: +${pnlPct.toFixed(1)}%\n` +
+            `Suggestion: Close RUN tranche, book profits`
+          );
+        }
+      }
+    }
+
     // Only raise SL, never lower it
     if (trailValue > 0 && trailValue > currentSL) {
       const trailKey = `auto_tsl_${trade.id}_${new Date().toISOString().slice(0, 10)}`;
@@ -3061,6 +3090,87 @@ let _cmpCache = {};
 let _cmpFetchTime = 0;
 let _atrCache = {};
 let _atrFetchTime = 0;
+let _fusionCache = {};  // {SYMBOL: {state,bbWidth,rsi,adx,diPlus,diMinus,walkingLine,runningLine,cloudBullish,score,time}}
+let _fusionFetchTime = 0;
+
+// ═══ FUSION STATE CALCULATOR ═══
+const FUSION_COLORS_EXEC={IGNITION:'#FFD700',THRUST:'#00E676',FADE:'#FF5252',COIL:'#B388FF',DRIFT:'#616161'};
+const FUSION_SCORES={IGNITION:3,THRUST:2,COIL:1,DRIFT:-2,FADE:-3};
+const FUSION_SL_HINTS={
+  THRUST:{text:'Trail EMA(21) — give room',color:'var(--g)'},
+  IGNITION:{text:'Move to breakeven',color:'#FFD700'},
+  COIL:{text:'Hold — watch for breakout',color:'#B388FF'},
+  DRIFT:{text:'No edge — consider exit',color:'#616161'},
+  FADE:{text:'Hard exit — trend reversed',color:'#FF5252'},
+};
+
+function _fusionEMA(data,p){const k=2/(p+1);const o=[];let prev=null;for(const v of data){if(v==null){o.push(prev);continue}prev=prev==null?v:v*k+prev*(1-k);o.push(prev)}return o}
+function _fusionSMA(data,p){const o=[];let s=0;for(let i=0;i<data.length;i++){s+=data[i]||0;if(i>=p)s-=data[i-p]||0;o.push(i>=p-1?s/p:null)}return o}
+function _fusionATR(ohlc,p){const tr=[];for(let i=0;i<ohlc.length;i++){const d=ohlc[i];const h=d.h||d.high,l=d.l||d.low,pc=i>0?(ohlc[i-1].c||ohlc[i-1].close):l;tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)))}const o=[];let s=0;for(let i=0;i<tr.length;i++){s+=tr[i];if(i>=p){s-=tr[i-p];o.push(s/p)}else if(i===p-1){o.push(s/p)}else{o.push(null)}}return o}
+
+function _fusionSuperTrend(ohlc,period,mult){
+  const len=ohlc.length;const st=new Array(len).fill(null);const dir=new Array(len).fill(1);const atr=_fusionATR(ohlc,period);
+  let pU=0,pD=0,pDir=1;
+  for(let i=0;i<len;i++){if(atr[i]==null)continue;const d=ohlc[i];const h=d.h||d.high,l=d.l||d.low,c=d.c||d.close;const mid=(h+l)/2;let up=mid-mult*atr[i],dn=mid+mult*atr[i];if(pU>0)up=Math.max(up,pU);if(pD>0)dn=Math.min(dn,pD);const d2=c>pD?1:c<pU?-1:pDir;st[i]=d2===1?up:dn;dir[i]=d2;pU=up;pD=dn;pDir=d2}
+  return{values:st,direction:dir};
+}
+
+function calcPositionFusion(ohlcArr){
+  if(!ohlcArr||ohlcArr.length<30)return null;
+  const closes=ohlcArr.map(d=>d.c||d.close);
+  // BB Width
+  const sma20=_fusionSMA(closes,20);const n=ohlcArr.length-1;
+  let bbWidth=null;
+  if(sma20[n]!=null&&n>=19){let s2=0;for(let j=n-19;j<=n;j++){const d=closes[j]-sma20[n];s2+=d*d}const std=Math.sqrt(s2/20);bbWidth=sma20[n]>0?((sma20[n]+2*std)-(sma20[n]-2*std))/sma20[n]*100:0}
+  // RSI
+  const rsiArr=[];let avgG=0,avgL=0;
+  for(let i=1;i<closes.length;i++){const d=closes[i]-closes[i-1];const g=d>0?d:0;const l=d<0?-d:0;if(i<=14){avgG+=g/14;avgL+=l/14;rsiArr.push(i===14?(avgL===0?100:100-100/(1+avgG/avgL)):null)}else{avgG=(avgG*13+g)/14;avgL=(avgL*13+l)/14;rsiArr.push(avgL===0?100:100-100/(1+avgG/avgL))}}
+  const rsi=rsiArr.length?rsiArr[rsiArr.length-1]:null;
+  // ADX
+  const dmP=[0],dmM=[0];for(let i=1;i<ohlcArr.length;i++){const uM=(ohlcArr[i].h||ohlcArr[i].high)-(ohlcArr[i-1].h||ohlcArr[i-1].high);const dM=(ohlcArr[i-1].l||ohlcArr[i-1].low)-(ohlcArr[i].l||ohlcArr[i].low);dmP.push(uM>dM&&uM>0?uM:0);dmM.push(dM>uM&&dM>0?dM:0)}
+  const atr14=_fusionATR(ohlcArr,14);const smP=_fusionEMA(dmP,14),smM=_fusionEMA(dmM,14),smA=_fusionEMA(atr14.map(v=>v||0),14);
+  let adx=null,diPlus=null,diMinus=null;const dx=[];
+  for(let i=0;i<ohlcArr.length;i++){if(!smA[i]||smA[i]===0){dx.push(null);continue}const dp=smP[i]/smA[i]*100,dm=smM[i]/smA[i]*100;if(i===n){diPlus=dp;diMinus=dm}const s=dp+dm;dx.push(s===0?0:Math.abs(dp-dm)/s*100)}
+  const adxLine=_fusionEMA(dx.map(v=>v||0),14);adx=adxLine[n]||null;
+  const adxRising=n>=3&&adxLine[n]!=null&&adxLine[n-3]!=null&&adxLine[n]>adxLine[n-3];
+  // EdgeCloud
+  const st1=_fusionSuperTrend(ohlcArr,10,2),st2=_fusionSuperTrend(ohlcArr,10,3);
+  const wl=(st1.values[n]!=null&&st2.values[n]!=null)?(st1.values[n]+st2.values[n])/2:null;
+  const rl=_fusionEMA(closes,21)[n]||null;
+  const cloudBullish=wl!=null&&rl!=null?wl>rl:null;
+  // State
+  let state='DRIFT';
+  if(bbWidth!=null&&rsi!=null&&adx!=null){
+    if(bbWidth<10&&rsi>55&&adxRising)state='IGNITION';
+    else if(bbWidth>=10&&rsi>55&&adx>25&&diPlus>diMinus)state='THRUST';
+    else if(bbWidth>=10&&rsi<45&&adx>25&&diMinus>diPlus)state='FADE';
+    else if(bbWidth<10&&adx<20)state='COIL';
+  }
+  return{state,bbWidth,rsi,adx,diPlus,diMinus,walkingLine:wl,runningLine:rl,cloudBullish,score:FUSION_SCORES[state]||0};
+}
+
+async function fetchFusionForPositions(symbols){
+  const wUrl=localStorage.getItem('zd_worker_url');if(!wUrl||!symbols.length)return;
+  const toFetch=symbols.filter(s=>!_fusionCache[s]||Date.now()-_fusionCache[s].time>1800000);
+  if(!toFetch.length)return;
+  console.log('Fusion fetch:',toFetch.join(', '));
+  for(let i=0;i<toFetch.length;i+=5){
+    const batch=toFetch.slice(i,i+5);
+    await Promise.allSettled(batch.map(async sym=>{
+      try{
+        const res=await fetch(wUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy'},body:JSON.stringify({ticker:`${sym}.NS`,range:'3mo',interval:'1d'}),signal:AbortSignal.timeout(10000)});
+        if(!res.ok)return;const data=await res.json();
+        const result=data?.chart?.result?.[0];if(!result)return;
+        const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};
+        const ohlc=[];for(let j=0;j<ts.length;j++){if(q.close[j]==null)continue;ohlc.push({time:ts[j],o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume?.[j]||0})}
+        const f=calcPositionFusion(ohlc);
+        if(f)_fusionCache[sym]={...f,time:Date.now()};
+      }catch(e){console.log('Fusion error',sym,e.message)}
+    }));
+    if(i+5<toFetch.length)await new Promise(r=>setTimeout(r,500));
+  }
+  console.log('Fusion fetch done:',Object.keys(_fusionCache).length,'cached');
+}
 
 // ── ATR(14) Calculator — Wilder's Smoothing ──
 function calcATR14(ohlcv) {
@@ -3335,8 +3445,21 @@ async function buildMergedPositions() {
       _cmpSource: broker ? 'broker' : cached?.source === 'dhan' ? 'dhan' : cached ? 'yahoo' : 'entry',
       _cmpTime: cached?.time || 0,
       _atrSource: atrSource,
+      _fusion: _fusionCache[sym] || null,
     };
   }).filter(Boolean);
+
+  // Async: fetch fusion states for all positions (non-blocking)
+  const fusionSyms = _mergedPositions.map(p => p.symbol).filter(s => s);
+  if (fusionSyms.length && (Date.now() - _fusionFetchTime > 1800000)) {
+    _fusionFetchTime = Date.now();
+    fetchFusionForPositions(fusionSyms).then(() => {
+      _mergedPositions.forEach(p => { if (_fusionCache[p.symbol]) p._fusion = _fusionCache[p.symbol]; });
+      renderPositions(); renderHeatmap(); renderPnlBar();
+    });
+  } else {
+    _mergedPositions.forEach(p => { if (_fusionCache[p.symbol]) p._fusion = _fusionCache[p.symbol]; });
+  }
 
   // Also include broker-only positions not in journal (rare but possible)
   brokerPos.forEach(p => {
@@ -3458,12 +3581,13 @@ function renderPositions() {
           <span class="ep-badge ep-badge-pyr">${(EP_CONFIG.pyramid[pyrLevel]?.label || 'P1').split('—')[0].trim()}</span>
           ${sector ? `<span class="ep-badge ep-badge-sector">${sector}</span>` : ''}
           ${days ? `<span style="font-size:9px;color:var(--t4)">Day ${days}</span>` : ''}
+          ${(()=>{const fs=p._fusion;if(!fs)return'<span style="display:inline-block;width:32px;height:14px;border-radius:3px;background:linear-gradient(90deg,transparent 25%,rgba(255,255,255,.04) 50%,transparent 75%);background-size:200% 100%;animation:fusionShimmer 1.2s ease-in-out infinite;vertical-align:middle"></span>';const c=FUSION_COLORS_EXEC[fs.state]||'#616161';const lbl={IGNITION:'IGN',THRUST:'THR',FADE:'FADE',COIL:'COIL',DRIFT:'DRFT'}[fs.state];return'<span style="font-size:8px;font-weight:700;font-family:IBM Plex Mono,monospace;padding:1px 5px;border-radius:3px;background:'+c+'20;color:'+c+';border:1px solid '+c+'40">'+lbl+'</span>'})()}
         </div>
         <div>
          <span class="ep-toggle" style="color:var(--t3);font-size:11px;margin-right:4px">▼</span>
           <span class="ep-badge ep-badge-grade" style="color:${gradeColor}">${grade}</span>
           <div style="text-align:right;margin-top:2px">
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pnlColor}">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pnlColor}">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)} ${(()=>{const fs=p._fusion;if(!fs)return'';const sc=fs.score;const c=sc>0?'var(--g)':sc<0?'var(--r)':'var(--t3)';return'<span style="font-size:9px;color:'+c+'">'+(sc>0?'+':'')+sc+'</span>'})()}</div>
             <div style="font-size:10px;color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</div>
           </div>
         </div>
@@ -3491,6 +3615,9 @@ function renderPositions() {
         <div class="ep-section-label">SL Ladder</div>
         ${renderSLLadder(trade, ltp)}
       </div>` : ''}
+
+      <!-- Fusion SL Hint -->
+      ${(()=>{const fs=p._fusion;if(!fs)return'';const h=FUSION_SL_HINTS[fs.state];if(!h)return'';return'<div class="ep-pos-section"><div style="font-size:9px;color:'+h.color+';font-family:IBM Plex Mono,monospace">'+h.text+'</div></div>'})()}
 
       <!-- ATR Meter -->
       ${trade?._epAtr14 || trade ? `<div class="ep-pos-section">${renderATRMeter(trade, ltp, p._atrSource)}</div>` : ''}
@@ -3708,6 +3835,18 @@ function renderPnlBar() {
   rEl.textContent = slRiskPct.toFixed(1) + '%' + (posWithoutSL ? ' ⚠' : '');
   rEl.style.color = slRiskPct > 10 ? 'var(--r)' : slRiskPct > 5 ? 'var(--y)' : 'var(--g)';
   rEl.title = '₹' + (totalSLRisk / 1000).toFixed(1) + 'K at risk if all SLs hit' + (posWithoutSL ? ' (' + posWithoutSL + ' without SL)' : '');
+
+  // Edge Score + Positions with Edge
+  let totalScore = 0, withEdge = 0, fusionCount = 0;
+  positions.forEach(p => {
+    const fs = p._fusion;
+    if (fs) { totalScore += fs.score; fusionCount++; if (fs.state === 'IGNITION' || fs.state === 'THRUST') withEdge++; }
+  });
+  const avgScore = fusionCount > 0 ? (totalScore / fusionCount) : 0;
+  const esEl = document.getElementById('edge-score');
+  if (esEl) { esEl.textContent = fusionCount > 0 ? (avgScore >= 0 ? '+' : '') + avgScore.toFixed(1) : '—'; esEl.style.color = avgScore > 0 ? 'var(--g)' : avgScore < 0 ? 'var(--r)' : 'var(--t3)'; esEl.title = 'Avg conviction: ' + totalScore + ' / ' + fusionCount + ' positions'; }
+  const ecEl = document.getElementById('edge-count');
+  if (ecEl) { ecEl.textContent = fusionCount > 0 ? withEdge + '/' + positions.length : '—'; ecEl.style.color = withEdge > positions.length / 2 ? 'var(--g)' : withEdge > 0 ? 'var(--y)' : 'var(--t3)'; ecEl.title = withEdge + ' in IGNITION or THRUST'; }
 }
 
 // ── Scroll to position card from heatmap click ──
@@ -3740,7 +3879,8 @@ function renderHeatmap() {
     const pctTotal = total > 0 ? value / total * 100 : 0;
     const width = Math.max(pctTotal, 8);
     const bg = pnl >= 0 ? `hsl(${145 + Math.min(pnlPct * 3, 30)},70%,${25 + Math.min(pnlPct * 2, 20)}%)` : `hsl(0,${60 + Math.min(Math.abs(pnlPct) * 3, 30)}%,${25 + Math.min(Math.abs(pnlPct), 15)}%)`;
-    return `<div class="exec-hm-block" style="flex:${width};background:${bg};cursor:pointer" title="${sym}: ${TE.fmt(pnl)} (${pnlPct.toFixed(1)}%) — Click to manage" onclick="scrollToPosition('${sym}')">
+    const fs=p._fusion;const fBorder=fs?FUSION_COLORS_EXEC[fs.state]||'#616161':'transparent';
+    return `<div class="exec-hm-block" style="flex:${width};background:${bg};cursor:pointer;border-bottom:3px solid ${fBorder}" title="${sym}: ${TE.fmt(pnl)} (${pnlPct.toFixed(1)}%)${fs?' · '+fs.state:''} — Click to manage" onclick="scrollToPosition('${sym}')">
       <div class="hm-sym">${sym}</div><div class="hm-pnl">${pnl>=0?'+':''}₹${Math.abs(pnl).toFixed(0)} (${pnl>=0?'+':''}${pnlPct.toFixed(1)}%)</div></div>`;
   }).join('') + '</div>';
 }
