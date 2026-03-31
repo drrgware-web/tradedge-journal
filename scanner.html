@@ -399,17 +399,18 @@
         let darvasData = null, trendlineData = null;
 
         // ═══ CHARTINK LIVE SCAN PRESETS ═══
-        // Syntax: ChartInk uses 'latest' for [0], '1 day ago' for [-1]
-        // Stochastic: latest Slow Stochastic %K( 5,3 ) / %D( 5,3 )  — capital %K, 2 params only
-        // EMA: latest ema( close , 10 )
-        // Max: latest max( 20 , latest high )
+        // Syntax: ChartInk uses 'latest' for [0], '1 day ago' for [-1], '2 days ago' for [-2]
+        // Stochastic: latest Slow Stochastic %K( 5,3 ) / %D( 5,3 )  — capital %K, 2 params
+        // EMA: latest ema( close , 10 )        ATR: latest Average True Range( 14 )
+        // Max: 1 day ago max( 20 , 1 day ago high )  — needs timeframe prefix on BOTH sides
+        // RSI: latest rsi( 14 )    Williams: latest Williams %r( 14 )    CCI: latest cci( 14 )
         const LIVE_SCANS = {
             'BREAKOUT SCANS': {
                 icon: '🚀', scans: [
-                    { id: 'horiz_breakout_20d', name: '20-Day High Breakout', desc: 'Close > 20-day high + volume surge', clause: "( {cash} ( latest close > latest max( 20 , latest high ) and 1 day ago close <= 1 day ago max( 20 , 1 day ago high ) and latest volume > 1.5 * latest sma( volume , 20 ) ) ) " },
-                    { id: 'horiz_breakout_52w', name: '52-Week High Breakout', desc: 'Close making new 52-week high + volume', clause: "( {cash} ( latest close >= latest max( 250 , latest high ) and latest volume > 1.3 * latest sma( volume , 20 ) ) ) " },
-                    { id: 'horiz_tight_range', name: 'Tight Range Breakout', desc: '10-day high breakout after ATR squeeze', clause: "( {cash} ( latest close > latest max( 10 , latest high ) and 1 day ago close <= 1 day ago max( 10 , 1 day ago high ) and latest atr( 10 ) < latest atr( 40 ) * 0.75 and latest volume > 1.3 * latest sma( volume , 20 ) ) ) " },
-                    { id: 'horiz_breakout_ema', name: '20-Day Breakout + EMA Sync', desc: '20-day high breakout + 10>20>50>200 EMA', clause: "( {cash} ( latest close > latest max( 20 , latest high ) and 1 day ago close <= 1 day ago max( 20 , 1 day ago high ) and latest volume > 1.5 * latest sma( volume , 20 ) and latest ema( close , 10 ) > latest ema( close , 20 ) and latest ema( close , 20 ) > latest ema( close , 50 ) and latest ema( close , 50 ) > latest ema( close , 200 ) ) ) " }
+                    { id: 'horiz_breakout_20d', name: '20-Day High Breakout', desc: 'Close > 20-day high + 1.5x volume surge', clause: "( {cash} ( latest close > 1 day ago max( 20 , 1 day ago high ) and 1 day ago close <= 2 days ago max( 20 , 2 days ago high ) and latest volume > 1.5 * latest sma( volume , 20 ) ) ) " },
+                    { id: 'horiz_breakout_sma', name: 'Resistance Breakout (SMA High)', desc: 'Close crossing above SMA of 20-day highs + volume', clause: "( {cash} ( latest close > latest sma( high , 20 ) and 1 day ago close <= 1 day ago sma( high , 20 ) and latest volume > 1.5 * latest sma( volume , 20 ) ) ) " },
+                    { id: 'horiz_tight_range', name: 'Tight Range Breakout', desc: '10-day high breakout after ATR contraction + volume', clause: "( {cash} ( latest close > 1 day ago max( 10 , 1 day ago high ) and 1 day ago close <= 2 days ago max( 10 , 2 days ago high ) and latest Average True Range( 10 ) < latest Average True Range( 40 ) * 0.75 and latest volume > 1.3 * latest sma( volume , 20 ) ) ) " },
+                    { id: 'horiz_breakout_ema', name: '20-Day Breakout + EMA Sync', desc: '20-day high breakout + 10>20>50>200 EMA alignment', clause: "( {cash} ( latest close > 1 day ago max( 20 , 1 day ago high ) and 1 day ago close <= 2 days ago max( 20 , 2 days ago high ) and latest volume > 1.5 * latest sma( volume , 20 ) and latest ema( close , 10 ) > latest ema( close , 20 ) and latest ema( close , 20 ) > latest ema( close , 50 ) and latest ema( close , 50 ) > latest ema( close , 200 ) ) ) " }
                 ]
             },
             'STOCHASTIC SCANS': {
