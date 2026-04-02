@@ -447,7 +447,7 @@ function calcAllFusionStates(ohlc,cfg){
 
 // ═══ LW CHART COMPONENT (Bar + Line + EdgeCloud + Fusion + Weekly) ═══
 function LWChart({symbol,w,h,mode,isDark}){
-  const containerRef=useRef(null);const chartObjRef=useRef(null);const ohlcRef=useRef([]);const fusionRef=useRef([]);const walkRef=useRef([]);const runRef=useRef([]);
+  const containerRef=useRef(null);const volContainerRef=useRef(null);const chartObjRef=useRef(null);const volChartRef=useRef(null);const ohlcRef=useRef([]);const fusionRef=useRef([]);const walkRef=useRef([]);const runRef=useRef([]);
   const[loading,setLoading]=useState(false);const[err,setErr]=useState(null);
   const[range,setRange]=useState('6mo');
   const[fusion,setFusion]=useState(null);
@@ -459,7 +459,7 @@ function LWChart({symbol,w,h,mode,isDark}){
   const[ecCfg,setEcCfg]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('te_ec_cfg')||'{}');if(!saved.stPeriod)return{...EC_DEFAULTS};return{...EC_DEFAULTS,...saved}}catch{return{...EC_DEFAULTS}}});
   const updateCfg=useCallback((k,v)=>{setEcCfg(prev=>{const n={...prev,[k]:v};localStorage.setItem('te_ec_cfg',JSON.stringify(n));return n})},[]);
 
-  const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];const seen=new Set();for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;const t=Math.floor(ts[i]);if(seen.has(t))continue;seen.add(t);ohlc.push({time:t,open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
+  const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];const seen=new Set();for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;const d=new Date(ts[i]*1000);const key=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();if(seen.has(key))continue;seen.add(key);ohlc.push({time:{year:d.getFullYear(),month:d.getMonth()+1,day:d.getDate()},_ts:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
 
   const fetchAndRender=useCallback(async(rng)=>{
     if(!symbol||!containerRef.current)return;
@@ -467,6 +467,7 @@ function LWChart({symbol,w,h,mode,isDark}){
     if(!wUrl){setErr('Set zd_worker_url in localStorage');return}
     setLoading(true);setErr(null);setHovered(null);
     if(chartObjRef.current){chartObjRef.current.remove();chartObjRef.current=null}
+    if(volChartRef.current){volChartRef.current.remove();volChartRef.current=null}
     containerRef.current.innerHTML='';
     try{
       const res=await fetch(wUrl+'?_='+Date.now(),{method:'POST',headers:{'Content-Type':'application/json','X-Kite-Action':'yahoo-proxy','Cache-Control':'no-cache','Pragma':'no-cache'},body:JSON.stringify({ticker:`${symbol}.NS`,range:rng,interval:'1d',_t:Date.now()})});
@@ -484,7 +485,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       const crossBg=dk?'#1a2030':'#e8e8e8';
       const bdr=dk?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)';
 
-      const chartH=Math.max(h||500,500);
+      const chartH=Math.max(h||440,440);
       // Wait for layout to settle, then measure true width
       await new Promise(r=>requestAnimationFrame(r));
       const chartW=containerRef.current.clientWidth||w||800;
@@ -508,20 +509,13 @@ function LWChart({symbol,w,h,mode,isDark}){
         mainSeries.setData(ohlc.map((d,i)=>({time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close})));
       }
 
-      // Volume + Pocket Pivot — overlay on main price scale (bottom 25%)
+      // Pocket Pivot detection (volume chart created separately below)
       const ppFlags=[];
-      const maxVol=Math.max(...ohlc.map(b=>b.volume||0));
-      const minPrice=Math.min(...ohlc.map(b=>b.low));
-      const priceRange=Math.max(...ohlc.map(b=>b.high))-minPrice;
-      const volSeries=chart.addHistogramSeries({color:'#26A69A',priceFormat:{type:'price'},priceScaleId:'',lastValueVisible:false,priceLineVisible:false});
-      const volData=ohlc.map((bar,i)=>{
-        const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;
-        let isPP=false;
-        if(isUp&&i>=2){let maxDV=0;for(let j=Math.max(0,i-(ecCfg.ppLookback||10));j<i;j++){const pC=j>0?ohlc[j-1].close:ohlc[j].close;if(ohlc[j].close<pC&&ohlc[j].volume>maxDV)maxDV=ohlc[j].volume}if(maxDV>0&&bar.volume>maxDV)isPP=true}
-        if(isPP)ppFlags.push(i);
-        return{time:bar.time,value:minPrice+(bar.volume/maxVol)*priceRange*0.12,color:isPP?'rgba(33,150,243,0.35)':isUp?'rgba(38,166,154,0.2)':'rgba(239,83,80,0.2)'};
+      ohlc.forEach((bar,i)=>{
+        if(i<2)return;const prevC=ohlc[i-1].close;if(bar.close<prevC)return;
+        let maxDV=0;for(let j=Math.max(0,i-(ecCfg.ppLookback||10));j<i;j++){const pC=j>0?ohlc[j-1].close:ohlc[j].close;if(ohlc[j].close<pC&&ohlc[j].volume>maxDV)maxDV=ohlc[j].volume}
+        if(maxDV>0&&bar.volume>maxDV)ppFlags.push(i);
       });
-      volSeries.setData(volData);
 
       const{walking,walkDir,running,st1,st2}=calcEdgeCloud(ohlc,ecCfg);
       walkRef.current=walking;runRef.current=running;
@@ -649,7 +643,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         const idx=ohlc.findIndex(d=>d.time===param.time);
         if(idx<0){setHovered(null);return}
         const d=ohlc[idx];const fs=fusionStates[idx];
-        setHovered({date:new Date(d.time*1000).toLocaleDateString('en-IN'),open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2?.values[idx],st2Dir:st2?.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
+        setHovered({date:d.time.day+'/'+d.time.month+'/'+d.time.year,open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2?.values[idx],st2Dir:st2?.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
 
       // ── Trade overlay from te_trades ──
       let tradeOverlay=null;
@@ -664,7 +658,7 @@ function LWChart({symbol,w,h,mode,isDark}){
           const riskPct=avgEntry>0&&sl>0?((avgEntry-sl)/avgEntry*100):0;
           // Entry fusion state (find bar closest to first entry date)
           let entryFusionState=null;
-          if(entries.length&&fusionStates.length){const ed=new Date(entries[0].date).getTime()/1000;const eIdx=ohlc.reduce((best,d,i)=>Math.abs(d.time-ed)<Math.abs((ohlc[best]._ts||0)-ed)?i:best,0);entryFusionState=fusionStates[eIdx]?.state||null}
+          if(entries.length&&fusionStates.length){const ed=new Date(entries[0].date).getTime()/1000;const eIdx=ohlc.reduce((best,d,i)=>Math.abs((d._ts||0)-ed)<Math.abs((ohlc[best]._ts||0)-ed)?i:best,0);entryFusionState=fusionStates[eIdx]?.state||null}
           tradeOverlay={entries,exits,avgEntry,sl,days,pnlPct,riskPct,status:match.status,entryFusion:entryFusionState,curFusion:fusionStates[ohlc.length-1]?.state};
           // Avg entry line — subtle
           if(avgEntry>0){const avgLine=chart.addLineSeries({color:'rgba(0,188,212,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:true,priceLineVisible:false,title:'Avg'});avgLine.setData([{time:ohlc[0].time,value:avgEntry},{time:ohlc[ohlc.length-1].time,value:avgEntry}])}
@@ -672,8 +666,8 @@ function LWChart({symbol,w,h,mode,isDark}){
           if(sl>0){const slLine=chart.addLineSeries({color:'rgba(255,82,82,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:true,priceLineVisible:false,title:'SL'});slLine.setData([{time:ohlc[0].time,value:sl},{time:ohlc[ohlc.length-1].time,value:sl}])}
           // Entry/exit/pyramid markers on main series
           const tm=[...markers];
-          entries.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs(d.time-ts)<Math.abs((ohlc[b]._ts||0)-ts)?i:b,0);tm.push({time:ohlc[near].time,position:'belowBar',color:j===0?'#00E676':'#FF9800',shape:'arrowUp',text:j===0?'P1':j===1?'P2':'P3'})});
-          exits.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs(d.time-ts)<Math.abs((ohlc[b]._ts||0)-ts)?i:b,0);const isProfit=(+e.price)>avgEntry;tm.push({time:ohlc[near].time,position:'aboveBar',color:isProfit?'#00E676':'#FF5252',shape:'arrowDown',text:j===0?'T1':j===1?'T2':j===2?'T3':'RUN'})});
+          entries.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs((d._ts||0)-ts)<Math.abs((ohlc[b]._ts||0)-ts)?i:b,0);tm.push({time:ohlc[near].time,position:'belowBar',color:j===0?'#00E676':'#FF9800',shape:'arrowUp',text:j===0?'P1':j===1?'P2':'P3'})});
+          exits.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs((d._ts||0)-ts)<Math.abs((ohlc[b]._ts||0)-ts)?i:b,0);const isProfit=(+e.price)>avgEntry;tm.push({time:ohlc[near].time,position:'aboveBar',color:isProfit?'#00E676':'#FF5252',shape:'arrowDown',text:j===0?'T1':j===1?'T2':j===2?'T3':'RUN'})});
           tm.sort((a,b)=>a.time-b.time);
           mainSeries.setMarkers(tm);
         }
@@ -683,6 +677,31 @@ function LWChart({symbol,w,h,mode,isDark}){
       chart.timeScale().fitContent();
       setTimeout(()=>{if(chartObjRef.current)chartObjRef.current.timeScale().fitContent()},200);
       setTimeout(()=>{if(chartObjRef.current)chartObjRef.current.timeScale().fitContent()},600);
+
+      // ── Separate volume chart ──
+      if(volContainerRef.current){
+        if(volChartRef.current){volChartRef.current.remove();volChartRef.current=null}
+        volContainerRef.current.innerHTML='';
+        const vc=LightweightCharts.createChart(volContainerRef.current,{
+          width:chartW,height:80,
+          layout:{background:{color:bgCol},textColor:txtCol,fontFamily:'IBM Plex Mono'},
+          grid:{vertLines:{color:gridCol},horzLines:{color:'transparent'}},
+          rightPriceScale:{visible:false,borderColor:bdr},
+          timeScale:{visible:false,borderColor:bdr},
+          crosshair:{mode:1},
+          handleScroll:{vertTouchDrag:false},
+        });
+        volChartRef.current=vc;
+        const vhs=vc.addHistogramSeries({color:'#26A69A',priceFormat:{type:'volume'},lastValueVisible:false,priceLineVisible:false});
+        vhs.setData(ohlc.map((bar,i)=>{
+          const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;const isPP=ppFlags.includes(i);
+          return{time:bar.time,value:bar.volume||0,color:isPP?'rgba(33,150,243,0.6)':isUp?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)'};
+        }));
+        vc.timeScale().fitContent();
+        // Sync time scales
+        chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range&&volChartRef.current)volChartRef.current.timeScale().setVisibleLogicalRange(range)});
+        vc.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range&&chartObjRef.current)chartObjRef.current.timeScale().setVisibleLogicalRange(range)});
+      }
 
       // Build panel data
       const n=ohlc.length-1;const cur=fusionStates[n];
@@ -715,7 +734,7 @@ function LWChart({symbol,w,h,mode,isDark}){
   // Resize chart when container resizes (window resize, layout change, etc.)
   useEffect(()=>{
     if(!containerRef.current)return;
-    const ro=new ResizeObserver(()=>{if(chartObjRef.current&&containerRef.current){const cw=containerRef.current.clientWidth;if(cw>0)chartObjRef.current.resize(cw,500)}});
+    const ro=new ResizeObserver(()=>{if(containerRef.current){const cw=containerRef.current.clientWidth;if(cw>0){if(chartObjRef.current)chartObjRef.current.resize(cw,440);if(volChartRef.current)volChartRef.current.resize(cw,80)}}});
     ro.observe(containerRef.current);
     // Also handle window resize as fallback
     const onResize=()=>{if(chartObjRef.current&&containerRef.current){chartObjRef.current.resize(containerRef.current.clientWidth,500)}};
@@ -751,7 +770,8 @@ function LWChart({symbol,w,h,mode,isDark}){
   return<div style={{animation:'fadeIn .3s ease-out',width:'100%',padding:'0 8px 20px'}}>
     <div style={{position:'relative'}}>
       {loading&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:5,background:isDark?'rgba(13,17,23,.9)':'rgba(255,255,255,.9)',backdropFilter:'blur(4px)'}}><div style={{width:32,height:32,border:'3px solid rgba(66,165,245,.12)',borderTop:'3px solid #42A5F5',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/></div>}
-      <div ref={containerRef} style={{width:'100%',minWidth:0,height:500,transition:'opacity .2s'}}/>
+      <div ref={containerRef} style={{width:'100%',minWidth:0,height:440,transition:'opacity .2s'}}/>
+      <div ref={volContainerRef} style={{width:'100%',height:80,borderTop:'1px solid var(--bdr)'}}/>
       {/* Top-left controls */}
       <div style={{position:'absolute',top:6,left:8,display:'flex',gap:6,alignItems:'center',zIndex:2}}>
         <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
