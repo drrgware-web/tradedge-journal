@@ -44,7 +44,6 @@ input[type="text"],input[type="number"],select,textarea{background:var(--bg-tert
 @keyframes ctxIn{from{opacity:0;transform:scale(.96) translateY(-3px)}to{opacity:1;transform:none}}
 .fade-in{animation:fadeIn 0.3s ease-out}
 @keyframes priceShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-@keyframes titleGlow{0%,100%{text-shadow:0 0 8px rgba(0,255,255,0.6),0 0 20px rgba(0,255,255,0.3)}50%{text-shadow:0 0 2px rgba(0,255,255,0.2),0 0 6px rgba(0,255,255,0.1)}}
 .price-shimmer{background:linear-gradient(90deg,transparent 25%,rgba(0,255,136,0.06) 50%,transparent 75%);background-size:200% 100%;animation:priceShimmer 1.2s ease-in-out infinite}
 .sp-sidebar{width:260px;min-width:260px;background:var(--bg-secondary);border-right:1px solid var(--border-dim);overflow-y:auto;max-height:calc(100vh - 50px);position:sticky;top:50px;transition:margin .2s}
 .sp-sidebar.collapsed{margin-left:-260px}
@@ -888,7 +887,7 @@ const ScannerDashboard=()=>{
   const[showSaveModal,setShowSaveModal]=useState(false);
   const[showSettingsModal,setShowSettingsModal]=useState(false);
   const[infoTip,setInfoTip]=useState(null);
-  useEffect(()=>{if(!infoTip)return;const fn=()=>setInfoTip(null);document.addEventListener('click',fn);return()=>document.removeEventListener('click',fn)},[infoTip]);
+  useEffect(()=>{if(!infoTip)return;const fn=()=>setInfoTip(null);const t=setTimeout(()=>document.addEventListener('click',fn),50);return()=>{clearTimeout(t);document.removeEventListener('click',fn)}},[infoTip]);
   const[settingsForm,setSettingsForm]=useState({workerUrl:'',ghToken:'',sbUrl:'',sbKey:'',groqKey:''});
   const[saveName,setSaveName]=useState("");
   const persistWLs=useCallback(wls=>{setSavedWLs(wls);localStorage.setItem('te_scan_watchlists',JSON.stringify(wls))},[]);
@@ -1008,7 +1007,7 @@ const ScannerDashboard=()=>{
 
       <div className="card"><div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-          <thead><tr style={{background:"rgba(0,255,136,0.03)"}}>{["","STOCK","PRICE","CHG%","CS","RSI","FUNDS","MACD","EMA 9/21","52W","VOL","CATALYSTS","1M","3M"].map(h=><th key={h} style={{padding:"8px",textAlign:"left",color:"var(--text-muted)",fontSize:9,fontWeight:700,letterSpacing:1,borderBottom:"1px solid var(--border-dim)",fontFamily:"var(--font-mono)",whiteSpace:"nowrap",position:"relative"}}>{h==='CS'?<span style={{display:"flex",alignItems:"center",gap:3}}>SCORE<span onClick={e=>{e.stopPropagation();setInfoTip(infoTip==='CS'?null:'CS')}} style={{cursor:"pointer",fontSize:10,color:"var(--text-muted)",opacity:.5}}>ⓘ</span>{infoTip==='CS'&&<span style={{position:"absolute",top:"100%",left:0,zIndex:20,padding:"8px 10px",background:"#0c1018",border:"1px solid var(--border-med)",borderRadius:6,fontSize:10,color:"var(--text-secondary)",fontFamily:"var(--font-mono)",lineHeight:1.5,width:260,boxShadow:"0 8px 20px rgba(0,0,0,.6)",whiteSpace:"normal",fontWeight:400}} onClick={e=>e.stopPropagation()}>O'Neil Master Score (0-99): weighted average of EPS Rank (25%), Price Strength/RS (35%), Buyer Demand/Accumulation (25%), and Industry Group Rank (15%). Higher = stronger stock.</span>}</span>:h}</th>)}</tr></thead>
+          <thead><tr style={{background:"rgba(0,255,136,0.03)"}}>{["","STOCK","PRICE","CHG%","SCORE","RSI","FUNDS","MACD","EMA 9/21","52W","VOL","CATALYSTS","1M","3M"].map(h=><th key={h} style={{padding:"8px",textAlign:"left",color:"var(--text-muted)",fontSize:9,fontWeight:700,letterSpacing:1,borderBottom:"1px solid var(--border-dim)",fontFamily:"var(--font-mono)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
           <tbody>{filteredStocks.map((stock,i)=>{
             const isExp=expandedStock===stock.symbol;
             return<Fragment key={stock.symbol}>
