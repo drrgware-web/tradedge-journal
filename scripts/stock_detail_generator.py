@@ -1171,8 +1171,8 @@ class StockDetailGenerator:
         fund = detail.get("fundamentals", {})
         tech = detail.get("technical", {})
         own = detail.get("ownership", {})
-        quarters = detail.get("quarterly_results", [])
-        
+        quarters = detail.get("quarterly_results", []) or detail.get("quarters_screener", [])
+
         # Extract EPS from quarterly results
         quarterly_eps = [q.get("eps", 0) for q in quarters[:8]]
         
