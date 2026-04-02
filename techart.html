@@ -456,7 +456,7 @@ function LWChart({symbol,w,h,mode,isDark}){
   const[showWeekly,setShowWeekly]=useState(false);
   const[showTrade,setShowTrade]=useState(false);
   const[showSettings,setShowSettings]=useState(false);
-  const[ecCfg,setEcCfg]=useState(()=>{try{return{...EC_DEFAULTS,...JSON.parse(localStorage.getItem('te_ec_cfg')||'{}')}}catch{return{...EC_DEFAULTS}}});
+  const[ecCfg,setEcCfg]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('te_ec_cfg')||'{}');if(!saved.stPeriod)return{...EC_DEFAULTS};return{...EC_DEFAULTS,...saved}}catch{return{...EC_DEFAULTS}}});
   const updateCfg=useCallback((k,v)=>{setEcCfg(prev=>{const n={...prev,[k]:v};localStorage.setItem('te_ec_cfg',JSON.stringify(n));return n})},[]);
 
   const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;ohlc.push({time:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
