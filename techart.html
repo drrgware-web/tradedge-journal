@@ -459,7 +459,7 @@ function LWChart({symbol,w,h,mode,isDark}){
   const[ecCfg,setEcCfg]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('te_ec_cfg')||'{}');if(!saved.stPeriod)return{...EC_DEFAULTS};return{...EC_DEFAULTS,...saved}}catch{return{...EC_DEFAULTS}}});
   const updateCfg=useCallback((k,v)=>{setEcCfg(prev=>{const n={...prev,[k]:v};localStorage.setItem('te_ec_cfg',JSON.stringify(n));return n})},[]);
 
-  const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;const d=new Date(ts[i]*1000);const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');ohlc.push({time:ds,_ts:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
+  const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];const seen=new Set();for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;const d=new Date(ts[i]*1000);const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(ds.length!==10||seen.has(ds))continue;seen.add(ds);ohlc.push({time:ds,_ts:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
 
   const fetchAndRender=useCallback(async(rng)=>{
     if(!symbol||!containerRef.current)return;
@@ -476,9 +476,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       const ohlc=parseOHLCV(result);
       if(!ohlc.length)throw new Error('Empty OHLCV');
       ohlcRef.current=ohlc;
-      console.log('OHLCV total bars:',ohlc.length);
-      console.log('First bar:',ohlc[0]);
-      console.log('Last bar:',ohlc[ohlc.length-1]);
+      console.log('OHLCV:',ohlc.length,'bars, first:',ohlc[0]?.time,'last:',ohlc[ohlc.length-1]?.time);
 
       const dk=isDark!==false;
       const bgCol=dk?'#0d1117':'#ffffff';
@@ -523,7 +521,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         priceScaleId: 'vol',
       });
       volumeSeries.priceScale().applyOptions({
-        scaleMargins: { top: 0.85, bottom: 0 },
+        scaleMargins: { top: 0.75, bottom: 0 },
       });
       console.log('Volume series created:', !!volumeSeries, 'priceScale:', !!volumeSeries.priceScale);
       const volData = ohlc.map((bar, i) => {
@@ -704,8 +702,8 @@ function LWChart({symbol,w,h,mode,isDark}){
       setFusion(prev=>({...(prev||{}),_tradeOverlay:tradeOverlay}));
 
       chart.timeScale().fitContent();
-      setTimeout(()=>{if(chartObjRef.current)chartObjRef.current.timeScale().fitContent()},100);
-      setTimeout(()=>{if(chartObjRef.current)chartObjRef.current.timeScale().fitContent()},500);
+      setTimeout(()=>{if(chartObjRef.current){chartObjRef.current.timeScale().fitContent();console.log('fitContent @200ms, visible:',chartObjRef.current.timeScale().getVisibleLogicalRange())}},200);
+      setTimeout(()=>{if(chartObjRef.current)chartObjRef.current.timeScale().fitContent()},600);
 
       // Build panel data
       const n=ohlc.length-1;const cur=fusionStates[n];
