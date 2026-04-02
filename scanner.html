@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradEdge EdgeScanner</title>
+<title>TradEdge Edge-Scanner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -44,6 +44,7 @@ input[type="text"],input[type="number"],select,textarea{background:var(--bg-tert
 @keyframes ctxIn{from{opacity:0;transform:scale(.96) translateY(-3px)}to{opacity:1;transform:none}}
 .fade-in{animation:fadeIn 0.3s ease-out}
 @keyframes priceShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes titleGlow{0%,100%{text-shadow:0 0 8px rgba(0,255,255,0.6),0 0 20px rgba(0,255,255,0.3)}50%{text-shadow:0 0 2px rgba(0,255,255,0.2),0 0 6px rgba(0,255,255,0.1)}}
 .price-shimmer{background:linear-gradient(90deg,transparent 25%,rgba(0,255,136,0.06) 50%,transparent 75%);background-size:200% 100%;animation:priceShimmer 1.2s ease-in-out infinite}
 .sp-sidebar{width:260px;min-width:260px;background:var(--bg-secondary);border-right:1px solid var(--border-dim);overflow-y:auto;max-height:calc(100vh - 50px);position:sticky;top:50px;transition:margin .2s}
 .sp-sidebar.collapsed{margin-left:-260px}
@@ -886,6 +887,8 @@ const ScannerDashboard=()=>{
   const[activeWL,setActiveWL]=useState(null);
   const[showSaveModal,setShowSaveModal]=useState(false);
   const[showSettingsModal,setShowSettingsModal]=useState(false);
+  const[infoTip,setInfoTip]=useState(null);
+  useEffect(()=>{if(!infoTip)return;const fn=()=>setInfoTip(null);document.addEventListener('click',fn);return()=>document.removeEventListener('click',fn)},[infoTip]);
   const[settingsForm,setSettingsForm]=useState({workerUrl:'',ghToken:'',sbUrl:'',sbKey:'',groqKey:''});
   const[saveName,setSaveName]=useState("");
   const persistWLs=useCallback(wls=>{setSavedWLs(wls);localStorage.setItem('te_scan_watchlists',JSON.stringify(wls))},[]);
@@ -963,7 +966,7 @@ const ScannerDashboard=()=>{
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ EDGESCANNER</h1>
+          <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,background:"linear-gradient(135deg,#00ff88,#00ffff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",animation:"titleGlow 3s ease-in-out infinite"}}>◈ Edge-Scanner</h1>
           <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{meta.total_scanned||stocks.length} STOCKS • TEChart v5.0 Embedded • Click row to chart{meta.generated_at?` • Data: ${new Date(meta.generated_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`:''}</div>
           {activeScans.size>0&&<div style={{fontSize:10,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700,marginTop:2}}>⟐ {activeScans.size===1?SCAN_PRESETS.find(p=>p.id===[...activeScans][0])?.name:`${activeScans.size} scans combined`} — {filteredStocks.length} matches <span style={{color:"var(--red)",cursor:"pointer",fontSize:8}} onClick={()=>setActiveScans(new Set())}>[clear all]</span></div>}
           {activeWL&&<div style={{fontSize:10,fontFamily:"var(--font-mono)",color:"#8844ff",fontWeight:700,marginTop:2}}>📋 {savedWLs.find(w=>w.id===activeWL)?.name} — {filteredStocks.length} matches <span style={{color:"var(--red)",cursor:"pointer",fontSize:8}} onClick={()=>setActiveWL(null)}>[clear]</span></div>}
@@ -979,7 +982,19 @@ const ScannerDashboard=()=>{
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
-        {[{label:"BULLISH",count:summary.bullish,color:"#00ff88",icon:"▲"},{label:"BEARISH",count:summary.bearish,color:"#ff4455",icon:"▼"},{label:"CATALYSTS",count:summary.catalysts,color:"#ffaa00",icon:"⚡"},{label:"VOL SPIKE",count:summary.volume,color:"#ff00ff",icon:"📊"},{label:"EARNINGS",count:summary.earnings,color:"#00c8ff",icon:"📅"},{label:"FUNDA",count:summary.funda,color:"#8844ff",icon:"📊"}].map((c,i)=><div key={i} style={{background:`linear-gradient(135deg,${c.color}06,${c.color}03)`,border:`1px solid ${c.color}18`,borderRadius:6,padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}>{c.icon} {c.label}</div><div style={{fontSize:20,fontWeight:800,color:c.color}}>{c.count}</div></div>)}
+        {[{label:"BULLISH",count:summary.bullish,color:"#00ff88",icon:"▲",info:"Stocks with O'Neil composite score ≥ 50. Strong price momentum + earnings + volume accumulation."},
+          {label:"BEARISH",count:summary.bearish,color:"#ff4455",icon:"▼",info:"Stocks with O'Neil composite score < 43. Weak technicals across multiple dimensions."},
+          {label:"CATALYSTS",count:summary.catalysts,color:"#ffaa00",icon:"⚡",info:"Stocks with upcoming earnings, results, or corporate actions as catalysts."},
+          {label:"VOL SPIKE",count:summary.volume,color:"#ff00ff",icon:"📊",info:"Stocks with unusual volume — spike or extreme spike vs 20-day average."},
+          {label:"EARNINGS",count:summary.earnings,color:"#00c8ff",icon:"📅",info:"Stocks with recent earnings breakout or EPS acceleration signal."},
+          {label:"FUNDA",count:summary.funda,color:"#8844ff",icon:"📊",info:"Stocks matched by Screener.in fundamental scans (PE, ROE, growth filters)."}
+        ].map((c,i)=><div key={i} style={{background:`linear-gradient(135deg,${c.color}06,${c.color}03)`,border:`1px solid ${c.color}18`,borderRadius:6,padding:"8px 10px",position:"relative"}}>
+          <div style={{fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1,display:"flex",alignItems:"center",gap:4}}>{c.icon} {c.label}
+            <span onClick={e=>{e.stopPropagation();setInfoTip(infoTip===c.label?null:c.label)}} style={{cursor:"pointer",fontSize:10,color:"var(--text-muted)",opacity:.5}}>ⓘ</span>
+          </div>
+          <div style={{fontSize:20,fontWeight:800,color:c.color}}>{c.count}</div>
+          {infoTip===c.label&&<div style={{position:"absolute",top:"100%",left:0,zIndex:20,marginTop:4,padding:"8px 10px",background:"#0c1018",border:"1px solid var(--border-med)",borderRadius:6,fontSize:10,color:"var(--text-secondary)",fontFamily:"var(--font-mono)",lineHeight:1.5,width:220,boxShadow:"0 8px 20px rgba(0,0,0,.6)"}} onClick={e=>e.stopPropagation()}>{c.info}</div>}
+        </div>)}
       </div>
 
       <ScanBuilder onApplyFilter={setAppliedFilters} onScanResults={setChartinkResults} fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={setFundaFilterSyms} allStocks={stocks}/>
@@ -993,7 +1008,7 @@ const ScannerDashboard=()=>{
 
       <div className="card"><div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-          <thead><tr style={{background:"rgba(0,255,136,0.03)"}}>{["","STOCK","PRICE","CHG%","SCORE","RSI","FUNDS","MACD","EMA 9/21","52W","VOL","CATALYSTS","1M","3M"].map(h=><th key={h} style={{padding:"8px",textAlign:"left",color:"var(--text-muted)",fontSize:9,fontWeight:700,letterSpacing:1,borderBottom:"1px solid var(--border-dim)",fontFamily:"var(--font-mono)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+          <thead><tr style={{background:"rgba(0,255,136,0.03)"}}>{["","STOCK","PRICE","CHG%","CS","RSI","FUNDS","MACD","EMA 9/21","52W","VOL","CATALYSTS","1M","3M"].map(h=><th key={h} style={{padding:"8px",textAlign:"left",color:"var(--text-muted)",fontSize:9,fontWeight:700,letterSpacing:1,borderBottom:"1px solid var(--border-dim)",fontFamily:"var(--font-mono)",whiteSpace:"nowrap",position:"relative"}}>{h==='CS'?<span style={{display:"flex",alignItems:"center",gap:3}}>SCORE<span onClick={e=>{e.stopPropagation();setInfoTip(infoTip==='CS'?null:'CS')}} style={{cursor:"pointer",fontSize:10,color:"var(--text-muted)",opacity:.5}}>ⓘ</span>{infoTip==='CS'&&<span style={{position:"absolute",top:"100%",left:0,zIndex:20,padding:"8px 10px",background:"#0c1018",border:"1px solid var(--border-med)",borderRadius:6,fontSize:10,color:"var(--text-secondary)",fontFamily:"var(--font-mono)",lineHeight:1.5,width:260,boxShadow:"0 8px 20px rgba(0,0,0,.6)",whiteSpace:"normal",fontWeight:400}} onClick={e=>e.stopPropagation()}>O'Neil Master Score (0-99): weighted average of EPS Rank (25%), Price Strength/RS (35%), Buyer Demand/Accumulation (25%), and Industry Group Rank (15%). Higher = stronger stock.</span>}</span>:h}</th>)}</tr></thead>
           <tbody>{filteredStocks.map((stock,i)=>{
             const isExp=expandedStock===stock.symbol;
             return<Fragment key={stock.symbol}>
@@ -1022,7 +1037,7 @@ const ScannerDashboard=()=>{
         </table>
       </div>{filteredStocks.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--text-muted)"}}><div style={{fontSize:28,marginBottom:8}}>◇</div><div style={{fontSize:12}}>No stocks match</div></div>}</div>
 
-      <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}><span>TRADEDGE EDGESCANNER v4.0 • TEChart EMBEDDED</span><span>⚡ CYBERPUNK</span></div>
+      <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid var(--border-dim)",display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--text-muted)",fontFamily:"var(--font-mono)",letterSpacing:1}}><span>TRADEDGE Edge-Scanner v4.0 • TEChart EMBEDDED</span><span>⚡ CYBERPUNK</span></div>
     </div></div>
     {orderDialog&&<OrderDialog symbol={orderDialog.symbol} type={orderDialog.type} lastPrice={orderDialog.price} onClose={()=>setOrderDialog(null)}/>}
     {showSaveModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={()=>setShowSaveModal(false)}>
