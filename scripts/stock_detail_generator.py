@@ -1062,6 +1062,9 @@ class StockDetailGenerator:
         
         # Sector performance cache
         self.sector_performance = {}
+
+        # yfinance OHLCV cache {symbol: DataFrame}
+        self._yf_hist_cache = {}
         
     def _load_symbols(self) -> List[str]:
         """Load NSE symbols list."""
@@ -1176,15 +1179,17 @@ class StockDetailGenerator:
         # Calculate returns from price history
         returns = tech.get("returns", {})
         
-        # Volume data — fetch OHLCV from yfinance for up/down day volume
+        # Volume data — fetch OHLCV from yfinance for up/down day volume (cached)
         avg_volume = tech.get("avg_volume", 0)
         recent_volume = tech.get("volume", 0)
         up_days_volume = 0
         down_days_volume = 0
         symbol = detail.get("symbol", "")
         try:
-            ticker = yf.Ticker(symbol + ".NS")
-            hist = ticker.history(period="3mo", interval="1d")
+            if symbol not in self._yf_hist_cache:
+                ticker = yf.Ticker(symbol + ".NS")
+                self._yf_hist_cache[symbol] = ticker.history(period="3mo", interval="1d")
+            hist = self._yf_hist_cache[symbol]
             if not hist.empty:
                 up_days_volume = int(hist[hist['Close'] > hist['Open']]['Volume'].sum())
                 down_days_volume = int(hist[hist['Close'] < hist['Open']]['Volume'].sum())
