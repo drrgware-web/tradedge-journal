@@ -634,12 +634,6 @@ function LWChart({symbol,w,h,mode,isDark}){
         wasSqueeze=isSq;
       }
 
-      // ── BB Width overlay panel ──
-      const bbwSeries=chart.addLineSeries({priceScaleId:'bbw',color:'#FFD700',lineWidth:1,lastValueVisible:true,priceLineVisible:false,title:'BBW%'});
-      bbwSeries.priceScale().applyOptions({scaleMargins:{top:0.85,bottom:0.1},visible:false});
-      const bbwD=[];for(let i=0;i<ohlc.length;i++){if(bbwArr[i]!=null)bbwD.push({time:ohlc[i].time,value:bbwArr[i]})}
-      bbwSeries.setData(bbwD);
-
       // ── All markers ──
       const markers=[];
       // Fusion state transitions
