@@ -64,14 +64,10 @@ jobs:
           git add data/stock_details/*.json || true
           git add data/screener_cache.json || true
           
-          # Check if there are changes to commit
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "📈 Daily scanner update [$(date +'%Y-%m-%d')]"
-            git pull --rebase origin main
-            git push
-          fi
+          # Always commit (--allow-empty ensures commit even if no data files changed)
+          git commit --allow-empty -m "📈 Daily scanner update [$(date +'%Y-%m-%d')]"
+          git pull --rebase origin main
+          git push
       
       - name: Summary
         run: |
