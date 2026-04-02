@@ -878,6 +878,8 @@ const ScannerDashboard=()=>{
   const[savedWLs,setSavedWLs]=useState(()=>{try{return JSON.parse(localStorage.getItem('te_scan_watchlists'))||[]}catch{return[]}});
   const[activeWL,setActiveWL]=useState(null);
   const[showSaveModal,setShowSaveModal]=useState(false);
+  const[showSettingsModal,setShowSettingsModal]=useState(false);
+  const[settingsForm,setSettingsForm]=useState({workerUrl:'',ghToken:'',sbUrl:'',sbKey:'',groqKey:''});
   const[saveName,setSaveName]=useState("");
   const persistWLs=useCallback(wls=>{setSavedWLs(wls);localStorage.setItem('te_scan_watchlists',JSON.stringify(wls))},[]);
 
@@ -965,6 +967,7 @@ const ScannerDashboard=()=>{
           <button className="btn" onClick={refetch} disabled={loading} style={{padding:"5px 10px",fontSize:10}}>↻ Refresh</button>
           <button className="btn" onClick={triggerScan} disabled={scanState!=='idle'} style={{padding:"5px 10px",fontSize:10,background:scanState==='done'?'rgba(0,255,136,0.15)':scanState==='failed'?'rgba(255,68,85,0.15)':scanState!=='idle'?'rgba(255,170,0,0.15)':'',borderColor:scanState==='done'?'#00ff88':scanState==='failed'?'#ff4455':scanState!=='idle'?'#ffaa00':''}}>{scanState==='triggering'?'⏳ Triggering...':scanState==='running'?'⏳ Running...':scanState==='done'?'✅ Done!':scanState==='failed'?'❌ Failed':'⚡ Scan'}</button>
           <button className="btn" onClick={()=>{const defName=(activeScans.size===1?SCAN_PRESETS.find(p=>p.id===[...activeScans][0])?.name:activeScans.size>1?`${activeScans.size} Scans Combined`:"All Stocks")+" — "+new Date().toLocaleDateString("en-IN");setSaveName(defName);setShowSaveModal(true)}} disabled={!filteredStocks.length} style={{padding:"5px 10px",fontSize:10}}>💾 Save</button>
+          <button className="btn" onClick={()=>{setSettingsForm({workerUrl:localStorage.getItem('zd_worker_url')||'',ghToken:localStorage.getItem('te_github_token')||'',sbUrl:localStorage.getItem('sb_url')||'',sbKey:localStorage.getItem('sb_key')||'',groqKey:localStorage.getItem('te_groq_key')||''});setShowSettingsModal(true)}} style={{padding:"5px 10px",fontSize:10}}>⚙</button>
         </div>
       </div>
 
@@ -1026,6 +1029,34 @@ const ScannerDashboard=()=>{
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <button className="btn" onClick={()=>setShowSaveModal(false)} style={{fontSize:10}}>Cancel</button>
           <button className="btn btn-accent" disabled={!saveName.trim()} onClick={()=>{const wl={id:Date.now().toString(),name:saveName.trim(),date:new Date().toLocaleDateString("en-IN"),symbols:filteredStocks.map(s=>s.symbol)};persistWLs([wl,...savedWLs]);setShowSaveModal(false)}} style={{fontSize:10}}>Save {filteredStocks.length} stocks</button>
+        </div>
+      </div>
+    </div>}
+    {showSettingsModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={()=>setShowSettingsModal(false)}>
+      <div style={{background:"var(--bg-secondary)",border:"1px solid var(--border-med)",borderRadius:10,padding:20,width:420,maxWidth:"90vw"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}>
+          <span style={{fontSize:14,fontWeight:800,color:"#fff",fontFamily:"var(--font-mono)"}}>⚙ Settings</span>
+          <button style={{background:"none",border:"none",color:"var(--text-muted)",fontSize:16,cursor:"pointer"}} onClick={()=>setShowSettingsModal(false)}>×</button>
+        </div>
+        {[{key:'workerUrl',ls:'zd_worker_url',label:'Worker URL',type:'text',placeholder:'https://your-worker.workers.dev'},
+          {key:'ghToken',ls:'te_github_token',label:'GitHub Token',type:'password',placeholder:'ghp_...'},
+          {key:'sbUrl',ls:'sb_url',label:'Supabase URL',type:'text',placeholder:'https://xxx.supabase.co'},
+          {key:'sbKey',ls:'sb_key',label:'Supabase Key',type:'password',placeholder:'eyJ...'},
+          {key:'groqKey',ls:'te_groq_key',label:'Groq API Key',type:'password',placeholder:'gsk_...'}
+        ].map(f=><div key={f.key} style={{marginBottom:10}}>
+          <div style={{fontSize:9,fontFamily:"var(--font-mono)",color:"var(--text-muted)",marginBottom:3,letterSpacing:".5px"}}>{f.label}</div>
+          <input type={f.type} value={settingsForm[f.key]} onChange={e=>setSettingsForm(prev=>({...prev,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{width:"100%",padding:"7px 10px",fontSize:11,background:"var(--bg-tertiary)",border:"1px solid var(--border-low)",borderRadius:4,color:"var(--accent)",fontFamily:"var(--font-mono)"}}/>
+        </div>)}
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
+          <button className="btn" onClick={()=>setShowSettingsModal(false)} style={{fontSize:10}}>Cancel</button>
+          <button className="btn btn-accent" onClick={()=>{
+            if(settingsForm.workerUrl)localStorage.setItem('zd_worker_url',settingsForm.workerUrl);else localStorage.removeItem('zd_worker_url');
+            if(settingsForm.ghToken)localStorage.setItem('te_github_token',settingsForm.ghToken);else localStorage.removeItem('te_github_token');
+            if(settingsForm.sbUrl)localStorage.setItem('sb_url',settingsForm.sbUrl);else localStorage.removeItem('sb_url');
+            if(settingsForm.sbKey)localStorage.setItem('sb_key',settingsForm.sbKey);else localStorage.removeItem('sb_key');
+            if(settingsForm.groqKey)localStorage.setItem('te_groq_key',settingsForm.groqKey);else localStorage.removeItem('te_groq_key');
+            setShowSettingsModal(false);
+          }} style={{fontSize:10}}>Save</button>
         </div>
       </div>
     </div>}
