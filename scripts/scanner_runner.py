@@ -378,7 +378,7 @@ def run_scans(
                 yf_symbols,
                 period="1y",
                 group_by="ticker",
-                auto_adjust=True,
+                auto_adjust=False,
                 threads=True,
                 progress=False,
             )
