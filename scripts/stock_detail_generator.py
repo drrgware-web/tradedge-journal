@@ -86,27 +86,31 @@ class ONeilScorer:
     def __init__(self):
         self.sector_performance = {}
         
-    def calculate_eps_strength(self, quarterly_eps: List[float], annual_eps: List[float]) -> int:
+    def calculate_eps_strength(self, quarterly_eps: List[float], annual_eps: List[float],
+                               trailing_eps: float = None, forward_eps: float = None) -> int:
         """
         Calculate EPS Strength (0-99) based on:
         - Current quarter EPS growth vs year-ago quarter
         - Last 3 quarters EPS growth acceleration
         - Annual EPS growth trend
+        - Fallback: trailing vs forward EPS growth from yfinance
         """
         score = 50  # Base score
-        
+        used_quarterly = False
+
         if len(quarterly_eps) >= 5:
             # Current quarter vs year-ago quarter
             current_q = quarterly_eps[0]
             year_ago_q = quarterly_eps[4] if len(quarterly_eps) > 4 else quarterly_eps[-1]
-            
+
             if year_ago_q > 0:
                 q_growth = ((current_q - year_ago_q) / year_ago_q) * 100
                 for threshold, points in self.EPS_THRESHOLDS:
                     if q_growth >= threshold:
                         score = points
                         break
-                        
+                used_quarterly = True
+
             # Check for acceleration in recent quarters
             if len(quarterly_eps) >= 3:
                 recent_growth = [
@@ -118,12 +122,24 @@ class ONeilScorer:
                     # Accelerating EPS - bonus
                     if recent_growth[0] > recent_growth[1] > recent_growth[2]:
                         score = min(99, score + 10)
-        
+
+        # Fallback: use trailing/forward EPS from yfinance
+        if not used_quarterly and trailing_eps and trailing_eps > 0:
+            if forward_eps and forward_eps > 0:
+                eps_growth = ((forward_eps - trailing_eps) / trailing_eps) * 100
+                for threshold, points in self.EPS_THRESHOLDS:
+                    if eps_growth >= threshold:
+                        score = points
+                        break
+            else:
+                # Have trailing EPS but no forward — score based on absolute level
+                score = 55 if trailing_eps > 0 else 40
+
         # Annual EPS trend
         if len(annual_eps) >= 3:
             if all(annual_eps[i] > annual_eps[i+1] for i in range(len(annual_eps)-1)):
                 score = min(99, score + 5)  # Consistent growth bonus
-                
+
         return max(1, min(99, score))
     
     def calculate_price_strength(self, returns: Dict[str, float], market_returns: Dict[str, float] = None) -> int:
@@ -1081,7 +1097,9 @@ class StockDetailGenerator:
             # 3. Calculate O'Neil scores
             eps_strength = self.oneil.calculate_eps_strength(
                 scoring_data.get("quarterly_eps", []),
-                scoring_data.get("annual_eps", [])
+                scoring_data.get("annual_eps", []),
+                trailing_eps=scoring_data.get("trailing_eps"),
+                forward_eps=scoring_data.get("forward_eps"),
             )
             
             price_strength = self.oneil.calculate_price_strength(
@@ -1157,10 +1175,21 @@ class StockDetailGenerator:
         # Calculate returns from price history
         returns = tech.get("returns", {})
         
-        # Volume data
+        # Volume data — compute up/down day volumes from price history
         avg_volume = tech.get("avg_volume", 0)
         recent_volume = tech.get("volume", 0)
-        
+        price_history = tech.get("price_history", [])
+        up_days_volume = 0
+        down_days_volume = 0
+        for candle in price_history[:50]:
+            c = candle.get("c", 0)
+            o = candle.get("o", 0)
+            v = candle.get("v", 0) or 0
+            if c > o:
+                up_days_volume += v
+            elif c < o:
+                down_days_volume += v
+
         return {
             "symbol": detail.get("symbol", ""),
             "cmp": tech.get("close", 0) or fund.get("current_price", 0),
@@ -1190,6 +1219,8 @@ class StockDetailGenerator:
             "quarterly_eps_growth": self._calc_eps_growth(quarterly_eps),
             "annual_eps_growth": fund.get("eps_growth", 0),
             "consecutive_eps_growth_years": 0,
+            "trailing_eps": fund.get("trailing_eps", 0) or fund.get("eps", 0),
+            "forward_eps": fund.get("forward_eps", 0),
             
             # Price data
             "returns": returns,
@@ -1202,6 +1233,14 @@ class StockDetailGenerator:
             "avg_volume": avg_volume,
             "recent_volume": recent_volume,
             "volume_ratio": recent_volume / avg_volume if avg_volume > 0 else 1,
+            "up_days_volume": up_days_volume,
+            "down_days_volume": down_days_volume,
+            "volume_data": {
+                "avg_volume": avg_volume,
+                "recent_volume": recent_volume,
+                "up_days_volume": up_days_volume,
+                "down_days_volume": down_days_volume,
+            },
             
             # Technical
             "rs_rating": tech.get("rs_rating", 50),
@@ -1299,7 +1338,64 @@ class StockDetailGenerator:
                 print(f"Progress: {i+1}/{len(target_symbols)} ({results['success']} success, {results['failed']} failed)")
         
         results["end_time"] = datetime.now().isoformat()
-        
+
+        # Second pass: build sector_performance and re-score group_rank + composite
+        sector_returns = {}  # {sector: [list of 1y returns]}
+        detail_cache = {}
+        for symbol in target_symbols:
+            detail_path = os.path.join(STOCK_DETAILS_DIR, f"{symbol}.json")
+            if not os.path.exists(detail_path):
+                continue
+            try:
+                with open(detail_path, "r") as f:
+                    detail = json.load(f)
+                detail_cache[symbol] = detail
+                sector = detail.get("sector", "")
+                ret_1y = detail.get("technical", {}).get("returns", {}).get("1y", 0) or 0
+                if sector:
+                    sector_returns.setdefault(sector, []).append(ret_1y)
+            except Exception:
+                continue
+
+        if sector_returns:
+            self.sector_performance = {
+                s: sum(rets) / len(rets) for s, rets in sector_returns.items()
+            }
+            print(f"\nRe-scoring {len(detail_cache)} stocks with sector performance ({len(self.sector_performance)} sectors)...")
+            for symbol, detail in detail_cache.items():
+                try:
+                    scoring_data = self._build_scoring_data(detail)
+                    eps_strength = self.oneil.calculate_eps_strength(
+                        scoring_data.get("quarterly_eps", []),
+                        scoring_data.get("annual_eps", []),
+                        trailing_eps=scoring_data.get("trailing_eps"),
+                        forward_eps=scoring_data.get("forward_eps"),
+                    )
+                    price_strength = self.oneil.calculate_price_strength(
+                        scoring_data.get("returns", {}),
+                        self.market_returns
+                    )
+                    _, buyer_demand_score = self.oneil.calculate_buyer_demand(
+                        scoring_data.get("volume_data", {}),
+                        scoring_data.get("price_data", {})
+                    )
+                    group_rank = self.oneil.calculate_group_rank(
+                        scoring_data.get("sector", ""),
+                        self.sector_performance
+                    )
+                    grade, composite, breakdown = self.oneil.calculate_master_score(
+                        eps_strength, price_strength, buyer_demand_score, group_rank
+                    )
+                    detail["oneil"]["master_score"] = grade
+                    detail["oneil"]["composite_score"] = composite
+                    detail["oneil"]["group_rank"] = group_rank
+                    detail["oneil"]["breakdown"] = breakdown
+                    detail_path = os.path.join(STOCK_DETAILS_DIR, f"{symbol}.json")
+                    with open(detail_path, "w") as f:
+                        json.dump(detail, f, indent=2, default=str)
+                except Exception:
+                    continue
+
         # Save summary
         summary_path = os.path.join(DATA_DIR, "generation_summary.json")
         with open(summary_path, "w") as f:
