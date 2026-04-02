@@ -476,7 +476,10 @@ function LWChart({symbol,w,h,mode,isDark}){
       const ohlc=parseOHLCV(result);
       if(!ohlc.length)throw new Error('Empty OHLCV');
       ohlcRef.current=ohlc;
-      console.log('OHLCV:',ohlc.length,'bars, first:',ohlc[0]?.time,'last:',ohlc[ohlc.length-1]?.time);
+      // Debug panel
+      let dbgEl=containerRef.current.parentElement.querySelector('#ec-debug');
+      if(!dbgEl){dbgEl=document.createElement('div');dbgEl.id='ec-debug';dbgEl.style.cssText='position:absolute;top:0;left:0;z-index:999;background:rgba(255,0,0,0.85);color:white;padding:8px;font:11px monospace;max-width:600px;word-wrap:break-word;pointer-events:none';containerRef.current.parentElement.appendChild(dbgEl)}
+      dbgEl.innerHTML=`Bars: ${ohlc.length}<br>First: ${JSON.stringify(ohlc[0])}<br>Last: ${JSON.stringify(ohlc[ohlc.length-1])}<br>Bar50: ${JSON.stringify(ohlc[50])}<br>Vol[0]: ${ohlc[0]?.volume}, Vol[last]: ${ohlc[ohlc.length-1]?.volume}<br>TimeType: ${typeof ohlc[0]?.time} = "${ohlc[0]?.time}"<br>March bars: ${ohlc.filter(b=>String(b.time).includes('2026-03')).length}<br>`;
 
       const dk=isDark!==false;
       const bgCol=dk?'#0d1117':'#ffffff';
@@ -535,8 +538,8 @@ function LWChart({symbol,w,h,mode,isDark}){
           color: isPP ? 'rgba(33,150,243,0.6)' : isUp ? 'rgba(38,166,154,0.4)' : 'rgba(239,83,80,0.4)',
         };
       });
-      console.log('Volume data points:', volData.length, 'First:', volData[0], 'Last:', volData[volData.length-1]);
       volumeSeries.setData(volData);
+      dbgEl.innerHTML+=`VolSeries: ${!!volumeSeries}<br>VolData: ${volData.length} pts<br>Vol[0]: ${JSON.stringify(volData[0])}<br>Vol[last]: ${JSON.stringify(volData[volData.length-1])}<br>ChartW: ${chartW}, ChartH: ${chartH}<br>`;
 
       const{walking,walkDir,running,st1,st2}=calcEdgeCloud(ohlc,ecCfg);
       walkRef.current=walking;runRef.current=running;
@@ -696,7 +699,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       setFusion(prev=>({...(prev||{}),_tradeOverlay:tradeOverlay}));
 
       chart.timeScale().fitContent();
-      setTimeout(()=>{if(chartObjRef.current){chartObjRef.current.timeScale().fitContent();console.log('fitContent @200ms, visible:',chartObjRef.current.timeScale().getVisibleLogicalRange())}},200);
+      setTimeout(()=>{if(chartObjRef.current){chartObjRef.current.timeScale().fitContent();const vr=chartObjRef.current.timeScale().getVisibleLogicalRange();const dbg2=document.getElementById('ec-debug');if(dbg2)dbg2.innerHTML+=`fitContent: from=${vr?.from?.toFixed(0)} to=${vr?.to?.toFixed(0)}<br>`}},200);
       setTimeout(()=>{if(chartObjRef.current)chartObjRef.current.timeScale().fitContent()},600);
 
       // Build panel data
