@@ -518,15 +518,14 @@ function LWChart({symbol,w,h,mode,isDark}){
       console.log('Volume data sample:', ohlc.slice(0,3).map(b => ({time:b.time, vol:b.volume})));
 
       const volumeSeries = chart.addHistogramSeries({
+        color: '#26A69A',
         priceFormat: { type: 'volume' },
-        priceScaleId: 'volume_scale',
+        priceScaleId: 'vol',
       });
-      chart.priceScale('volume_scale').applyOptions({
+      volumeSeries.priceScale().applyOptions({
         scaleMargins: { top: 0.85, bottom: 0 },
-        drawTicks: false,
-        borderVisible: false,
-        visible: false,
       });
+      console.log('Volume series created:', !!volumeSeries, 'priceScale:', !!volumeSeries.priceScale);
       const volData = ohlc.map((bar, i) => {
         const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;
         let isPP=false;
