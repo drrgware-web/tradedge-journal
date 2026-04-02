@@ -249,7 +249,9 @@ def create_summary_entry(detail: Dict) -> Dict:
         "eps_strength": oneil.get("eps_strength", 0),
         "price_strength": oneil.get("price_strength", 0),
         "buyer_demand": oneil.get("buyer_demand", "-"),
-        
+        "group_rank": oneil.get("group_rank", 0),
+        "buyer_demand_score": oneil.get("buyer_demand_score", 50),
+
         # Best Guru
         "best_guru": best_guru.get("strategy", "-"),
         "best_guru_score": best_guru.get("score_pct", 0),
