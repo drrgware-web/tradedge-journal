@@ -312,7 +312,36 @@
           <input type="text" id="worker-url-input" placeholder="https://xxx.workers.dev" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px;margin-bottom:8px">
           <button class="btn btn-xs" onclick="saveWorkerUrl()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save Worker URL</button>
         </div>
-        
+
+        <!-- GitHub Token -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">🔑</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">GitHub Token</span>
+          </div>
+          <input type="password" id="gh-token-input" placeholder="ghp_..." style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px;margin-bottom:8px">
+          <button class="btn btn-xs" onclick="saveGhToken()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save GitHub Token</button>
+        </div>
+
+        <!-- Supabase Settings -->
+        <div style="background:var(--bg3);border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:14px">⚡</span>
+            <span style="font-size:11px;font-weight:600;color:var(--t1)">Supabase</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">URL</label>
+              <input type="text" id="sb-url-input" placeholder="https://xxx.supabase.co" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+            <div>
+              <label style="font-size:9px;color:var(--t3);display:block;margin-bottom:4px">Anon Key</label>
+              <input type="password" id="sb-key-input" placeholder="eyJ..." style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:10px">
+            </div>
+          </div>
+          <button class="btn btn-xs" onclick="saveSupabaseSettings()" style="background:var(--g);color:#000;font-weight:600;width:100%">Save Supabase Settings</button>
+        </div>
+
       </div>
     </div>
   </div>
@@ -1175,6 +1204,13 @@ function loadSettingsValues() {
   // Worker URL
   const workerUrl = localStorage.getItem('zd_worker_url') || '';
   document.getElementById('worker-url-input').value = workerUrl;
+
+  // GitHub Token
+  document.getElementById('gh-token-input').value = localStorage.getItem('te_github_token') || '';
+
+  // Supabase
+  document.getElementById('sb-url-input').value = localStorage.getItem('sb_url') || '';
+  document.getElementById('sb-key-input').value = localStorage.getItem('sb_key') || '';
 }
 
 function updateGroqStatus() {
@@ -1323,6 +1359,20 @@ function saveWorkerUrl() {
     localStorage.removeItem('zd_worker_url');
     if (typeof toast === 'function') toast('Worker URL removed', '🗑️');
   }
+}
+
+function saveGhToken() {
+  const v = document.getElementById('gh-token-input').value.trim();
+  if (v) { localStorage.setItem('te_github_token', v); if (typeof toast === 'function') toast('GitHub Token saved!', '✅'); }
+  else { localStorage.removeItem('te_github_token'); if (typeof toast === 'function') toast('GitHub Token removed', '🗑️'); }
+}
+
+function saveSupabaseSettings() {
+  const url = document.getElementById('sb-url-input').value.trim();
+  const key = document.getElementById('sb-key-input').value.trim();
+  if (url) localStorage.setItem('sb_url', url); else localStorage.removeItem('sb_url');
+  if (key) localStorage.setItem('sb_key', key); else localStorage.removeItem('sb_key');
+  if (typeof toast === 'function') toast('Supabase settings saved!', '✅');
 }
 
 // ── Alerts Panel Functions ──
