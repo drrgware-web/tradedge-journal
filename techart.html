@@ -519,7 +519,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         let isPP=false;
         if(isUp&&i>=2){let maxDV=0;for(let j=Math.max(0,i-(ecCfg.ppLookback||10));j<i;j++){const pC=j>0?ohlc[j-1].close:ohlc[j].close;if(ohlc[j].close<pC&&ohlc[j].volume>maxDV)maxDV=ohlc[j].volume}if(maxDV>0&&bar.volume>maxDV)isPP=true}
         if(isPP)ppFlags.push(i);
-        return{time:bar.time,value:minPrice+(bar.volume/maxVol)*priceRange*0.25,color:isPP?'rgba(33,150,243,0.5)':isUp?'rgba(38,166,154,0.3)':'rgba(239,83,80,0.3)'};
+        return{time:bar.time,value:minPrice+(bar.volume/maxVol)*priceRange*0.12,color:isPP?'rgba(33,150,243,0.35)':isUp?'rgba(38,166,154,0.2)':'rgba(239,83,80,0.2)'};
       });
       volSeries.setData(volData);
 
