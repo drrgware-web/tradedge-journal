@@ -953,7 +953,7 @@ const ScannerDashboard=()=>{
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:800,letterSpacing:1,background:"linear-gradient(135deg,#00ff88,#00c8ff,#8844ff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>◈ EDGESCANNER</h1>
-          <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{meta.total_scanned||stocks.length} STOCKS • TEChart v5.0 Embedded • Click row to chart</div>
+          <div style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>{meta.total_scanned||stocks.length} STOCKS • TEChart v5.0 Embedded • Click row to chart{meta.generated_at?` • Data: ${new Date(meta.generated_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`:''}</div>
           {activeScans.size>0&&<div style={{fontSize:10,fontFamily:"var(--font-mono)",color:"var(--accent)",fontWeight:700,marginTop:2}}>⟐ {activeScans.size===1?SCAN_PRESETS.find(p=>p.id===[...activeScans][0])?.name:`${activeScans.size} scans combined`} — {filteredStocks.length} matches <span style={{color:"var(--red)",cursor:"pointer",fontSize:8}} onClick={()=>setActiveScans(new Set())}>[clear all]</span></div>}
           {activeWL&&<div style={{fontSize:10,fontFamily:"var(--font-mono)",color:"#8844ff",fontWeight:700,marginTop:2}}>📋 {savedWLs.find(w=>w.id===activeWL)?.name} — {filteredStocks.length} matches <span style={{color:"var(--red)",cursor:"pointer",fontSize:8}} onClick={()=>setActiveWL(null)}>[clear]</span></div>}
         </div>
