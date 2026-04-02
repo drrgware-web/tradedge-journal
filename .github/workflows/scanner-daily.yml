@@ -32,6 +32,10 @@ jobs:
         run: |
           python scripts/scanner_runner.py
       
+      - name: Generate stock details (O'Neil scores)
+        run: |
+          python scripts/stock_detail_generator.py
+
       - name: Update Screener.in data (top 50 stocks)
         run: |
           if [ -f "scripts/screener_fetcher.py" ]; then
