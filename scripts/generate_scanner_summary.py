@@ -7,8 +7,11 @@ Creates category-based scan results for quick filtering.
 
 import json
 import os
+import time
 from datetime import datetime
 from typing import Dict, List, Any
+
+import yfinance as yf
 
 # Paths - Use repo root data directory (scripts/ is one level deep)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -271,14 +274,91 @@ def create_summary_entry(detail: Dict) -> Dict:
         "updated_at": detail.get("updated_at", "")
     }
 
+def refresh_prices(details: List[Dict]) -> Dict[str, Dict]:
+    """Batch-fetch latest close + change_pct from yfinance for all symbols."""
+    symbols = [d.get("symbol", "") for d in details if d.get("symbol")]
+    if not symbols:
+        return {}
+
+    fresh = {}  # {SYMBOL: {close, change_pct}}
+    BATCH = 100
+    total_batches = (len(symbols) + BATCH - 1) // BATCH
+
+    print(f"\n  📡 Refreshing prices for {len(symbols)} symbols in {total_batches} batches...")
+
+    for i in range(0, len(symbols), BATCH):
+        batch = symbols[i:i + BATCH]
+        batch_num = i // BATCH + 1
+        yf_syms = [f"{s}.NS" for s in batch]
+
+        try:
+            data = yf.download(
+                yf_syms,
+                period="2d",
+                group_by="ticker",
+                auto_adjust=False,
+                threads=True,
+                progress=False,
+            )
+
+            for sym in batch:
+                yf_sym = f"{sym}.NS"
+                try:
+                    if len(yf_syms) == 1:
+                        df = data
+                    else:
+                        if yf_sym not in data.columns.get_level_values(0):
+                            continue
+                        df = data[yf_sym].dropna(how="all")
+
+                    if len(df) < 2:
+                        continue
+
+                    latest = float(df["Close"].iloc[-1])
+                    prev = float(df["Close"].iloc[-2])
+                    if prev > 0 and latest > 0:
+                        fresh[sym] = {
+                            "close": round(latest, 2),
+                            "change_pct": round((latest - prev) / prev * 100, 2),
+                        }
+                except Exception:
+                    pass
+
+            print(f"    Batch {batch_num}/{total_batches}: {len([s for s in batch if s in fresh])}/{len(batch)} prices updated")
+        except Exception as e:
+            print(f"    Batch {batch_num}/{total_batches} failed: {e}")
+
+        if i + BATCH < len(symbols):
+            time.sleep(1)  # Rate limit between batches
+
+    print(f"  ✅ Refreshed {len(fresh)}/{len(symbols)} prices")
+    return fresh
+
+
 def generate_summary():
     """Generate complete scanner results."""
     details = load_all_details()
-    
+
     if not details:
         print("No stock details found")
         return
-    
+
+    # Refresh prices from yfinance
+    fresh_prices = refresh_prices(details)
+    if fresh_prices:
+        for detail in details:
+            sym = detail.get("symbol", "")
+            if sym in fresh_prices:
+                fp = fresh_prices[sym]
+                # Update technicals
+                if "technicals" not in detail:
+                    detail["technicals"] = {}
+                detail["technicals"]["close"] = fp["close"]
+                detail["technicals"]["change_pct"] = fp["change_pct"]
+                # Update root level too
+                detail["price"] = fp["close"]
+                detail["change_pct"] = fp["change_pct"]
+
     # Create categories
     categories = create_scan_categories(details)
     
