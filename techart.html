@@ -364,14 +364,19 @@ function calcSuperTrend(ohlc,period,mult){
 function calcEdgeCloud(ohlc,cfg){
   const c=cfg||{};
   const st1=calcSuperTrend(ohlc,c.stPeriod||10,c.stMult1||3);
-  const st2=calcSuperTrend(ohlc,c.stPeriod||10,c.stMult2||3);
-  const walking=st1.values.map((v,i)=>(v!=null&&st2.values[i]!=null)?(v+st2.values[i])/2:null);
-  const walkDir=st1.direction.map((v,i)=>(v===1&&st2.direction[i]===1)?1:(v===-1&&st2.direction[i]===-1)?-1:v);
+  let walking,walkDir,st2=null;
+  if(c.dualST){
+    st2=calcSuperTrend(ohlc,c.stPeriod2||10,c.stMult2||3);
+    walking=st1.values.map((v,i)=>(v!=null&&st2.values[i]!=null)?(v+st2.values[i])/2:null);
+    walkDir=st1.direction.map((v,i)=>(v===1&&st2.direction[i]===1)?1:(v===-1&&st2.direction[i]===-1)?-1:v);
+  }else{
+    walking=st1.values.slice();walkDir=st1.direction.slice();
+  }
   const closes=ohlc.map(d=>d.close);
   const running=calcEMA(closes,c.emaPeriod||21);
   return{walking,walkDir,running,st1,st2};
 }
-const EC_DEFAULTS={stPeriod:10,stMult1:3,stMult2:3,emaPeriod:21,wlColor:'#FFA000',wlWidth:2,wlStyle:'dashed',rlColor:'#42A5F5',rlWidth:2,rlStyle:'solid',showCloud:true};
+const EC_DEFAULTS={stPeriod:10,stMult1:3,dualST:false,stPeriod2:10,stMult2:2,emaPeriod:21,wlColor:'#FFA000',wlWidth:2,wlStyle:'dashed',rlColor:'#42A5F5',rlWidth:2,rlStyle:'solid',showCloud:true};
 
 function calcRSI(closes,period){
   const out=new Array(closes.length).fill(null);let avgG=0,avgL=0;
@@ -762,7 +767,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
         <button onClick={()=>setShowWeekly(!showWeekly)} style={{padding:'3px 8px',fontSize:9,fontFamily:'var(--fm)',fontWeight:showWeekly?700:500,color:showWeekly?'#B388FF':'var(--t3)',background:showWeekly?'rgba(179,136,255,.12)':'transparent',border:`1px solid ${showWeekly?'rgba(179,136,255,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>Wkly</button>
         <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
-        <span style={{font:'600 7px var(--fm)',color:ecCfg.wlColor,opacity:.7}}>╌ WL({ecCfg.stPeriod},{ecCfg.stMult1}+{ecCfg.stMult2})</span>
+        <span style={{font:'600 7px var(--fm)',color:ecCfg.wlColor,opacity:.7}}>╌ WL({ecCfg.stPeriod},{ecCfg.stMult1}{ecCfg.dualST?'+'+ecCfg.stMult2:''})</span>
         <span style={{font:'600 7px var(--fm)',color:ecCfg.rlColor,opacity:.7}}>— RL({ecCfg.emaPeriod})</span>
         <span style={{font:'600 7px var(--fm)',color:'#2196F3',opacity:.7}}>▲ PP</span>
         <span style={{font:'600 7px var(--fm)',color:'#FFEB3B',opacity:.7}}>▲ BO</span>
@@ -775,10 +780,14 @@ function LWChart({symbol,w,h,mode,isDark}){
         <div style={{font:'700 9px var(--fm)',color:'var(--t2)',marginBottom:8,letterSpacing:'.08em'}}>EDGECLOUD SETTINGS</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,font:'400 9px var(--fm)',color:'var(--t3)'}}>
           <label>ST Period<input type="number" value={ecCfg.stPeriod} min={2} max={50} onChange={e=>updateCfg('stPeriod',+e.target.value||10)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+          <label>ST Multiplier<input type="number" value={ecCfg.stMult1} min={0.5} max={10} step={0.5} onChange={e=>updateCfg('stMult1',+e.target.value||3)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
           <label>EMA Period<input type="number" value={ecCfg.emaPeriod} min={2} max={100} onChange={e=>updateCfg('emaPeriod',+e.target.value||21)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
-          <label>ST Mult 1<input type="number" value={ecCfg.stMult1} min={0.5} max={10} step={0.5} onChange={e=>updateCfg('stMult1',+e.target.value||2)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
-          <label>ST Mult 2<input type="number" value={ecCfg.stMult2} min={0.5} max={10} step={0.5} onChange={e=>updateCfg('stMult2',+e.target.value||3)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+          <label style={{display:'flex',alignItems:'center',gap:4,paddingTop:12}}><input type="checkbox" checked={ecCfg.dualST||false} onChange={e=>updateCfg('dualST',e.target.checked)} style={{accentColor:'var(--amb)'}}/> Dual SuperTrend</label>
         </div>
+        {ecCfg.dualST&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,font:'400 9px var(--fm)',color:'var(--t3)',marginTop:6,padding:6,background:'var(--bg3)',borderRadius:4,border:'1px solid var(--bdr)'}}>
+          <label>ST2 Period<input type="number" value={ecCfg.stPeriod2||10} min={2} max={50} onChange={e=>updateCfg('stPeriod2',+e.target.value||10)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+          <label>ST2 Multiplier<input type="number" value={ecCfg.stMult2||2} min={0.5} max={10} step={0.5} onChange={e=>updateCfg('stMult2',+e.target.value||2)} style={{width:'100%',marginTop:2,padding:'3px 6px',background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 10px var(--fm)'}}/></label>
+        </div>}
         <div style={{marginTop:8,font:'700 8px var(--fm)',color:'var(--t4)',marginBottom:4}}>WALKING LINE</div>
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
           <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Color<input type="color" value={ecCfg.wlColor} onChange={e=>updateCfg('wlColor',e.target.value)} style={{width:28,height:18,border:'none',background:'none',cursor:'pointer',verticalAlign:'middle',marginLeft:4}}/></label>
@@ -795,7 +804,7 @@ function LWChart({symbol,w,h,mode,isDark}){
           <label style={{font:'400 9px var(--fm)',color:'var(--t3)',display:'flex',alignItems:'center',gap:4}}><input type="checkbox" checked={ecCfg.showCloud} onChange={e=>updateCfg('showCloud',e.target.checked)} style={{accentColor:'var(--grn)'}}/> Show Cloud</label>
           <button onClick={()=>{setEcCfg({...EC_DEFAULTS});localStorage.setItem('te_ec_cfg',JSON.stringify(EC_DEFAULTS))}} style={{marginLeft:'auto',padding:'3px 8px',fontSize:8,fontFamily:'var(--fm)',color:'var(--t3)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,cursor:'pointer'}}>Reset</button>
         </div>
-        <div style={{marginTop:6,font:'400 8px var(--fm)',color:'var(--t4)'}}>ST({ecCfg.stPeriod},{ecCfg.stMult1}) + ST({ecCfg.stPeriod},{ecCfg.stMult2}) avg = Walking · EMA({ecCfg.emaPeriod}) = Running</div>
+        <div style={{marginTop:6,font:'400 8px var(--fm)',color:'var(--t4)'}}>{ecCfg.dualST?`avg(ST(${ecCfg.stPeriod},${ecCfg.stMult1}) + ST(${ecCfg.stPeriod2||10},${ecCfg.stMult2||2}))`:`ST(${ecCfg.stPeriod},${ecCfg.stMult1})`} = Walking · EMA({ecCfg.emaPeriod}) = Running</div>
       </div>}
       {/* Top-right weekly badge */}
       {showWeekly&&weeklyState&&<div style={{position:'absolute',top:6,right:8,zIndex:2,font:'700 9px var(--fm)',color:weeklyState.color,padding:'3px 10px',background:`${weeklyState.color}15`,border:`1px solid ${weeklyState.color}30`,borderRadius:4,backdropFilter:'blur(4px)'}}>Wkly: {weeklyState.state}</div>}
