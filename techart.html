@@ -538,23 +538,31 @@ function LWChart({symbol,w,h,mode,isDark}){
       const fusionStates=calcAllFusionStates(ohlc);
       fusionRef.current=fusionStates;
 
-      // Cloud fill BETWEEN Walking Line and Running Line
+      // Cloud fill BETWEEN Walking Line and Running Line — per-bar color
       if(ecCfg.showCloud){
-        const cloudTopD=[],cloudBotD=[];
+        // Split into bullish (WL>RL) and bearish (WL<RL) segments
+        const bullTop=[],bullBot=[],bearTop=[],bearBot=[];
         for(let i=0;i<ohlc.length;i++){
           if(walking[i]==null||running[i]==null)continue;
-          const t=ohlc[i].time;
-          cloudTopD.push({time:t,value:Math.max(walking[i],running[i])});
-          cloudBotD.push({time:t,value:Math.min(walking[i],running[i])});
+          const t=ohlc[i].time;const hi=Math.max(walking[i],running[i]);const lo=Math.min(walking[i],running[i]);
+          if(walking[i]>=running[i]){
+            bullTop.push({time:t,value:hi});bullBot.push({time:t,value:lo});
+            bearTop.push({time:t,value:lo});bearBot.push({time:t,value:lo}); // zero-height for bear
+          }else{
+            bearTop.push({time:t,value:hi});bearBot.push({time:t,value:lo});
+            bullTop.push({time:t,value:lo});bullBot.push({time:t,value:lo}); // zero-height for bull
+          }
         }
-        const bullish=ohlc.length>0&&walking[ohlc.length-1]!=null&&running[ohlc.length-1]!=null&&walking[ohlc.length-1]>running[ohlc.length-1];
-        const cloudCol=bullish?'rgba(0,230,118,0.15)':'rgba(239,83,80,0.15)';
-        // Upper line area fills down with cloud color
-        const cTop=chart.addAreaSeries({topColor:cloudCol,bottomColor:cloudCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        cTop.setData(cloudTopD);
-        // Lower line area fills down with chart bg — masks everything below the lower line
-        const cBot=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        cBot.setData(cloudBotD);
+        // Bullish cloud (green) — top fills down, mask erases below bottom
+        const bTop=chart.addAreaSeries({topColor:'rgba(0,230,118,0.15)',bottomColor:'rgba(0,230,118,0.15)',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        bTop.setData(bullTop);
+        const bMask=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        bMask.setData(bullBot);
+        // Bearish cloud (red) — same technique
+        const rTop=chart.addAreaSeries({topColor:'rgba(239,83,80,0.15)',bottomColor:'rgba(239,83,80,0.15)',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        rTop.setData(bearTop);
+        const rMask=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        rMask.setData(bearBot);
       }
 
       // ── Donchian Channel (20) ──
