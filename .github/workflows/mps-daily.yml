@@ -192,6 +192,7 @@ jobs:
             git commit -m "⚡ MPS ${DATE} ${TIME} IST: ${SCORE} — ${ZONE}" || echo "No changes to commit"
           fi
           
+          git pull --rebase origin main
           git push
 
       - name: Summary

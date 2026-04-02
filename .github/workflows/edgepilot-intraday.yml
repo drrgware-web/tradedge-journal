@@ -68,4 +68,5 @@ jobs:
           git config user.email "bot@tradedge.app"
           git add data/intraday_alerts_sent.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "⚡ Intraday alert state $(date -u +%H:%M)"
+          git pull --rebase origin main
           git push || true

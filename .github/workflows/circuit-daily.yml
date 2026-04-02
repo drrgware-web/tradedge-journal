@@ -31,4 +31,5 @@ jobs:
           git config user.email "bot@tradedge.dev"
           git add data/circuit_limits.json
           git diff --cached --quiet || git commit -m "Circuit limits $(date +'%Y-%m-%d %H:%M IST')"
+          git pull --rebase origin main
           git push

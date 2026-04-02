@@ -56,4 +56,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/pos_alerts_sent.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "Position monitor state — $(date -u +%Y-%m-%dT%H:%M)"
+          git pull --rebase origin main
           git push || true

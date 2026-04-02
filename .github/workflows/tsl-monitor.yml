@@ -39,4 +39,5 @@ jobs:
           git config user.email "bot@tradedge.app"
           git add data/tsl_levels.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "🛡️ TSL levels updated $(date +'%Y-%m-%d %H:%M')"
+          git pull --rebase origin main
           git push || true
