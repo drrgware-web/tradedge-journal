@@ -868,7 +868,14 @@ const ScannerDashboard=()=>{
   const[activeFundaScan,setActiveFundaScan]=useState(null);
   const[fundaFilterSyms,setFundaFilterSyms]=useState(null);
   const[scanState,setScanState]=useState('idle');
-  const triggerScan=useCallback(async()=>{const t=localStorage.getItem('te_github_token');if(!t){alert('Set te_github_token in localStorage');return}setScanState('triggering');try{const r=await fetch('https://api.github.com/repos/drrgware-web/tradedge-journal/actions/workflows/scanner-daily.yml/dispatches',{method:'POST',headers:{'Authorization':'Bearer '+t,'Accept':'application/vnd.github.v3+json'},body:JSON.stringify({ref:'main'})});if(r.status!==204){setScanState('failed');setTimeout(()=>setScanState('idle'),3000);return}setScanState('running');let polls=0;const poll=setInterval(async()=>{polls++;if(polls>30){clearInterval(poll);setScanState('idle');return}try{const res=await fetch('https://api.github.com/repos/drrgware-web/tradedge-journal/actions/workflows/scanner-daily.yml/runs?per_page=1',{headers:{'Authorization':'Bearer '+t,'Accept':'application/vnd.github.v3+json'}});const data=await res.json();const run=data.workflow_runs?.[0];if(run?.status==='completed'){clearInterval(poll);if(run.conclusion==='success'){setScanState('done');refetch();setTimeout(()=>setScanState('idle'),3000)}else{setScanState('failed');setTimeout(()=>setScanState('idle'),3000)}}}catch(e){}},10000)}catch(e){setScanState('failed');setTimeout(()=>setScanState('idle'),3000)}},[refetch]);
+  const doDispatchScan=useCallback(async()=>{const t=localStorage.getItem('te_github_token');if(!t){alert('Set te_github_token in Settings ⚙');return}setScanState('triggering');try{const r=await fetch('https://api.github.com/repos/drrgware-web/tradedge-journal/actions/workflows/scanner-daily.yml/dispatches',{method:'POST',headers:{'Authorization':'Bearer '+t,'Accept':'application/vnd.github.v3+json'},body:JSON.stringify({ref:'main'})});if(r.status!==204){setScanState('failed');setTimeout(()=>setScanState('idle'),3000);return}setScanState('running');let polls=0;const poll=setInterval(async()=>{polls++;if(polls>30){clearInterval(poll);setScanState('idle');return}try{const res=await fetch('https://api.github.com/repos/drrgware-web/tradedge-journal/actions/workflows/scanner-daily.yml/runs?per_page=1',{headers:{'Authorization':'Bearer '+t,'Accept':'application/vnd.github.v3+json'}});const data=await res.json();const run=data.workflow_runs?.[0];if(run?.status==='completed'){clearInterval(poll);if(run.conclusion==='success'){setScanState('done');refetch();setTimeout(()=>setScanState('idle'),3000)}else{setScanState('failed');setTimeout(()=>setScanState('idle'),3000)}}}catch(e){}},10000)}catch(e){setScanState('failed');setTimeout(()=>setScanState('idle'),3000)}},[refetch]);
+  const[marketWarning,setMarketWarning]=useState(false);
+  const triggerScan=useCallback(()=>{
+    const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+    const day=now.getDay();const h=now.getHours();const m=now.getMinutes();const mins=h*60+m;
+    const isWeekday=day>=1&&day<=5;const isMarketHours=mins>=555&&mins<=930; // 9:15=555, 15:30=930
+    if(isWeekday&&isMarketHours){setMarketWarning(true)}else{doDispatchScan()}
+  },[doDispatchScan]);
   const[appliedFilters,setAppliedFilters]=useState({funda:null,chartink:null});
   const[sidebarOpen,setSidebarOpen]=useState(true);
   const[activeScans,setActiveScans]=useState(new Set());
@@ -1029,6 +1036,17 @@ const ScannerDashboard=()=>{
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <button className="btn" onClick={()=>setShowSaveModal(false)} style={{fontSize:10}}>Cancel</button>
           <button className="btn btn-accent" disabled={!saveName.trim()} onClick={()=>{const wl={id:Date.now().toString(),name:saveName.trim(),date:new Date().toLocaleDateString("en-IN"),symbols:filteredStocks.map(s=>s.symbol)};persistWLs([wl,...savedWLs]);setShowSaveModal(false)}} style={{fontSize:10}}>Save {filteredStocks.length} stocks</button>
+        </div>
+      </div>
+    </div>}
+    {marketWarning&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}} onClick={()=>setMarketWarning(false)}>
+      <div style={{background:"var(--bg-secondary)",border:"1px solid rgba(255,170,0,0.3)",borderRadius:10,padding:20,width:380,maxWidth:"90vw"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:20,marginBottom:8}}>⚠️</div>
+        <div style={{fontSize:12,fontWeight:700,color:"#ffaa00",fontFamily:"var(--font-mono)",marginBottom:8}}>Market is open</div>
+        <div style={{fontSize:11,color:"var(--text-secondary)",lineHeight:1.6,marginBottom:14}}>Running the scanner before market close (3:30 PM IST) will capture intraday prices, not end-of-day closing prices. Results may not be accurate.</div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button className="btn" onClick={()=>setMarketWarning(false)} style={{fontSize:10}}>Cancel</button>
+          <button className="btn" onClick={()=>{setMarketWarning(false);doDispatchScan()}} style={{fontSize:10,borderColor:"#ffaa00",color:"#ffaa00"}}>Run Anyway</button>
         </div>
       </div>
     </div>}
