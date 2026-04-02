@@ -538,31 +538,32 @@ function LWChart({symbol,w,h,mode,isDark}){
       const fusionStates=calcAllFusionStates(ohlc);
       fusionRef.current=fusionStates;
 
-      // Cloud fill BETWEEN Walking Line and Running Line — per-bar color
+      // Cloud fill BETWEEN WL and RL — colored by fusion state per bar
       if(ecCfg.showCloud){
-        // Split into bullish (WL>RL) and bearish (WL<RL) segments
-        const bullTop=[],bullBot=[],bearTop=[],bearBot=[];
+        const FC={IGNITION:'rgba(255,215,0,0.14)',THRUST:'rgba(0,230,118,0.12)',FADE:'rgba(255,82,82,0.12)',COIL:'rgba(179,136,255,0.10)',DRIFT:'rgba(97,97,97,0.08)'};
+        // Build per-state top/bot arrays; inactive bars get zero-height (lo=lo)
+        const stateTopData={},stateBotData={};const maskBotD=[];
+        const states=Object.keys(FC);
+        states.forEach(s=>{stateTopData[s]=[];stateBotData[s]=[]});
         for(let i=0;i<ohlc.length;i++){
           if(walking[i]==null||running[i]==null)continue;
           const t=ohlc[i].time;const hi=Math.max(walking[i],running[i]);const lo=Math.min(walking[i],running[i]);
-          if(walking[i]>=running[i]){
-            bullTop.push({time:t,value:hi});bullBot.push({time:t,value:lo});
-            bearTop.push({time:t,value:lo});bearBot.push({time:t,value:lo}); // zero-height for bear
-          }else{
-            bearTop.push({time:t,value:hi});bearBot.push({time:t,value:lo});
-            bullTop.push({time:t,value:lo});bullBot.push({time:t,value:lo}); // zero-height for bull
-          }
+          const fs=fusionStates[i]?.state||'DRIFT';
+          maskBotD.push({time:t,value:lo});
+          states.forEach(s=>{
+            if(s===fs){stateTopData[s].push({time:t,value:hi});stateBotData[s].push({time:t,value:lo})}
+            else{stateTopData[s].push({time:t,value:lo});stateBotData[s].push({time:t,value:lo})}
+          });
         }
-        // Bullish cloud (green) — top fills down, mask erases below bottom
-        const bTop=chart.addAreaSeries({topColor:'rgba(0,230,118,0.15)',bottomColor:'rgba(0,230,118,0.15)',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        bTop.setData(bullTop);
-        const bMask=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        bMask.setData(bullBot);
-        // Bearish cloud (red) — same technique
-        const rTop=chart.addAreaSeries({topColor:'rgba(239,83,80,0.15)',bottomColor:'rgba(239,83,80,0.15)',lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        rTop.setData(bearTop);
-        const rMask=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        rMask.setData(bearBot);
+        // Create area series per state + one shared bg mask
+        states.forEach(s=>{
+          if(!stateTopData[s].length)return;
+          const a=chart.addAreaSeries({topColor:FC[s],bottomColor:FC[s],lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+          a.setData(stateTopData[s]);
+        });
+        // Background mask at lower boundary erases fill below the cloud
+        const mask=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+        mask.setData(maskBotD);
       }
 
       // ── Donchian Channel (20) ──
