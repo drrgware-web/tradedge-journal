@@ -376,7 +376,7 @@ function calcEdgeCloud(ohlc,cfg){
   const running=calcEMA(closes,c.emaPeriod||21);
   return{walking,walkDir,running,st1,st2};
 }
-const EC_DEFAULTS={stPeriod:10,stMult1:3,dualST:false,stPeriod2:10,stMult2:2,emaPeriod:21,wlColor:'#FFA000',wlWidth:2,wlStyle:'dashed',rlColor:'#42A5F5',rlWidth:2,rlStyle:'solid',showCloud:true};
+const EC_DEFAULTS={stPeriod:10,stMult1:3,dualST:false,stPeriod2:10,stMult2:2,emaPeriod:21,bbPeriod:20,bbStdDev:2,bbSqueeze:10,adxPeriod:14,rsiPeriod:14,dcPeriod:20,ppLookback:10,wlColor:'#FFA000',wlWidth:2,wlStyle:'dashed',rlColor:'#42A5F5',rlWidth:2,rlStyle:'solid',showCloud:true};
 
 function calcRSI(closes,period){
   const out=new Array(closes.length).fill(null);let avgG=0,avgL=0;
@@ -431,11 +431,12 @@ const FUSION_CLOUD={IGNITION:'rgba(255,215,0,0.18)',THRUST:'rgba(0,230,118,0.15)
 const FUSION_BG={IGNITION:'rgba(255,215,0,0.06)',THRUST:'rgba(0,230,118,0.05)',FADE:'rgba(255,82,82,0.05)',COIL:'rgba(179,136,255,0.04)',DRIFT:'rgba(97,97,97,0.03)'};
 const FUSION_DESC={IGNITION:'Tight BB + momentum building — squeeze fire',THRUST:'Strong trend confirmed — ride the move',FADE:'Bearish pressure dominant — caution',COIL:'Low vol + low trend — spring loading',DRIFT:'No clear edge — range-bound'};
 
-function calcAllFusionStates(ohlc){
+function calcAllFusionStates(ohlc,cfg){
+  const c=cfg||{};
   const closes=ohlc.map(d=>d.close);
-  const bbw=calcBollingerWidth(closes,20);
-  const rsi=calcRSI(closes,14);
-  const{adx,diP,diM}=calcADX(ohlc,14);
+  const bbw=calcBollingerWidth(closes,c.bbPeriod||20);
+  const rsi=calcRSI(closes,c.rsiPeriod||14);
+  const{adx,diP,diM}=calcADX(ohlc,c.adxPeriod||14);
   const states=[];
   for(let i=0;i<ohlc.length;i++){
     const adxRising=i>=3&&adx[i]!=null&&adx[i-3]!=null&&adx[i]>adx[i-3];
@@ -518,7 +519,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         let isPP=false;
         if(isUp&&i>=2){
           let maxDownVol=0;
-          for(let j=Math.max(0,i-10);j<i;j++){
+          for(let j=Math.max(0,i-(ecCfg.ppLookback||10));j<i;j++){
             const pC=j>0?ohlc[j-1].close:ohlc[j].close;
             if(ohlc[j].close<pC&&ohlc[j].volume>maxDownVol)maxDownVol=ohlc[j].volume;
           }
@@ -540,7 +541,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       const rnD=[];for(let i=0;i<ohlc.length;i++){if(running[i]!=null)rnD.push({time:ohlc[i].time,value:running[i]})}
       rnSeries.setData(rnD);
 
-      const fusionStates=calcAllFusionStates(ohlc);
+      const fusionStates=calcAllFusionStates(ohlc,ecCfg);
       fusionRef.current=fusionStates;
 
       // Cloud fill BETWEEN WL and RL — colored by fusion state per bar
@@ -572,7 +573,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       }
 
       // ── Donchian Channel (20) ──
-      const dcPeriod=20;const dcUpper=[],dcLower=[];
+      const dcPeriod=ecCfg.dcPeriod||20;const dcUpper=[],dcLower=[];
       for(let i=0;i<ohlc.length;i++){
         if(i<dcPeriod-1){dcUpper.push(null);dcLower.push(null);continue}
         let hh=-Infinity,ll=Infinity;for(let j=i-dcPeriod+1;j<=i;j++){if(ohlc[j].high>hh)hh=ohlc[j].high;if(ohlc[j].low<ll)ll=ohlc[j].low}
@@ -615,11 +616,11 @@ function LWChart({symbol,w,h,mode,isDark}){
 
       // ── BB Squeeze markers ──
       const closes=ohlc.map(d=>d.close);
-      const bbwArr=calcBollingerWidth(closes,20);
+      const bbwArr=calcBollingerWidth(closes,ecCfg.bbPeriod||20);
       const sqFlags=[];let wasSqueeze=false;
       for(let i=1;i<ohlc.length;i++){
         if(bbwArr[i]==null)continue;
-        const isSq=bbwArr[i]<10;
+        const isSq=bbwArr[i]<(ecCfg.bbSqueeze||10);
         if(isSq&&!wasSqueeze)sqFlags.push({idx:i,type:'enter'}); // squeeze starts
         if(!isSq&&wasSqueeze)sqFlags.push({idx:i,type:'fire'}); // squeeze fires
         wasSqueeze=isSq;
@@ -800,8 +801,17 @@ function LWChart({symbol,w,h,mode,isDark}){
           <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Width<select value={ecCfg.rlWidth} onChange={e=>updateCfg('rlWidth',+e.target.value)} style={{padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>
           <label style={{font:'400 9px var(--fm)',color:'var(--t3)'}}>Style<select value={ecCfg.rlStyle} onChange={e=>updateCfg('rlStyle',e.target.value)} style={{padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>
         </div>
+        <div style={{marginTop:8,font:'700 8px var(--fm)',color:'var(--t4)',marginBottom:4}}>INDICATORS</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,font:'400 8px var(--fm)',color:'var(--t3)'}}>
+          <label>BB({ecCfg.bbPeriod})<input type="number" value={ecCfg.bbPeriod} min={10} max={50} onChange={e=>updateCfg('bbPeriod',+e.target.value||20)} style={{width:'100%',marginTop:1,padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}/></label>
+          <label>RSI({ecCfg.rsiPeriod})<input type="number" value={ecCfg.rsiPeriod} min={7} max={28} onChange={e=>updateCfg('rsiPeriod',+e.target.value||14)} style={{width:'100%',marginTop:1,padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}/></label>
+          <label>ADX({ecCfg.adxPeriod})<input type="number" value={ecCfg.adxPeriod} min={7} max={28} onChange={e=>updateCfg('adxPeriod',+e.target.value||14)} style={{width:'100%',marginTop:1,padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}/></label>
+          <label>DC({ecCfg.dcPeriod})<input type="number" value={ecCfg.dcPeriod} min={10} max={50} onChange={e=>updateCfg('dcPeriod',+e.target.value||20)} style={{width:'100%',marginTop:1,padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}/></label>
+          <label>PP({ecCfg.ppLookback})<input type="number" value={ecCfg.ppLookback} min={5} max={20} onChange={e=>updateCfg('ppLookback',+e.target.value||10)} style={{width:'100%',marginTop:1,padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}/></label>
+          <label>Sq%({ecCfg.bbSqueeze})<input type="number" value={ecCfg.bbSqueeze} min={5} max={20} onChange={e=>updateCfg('bbSqueeze',+e.target.value||10)} style={{width:'100%',marginTop:1,padding:'2px 4px',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,color:'var(--t1)',font:'500 9px var(--fm)'}}/></label>
+        </div>
         <div style={{marginTop:8,display:'flex',gap:8,alignItems:'center'}}>
-          <label style={{font:'400 9px var(--fm)',color:'var(--t3)',display:'flex',alignItems:'center',gap:4}}><input type="checkbox" checked={ecCfg.showCloud} onChange={e=>updateCfg('showCloud',e.target.checked)} style={{accentColor:'var(--grn)'}}/> Show Cloud</label>
+          <label style={{font:'400 9px var(--fm)',color:'var(--t3)',display:'flex',alignItems:'center',gap:4}}><input type="checkbox" checked={ecCfg.showCloud} onChange={e=>updateCfg('showCloud',e.target.checked)} style={{accentColor:'var(--grn)'}}/> Cloud</label>
           <button onClick={()=>{setEcCfg({...EC_DEFAULTS});localStorage.setItem('te_ec_cfg',JSON.stringify(EC_DEFAULTS))}} style={{marginLeft:'auto',padding:'3px 8px',fontSize:8,fontFamily:'var(--fm)',color:'var(--t3)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:3,cursor:'pointer'}}>Reset</button>
         </div>
         <div style={{marginTop:6,font:'400 8px var(--fm)',color:'var(--t4)'}}>{ecCfg.dualST?`avg(ST(${ecCfg.stPeriod},${ecCfg.stMult1}) + ST(${ecCfg.stPeriod2||10},${ecCfg.stMult2||2}))`:`ST(${ecCfg.stPeriod},${ecCfg.stMult1})`} = Walking · EMA({ecCfg.emaPeriod}) = Running</div>
@@ -942,6 +952,7 @@ function App(){
   const[wlOpen,setWlOpen]=useState(false);
   const[isDark,setIsDark]=useState(()=>localStorage.getItem('te_theme')!=='light');
   const chartRef=useRef(null);const ctRef=useRef(null);const[cW,setCW]=useState(800);const[cH,setCH]=useState(400);
+  const[searchQ,setSearchQ]=useState('');const[searchResults,setSearchResults]=useState([]);const[showSearch,setShowSearch]=useState(false);const[nseSymbols,setNseSymbols]=useState([]);const searchRef=useRef(null);const debounceRef=useRef(null);
 
   // Load data
   useEffect(()=>{
@@ -952,7 +963,23 @@ function App(){
       if(live)uS('ok',`LIVE · ${generated?.slice(0,10)||''}`);
     });
     fS().then(m=>setTrd(m||[]));
+    // Load NSE symbols for search
+    fetch('data/nse_symbols.json').then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d))setNseSymbols(d)}).catch(()=>{});
   },[]);
+
+  // Search debounce
+  useEffect(()=>{
+    if(!searchQ.trim()){setSearchResults([]);return}
+    clearTimeout(debounceRef.current);
+    debounceRef.current=setTimeout(()=>{
+      const q=searchQ.toUpperCase();
+      const r=nseSymbols.filter(s=>s.symbol.includes(q)||s.name.toUpperCase().includes(q)).slice(0,8);
+      setSearchResults(r);
+    },200);
+  },[searchQ,nseSymbols]);
+
+  // Close search dropdown on outside click
+  useEffect(()=>{const fn=e=>{if(searchRef.current&&!searchRef.current.contains(e.target))setShowSearch(false)};document.addEventListener('mousedown',fn);return()=>document.removeEventListener('mousedown',fn)},[]);
 
   useEffect(()=>{const ro=new ResizeObserver(e=>{for(const en of e){setCW(en.contentRect.width);setCH(en.contentRect.height)}});if(chartRef.current)ro.observe(chartRef.current);if(ctRef.current)ro.observe(ctRef.current);return()=>ro.disconnect()},[]);
 
@@ -1049,6 +1076,15 @@ function App(){
     <div className="ct" ref={ctRef}>
       <div className="ib">
         <span style={{font:'800 15px var(--fu)',color:'var(--t1)'}}>{sel.s}</span>
+        <div ref={searchRef} style={{position:'relative'}}>
+          <input value={searchQ} onChange={e=>{setSearchQ(e.target.value);setShowSearch(true)}} onFocus={()=>setShowSearch(true)} placeholder="Search..." style={{width:140,padding:'3px 8px',font:'400 10px var(--fm)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:4,color:'var(--t1)',outline:'none'}} onKeyDown={e=>{if(e.key==='Enter'&&searchResults.length){setSel({s:searchResults[0].symbol,n:searchResults[0].name,x:'NSE'});setSearchQ('');setShowSearch(false)}}}/>
+          {showSearch&&searchResults.length>0&&<div style={{position:'absolute',top:'100%',left:0,width:260,maxHeight:240,overflowY:'auto',background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,boxShadow:'0 8px 24px rgba(0,0,0,.6)',zIndex:20,marginTop:2}}>
+            {searchResults.map(r=><div key={r.symbol} onClick={()=>{setSel({s:r.symbol,n:r.name,x:'NSE'});setSearchQ('');setShowSearch(false)}} style={{padding:'6px 10px',cursor:'pointer',borderBottom:'1px solid var(--bdr)',font:'400 10px var(--fm)',color:'var(--t2)',display:'flex',gap:8,alignItems:'center'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bgh)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+              <span style={{font:'700 11px var(--fm)',color:'var(--t1)',minWidth:80}}>{r.symbol}</span>
+              <span style={{font:'400 9px var(--fu)',color:'var(--t3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span>
+            </div>)}
+          </div>}
+        </div>
         {tab==='chart'&&<span style={{font:'500 11px var(--fm)',color:'var(--cyn)'}}>({bv.l} × 3)</span>}
         <span style={{font:'500 10px var(--fu)',color:'var(--t3)'}}>Daily</span>
         <span style={{font:'600 12px var(--fm)',color:'var(--t1)'}}>CMP: <b>{lp.toFixed(2)}</b></span>
