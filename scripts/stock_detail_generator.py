@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import traceback
+import yfinance as yf
 
 # Try importing requests - will be installed in workflow
 try:
@@ -1175,20 +1176,20 @@ class StockDetailGenerator:
         # Calculate returns from price history
         returns = tech.get("returns", {})
         
-        # Volume data — compute up/down day volumes from price history
+        # Volume data — fetch OHLCV from yfinance for up/down day volume
         avg_volume = tech.get("avg_volume", 0)
         recent_volume = tech.get("volume", 0)
-        price_history = tech.get("price_history", [])
         up_days_volume = 0
         down_days_volume = 0
-        for candle in price_history[:50]:
-            c = candle.get("c", 0)
-            o = candle.get("o", 0)
-            v = candle.get("v", 0) or 0
-            if c > o:
-                up_days_volume += v
-            elif c < o:
-                down_days_volume += v
+        symbol = detail.get("symbol", "")
+        try:
+            ticker = yf.Ticker(symbol + ".NS")
+            hist = ticker.history(period="3mo", interval="1d")
+            if not hist.empty:
+                up_days_volume = int(hist[hist['Close'] > hist['Open']]['Volume'].sum())
+                down_days_volume = int(hist[hist['Close'] < hist['Open']]['Volume'].sum())
+        except Exception:
+            pass
 
         return {
             "symbol": detail.get("symbol", ""),
