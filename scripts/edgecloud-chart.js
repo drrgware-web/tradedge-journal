@@ -41,7 +41,8 @@ async function fetchOHLCV(symbol,range){
   const ohlc=[];
   for(let i=0;i<ts.length;i++){
     if(q.close[i]==null)continue;
-    ohlc.push({time:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0});
+    const dt=new Date(ts[i]*1000);const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    ohlc.push({time:ds,open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0});
   }
   return ohlc;
 }

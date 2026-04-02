@@ -459,7 +459,7 @@ function LWChart({symbol,w,h,mode,isDark}){
   const[ecCfg,setEcCfg]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('te_ec_cfg')||'{}');if(!saved.stPeriod)return{...EC_DEFAULTS};return{...EC_DEFAULTS,...saved}}catch{return{...EC_DEFAULTS}}});
   const updateCfg=useCallback((k,v)=>{setEcCfg(prev=>{const n={...prev,[k]:v};localStorage.setItem('te_ec_cfg',JSON.stringify(n));return n})},[]);
 
-  const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;ohlc.push({time:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
+  const parseOHLCV=(result)=>{const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const ohlc=[];for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;const d=new Date(ts[i]*1000);const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');ohlc.push({time:ds,_ts:ts[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}return ohlc};
 
   const fetchAndRender=useCallback(async(rng)=>{
     if(!symbol||!containerRef.current)return;
@@ -476,7 +476,9 @@ function LWChart({symbol,w,h,mode,isDark}){
       const ohlc=parseOHLCV(result);
       if(!ohlc.length)throw new Error('Empty OHLCV');
       ohlcRef.current=ohlc;
-      console.log(`EdgeCloud: ${symbol} ${rng} — ${ohlc.length} bars, last: ${new Date(ohlc[ohlc.length-1].time*1000).toLocaleDateString('en-IN')}`);
+      console.log('OHLCV total bars:',ohlc.length);
+      console.log('First bar:',ohlc[0]);
+      console.log('Last bar:',ohlc[ohlc.length-1]);
 
       const dk=isDark!==false;
       const bgCol=dk?'#0d1117':'#ffffff';
@@ -509,20 +511,35 @@ function LWChart({symbol,w,h,mode,isDark}){
         mainSeries.setData(ohlc.map((d,i)=>({time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close})));
       }
 
-      // Volume with Pocket Pivot detection
+      // Volume + Pocket Pivot detection
       const ppFlags=[];
-      const volSeries=chart.addHistogramSeries({priceScaleId:'vol',color:'#26A69A',priceFormat:{type:'volume'}});
-      volSeries.priceScale().applyOptions({scaleMargins:{top:0.8,bottom:0},visible:false});
-      const volData=[];
-      for(let i=0;i<ohlc.length;i++){
-        const d=ohlc[i];const prevC=i>0?ohlc[i-1].close:d.close;const isUp=d.close>=prevC;
+      console.log('=== VOLUME DEBUG ===');
+      console.log('Chart instance:', !!chart);
+      console.log('Volume data sample:', ohlc.slice(0,3).map(b => ({time:b.time, vol:b.volume})));
+
+      const volumeSeries = chart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume_scale',
+      });
+      chart.priceScale('volume_scale').applyOptions({
+        scaleMargins: { top: 0.85, bottom: 0 },
+        drawTicks: false,
+        borderVisible: false,
+        visible: false,
+      });
+      const volData = ohlc.map((bar, i) => {
+        const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;
         let isPP=false;
-        if(isUp&&i>=2){let maxDV=0;for(let j=Math.max(0,i-(ecCfg.ppLookback||10));j<i;j++){const pC=j>0?ohlc[j-1].close:ohlc[j].close;if(ohlc[j].close<pC&&ohlc[j].volume>maxDV)maxDV=ohlc[j].volume}if(maxDV>0&&d.volume>maxDV)isPP=true}
+        if(isUp&&i>=2){let maxDV=0;for(let j=Math.max(0,i-(ecCfg.ppLookback||10));j<i;j++){const pC=j>0?ohlc[j-1].close:ohlc[j].close;if(ohlc[j].close<pC&&ohlc[j].volume>maxDV)maxDV=ohlc[j].volume}if(maxDV>0&&bar.volume>maxDV)isPP=true}
         if(isPP)ppFlags.push(i);
-        volData.push({time:d.time,value:d.volume,color:isPP?'rgba(33,150,243,0.7)':isUp?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)'});
-      }
-      volSeries.setData(volData);
-      console.log('Volume:',volData.length,'bars, last vol:',volData.length?volData[volData.length-1].value:0);
+        return {
+          time: bar.time,
+          value: bar.volume || 0,
+          color: isPP ? 'rgba(33,150,243,0.6)' : isUp ? 'rgba(38,166,154,0.4)' : 'rgba(239,83,80,0.4)',
+        };
+      });
+      console.log('Volume data points:', volData.length, 'First:', volData[0], 'Last:', volData[volData.length-1]);
+      volumeSeries.setData(volData);
 
       const{walking,walkDir,running,st1,st2}=calcEdgeCloud(ohlc,ecCfg);
       walkRef.current=walking;runRef.current=running;
@@ -656,7 +673,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         const idx=ohlc.findIndex(d=>d.time===param.time);
         if(idx<0){setHovered(null);return}
         const d=ohlc[idx];const fs=fusionStates[idx];
-        setHovered({date:new Date(d.time*1000).toLocaleDateString('en-IN'),open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2.values[idx],st2Dir:st2.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
+        setHovered({date:d.time,open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2?.values[idx],st2Dir:st2?.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
 
       // ── Trade overlay from te_trades ──
       let tradeOverlay=null;
@@ -671,7 +688,7 @@ function LWChart({symbol,w,h,mode,isDark}){
           const riskPct=avgEntry>0&&sl>0?((avgEntry-sl)/avgEntry*100):0;
           // Entry fusion state (find bar closest to first entry date)
           let entryFusionState=null;
-          if(entries.length&&fusionStates.length){const ed=new Date(entries[0].date).getTime()/1000;const eIdx=ohlc.reduce((best,d,i)=>Math.abs(d.time-ed)<Math.abs(ohlc[best].time-ed)?i:best,0);entryFusionState=fusionStates[eIdx]?.state||null}
+          if(entries.length&&fusionStates.length){const ed=new Date(entries[0].date).getTime()/1000;const eIdx=ohlc.reduce((best,d,i)=>Math.abs((d._ts||0)-ed)<Math.abs((ohlc[best]._ts||0)-ed)?i:best,0);entryFusionState=fusionStates[eIdx]?.state||null}
           tradeOverlay={entries,exits,avgEntry,sl,days,pnlPct,riskPct,status:match.status,entryFusion:entryFusionState,curFusion:fusionStates[ohlc.length-1]?.state};
           // Avg entry line — subtle
           if(avgEntry>0){const avgLine=chart.addLineSeries({color:'rgba(0,188,212,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:true,priceLineVisible:false,title:'Avg'});avgLine.setData([{time:ohlc[0].time,value:avgEntry},{time:ohlc[ohlc.length-1].time,value:avgEntry}])}
@@ -679,8 +696,8 @@ function LWChart({symbol,w,h,mode,isDark}){
           if(sl>0){const slLine=chart.addLineSeries({color:'rgba(255,82,82,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:true,priceLineVisible:false,title:'SL'});slLine.setData([{time:ohlc[0].time,value:sl},{time:ohlc[ohlc.length-1].time,value:sl}])}
           // Entry/exit/pyramid markers on main series
           const tm=[...markers];
-          entries.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs(d.time-ts)<Math.abs(ohlc[b].time-ts)?i:b,0);tm.push({time:ohlc[near].time,position:'belowBar',color:j===0?'#00E676':'#FF9800',shape:'arrowUp',text:j===0?'P1':j===1?'P2':'P3'})});
-          exits.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs(d.time-ts)<Math.abs(ohlc[b].time-ts)?i:b,0);const isProfit=(+e.price)>avgEntry;tm.push({time:ohlc[near].time,position:'aboveBar',color:isProfit?'#00E676':'#FF5252',shape:'arrowDown',text:j===0?'T1':j===1?'T2':j===2?'T3':'RUN'})});
+          entries.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs((d._ts||0)-ts)<Math.abs((ohlc[b]._ts||0)-ts)?i:b,0);tm.push({time:ohlc[near].time,position:'belowBar',color:j===0?'#00E676':'#FF9800',shape:'arrowUp',text:j===0?'P1':j===1?'P2':'P3'})});
+          exits.forEach((e,j)=>{const ts=new Date(e.date).getTime()/1000;const near=ohlc.reduce((b,d,i)=>Math.abs((d._ts||0)-ts)<Math.abs((ohlc[b]._ts||0)-ts)?i:b,0);const isProfit=(+e.price)>avgEntry;tm.push({time:ohlc[near].time,position:'aboveBar',color:isProfit?'#00E676':'#FF5252',shape:'arrowDown',text:j===0?'T1':j===1?'T2':j===2?'T3':'RUN'})});
           tm.sort((a,b)=>a.time-b.time);
           mainSeries.setMarkers(tm);
         }
