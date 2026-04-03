@@ -114,7 +114,7 @@ window.createEdgeCloudChart = async function(container, symbol, options) {
       for (let i = 0; i < ohlc.length; i++) {
         if (walking[i] == null || running[i] == null) continue;
         const t = ohlc[i].time; const hi = Math.max(walking[i], running[i]); const lo = Math.min(walking[i], running[i]);
-        if (walking[i] >= running[i]) { bullTop.push({ time: t, value: hi }); bullBot.push({ time: t, value: lo }); bearTop.push({ time: t, value: lo }); bearBot.push({ time: t, value: lo }); }
+        if (running[i] >= walking[i]) { bullTop.push({ time: t, value: hi }); bullBot.push({ time: t, value: lo }); bearTop.push({ time: t, value: lo }); bearBot.push({ time: t, value: lo }); }
         else { bearTop.push({ time: t, value: hi }); bearBot.push({ time: t, value: lo }); bullTop.push({ time: t, value: lo }); bullBot.push({ time: t, value: lo }); }
       }
       const aOpts = { lineColor: 'transparent', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false };

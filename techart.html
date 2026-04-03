@@ -556,7 +556,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         for(let i=0;i<ohlc.length;i++){
           if(walking[i]==null||running[i]==null)continue;
           const t=ohlc[i].time;const hi=Math.max(walking[i],running[i]);const lo=Math.min(walking[i],running[i]);
-          const isBull=walking[i]>running[i];
+          const isBull=running[i]>walking[i];
           if(isBull){
             bullUpper.push({time:t,value:hi});bullLower.push({time:t,value:lo});
             bearUpper.push({time:t,value:lo});bearLower.push({time:t,value:lo});
@@ -598,7 +598,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       for(let i=3;i<ohlc.length;i++){
         if(walking[i]==null||running[i]==null)continue;
         const cloudTop=Math.max(walking[i],running[i]);const cloudBot=Math.min(walking[i],running[i]);
-        const bullCloud=walking[i]>running[i];const fs=fusionStates[i]?.state;
+        const bullCloud=running[i]>walking[i];const fs=fusionStates[i]?.state;
         if(fs==='FADE')continue; // skip counter-trend
         if(bullCloud){
           // Check: was above cloud recently, dipped into cloud, closed back above
@@ -657,7 +657,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         const idx=ohlc.findIndex(d=>d.time===param.time);
         if(idx<0){setHovered(null);return}
         const d=ohlc[idx];const fs=fusionStates[idx];
-        setHovered({date:d.time.day+'/'+d.time.month+'/'+d.time.year,open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2?.values[idx],st2Dir:st2?.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?walking[idx]>running[idx]:null,...fs})});
+        setHovered({date:d.time.day+'/'+d.time.month+'/'+d.time.year,open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2?.values[idx],st2Dir:st2?.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?running[idx]>walking[idx]:null,...fs})});
 
       // ── Trade overlay from te_trades ──
       let tradeOverlay=null;
@@ -722,7 +722,7 @@ function LWChart({symbol,w,h,mode,isDark}){
 
       // Build panel data
       const n=ohlc.length-1;const cur=fusionStates[n];
-      const cloudBull=walking[n]!=null&&running[n]!=null?walking[n]>running[n]:null;
+      const cloudBull=walking[n]!=null&&running[n]!=null?running[n]>walking[n]:null;
       const stripLen=Math.min(60,ohlc.length);
       const strip=fusionStates.slice(-stripLen);
       const bbwStrip=strip.map(s=>s.bbw);
@@ -857,16 +857,17 @@ function LWChart({symbol,w,h,mode,isDark}){
         const n=ohlcRef.current.length-1;const lastC=n>=0?ohlcRef.current[n].close:0;
         const wl=d.walking!=null?d.walking:(walkRef.current[n]||0);
         const rl=d.running!=null?d.running:(runRef.current[n]||0);
-        const cloudBull=d.cloudBull!=null?d.cloudBull:wl>rl;
+        const cloudBull=d.cloudBull!=null?d.cloudBull:rl>wl;
         const cloudW=Math.abs(wl-rl);
         const disp=rl>0?((lastC-rl)/rl*100):0;
         const stLabel=d.state==='THRUST'||d.state==='IGNITION'?(cloudBull?'STRONG BULL':'BULL'):d.state==='FADE'?(!cloudBull?'STRONG BEAR':'BEAR'):cloudBull?'BULL':'BEAR';
         const stColor=d.state==='THRUST'||d.state==='IGNITION'?'#00E676':d.state==='FADE'?'#FF5252':cloudBull?'#26a69a':'#ef5350';
-        const r=(l,v,c)=><div key={l} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'1px 0'}}><span style={{color:'var(--t4)',fontSize:9}}>{l}</span><span style={{color:c,fontWeight:700,fontSize:10}}>{v}</span></div>;
-        return<div style={{position:'absolute',top:8,right:8,zIndex:10,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'8px 12px',minWidth:160}}>
+        const r=(l,v,c)=><div key={l} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'2px 0'}}><span style={{color:'var(--t4)',fontSize:9}}>{l}</span><span style={{color:c,fontWeight:700,fontSize:10}}>{v}</span></div>;
+        return<div style={{position:'absolute',top:8,right:8,zIndex:10,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'8px 12px',minWidth:180}}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{font:'700 9px var(--fm)',color:'#00e5ff',letterSpacing:'.08em'}}>EdgeCloud v3</span><span style={{font:'500 8px var(--fm)',color:'#00e5ff'}}>ST({ecCfg.stPeriod},{ecCfg.stMult1})</span></div>
+          <div style={{height:1,background:'rgba(255,255,255,0.06)',margin:'2px 0 4px'}}/>
           {r('State',stLabel,stColor)}
-          {r('Walking','₹'+wl.toFixed(2),wl>=rl?'#26a69a':'#ef5350')}
+          {r('Walking','₹'+wl.toFixed(2),rl>=wl?'#26a69a':'#ef5350')}
           {r('Running','₹'+rl.toFixed(2),'#ff9800')}
           {r('Cloud','₹'+cloudW.toFixed(0),cloudBull?'#26a69a':'#ef5350')}
           {r('Disparity',disp.toFixed(1)+'%',disp>0?'#26a69a':'#ef5350')}

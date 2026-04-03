@@ -3137,7 +3137,7 @@ function calcPositionFusion(ohlcArr){
   const st1=_fusionSuperTrend(ohlcArr,10,2),st2=_fusionSuperTrend(ohlcArr,10,3);
   const wl=(st1.values[n]!=null&&st2.values[n]!=null)?(st1.values[n]+st2.values[n])/2:null;
   const rl=_fusionEMA(closes,21)[n]||null;
-  const cloudBullish=wl!=null&&rl!=null?wl>rl:null;
+  const cloudBullish=wl!=null&&rl!=null?rl>wl:null;
   // State
   let state='DRIFT';
   if(bbWidth!=null&&rsi!=null&&adx!=null){
