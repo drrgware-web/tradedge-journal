@@ -637,11 +637,11 @@ function LWChart({symbol,w,h,mode,isDark}){
         else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
       // Pocket Pivot
       const ppCutoff=Math.max(0,ohlc.length-60);
-      ppFlags.filter(i=>i>=ppCutoff).forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#2196F3',shape:'arrowUp',text:'PP'})});
+      ppFlags.filter(i=>i>=ppCutoff).forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#00e5ff',shape:'arrowUp',text:'PP'})});
       // Donchian breakouts
       boFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
-        if(type==='bull')markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#FFEB3B80':'#FFEB3B',shape:'arrowUp',text:'BO'});
-        else markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#FFEB3B80':'#FFEB3B',shape:'arrowDown',text:'BD'})});
+        if(type==='bull')markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowUp',text:'BO'});
+        else markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowDown',text:'BD'})});
       // Pullbacks
       pbFlags.forEach(i=>{const fs=fusionStates[i]?.state;const bright=fs==='THRUST';
         markers.push({time:ohlc[i].time,position:'belowBar',color:bright?'#26A69A':'#26A69A99',shape:'circle',text:'PB'})});
@@ -709,9 +709,11 @@ function LWChart({symbol,w,h,mode,isDark}){
         volChartRef.current=vc;
         const vhs=vc.addHistogramSeries({color:'#26a69a',priceFormat:{type:'volume'},lastValueVisible:false,priceLineVisible:false});
         const ppSet=new Set(ppFlags.filter(idx=>idx>=ohlc.length-60));
+        const boSet=new Set(boFlags.map(b=>b.idx));
         vhs.setData(ohlc.map((bar,i)=>{
           const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;
-          return{time:bar.time,value:bar.volume||0,color:ppSet.has(i)?'rgba(33,150,243,0.7)':isUp?'rgba(0,230,118,0.5)':'rgba(239,83,80,0.5)'};
+          const isSignal=ppSet.has(i)||boSet.has(i);
+          return{time:bar.time,value:bar.volume||0,color:isSignal?'rgba(0,229,255,0.8)':isUp?'rgba(0,230,118,0.5)':'rgba(239,83,80,0.5)'};
         }));
         vc.timeScale().fitContent();
         // Sync time scales
@@ -797,8 +799,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
         <span style={{font:'600 7px var(--fm)',color:'#26a69a',opacity:.7}}>╌ WL({ecCfg.stPeriod},{ecCfg.stMult1}{ecCfg.dualST?'+'+ecCfg.stMult2:''})</span>
         <span style={{font:'600 7px var(--fm)',color:'#ff9800',opacity:.7}}>— RL({ecCfg.emaPeriod})</span>
-        <span style={{font:'600 7px var(--fm)',color:'#2196F3',opacity:.7}}>▲ PP</span>
-        <span style={{font:'600 7px var(--fm)',color:'#FFEB3B',opacity:.7}}>▲ BO</span>
+        <span style={{font:'600 7px var(--fm)',color:'#00e5ff',opacity:.7}}>▲ PP</span>
+        <span style={{font:'600 7px var(--fm)',color:'#00e5ff',opacity:.7}}>▲ BO</span>
         <span style={{font:'600 7px var(--fm)',color:'#26A69A',opacity:.7}}>● PB</span>
         <span style={{font:'600 7px var(--fm)',color:'#B388FF',opacity:.7}}>◆ SQ</span>
         <button onClick={()=>setShowSettings(s=>!s)} style={{padding:'2px 6px',fontSize:8,fontFamily:'var(--fm)',color:showSettings?'var(--t1)':'var(--t3)',background:showSettings?'var(--bg3)':'transparent',border:'1px solid var(--bdr)',borderRadius:3,cursor:'pointer',marginLeft:4}}>⚙</button>
