@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge · Stock Report</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a12;color:#e8e8f0;font-family:'Outfit',system-ui,sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
+.nv{display:flex;align-items:center;height:42px;padding:0 16px;background:linear-gradient(180deg,#0d0d18,#0a0a12);border-bottom:1px solid #1a1a2e;position:sticky;top:0;z-index:100}
+.nv a{text-decoration:none}.nb{display:flex;align-items:center;gap:6px;margin-right:12px}
+.ni{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#00e5ff,#0091ea);display:flex;align-items:center;justify-content:center;font:900 12px 'JetBrains Mono',monospace;color:#000}
+.nn{font:700 13px 'Outfit',sans-serif;color:#e8e8f0;letter-spacing:.02em}
+.nl{display:flex;gap:4px;flex:1}
+.na{padding:5px 12px;font:600 11px 'JetBrains Mono',monospace;color:#566178;border-radius:4px;transition:all .15s;text-decoration:none}
+.na:hover{color:#e8e8f0;background:rgba(255,255,255,.04)}.na.on{color:#00e5ff;background:rgba(0,229,255,.08)}
+input:focus{outline:none;border-color:#00e5ff!important}
+</style>
+</head>
+<body>
+<a href="dashboard.html" style="position:fixed;top:10px;left:10px;z-index:9998;padding:4px 10px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;color:#00ff88;background:rgba(6,8,12,.85);border:1px solid rgba(0,255,136,.25);border-radius:5px;text-decoration:none;backdrop-filter:blur(8px);transition:all .15s;opacity:.7" onmouseenter="this.style.opacity='1';this.style.borderColor='rgba(0,255,136,.6)'" onmouseleave="this.style.opacity='.7';this.style.borderColor='rgba(0,255,136,.25)'">Home</a>
+<nav class="nv">
+  <a class="nb" href="index.html"><div class="ni">TE</div><span class="nn">TradEdge</span></a>
+  <div class="nl">
+    <a class="na" href="dashboard.html">Dashboard</a>
+    <a class="na" href="scanner.html">Scanner</a>
+    <a class="na" href="techart.html">TEchart</a>
+    <a class="na on" href="report.html">Report</a>
+    <a class="na" href="watchlist.html">Watchlist</a>
+    <a class="na" href="index.html">Journal</a>
+  </div>
+</nav>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useCallback,useRef}=React;
+
+// ═══ INDICATOR CALCULATIONS ═══
+function calcEMA(data,period){const k=2/(period+1);const out=[];let prev=null;for(const v of data){if(v==null){out.push(prev);continue}prev=prev==null?v:v*k+prev*(1-k);out.push(prev)}return out}
+function calcSMA(data,period){const out=[];let sum=0;for(let i=0;i<data.length;i++){sum+=data[i]||0;if(i>=period)sum-=data[i-period]||0;out.push(i>=period-1?sum/period:null)}return out}
+function calcATR(ohlc,period){const tr=[];for(let i=0;i<ohlc.length;i++){const d=ohlc[i],h=d.high,l=d.low,pc=i>0?ohlc[i-1].close:l;tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)))}const out=[];let s=0;for(let i=0;i<tr.length;i++){s+=tr[i];if(i>=period){s-=tr[i-period];out.push(s/period)}else if(i===period-1)out.push(s/period);else out.push(null)}return out}
+function calcSuperTrend(ohlc,period,mult){const n=ohlc.length,st=Array(n).fill(null),dir=Array(n).fill(1);const atr=calcATR(ohlc,period);let pU=0,pD=0,pDir=1;for(let i=0;i<n;i++){if(atr[i]==null)continue;const mid=(ohlc[i].high+ohlc[i].low)/2;let up=mid-mult*atr[i],dn=mid+mult*atr[i];if(pU>0)up=Math.max(up,pU);if(pD>0)dn=Math.min(dn,pD);const d2=ohlc[i].close>pD?1:ohlc[i].close<pU?-1:pDir;st[i]=d2===1?up:dn;dir[i]=d2;pU=up;pD=dn;pDir=d2}return{values:st,direction:dir}}
+function calcRSI(closes,period){const out=Array(closes.length).fill(null);let aG=0,aL=0;for(let i=1;i<closes.length;i++){const d=closes[i]-closes[i-1],g=d>0?d:0,l=d<0?-d:0;if(i<=period){aG+=g/period;aL+=l/period;if(i===period)out[i]=aL===0?100:100-100/(1+aG/aL)}else{aG=(aG*(period-1)+g)/period;aL=(aL*(period-1)+l)/period;out[i]=aL===0?100:100-100/(1+aG/aL)}}return out}
+function calcBBWidth(closes,period){const sma=calcSMA(closes,period),out=[];for(let i=0;i<closes.length;i++){if(sma[i]==null||i<period-1){out.push(null);continue}let s2=0;for(let j=i-period+1;j<=i;j++){const d=closes[j]-sma[i];s2+=d*d}const std=Math.sqrt(s2/period);out.push(sma[i]>0?((sma[i]+2*std)-(sma[i]-2*std))/sma[i]*100:0)}return out}
+function calcADX(ohlc,period){const n=ohlc.length,dmP=[0],dmM=[0];for(let i=1;i<n;i++){const uM=ohlc[i].high-ohlc[i-1].high,dM=ohlc[i-1].low-ohlc[i].low;dmP.push(uM>dM&&uM>0?uM:0);dmM.push(dM>uM&&dM>0?dM:0)}const atr=calcATR(ohlc,period);const sDmP=calcEMA(dmP,period),sDmM=calcEMA(dmM,period),sAtr=calcEMA(atr.map(v=>v||0),period);const dx=[],diP=Array(n).fill(null),diM=Array(n).fill(null);for(let i=0;i<n;i++){if(!sAtr[i]){dx.push(null);continue}const dp=sDmP[i]/sAtr[i]*100,dm=sDmM[i]/sAtr[i]*100;diP[i]=dp;diM[i]=dm;const s=dp+dm;dx.push(s===0?0:Math.abs(dp-dm)/s*100)}return{adx:calcEMA(dx.map(v=>v||0),period),diP,diM}}
+function calcMACD(closes){const e12=calcEMA(closes,12),e26=calcEMA(closes,26);const macd=e12.map((v,i)=>v!=null&&e26[i]!=null?v-e26[i]:null);const signal=calcEMA(macd.filter(v=>v!=null),9);return{macd,signal,histogram:macd.map((v,i)=>v!=null&&signal[i]!=null?v-signal[i]:null)}}
+function getFusionState(bbw,rsi,adx,diP,diM,adxRising){if(bbw==null||rsi==null||adx==null)return"DRIFT";if(bbw<10&&rsi>55&&adxRising)return"IGNITION";if(bbw>=10&&rsi>55&&adx>25&&(diP||0)>(diM||0))return"THRUST";if(bbw>=10&&rsi<45&&adx>25&&(diM||0)>(diP||0))return"FADE";if(bbw<10&&adx<20)return"COIL";return"DRIFT"}
+
+// ═══ ANALYSIS ENGINE ═══
+function analyzeStock(ohlc){
+  if(!ohlc||ohlc.length<60)return null;
+  const n=ohlc.length,last=ohlc[n-1];const closes=ohlc.map(d=>d.close);const volumes=ohlc.map(d=>d.volume);
+  const st=calcSuperTrend(ohlc,10,3);const walking=st.values,walkDir=st.direction;
+  const running=calcEMA(closes,21);const ema8=calcEMA(closes,8);const ema50=calcEMA(closes,50);const ema200=calcEMA(closes,200);
+  const sma50=calcSMA(closes,50);const sma200=calcSMA(closes,200);
+  const rsi=calcRSI(closes,14);const bbw=calcBBWidth(closes,20);const{adx,diP,diM}=calcADX(ohlc,14);const atr=calcATR(ohlc,14);const macdData=calcMACD(closes);
+  const i=n-1;const adxRising=i>=3&&adx[i]!=null&&adx[i-3]!=null&&adx[i]>adx[i-3];
+  const fusion=getFusionState(bbw[i],rsi[i],adx[i],diP[i],diM[i],adxRising);
+  const wl=walking[i],rl=running[i];const bullCloud=(rl||0)>(wl||0);const cloudWidth=Math.abs((wl||0)-(rl||0));
+  const emaStacked=ema8[i]>running[i]&&running[i]>(ema50[i]||0)&&(ema50[i]||0)>(ema200[i]||0);
+  const above50=last.close>(sma50[i]||0);const above200=last.close>(sma200[i]||0);const goldenCross=(sma50[i]||0)>(sma200[i]||0);
+  const chg1d=n>1?(last.close-ohlc[n-2].close)/ohlc[n-2].close*100:0;
+  const chg1w=n>5?(last.close-ohlc[n-6].close)/ohlc[n-6].close*100:0;
+  const chg1m=n>22?(last.close-ohlc[n-23].close)/ohlc[n-23].close*100:0;
+  const chg3m=n>66?(last.close-ohlc[n-67].close)/ohlc[n-67].close*100:0;
+  const chg6m=n>125?(last.close-ohlc[Math.max(0,n-126)].close)/ohlc[Math.max(0,n-126)].close*100:null;
+  const yearHigh=Math.max(...ohlc.map(d=>d.high));const yearLow=Math.min(...ohlc.map(d=>d.low));const fromHigh=(last.close-yearHigh)/yearHigh*100;
+  const avgVol20=volumes.slice(-20).reduce((a,b)=>a+b,0)/20;const rVol=avgVol20>0?last.volume/avgVol20:1;
+  const macdBull=macdData.macd[i]>(macdData.signal[i]||0);
+  const dcPeriod=20;let dcUpper=null,dcLower=null;
+  if(i>=dcPeriod-1){dcUpper=Math.max(...ohlc.slice(i-dcPeriod+1,i+1).map(d=>d.high));dcLower=Math.min(...ohlc.slice(i-dcPeriod+1,i+1).map(d=>d.low))}
+  const s1=wl||sma50[i];const s2=rl||running[i];const s3=ema50[i];const s4=ema200[i];
+  const aggressive={low:last.close*0.98,high:last.close*1.00};const conservative={low:wl||last.close*0.95,high:rl||last.close*0.97};const accumulation={low:ema50[i]||last.close*0.92,high:wl||last.close*0.95};
+  const atrVal=atr[i]||last.close*0.02;const t1=last.close+atrVal*2;const t2=last.close+atrVal*4;const t3=last.close+atrVal*6;const sl=Math.min(wl||last.close*0.94,last.close-atrVal*2);const riskPct=((last.close-sl)/last.close*100);
+  let techScore=0;if(emaStacked)techScore+=1;if(rsi[i]>50&&rsi[i]<75)techScore+=1;if(adx[i]>20)techScore+=0.5;if(macdBull)techScore+=0.5;if(bullCloud)techScore+=1;if(above50&&above200)techScore+=0.5;if(rVol>1)techScore+=0.5;techScore=Math.min(5,Math.round(techScore*10)/10);
+  const rrRatio=riskPct>0?((t2-last.close)/last.close*100)/riskPct:1;const rrScore=Math.min(5,Math.round(Math.min(rrRatio,5)*10)/10);
+  const totalScore=techScore+rrScore;let verdict="HOLD";let verdictColor="#FFA000";
+  if(totalScore>=8&&fusion!=="FADE"){verdict="STRONG BUY";verdictColor="#00C853"}else if(totalScore>=6){verdict="BUY";verdictColor="#4CAF50"}else if(totalScore<4||fusion==="FADE"){verdict="AVOID";verdictColor="#FF5252"}
+  return{close:last.close,open:last.open,high:last.high,low:last.low,volume:last.volume,avgVol20,rVol,chg1d,chg1w,chg1m,chg3m,chg6m,yearHigh,yearLow,fromHigh,fusion,bullCloud,cloudWidth,wl,rl,ema8:ema8[i],ema50:ema50[i],ema200:ema200[i],sma50:sma50[i],sma200:sma200[i],rsi:rsi[i],bbw:bbw[i],adx:adx[i],diP:diP[i],diM:diM[i],adxRising,atr:atrVal,macdBull,emaStacked,above50,above200,goldenCross,dcUpper,dcLower,s1,s2,s3,s4,aggressive,conservative,accumulation,t1,t2,t3,sl,riskPct,rrRatio,techScore,rrScore,verdict,verdictColor,walkDir:walkDir[i]};
+}
+
+// ═══ GAUGE ═══
+function Gauge({value,max,label,color,size=56}){const pct=Math.min(Math.max(value/max,0),1);const r=size/2-6;const startAngle=-135*Math.PI/180;const sweepAngle=270*Math.PI/180*pct;const cx=size/2,cy=size/2+4;const x1=cx+r*Math.cos(startAngle),y1=cy+r*Math.sin(startAngle);const x2=cx+r*Math.cos(startAngle+sweepAngle),y2=cy+r*Math.sin(startAngle+sweepAngle);const bgX2=cx+r*Math.cos(startAngle+270*Math.PI/180),bgY2=cy+r*Math.sin(startAngle+270*Math.PI/180);return<div style={{textAlign:"center",width:size}}><svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}><path d={`M${x1},${y1} A${r},${r} 0 1,1 ${bgX2},${bgY2}`} fill="none" stroke="#2a2a3a" strokeWidth="5" strokeLinecap="round"/>{pct>0&&<path d={`M${x1},${y1} A${r},${r} 0 ${sweepAngle>Math.PI?1:0},1 ${x2},${y2}`} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"/>}<text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize="11" fontWeight="700" fontFamily="'JetBrains Mono',monospace">{typeof value==="number"?value.toFixed(1):value}</text></svg><div style={{fontSize:8,color:"#8a8a9a",marginTop:-4,fontWeight:600,letterSpacing:".04em"}}>{label}</div></div>}
+
+// ═══ SIGNAL BADGE ═══
+function Signal({label,bullish,neutral}){const bg=neutral?"#333":bullish?"rgba(0,200,83,0.12)":"rgba(255,82,82,0.12)";const color=neutral?"#888":bullish?"#00C853":"#FF5252";const icon=neutral?"●":bullish?"▲":"▼";return<div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}><span style={{color,fontSize:10}}>{icon}</span><span style={{color,fontWeight:600,fontSize:10}}>{label}</span></div>}
+
+// ═══ SPARKLINE ═══
+function Sparkline({data,width=200,height=60}){if(!data||data.length<5)return null;const closes=data.map(d=>d.close);const min=Math.min(...closes),max=Math.max(...closes);const range=max-min||1;const pts=closes.map((c,i)=>`${(i/(closes.length-1))*width},${height-((c-min)/range)*(height-8)-4}`).join(" ");const lastY=height-((closes[closes.length-1]-min)/range)*(height-8)-4;const isUp=closes[closes.length-1]>=closes[0];return<svg width={width} height={height} style={{display:"block"}}><polyline points={pts} fill="none" stroke={isUp?"#00C853":"#FF5252"} strokeWidth="1.5"/><circle cx={width} cy={lastY} r="2.5" fill={isUp?"#00C853":"#FF5252"}/></svg>}
+
+// ═══ MAIN REPORT ═══
+function StockReport(){
+  const[symbol,setSymbol]=useState("");const[input,setInput]=useState("");
+  const[loading,setLoading]=useState(false);const[ohlc,setOhlc]=useState(null);const[analysis,setAnalysis]=useState(null);const[error,setError]=useState(null);
+
+  const fetchData=useCallback(async(sym)=>{
+    setLoading(true);setError(null);
+    try{
+      const wUrl=localStorage.getItem('zd_worker_url')||'https://spring-fire-41a0.drrgware.workers.dev';
+      const res=await fetch(wUrl,{method:"POST",headers:{"Content-Type":"application/json","X-Kite-Action":"yahoo-proxy"},body:JSON.stringify({ticker:`${sym}.NS`,range:"1y",interval:"1d",_t:Date.now()})});
+      const data=await res.json();const result=data?.chart?.result?.[0];if(!result)throw new Error("No data");
+      const ts=result.timestamp||[];const q=result.indicators?.quote?.[0]||{};const parsed=[];const seen=new Set();
+      for(let i=0;i<ts.length;i++){if(q.close[i]==null)continue;const d=new Date(ts[i]*1000);const key=`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;if(seen.has(key))continue;seen.add(key);
+        parsed.push({date:d.toISOString().slice(0,10),open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}
+      if(parsed.length<60)throw new Error("Insufficient data");
+      setOhlc(parsed);setAnalysis(analyzeStock(parsed));setSymbol(sym);
+    }catch(e){setError(e.message)}
+    setLoading(false);
+  },[]);
+
+  const handleSubmit=()=>{const sym=input.trim().toUpperCase();if(sym)fetchData(sym)};
+  // Auto-load from URL param
+  useEffect(()=>{const p=new URLSearchParams(window.location.search);const s=p.get('s')||p.get('symbol');if(s){setInput(s.toUpperCase());fetchData(s.toUpperCase())}},[]);
+
+  const FC={IGNITION:"#FFD700",THRUST:"#00E676",FADE:"#FF5252",COIL:"#B388FF",DRIFT:"#888"};
+  const a=analysis;const fmt=(v,d=2)=>v!=null?`₹${v.toFixed(d)}`:"—";const pct=(v)=>v!=null?`${v>=0?"+":""}${v.toFixed(1)}%`:"—";
+
+  return<div>
+    {/* Search */}
+    <div style={{display:"flex",gap:8,padding:"16px 20px",background:"#0d0d18",borderBottom:"1px solid #1a1a2e"}}>
+      <input value={input} onChange={e=>setInput(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&handleSubmit()} placeholder="Enter NSE Symbol (e.g. BLISSGVS)" style={{flex:1,padding:"8px 14px",background:"#12121e",border:"1px solid #2a2a3e",borderRadius:6,color:"#e8e8f0",fontSize:14,fontFamily:"'JetBrains Mono',monospace"}}/>
+      <button onClick={handleSubmit} disabled={loading} style={{padding:"8px 24px",background:"linear-gradient(135deg,#00e5ff,#00bcd4)",border:"none",borderRadius:6,color:"#000",fontWeight:700,fontSize:13,cursor:"pointer",opacity:loading?0.5:1}}>{loading?"Scanning...":"Generate Report"}</button>
+    </div>
+
+    {error&&<div style={{padding:20,color:"#FF5252",textAlign:"center"}}>{error}</div>}
+
+    {a&&<div style={{padding:"12px 16px",maxWidth:1200,margin:"0 auto"}}>
+      {/* HEADER */}
+      <div style={{textAlign:"center",marginBottom:12,paddingBottom:10,borderBottom:"2px solid #1a1a2e"}}>
+        <h1 style={{fontSize:24,fontWeight:800,letterSpacing:".02em",margin:0,color:"#fff"}}>{symbol}</h1>
+        <div style={{fontSize:11,color:"#8a8a9a",marginTop:2,letterSpacing:".08em"}}>TECHNICAL & FUNDAMENTAL 1-PAGE SUMMARY REPORT</div>
+        <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:8,flexWrap:"wrap"}}>
+          <span style={{fontSize:12}}>EXPERT RATING: <span style={{color:a.verdictColor,fontWeight:800}}>{a.verdict}</span></span>
+          <span style={{fontSize:12}}>TARGET: <span style={{color:"#00E676",fontWeight:700}}>{fmt(a.t1,0)}–{fmt(a.t3,0)}</span></span>
+          <span style={{fontSize:12}}>STOP LOSS: <span style={{color:"#FF5252",fontWeight:700}}>{fmt(a.sl,0)}</span></span>
+          <span style={{fontSize:12,padding:"1px 8px",background:"rgba(0,229,255,0.1)",borderRadius:4,color:"#00e5ff"}}><span style={{fontWeight:700}}>{a.fusion}</span> · {a.bullCloud?"BULL":"BEAR"} CLOUD</span>
+        </div>
+      </div>
+
+      {/* 2-COLUMN GRID */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        {/* LEFT: TECHNICAL */}
+        <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:"3px solid #00e5ff"}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#00e5ff",marginBottom:8}}>TECHNICAL SNAPSHOT & TREND</div>
+          <div style={{display:"flex",justifyContent:"space-around",marginBottom:8}}>
+            <Gauge value={a.rsi||50} max={100} label="RSI" color={a.rsi>55?"#00E676":a.rsi<45?"#FF5252":"#FFA000"}/>
+            <Gauge value={a.adx||0} max={60} label="ADX" color={a.adx>25?"#00E676":"#FFA000"}/>
+            <Gauge value={a.bbw||0} max={40} label="BB Width" color={a.bbw<10?"#B388FF":"#00e5ff"}/>
+            <Gauge value={a.techScore} max={5} label="Tech Score" color={a.techScore>=4?"#00E676":a.techScore>=2.5?"#FFA000":"#FF5252"}/>
+          </div>
+          <Signal label={`EMAs ${a.emaStacked?"Stacked Bullish":"Not Stacked"}`} bullish={a.emaStacked}/>
+          <Signal label={`RSI ${a.rsi?.toFixed(1)} — ${a.rsi>55?"Bullish":a.rsi<45?"Bearish":"Neutral"}`} bullish={a.rsi>50} neutral={a.rsi>=45&&a.rsi<=55}/>
+          <Signal label={`Volume — RVol ${a.rVol?.toFixed(1)}x ${a.rVol>1.5?"(High)":a.rVol<0.5?"(Dry)":"(Normal)"}`} bullish={a.rVol>1} neutral={a.rVol>=0.5&&a.rVol<=1.5}/>
+          <Signal label={`MACD ${a.macdBull?"Bullish Crossover":"Bearish"}`} bullish={a.macdBull}/>
+          <Signal label={`ADX ${a.adx?.toFixed(1)} — ${a.adx>25?"Trending":"Ranging"} ${a.adxRising?"↑":""}`} bullish={a.adx>25} neutral={!a.adx||a.adx<=25}/>
+          <Signal label={`Cloud ${a.bullCloud?"Bullish":"Bearish"} — Width ₹${a.cloudWidth?.toFixed(0)}`} bullish={a.bullCloud}/>
+          <div style={{marginTop:8,padding:8,background:"#0a0a14",borderRadius:6,border:"1px solid #1a1a2e"}}><Sparkline data={ohlc} width={280} height={50}/><div style={{display:"flex",justifyContent:"space-between",fontSize:8,color:"#666",marginTop:4}}><span>Support: {fmt(a.s1,0)} / {fmt(a.s3,0)}</span><span>Resistance: {fmt(a.dcUpper,0)}</span></div></div>
+        </div>
+
+        {/* RIGHT */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:"3px solid #FFD700"}}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#FFD700",marginBottom:8}}>PRICE & PERFORMANCE</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              {[["CMP",fmt(a.close),"#fff"],["Day Chg",pct(a.chg1d),a.chg1d>=0?"#00E676":"#FF5252"],["1 Week",pct(a.chg1w),a.chg1w>=0?"#00E676":"#FF5252"],["1 Month",pct(a.chg1m),a.chg1m>=0?"#00E676":"#FF5252"],["3 Month",pct(a.chg3m),a.chg3m>=0?"#00E676":"#FF5252"],["From High",pct(a.fromHigh),"#FF5252"],["52W High",fmt(a.yearHigh,0),"#00E676"],["52W Low",fmt(a.yearLow,0),"#FF5252"]].map(([l,v,c])=><div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 8px",background:"#0a0a14",borderRadius:4}}><span style={{fontSize:9,color:"#8a8a9a"}}>{l}</span><span style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v}</span></div>)}
+            </div>
+          </div>
+          <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:`3px solid ${FC[a.fusion]}`}}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#00e5ff",marginBottom:8}}>EDGECLOUD FUSION STATE</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}><span style={{fontSize:22,fontWeight:800,color:FC[a.fusion]}}>{a.fusion}</span><span style={{fontSize:11,color:a.bullCloud?"#00E676":"#FF5252",fontWeight:600,padding:"2px 8px",background:a.bullCloud?"rgba(0,230,118,0.1)":"rgba(255,82,82,0.1)",borderRadius:4}}>{a.bullCloud?"BULLISH":"BEARISH"} CLOUD</span></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4,fontSize:9}}>
+              {[["Walking",fmt(a.wl),a.walkDir===1?"#00E676":"#FF5252"],["Running",fmt(a.rl),"#FFA000"],["Cloud ₹",a.cloudWidth?.toFixed(0),a.bullCloud?"#00E676":"#FF5252"],["ATR(14)",fmt(a.atr),"#00e5ff"],["BBW",`${a.bbw?.toFixed(1)}%`,a.bbw<10?"#B388FF":"#888"],["R:R",`${a.rrRatio?.toFixed(1)}x`,a.rrRatio>2?"#00E676":"#FFA000"]].map(([l,v,c])=><div key={l} style={{padding:"3px 6px",background:"#0a0a14",borderRadius:4,textAlign:"center"}}><div style={{color:"#666",fontSize:8}}>{l}</div><div style={{color:c,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontSize:10}}>{v}</div></div>)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* BOTTOM */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:10}}>
+        <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:"3px solid #00E676"}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#00E676",marginBottom:8}}>STRATEGIC TRADE PLAN</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div>
+              <div style={{fontSize:9,color:"#888",fontWeight:600,marginBottom:4}}>ENTRY ZONES</div>
+              {[["Aggressive",`${fmt(a.aggressive.low,0)}–${fmt(a.aggressive.high,0)}`,"#00E676"],["Conservative",`${fmt(a.conservative.low,0)}–${fmt(a.conservative.high,0)}`,"#FFA000"],["Accumulation",`${fmt(a.accumulation.low,0)}–${fmt(a.accumulation.high,0)}`,"#00e5ff"]].map(([l,v,c])=><div key={l} style={{padding:"4px 6px",marginBottom:3,background:"#0a0a14",borderRadius:4,borderLeft:`2px solid ${c}`}}><div style={{fontSize:8,color:"#888"}}>{l}</div><div style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v}</div></div>)}
+            </div>
+            <div>
+              <div style={{fontSize:9,color:"#888",fontWeight:600,marginBottom:4}}>TARGETS & RISK</div>
+              {[["T1",fmt(a.t1,0),`+${((a.t1-a.close)/a.close*100).toFixed(1)}%`,"#00E676"],["T2",fmt(a.t2,0),`+${((a.t2-a.close)/a.close*100).toFixed(1)}%`,"#00C853"],["T3",fmt(a.t3,0),`+${((a.t3-a.close)/a.close*100).toFixed(1)}%`,"#00BFA5"]].map(([l,v,p,c])=><div key={l} style={{padding:"4px 6px",marginBottom:3,background:"#0a0a14",borderRadius:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontWeight:800,color:c,fontSize:11}}>{l}</span><span style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v}</span><span style={{fontSize:8,color:"#888"}}>{p}</span></div>)}
+              <div style={{padding:"4px 6px",background:"rgba(255,82,82,0.08)",borderRadius:4,borderLeft:"2px solid #FF5252",marginTop:4}}><div style={{fontSize:8,color:"#FF5252"}}>STOP LOSS</div><div style={{fontSize:12,fontWeight:800,color:"#FF5252",fontFamily:"'JetBrains Mono',monospace"}}>{fmt(a.sl,0)} <span style={{fontSize:9,fontWeight:500}}>(-{a.riskPct?.toFixed(1)}%)</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:`3px solid ${a.verdictColor}`,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:a.verdictColor,marginBottom:8}}>CONCLUSION SCORECARD</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:12}}>
+            {[["Technical",a.techScore,"#00e5ff"],["Risk/Reward",a.rrScore,"#FFD700"]].map(([l,v,c])=><div key={l} style={{padding:"6px 8px",background:"#0a0a14",borderRadius:4}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:9,color:"#888"}}>{l}</span><span style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v.toFixed(1)}/5</span></div><div style={{height:4,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}><div style={{width:`${v/5*100}%`,height:"100%",background:c,borderRadius:2}}/></div></div>)}
+          </div>
+          <div style={{textAlign:"center",padding:16,background:`${a.verdictColor}08`,border:`2px solid ${a.verdictColor}30`,borderRadius:8}}>
+            <div style={{fontSize:10,color:"#888",marginBottom:4}}>FINAL VERDICT</div>
+            <div style={{fontSize:28,fontWeight:900,color:a.verdictColor,letterSpacing:".02em"}}>{a.verdict}</div>
+            <div style={{fontSize:10,color:"#666",marginTop:4}}>{a.verdict==="STRONG BUY"?"All systems align — high conviction setup":a.verdict==="BUY"?"Positive setup — proceed with normal sizing":a.verdict==="HOLD"?"Mixed signals — wait for clarity":"Adverse conditions — protect capital"}</div>
+          </div>
+          <div style={{fontSize:7,color:"#444",marginTop:8,lineHeight:1.4}}>This report is auto-generated from technical data only. Not investment advice. Always do your own research.</div>
+        </div>
+      </div>
+
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",marginTop:8,borderTop:"1px solid #1a1a2e",fontSize:8,color:"#444"}}>
+        <span>TradEdge EdgeCloud Report · Generated {new Date().toLocaleDateString("en-IN")} · {new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}</span>
+        <span style={{color:"#00e5ff",fontWeight:600}}>EdgeCloud v3 · ST(10,3) + EMA(21)</span>
+      </div>
+    </div>}
+
+    {!a&&!loading&&!error&&<div style={{textAlign:"center",padding:60,color:"#444"}}><div style={{fontSize:48,marginBottom:12}}>📊</div><div style={{fontSize:14,fontWeight:600}}>Enter an NSE symbol to generate the report</div><div style={{fontSize:11,marginTop:4}}>e.g. BLISSGVS, RELIANCE, TCS, SBIN</div></div>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<StockReport/>);
+</script>
+</body>
+</html>
