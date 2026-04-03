@@ -54,6 +54,21 @@ jobs:
             echo "generate_scanner_summary.py not found, skipping..."
           fi
       
+      - name: Debug - check AEROFLEX values
+        run: |
+          python3 -c "
+          import json
+          with open('data/scanner_results.json') as f:
+              data = json.load(f)
+          stocks = data.get('all_stocks', data.get('stocks', []))
+          for s in stocks:
+              if s.get('symbol') == 'AEROFLEX':
+                  print('AEROFLEX change_pct:', s.get('change_pct'), 'close:', s.get('close') or s.get('cmp'))
+                  break
+          else:
+              print('AEROFLEX not found in output')
+          "
+
       - name: Commit and push changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
