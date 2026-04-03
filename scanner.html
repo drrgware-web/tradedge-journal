@@ -348,7 +348,7 @@ const CatalystPill=({catalyst})=>{const cs={bullish:{bg:"rgba(0,255,136,0.08)",b
 // TECHART v5.0 — SCANNER EMBEDDED VERSION
 // ═══════════════════════════════════════════════════════════════
 
-const TEChartScanner=({symbol,onOrder})=>{
+const TEChartScanner=({symbol,liveCMP,onOrder})=>{
   const canvasRef=useRef(null);
   const[prices,setPrices]=useState(null);
   const[loading,setLoading]=useState(true);
@@ -370,9 +370,21 @@ const TEChartScanner=({symbol,onOrder})=>{
     setLoading(true);
     fetch(`./data/stock_details/${symbol}.json?t=${Date.now()}`)
       .then(r=>r.ok?r.json():null)
-      .then(d=>{if(d?.price_history?.length)setPrices(d.price_history);setLoading(false)})
+      .then(d=>{
+        const history=d?.price_history||[];
+        if(history.length>0&&liveCMP){
+          const lastBar=history[history.length-1];
+          const today=new Date();const todayStr=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+          if(lastBar.date!==todayStr){
+            const prevC=lastBar.c||lastBar.close||0;
+            history.push({date:todayStr,o:prevC,h:Math.max(prevC,liveCMP),l:Math.min(prevC,liveCMP),c:liveCMP,v:0});
+          }
+        }
+        if(history.length)setPrices(history);
+        setLoading(false);
+      })
       .catch(()=>setLoading(false));
-  },[symbol]);
+  },[symbol,liveCMP]);
 
   useEffect(()=>{DrawingStore.save(symbol,drawings)},[drawings,symbol]);
   useEffect(()=>{CS.saveAlerts(symbol,alerts)},[alerts,symbol]);
@@ -1093,7 +1105,7 @@ const ScannerDashboard=()=>{
                 <td style={{padding:"8px"}}><PctCell val={stock.returns?.["3m"]}/></td>
               </tr>
               {isExp&&<tr><td colSpan={14} style={{padding:"8px 12px",background:"linear-gradient(180deg,rgba(0,0,0,0.4),rgba(6,8,12,0.9))",borderBottom:"2px solid var(--accent)"}}>
-                <TEChartScanner symbol={stock.symbol} onOrder={o=>setOrderDialog(o)}/>
+                <TEChartScanner symbol={stock.symbol} liveCMP={stock.price||stock.cmp||stock.close} onOrder={o=>setOrderDialog(o)}/>
               </td></tr>}
             </Fragment>})}</tbody>
         </table>
