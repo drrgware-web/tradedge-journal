@@ -477,22 +477,27 @@ function LWChart({symbol,w,h,mode,isDark}){
       const ohlc=parseOHLCV(result);
       if(!ohlc.length)throw new Error('Empty OHLCV');
 
-      // Append/update today's live bar from meta if market data is newer
+      // Append/update today's live bar ONLY if market timestamp is from today
       const meta=result.meta||{};
       const liveCMP=meta.regularMarketPrice;const liveVol=meta.regularMarketVolume||0;
-      if(liveCMP&&liveCMP>0){
-        const now=new Date();const todayKey={year:now.getFullYear(),month:now.getMonth()+1,day:now.getDate()};
+      const mktTime=meta.regularMarketTime;
+      if(liveCMP&&liveCMP>0&&mktTime){
+        const mktDate=new Date(mktTime*1000);
+        const now=new Date();
+        const todayKey={year:now.getFullYear(),month:now.getMonth()+1,day:now.getDate()};
+        const mktDay={year:mktDate.getFullYear(),month:mktDate.getMonth()+1,day:mktDate.getDate()};
+        const isMarketToday=mktDay.year===todayKey.year&&mktDay.month===todayKey.month&&mktDay.day===todayKey.day;
         const last=ohlc[ohlc.length-1];
         const lastIsToday=last.time.year===todayKey.year&&last.time.month===todayKey.month&&last.time.day===todayKey.day;
-        if(lastIsToday){
-          // Update today's bar with live data
-          last.high=Math.max(last.high,liveCMP);
-          last.low=Math.min(last.low,liveCMP);
-          last.close=liveCMP;
-          if(liveVol>last.volume)last.volume=liveVol;
-        }else{
-          // Append new bar for today
-          ohlc.push({time:todayKey,_ts:Math.floor(now.getTime()/1000),open:last.close,high:Math.max(last.close,liveCMP),low:Math.min(last.close,liveCMP),close:liveCMP,volume:liveVol});
+        if(isMarketToday){
+          if(lastIsToday){
+            last.high=Math.max(last.high,liveCMP);
+            last.low=Math.min(last.low,liveCMP);
+            last.close=liveCMP;
+            if(liveVol>last.volume)last.volume=liveVol;
+          }else{
+            ohlc.push({time:todayKey,_ts:Math.floor(now.getTime()/1000),open:last.close,high:Math.max(last.close,liveCMP),low:Math.min(last.close,liveCMP),close:liveCMP,volume:liveVol});
+          }
         }
       }
 
@@ -626,6 +631,18 @@ function LWChart({symbol,w,h,mode,isDark}){
         wasSqueeze=isSq;
       }
 
+      // Blue overlay bars for PP, BO, PB signal days
+      const ppCutoff=Math.max(0,ohlc.length-60);
+      const signalIdxs=new Set([
+        ...ppFlags.filter(i=>i>=ppCutoff),
+        ...boFlags.filter(b=>b.type==='bull').map(b=>b.idx),
+        ...pbFlags
+      ]);
+      if(signalIdxs.size>0){
+        const blueBars=chart.addBarSeries({upColor:'#00e5ff',downColor:'#00e5ff',thinBars:false,openVisible:false,lastValueVisible:false,priceLineVisible:false});
+        blueBars.setData([...signalIdxs].sort((a,b)=>a-b).map(i=>{const d=ohlc[i];return{time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close}}));
+      }
+
       // ── All markers ──
       const markers=[];
       // Fusion state transitions
@@ -635,12 +652,11 @@ function LWChart({symbol,w,h,mode,isDark}){
         else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'F'});
         else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
       // Pocket Pivot
-      const ppCutoff=Math.max(0,ohlc.length-60);
       ppFlags.filter(i=>i>=ppCutoff).forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#00e5ff',shape:'arrowUp',text:'PP'})});
       // Donchian breakouts
       boFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
         if(type==='bull')markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowUp',text:'BO'});
-        else markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowDown',text:'BD'})});
+        else markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#FF525260':'#FF5252',shape:'arrowDown',text:'BD'})});
       // Pullbacks
       pbFlags.forEach(i=>{const fs=fusionStates[i]?.state;const bright=fs==='THRUST';
         markers.push({time:ohlc[i].time,position:'belowBar',color:bright?'#26A69A':'#26A69A99',shape:'circle',text:'PB'})});
@@ -654,7 +670,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       // Crosshair move → update hovered bar
       chart.subscribeCrosshairMove(param=>{
         if(!param||!param.time){setHovered(null);return}
-        const idx=ohlc.findIndex(d=>d.time===param.time);
+        const idx=ohlc.findIndex(d=>d.time.year===param.time.year&&d.time.month===param.time.month&&d.time.day===param.time.day);
         if(idx<0){setHovered(null);return}
         const d=ohlc[idx];const fs=fusionStates[idx];
         setHovered({date:d.time.day+'/'+d.time.month+'/'+d.time.year,open:d.open,high:d.high,low:d.low,close:d.close,volume:d.volume,walking:walking[idx],running:running[idx],st1Val:st1.values[idx],st1Dir:st1.direction[idx],st2Val:st2?.values[idx],st2Dir:st2?.direction[idx],cloudBull:walking[idx]!=null&&running[idx]!=null?running[idx]>walking[idx]:null,...fs})});
