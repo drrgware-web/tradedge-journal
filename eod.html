@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TradEdge · EOD Research</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg: #090b0f;
@@ -21,7 +21,7 @@
   --text2: #8899aa;
   --text3: #556677;
   --font-mono: 'Space Mono', monospace;
-  --font-display: 'Syne', sans-serif;
+  --font-display: 'Space Mono', monospace;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 12px; min-height: 100vh; }
@@ -216,8 +216,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-mono);
   <div class="grid-4" id="indexCards">
     <div class="card"><div class="card-title"><span class="icon">📈</span>NIFTY 50</div><div class="index-val" id="niftyVal">—</div><div class="index-chng" id="niftyChng">—</div><div class="index-sub" id="nifty52w">—</div></div>
     <div class="card"><div class="card-title"><span class="icon">🏦</span>BANK NIFTY</div><div class="index-val" id="bnkVal">—</div><div class="index-chng" id="bnkChng">—</div><div class="index-sub" id="bnk52w">—</div></div>
-    <div class="card"><div class="card-title"><span class="icon">🔹</span>MIDCAP 100</div><div class="index-val" id="midVal">—</div><div class="index-chng" id="midChng">—</div><div class="index-sub" id="mid52w">—</div></div>
-    <div class="card"><div class="card-title"><span class="icon">🔸</span>SMALLCAP 100</div><div class="index-val" id="smlVal">—</div><div class="index-chng" id="smlChng">—</div><div class="index-sub" id="sml52w">—</div></div>
+    <div class="card"><div class="card-title"><span class="icon">💻</span>NIFTY IT</div><div class="index-val" id="midVal">—</div><div class="index-chng" id="midChng">—</div><div class="index-sub" id="mid52w">—</div></div>
+    <div class="card"><div class="card-title"><span class="icon">🏛</span>NIFTY FIN SVC</div><div class="index-val" id="smlVal">—</div><div class="index-chng" id="smlChng">—</div><div class="index-sub" id="sml52w">—</div></div>
   </div>
 
   <!-- ROW 2: MPS + SECTORS + SHAPERS -->
@@ -341,8 +341,8 @@ async function loadIndices() {
   const indices = [
     { ticker: '^NSEI',    valId: 'niftyVal', chngId: 'niftyChng', subId: 'nifty52w', label: 'NSE' },
     { ticker: '^NSEBANK', valId: 'bnkVal',   chngId: 'bnkChng',   subId: 'bnk52w',   label: 'NSEBANK' },
-    { ticker: 'NIFMID150.NS', valId: 'midVal', chngId: 'midChng', subId: 'mid52w',   label: 'MIDCAP' },
-    { ticker: 'NIFSMCP100.NS', valId: 'smlVal', chngId: 'smlChng', subId: 'sml52w', label: 'SMALLCAP' },
+    { ticker: '^CNXIT',  valId: 'midVal', chngId: 'midChng', subId: 'mid52w',   label: 'NIFTY IT' },
+    { ticker: '^CNXFIN', valId: 'smlVal', chngId: 'smlChng', subId: 'sml52w', label: 'NIFTY FIN' },
   ];
   await Promise.all(indices.map(async idx => {
     const d = await fetchIndex(idx.ticker);

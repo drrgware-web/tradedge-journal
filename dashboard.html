@@ -45,6 +45,81 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .card:hover .card-arrow{color:var(--card-border,var(--cyan));transform:translateX(4px)}
 .footer{text-align:center;padding:30px 20px;font-family:var(--mono);font-size:8px;color:var(--t4);letter-spacing:.12em;border-top:1px solid var(--bd)}
 .footer a{color:var(--cyan);text-decoration:none;opacity:.5}.footer a:hover{opacity:1}
+/* TABS */
+.dash-tabs{display:flex;gap:2px;justify-content:center;margin:0 auto 20px;padding:3px;background:var(--s1);border:1px solid var(--bd);border-radius:8px;width:fit-content}
+.dash-tab{padding:8px 24px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--t3);border:none;background:transparent;border-radius:6px;cursor:pointer;transition:all .15s}
+.dash-tab:hover{color:var(--t2);background:rgba(255,255,255,.03)}
+.dash-tab.active{color:var(--cyan);background:rgba(0,229,255,.08)}
+.tab-content{display:none}.tab-content.active{display:block}
+/* EOD TAB STYLES */
+.eod-status-bar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--s1);border:1px solid var(--bd);border-radius:6px;font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:16px}
+.eod-status-bar .sep{color:var(--bd2)}
+.eod-tag{padding:2px 8px;border-radius:3px;font-size:9px;letter-spacing:.5px;text-transform:uppercase}
+.eod-tag-success{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}
+.eod-tag-warn{background:rgba(255,208,0,.1);color:var(--yellow);border:1px solid rgba(255,208,0,.2)}
+.eod-tag-error{background:rgba(255,51,102,.1);color:var(--red);border:1px solid rgba(255,51,102,.2)}
+.eod-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.eod-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.eod-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.eod-card{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:14px}
+.eod-card-title{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.eod-idx-val{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
+.eod-idx-chng{font-size:11px;margin-top:4px}.eod-idx-chng.up{color:var(--green)}.eod-idx-chng.down{color:var(--red)}
+.eod-idx-sub{font-size:9px;color:var(--t3);margin-top:2px}
+.eod-mps-score{font-family:var(--mono);font-size:48px;font-weight:800;line-height:1}
+.eod-mps-label{font-size:10px;color:var(--t3);margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+.eod-mps-bar{height:4px;background:var(--bd);border-radius:2px;margin:10px 0;overflow:hidden}
+.eod-mps-fill{height:100%;border-radius:2px;transition:width .8s ease}
+.eod-pillar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.eod-pillar-name{font-size:9px;color:var(--t3);width:80px;flex-shrink:0;font-family:var(--mono)}
+.eod-pillar-bar{flex:1;height:3px;background:var(--bd);border-radius:2px;overflow:hidden}
+.eod-pillar-fill{height:100%;border-radius:2px}
+.eod-pillar-val{font-size:9px;color:var(--t2);width:28px;text-align:right;font-family:var(--mono)}
+.eod-section-label{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--bd);font-family:var(--mono)}
+.eod-q-leading{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:rgba(0,255,136,.1);color:var(--green)}
+.eod-q-improving{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:rgba(0,200,255,.1);color:var(--blue)}
+.eod-q-lagging{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:rgba(255,51,102,.1);color:var(--red)}
+.eod-shaper-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--s2);border:1px solid var(--bd);border-radius:6px;margin-bottom:5px;font-family:var(--mono)}
+.eod-shaper-sym{font-size:12px;font-weight:700;width:100px}
+.eod-shaper-sector{font-size:9px;color:var(--t3);flex:1}
+.eod-shaper-type{font-size:9px;padding:1px 6px;border-radius:3px}
+.eod-type-loki{background:rgba(255,107,53,.1);color:#ff6b35;border:1px solid rgba(255,107,53,.2)}
+.eod-type-oversold{background:rgba(0,200,255,.1);color:var(--blue);border:1px solid rgba(0,200,255,.2)}
+.eod-type-mini-coil{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}
+.eod-type-123{background:rgba(255,208,0,.1);color:var(--yellow);border:1px solid rgba(255,208,0,.2)}
+.eod-type-bbr{background:rgba(180,100,255,.1);color:#b46cff;border:1px solid rgba(180,100,255,.2)}
+.eod-shaper-score{font-size:11px;font-weight:700;color:var(--t2);width:28px;text-align:right}
+.eod-shaper-chng{font-size:10px;width:52px;text-align:right}
+.eod-chng-up{color:var(--green)}.eod-chng-down{color:var(--red)}.eod-chng-neu{color:var(--t3)}
+.eod-breadth-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.eod-breadth-item{padding:10px;background:var(--s2);border-radius:5px;border:1px solid var(--bd)}
+.eod-breadth-val{font-family:var(--mono);font-size:18px;font-weight:700}
+.eod-breadth-label{font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono)}
+.eod-pos-item{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--s2);border:1px solid var(--bd);border-radius:5px;margin-bottom:5px;font-family:var(--mono)}
+.eod-pos-sym{font-size:12px;font-weight:700;width:90px}
+.eod-pos-detail{font-size:9px;color:var(--t3)}
+.eod-pos-pnl{font-size:11px;font-weight:700;margin-left:auto}.eod-pos-pnl.up{color:var(--green)}.eod-pos-pnl.down{color:var(--red)}
+.eod-ai-note{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:20px;position:relative;overflow:hidden}
+.eod-ai-note::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue),#ff6b35)}
+.eod-ai-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;font-family:var(--mono)}
+.eod-ai-badge{font-size:9px;padding:2px 8px;border-radius:3px;background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2);letter-spacing:.5px}
+.eod-ai-model{font-size:9px;color:var(--t3)}
+.eod-ai-content{font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--t1);white-space:pre-wrap}
+.eod-ai-content h3{font-size:13px;font-weight:700;color:var(--blue);margin:16px 0 6px;letter-spacing:.5px}
+.eod-ai-content h3:first-child{margin-top:0}
+.eod-ai-content .bull{color:var(--green)}.eod-ai-content .bear{color:var(--red)}
+.eod-skeleton{background:linear-gradient(90deg,var(--s2) 25%,var(--bd) 50%,var(--s2) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px}
+.eod-skel-line{height:12px;margin-bottom:8px}.eod-skel-line.short{width:40%}.eod-skel-line.med{width:70%}
+.eod-empty{text-align:center;padding:32px;color:var(--t3);font-size:11px;font-family:var(--mono)}
+.eod-empty .icon{font-size:28px;margin-bottom:8px}
+.eod-scroll-y{overflow-y:auto;max-height:320px}.eod-scroll-y::-webkit-scrollbar{width:4px}.eod-scroll-y::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+.eod-btn{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:4px;border:1px solid var(--bd2);background:var(--s2);color:var(--t2);cursor:pointer;transition:all .15s;letter-spacing:.5px}
+.eod-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.eod-btn.primary{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08)}
+.eod-btn.primary:hover{background:rgba(0,255,136,.15)}
+.eod-btn:disabled{opacity:.4;cursor:not-allowed}
+.eod-btn.running{border-color:var(--yellow);color:var(--yellow);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
 </style>
 </head>
 <body>
@@ -56,6 +131,15 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
   <div class="hero-tagline">Define Your Edge With <b>TradEdge</b></div>
   <div class="hero-clock"><span id="clock"></span><span id="market-status"></span></div>
 </div>
+
+<!-- TAB NAVIGATION -->
+<div class="dash-tabs">
+  <button class="dash-tab active" onclick="switchTab('hub',this)">◈ HUB</button>
+  <button class="dash-tab" onclick="switchTab('eod',this)">✦ EOD</button>
+</div>
+
+<!-- ═══ HUB TAB ═══ -->
+<div id="tab-hub" class="tab-content active">
 
 <!-- INTELLIGENCE -->
 <div class="section">
@@ -197,6 +281,62 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
   </div>
 </div>
 
+</div><!-- end tab-hub -->
+
+<!-- ═══ EOD TAB ═══ -->
+<div id="tab-eod" class="tab-content">
+<div style="max-width:1200px;margin:0 auto;padding:0 20px">
+
+  <!-- EOD HEADER -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px">
+    <div>
+      <div style="font-family:var(--mono);font-size:22px;font-weight:800;color:var(--t1);display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:dotPulse 2s infinite"></span>EOD RESEARCH NOTE</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.5px" id="eodNoteDate">Loading market data...</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="eod-btn" id="eodBtnRefresh" onclick="eodLoadAll()">↻ Refresh</button>
+      <button class="eod-btn primary" id="eodBtnGenerate" onclick="eodGenerateNote()">✦ Generate Note</button>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="eod-status-bar">
+    <span id="eodStatusMPS">MPS: —</span><span class="sep">·</span>
+    <span id="eodStatusRegime">Regime: —</span><span class="sep">·</span>
+    <span id="eodStatusScanner">Scanner: —</span><span class="sep">·</span>
+    <span id="eodStatusTime">—</span>
+  </div>
+
+  <!-- INDICES -->
+  <div class="eod-grid-4">
+    <div class="eod-card"><div class="eod-card-title">📈 NIFTY 50</div><div class="eod-idx-val" id="eodNiftyVal">—</div><div class="eod-idx-chng" id="eodNiftyChng">—</div><div class="eod-idx-sub" id="eodNifty52w">—</div></div>
+    <div class="eod-card"><div class="eod-card-title">🏦 BANK NIFTY</div><div class="eod-idx-val" id="eodBnkVal">—</div><div class="eod-idx-chng" id="eodBnkChng">—</div><div class="eod-idx-sub" id="eodBnk52w">—</div></div>
+    <div class="eod-card"><div class="eod-card-title">💻 NIFTY IT</div><div class="eod-idx-val" id="eodItVal">—</div><div class="eod-idx-chng" id="eodItChng">—</div><div class="eod-idx-sub" id="eodIt52w">—</div></div>
+    <div class="eod-card"><div class="eod-card-title">🏛 NIFTY FIN SVC</div><div class="eod-idx-val" id="eodFinVal">—</div><div class="eod-idx-chng" id="eodFinChng">—</div><div class="eod-idx-sub" id="eodFin52w">—</div></div>
+  </div>
+
+  <!-- MPS + SECTORS + SHAPERS -->
+  <div class="eod-grid-3">
+    <div class="eod-card"><div class="eod-card-title">🧭 MARKET PULSE SCORE</div><div id="eodMpsContent"><div class="eod-skeleton eod-skel-line short"></div><div class="eod-skeleton eod-skel-line med"></div></div></div>
+    <div class="eod-card"><div class="eod-card-title">🔄 SECTOR ROTATION</div><div class="eod-section-label">LEADING ↑</div><div id="eodLeading"><div class="eod-skeleton eod-skel-line"></div></div><div class="eod-section-label" style="margin-top:10px">LAGGING ↓</div><div id="eodLagging"><div class="eod-skeleton eod-skel-line"></div></div></div>
+    <div class="eod-card"><div class="eod-card-title">🔮 TODAY'S SETUPS</div><div class="eod-scroll-y" id="eodShapersList"><div class="eod-skeleton eod-skel-line"></div><div class="eod-skeleton eod-skel-line med"></div></div></div>
+  </div>
+
+  <!-- POSITIONS + BREADTH -->
+  <div class="eod-grid-2">
+    <div class="eod-card"><div class="eod-card-title">💼 OPEN POSITIONS</div><div id="eodPositions"><div class="eod-skeleton eod-skel-line"></div></div></div>
+    <div class="eod-card"><div class="eod-card-title">📊 MARKET BREADTH</div><div class="eod-breadth-grid" id="eodBreadth"><div class="eod-breadth-item"><div class="eod-breadth-val eod-skeleton" style="width:60px;height:20px"></div><div class="eod-breadth-label">Bullish</div></div><div class="eod-breadth-item"><div class="eod-breadth-val eod-skeleton" style="width:60px;height:20px"></div><div class="eod-breadth-label">Bearish</div></div><div class="eod-breadth-item"><div class="eod-breadth-val eod-skeleton" style="width:60px;height:20px"></div><div class="eod-breadth-label">Vol Spike</div></div><div class="eod-breadth-item"><div class="eod-breadth-val eod-skeleton" style="width:60px;height:20px"></div><div class="eod-breadth-label">Setups</div></div></div></div>
+  </div>
+
+  <!-- AI NOTE -->
+  <div class="eod-ai-note">
+    <div class="eod-ai-header"><span class="eod-ai-badge">✦ AI RESEARCH NOTE</span><span class="eod-ai-model">llama-3.3-70b · Groq</span><span id="eodAiTime" style="font-size:9px;color:var(--t3);margin-left:auto"></span></div>
+    <div class="eod-ai-content" id="eodAiContent"><div class="eod-empty"><div class="icon">✦</div>Click "Generate Note" to create today's EOD research note using AI analysis of market data, sector rotation, and trading setups.</div></div>
+  </div>
+
+</div>
+</div><!-- end tab-eod -->
+
 <div class="footer">TRADEDGE COMMAND CENTER · v4.4 · Built by <a href="https://github.com/drrgware-web" target="_blank">drrgware</a> · Define Your Edge With TradEdge · ✦</div>
 
 <script>
@@ -206,6 +346,47 @@ function playHover(){try{ensureAudio();const o=audioCtx.createOscillator(),g=aud
 function playClick(){try{ensureAudio();const o=audioCtx.createOscillator(),g=audioCtx.createGain(),o2=audioCtx.createOscillator(),g2=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o2.connect(g2);g2.connect(audioCtx.destination);o.type='square';o.frequency.setValueAtTime(1200,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+.08);g.gain.setValueAtTime(.12,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.1);o2.type='sine';o2.frequency.setValueAtTime(150,audioCtx.currentTime);o2.frequency.exponentialRampToValueAtTime(60,audioCtx.currentTime+.12);g2.gain.setValueAtTime(.15,audioCtx.currentTime);g2.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.15);o.start(audioCtx.currentTime);o.stop(audioCtx.currentTime+.1);o2.start(audioCtx.currentTime);o2.stop(audioCtx.currentTime+.15)}catch(e){}}
 function updateClock(){const now=new Date();const ist=now.toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});const dateStr=now.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short',day:'numeric',month:'short',year:'numeric'});document.getElementById('clock').textContent=dateStr+' · '+ist+' IST';const h=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getHours(),m=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getMinutes(),day=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'})).getDay(),mins=h*60+m,isOpen=day>=1&&day<=5&&mins>=555&&mins<=930;document.getElementById('market-status').innerHTML='<span class="market-dot" style="color:'+(isOpen?'#00ff88':'#ff3366')+';background:'+(isOpen?'#00ff88':'#ff3366')+'"></span><span style="color:'+(isOpen?'#00ff88':'#ff3366')+';font-weight:600">'+(isOpen?'MARKET OPEN':'MARKET CLOSED')+'</span>'}
 updateClock();setInterval(updateClock,1000);
+
+// ═══ TAB SWITCHING ═══
+let eodLoaded=false;
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.dash-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='eod'&&!eodLoaded){eodLoaded=true;eodLoadAll()}
+}
+
+// ═══ EOD TAB LOGIC ═══
+const EOD_WORKER=localStorage.getItem('zd_worker_url')||'';
+const EOD_GROQ=localStorage.getItem('te_groq_key')||localStorage.getItem('groq_api_key');
+
+async function eodFetchJSON(p){const r=await fetch(p+'?t='+Date.now());if(!r.ok)throw new Error(p+' → '+r.status);return r.json()}
+async function eodFetchIndex(ticker){try{const r=await fetch(EOD_WORKER,{method:'POST',headers:{'X-Kite-Action':'yahoo-proxy','Content-Type':'application/json'},body:JSON.stringify({ticker,range:'1d',interval:'1m'})});const d=await r.json();const m=d?.chart?.result?.[0]?.meta;if(!m)return null;const c=m.regularMarketPrice-m.previousClose;return{price:m.regularMarketPrice,chng:c,chngPct:c/m.previousClose*100,high52w:m.fiftyTwoWeekHigh,low52w:m.fiftyTwoWeekLow}}catch{return null}}
+function eodFmt(n,d=2){return n==null?'—':Number(n).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d})}
+function eodFmtPct(n){if(n==null)return'—';return(n>=0?'+':'')+eodFmt(n)+'%'}
+function eodChngCls(n){return n>0?'eod-chng-up':n<0?'eod-chng-down':'eod-chng-neu'}
+
+async function eodLoadIndices(){
+  const ix=[{t:'^NSEI',v:'eodNiftyVal',c:'eodNiftyChng',s:'eodNifty52w'},{t:'^NSEBANK',v:'eodBnkVal',c:'eodBnkChng',s:'eodBnk52w'},{t:'^CNXIT',v:'eodItVal',c:'eodItChng',s:'eodIt52w'},{t:'^CNXFIN',v:'eodFinVal',c:'eodFinChng',s:'eodFin52w'}];
+  await Promise.all(ix.map(async i=>{const d=await eodFetchIndex(i.t);if(!d)return;document.getElementById(i.v).textContent=eodFmt(d.price,0);const el=document.getElementById(i.c);el.textContent=eodFmtPct(d.chngPct)+' ('+(d.chng>=0?'+':'')+eodFmt(d.chng,0)+')';el.className='eod-idx-chng '+(d.chng>=0?'up':'down');const prox=((d.price-d.low52w)/(d.high52w-d.low52w)*100).toFixed(0);document.getElementById(i.s).textContent='52W: '+eodFmt(d.low52w,0)+' – '+eodFmt(d.high52w,0)+' · '+prox+'%'}))}
+
+async function eodLoadMPS(){try{const d=await eodFetchJSON('data/mps_latest.json');const c=d.current||d;const s=c.mps_score??c.total_score??c.score??0;const reg=c.regime||c.market_regime||(s>=70?'BULL':s>=40?'NEUTRAL':'BEAR');const pil=c.pillar_scores||c.pillars||[];const col=s>=70?'var(--green)':s>=40?'var(--yellow)':'var(--red)';let h='<div class="eod-mps-score" style="color:'+col+'">'+Math.round(s)+'</div><div class="eod-mps-label">'+reg+'</div><div class="eod-mps-bar"><div class="eod-mps-fill" style="width:'+s+'%;background:'+col+'"></div></div>';pil.slice(0,6).forEach(p=>{const n=p.name||p.pillar||'';const v=p.weighted_score??p.score??p.raw_score??0;const mx=p.weight?p.weight*100:20;const pct=Math.min(v/mx*100,100);const pc=pct>60?'var(--green)':pct>30?'var(--yellow)':'var(--red)';h+='<div class="eod-pillar-row"><div class="eod-pillar-name">'+n.substring(0,12)+'</div><div class="eod-pillar-bar"><div class="eod-pillar-fill" style="width:'+pct+'%;background:'+pc+'"></div></div><div class="eod-pillar-val">'+(v.toFixed?v.toFixed(1):v)+'</div></div>'});document.getElementById('eodMpsContent').innerHTML=h;document.getElementById('eodStatusMPS').textContent='MPS: '+Math.round(s);document.getElementById('eodStatusRegime').innerHTML='<span class="eod-tag '+(s>=70?'eod-tag-success':s>=40?'eod-tag-warn':'eod-tag-error')+'">'+reg+'</span>';return{score:s,regime:reg,pillars:pil}}catch{document.getElementById('eodMpsContent').innerHTML='<div class="eod-empty">MPS data unavailable</div>';return{score:50,regime:'UNKNOWN',pillars:[]}}}
+
+async function eodLoadSectors(){try{const d=await eodFetchJSON('data/rrm_data.json');const b=d.default_benchmark||'^NSEI';const dy=d.benchmarks_data?.[b]?.daily||d.benchmarks_data?.[Object.keys(d.benchmarks_data)[0]]?.daily;if(!dy)throw 0;const sec=dy.sectors||[];const ld=sec.filter(s=>s.quadrant==='Leading').slice(0,5);const lg=sec.filter(s=>s.quadrant==='Lagging').slice(0,5);const im=sec.filter(s=>s.quadrant==='Improving').slice(0,3);const r=(l,c)=>l.map(s=>'<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="flex:1;font-size:10px;font-family:var(--mono);color:var(--t1)">'+(s.name||s.symbol)+'</span><span class="'+c+'">'+s.quadrant+'</span></div>').join('')||'<div class="eod-empty" style="padding:8px">None</div>';document.getElementById('eodLeading').innerHTML=r(ld,'eod-q-leading')+r(im,'eod-q-improving');document.getElementById('eodLagging').innerHTML=r(lg,'eod-q-lagging');return{leading:ld,lagging:lg,improving:im,sectors:sec}}catch{document.getElementById('eodLeading').innerHTML='<div class="eod-empty">RRM data unavailable</div>';document.getElementById('eodLagging').innerHTML='';return{leading:[],lagging:[],improving:[],sectors:[]}}}
+
+function eodDetectShapers(stocks){const results=[];for(const s of stocks){const types=[];const ema3=s.ema_3||0,stK=s.stochastic_k??50,macdH=s.macd_histogram??0,vR=s.volume_ratio??1,rsi=s.rsi??50,s20=s.sma_20??0,s50=s.sma_50??0,cl=s.close??s.cmp??0,chg=s.change_pct??0;if(ema3>0&&cl>ema3&&macdH>0&&vR>=1.5&&rsi>=35&&rsi<=65&&s20>s50)types.push({type:'LOKI',cls:'eod-type-loki'});if(vR>0&&vR<=0.6&&cl>s50&&s20>s50&&rsi>=40&&rsi<=65)types.push({type:'MINI COIL',cls:'eod-type-mini-coil'});if(stK>0&&stK<25&&rsi<50&&cl>s20&&s20>s50&&chg>0)types.push({type:'OVERSOLD',cls:'eod-type-oversold'});if(macdH<0&&macdH>-2&&stK>=20&&stK<=50&&s20>s50&&cl>s50&&vR<=1)types.push({type:'1-2-3',cls:'eod-type-123'});if(cl>s50&&cl>(s.sma_200??0)&&vR>=1.5&&(s.return_1w??0)>0&&(s.return_1m??0)>0)types.push({type:'BBR',cls:'eod-type-bbr'});if(types.length)results.push({...s,shaperTypes:types})}return results.sort((a,b)=>(b.composite_score||0)-(a.composite_score||0)).slice(0,20)}
+
+async function eodLoadScanner(){try{const d=await eodFetchJSON('data/scanner_results.json');const stocks=d.stocks||d.all_stocks||d.scan_results||[];const bullish=stocks.filter(s=>(s.composite_score||0)>=50).length;const bearish=stocks.filter(s=>(s.composite_score||0)>0&&s.composite_score<40).length;const volSpike=stocks.filter(s=>(s.volume_ratio||0)>=1.5).length;const shapers=eodDetectShapers(stocks);document.getElementById('eodBreadth').innerHTML='<div class="eod-breadth-item"><div class="eod-breadth-val" style="color:var(--green)">'+bullish+'</div><div class="eod-breadth-label">Bullish ≥50</div></div><div class="eod-breadth-item"><div class="eod-breadth-val" style="color:var(--red)">'+bearish+'</div><div class="eod-breadth-label">Bearish &lt;40</div></div><div class="eod-breadth-item"><div class="eod-breadth-val" style="color:var(--yellow)">'+volSpike+'</div><div class="eod-breadth-label">Vol Spike</div></div><div class="eod-breadth-item"><div class="eod-breadth-val" style="color:var(--blue)">'+shapers.length+'</div><div class="eod-breadth-label">Setups</div></div>';if(!shapers.length){document.getElementById('eodShapersList').innerHTML='<div class="eod-empty">No setups detected today</div>'}else{document.getElementById('eodShapersList').innerHTML=shapers.slice(0,12).map(s=>{const c=s.change_pct??0;const tags=s.shaperTypes.map(t=>'<span class="eod-shaper-type '+t.cls+'">'+t.type+'</span>').join(' ');return'<div class="eod-shaper-item"><div class="eod-shaper-sym">'+s.symbol+'</div><div class="eod-shaper-sector">'+(s.sector||'').substring(0,18)+'</div><div style="display:flex;gap:4px;flex-wrap:wrap">'+tags+'</div><div class="eod-shaper-score">'+(s.composite_score||'—')+'</div><div class="eod-shaper-chng '+eodChngCls(c)+'">'+eodFmtPct(c)+'</div></div>'}).join('')}document.getElementById('eodStatusScanner').textContent=stocks.length+' stocks · '+shapers.length+' setups';return{stocks,shapers,bullish,bearish,volSpike}}catch{document.getElementById('eodShapersList').innerHTML='<div class="eod-empty">Scanner data unavailable</div>';return{stocks:[],shapers:[],bullish:0,bearish:0,volSpike:0}}}
+
+async function eodLoadPositions(){try{const trades=JSON.parse(localStorage.getItem('te_trades')||'[]');const open=trades.filter(t=>t.status==='Open'||t.status==='Partial');if(!open.length){document.getElementById('eodPositions').innerHTML='<div class="eod-empty">No open positions</div>';return[]}const cmps={};await Promise.all(open.map(async t=>{const d=await eodFetchIndex(t.symbol+'.NS');if(d)cmps[t.symbol]=d.price}));document.getElementById('eodPositions').innerHTML=open.map(t=>{const entry=t.entries?.[0]?.price||0;const qty=(t.entries||[]).reduce((s,e)=>s+(e.qty||0),0);const cmp=cmps[t.symbol]||t.cmp||entry;const pnl=((cmp-entry)/entry)*100;return'<div class="eod-pos-item"><div class="eod-pos-sym">'+t.symbol+'</div><div class="eod-pos-detail">Qty: '+qty+' · Entry: ₹'+eodFmt(entry)+'</div><div class="eod-pos-detail" style="margin-left:auto">CMP: ₹'+eodFmt(cmp)+'</div><div class="eod-pos-pnl '+(pnl>=0?'up':'down')+'">'+eodFmtPct(pnl)+'</div></div>'}).join('');return open}catch{document.getElementById('eodPositions').innerHTML='<div class="eod-empty">Could not load positions</div>';return[]}}
+
+async function eodGenerateNote(){if(!EOD_GROQ){alert('Set te_groq_key in localStorage first');return}const btn=document.getElementById('eodBtnGenerate');btn.textContent='⏳ Generating...';btn.classList.add('running');btn.disabled=true;document.getElementById('eodAiContent').innerHTML='<div class="eod-skeleton eod-skel-line"></div><div class="eod-skeleton eod-skel-line med"></div><div class="eod-skeleton eod-skel-line short"></div><div class="eod-skeleton eod-skel-line"></div>';try{const[mps,sec,scan,pos]=await Promise.all([eodFetchJSON('data/mps_latest.json').catch(()=>null),eodFetchJSON('data/rrm_data.json').catch(()=>null),eodFetchJSON('data/scanner_results.json').catch(()=>null),Promise.resolve(JSON.parse(localStorage.getItem('te_trades')||'[]').filter(t=>t.status==='Open'||t.status==='Partial'))]);const sc=mps?.current?.mps_score??mps?.current?.total_score??'?';const reg=mps?.current?.regime||(sc>=70?'BULLISH':sc>=40?'NEUTRAL':'BEARISH');const b=sec?.default_benchmark||'^NSEI';const dy=sec?.benchmarks_data?.[b]?.daily;const ld=(dy?.sectors||[]).filter(s=>s.quadrant==='Leading').slice(0,5).map(s=>s.name||s.symbol).join(', ');const lg=(dy?.sectors||[]).filter(s=>s.quadrant==='Lagging').slice(0,5).map(s=>s.name||s.symbol).join(', ');const im=(dy?.sectors||[]).filter(s=>s.quadrant==='Improving').slice(0,3).map(s=>s.name||s.symbol).join(', ');const stocks=scan?.stocks||scan?.all_stocks||[];const bull=stocks.filter(s=>(s.composite_score||0)>=50).length;const bear=stocks.filter(s=>(s.composite_score||0)>0&&s.composite_score<40).length;const top=stocks.filter(s=>s.composite_score>=60).slice(0,10).map(s=>s.symbol+'('+s.composite_score+')').join(', ');const shp=eodDetectShapers(stocks).slice(0,8).map(s=>s.symbol+'['+s.shaperTypes.map(t=>t.type).join('+')+']').join(', ');const posStr=pos.slice(0,8).map(t=>{const e=t.entries?.[0]?.price||0;return t.symbol+'@₹'+e}).join(', ');const today=new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});const prompt='You are a professional Indian equity market analyst writing an EOD research note for a systematic trader using Minervini SEPA / O\'Neil CANSLIM methodology on NSE.\n\nToday is '+today+'.\n\nMARKET DATA:\n- Market Pulse Score (MPS): '+sc+'/100 — Regime: '+reg+'\n- Leading Sectors: '+(ld||'None')+'\n- Improving Sectors: '+(im||'None')+'\n- Lagging Sectors: '+(lg||'None')+'\n- Bullish stocks (score ≥50): '+bull+'\n- Bearish stocks (score <40): '+bear+'\n- Top scored stocks: '+(top||'None')+'\n- Shaper Setups: '+(shp||'None')+'\n- Open Positions: '+(posStr||'None')+'\n\nWrite a concise, actionable EOD research note with these sections:\n1. MARKET VERDICT (2-3 sentences)\n2. SECTOR WATCH (rotations, what to watch tomorrow)\n3. SETUPS TO WATCH (comment on shaper setups)\n4. POSITION REVIEW (open positions in context)\n5. TOMORROW\'S GAME PLAN (1-3 actionable points)\n\nKeep it sharp, data-driven, under 400 words. No fluff.';const resp=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':'Bearer '+EOD_GROQ,'Content-Type':'application/json'},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],max_tokens:800,temperature:0.7})});if(!resp.ok)throw new Error('Groq API: '+resp.status);const data=await resp.json();const text=data.choices?.[0]?.message?.content||'No response';const fmt=text.replace(/#{1,3}\s*(.*)/g,'<h3>$1</h3>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\b(BULLISH|BULL|bullish)\b/g,'<span class="bull">$1</span>').replace(/\b(BEARISH|BEAR|bearish)\b/g,'<span class="bear">$1</span>');document.getElementById('eodAiContent').innerHTML=fmt;document.getElementById('eodAiTime').textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});localStorage.setItem('te_eod_note',JSON.stringify({text,date:new Date().toISOString()}))}catch(e){document.getElementById('eodAiContent').innerHTML='<div class="eod-empty"><div class="icon">⚠</div>'+e.message+'</div>'}finally{btn.textContent='✦ Generate Note';btn.classList.remove('running');btn.disabled=false}}
+
+async function eodLoadAll(){document.getElementById('eodNoteDate').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});document.getElementById('eodStatusTime').textContent='Updated: '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});await Promise.all([eodLoadIndices(),eodLoadMPS(),eodLoadSectors(),eodLoadScanner(),eodLoadPositions()]);const saved=JSON.parse(localStorage.getItem('te_eod_note')||'null');if(saved){const sd=new Date(saved.date).toDateString();if(sd===new Date().toDateString()){const f=saved.text.replace(/#{1,3}\s*(.*)/g,'<h3>$1</h3>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\b(BULLISH|BULL|bullish)\b/g,'<span class="bull">$1</span>').replace(/\b(BEARISH|BEAR|bearish)\b/g,'<span class="bear">$1</span>');document.getElementById('eodAiContent').innerHTML=f;document.getElementById('eodAiTime').textContent=new Date(saved.date).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+' (saved)'}}}
+
+// Auto-switch to EOD tab if URL hash
+if(window.location.hash==='#eod'){document.querySelector('.dash-tab:nth-child(2)').click()}
 </script>
 </body>
 </html>
