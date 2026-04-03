@@ -380,26 +380,8 @@ def generate_summary():
         print("No stock details found")
         return
 
-    # Refresh prices from yfinance
-    fresh_prices = {}
-    try:
-        fresh_prices = refresh_prices(details)
-    except Exception as e:
-        print(f"  ❌ refresh_prices() crashed: {e}")
-        import traceback; traceback.print_exc()
-    if fresh_prices:
-        for detail in details:
-            sym = detail.get("symbol", "")
-            if sym in fresh_prices:
-                fp = fresh_prices[sym]
-                # Update technicals
-                if "technicals" not in detail:
-                    detail["technicals"] = {}
-                detail["technicals"]["close"] = fp["close"]
-                detail["technicals"]["change_pct"] = fp["change_pct"]
-                # Update root level too
-                detail["price"] = fp["close"]
-                detail["change_pct"] = fp["change_pct"]
+    # Note: fresh prices are written to stock_details/*.json by scanner_runner.py
+    # generate_scanner_summary.py just reads whatever is in those files
 
     # Create categories
     categories = create_scan_categories(details)

@@ -402,7 +402,30 @@ def run_scans(
                 
                 if stock_df.empty or len(stock_df) < 50:
                     continue
-                
+
+                # Update stock_details JSON with fresh close/change_pct
+                try:
+                    close_col = stock_df["Close"]
+                    if len(close_col) >= 2:
+                        fresh_close = round(float(close_col.iloc[-1]), 2)
+                        fresh_prev = float(close_col.iloc[-2])
+                        fresh_chg = round((fresh_close - fresh_prev) / fresh_prev * 100, 2) if fresh_prev > 0 else 0
+                        detail_path = DATA_DIR / "stock_details" / f"{symbol}.json"
+                        if detail_path.exists():
+                            with open(detail_path) as df:
+                                detail = json.load(df)
+                            if "technicals" not in detail:
+                                detail["technicals"] = {}
+                            detail["technicals"]["close"] = fresh_close
+                            detail["technicals"]["change_pct"] = fresh_chg
+                            detail["price"] = fresh_close
+                            detail["change_pct"] = fresh_chg
+                            detail["updated_at"] = datetime.now().isoformat()
+                            with open(detail_path, "w") as df:
+                                json.dump(detail, df, indent=2, default=str)
+                except Exception:
+                    pass
+
                 # Run each scan against this stock
                 matched_scans = []
                 for scan in scans_to_run:
