@@ -77,7 +77,7 @@ function analyzeStock(ohlc){
   if(i>=dcPeriod-1){dcUpper=Math.max(...ohlc.slice(i-dcPeriod+1,i+1).map(d=>d.high));dcLower=Math.min(...ohlc.slice(i-dcPeriod+1,i+1).map(d=>d.low))}
   const s1=wl||sma50[i];const s2=rl||running[i];const s3=ema50[i];const s4=ema200[i];
   const aggressive={low:last.close*0.98,high:last.close*1.00};const conservative={low:wl||last.close*0.95,high:rl||last.close*0.97};const accumulation={low:ema50[i]||last.close*0.92,high:wl||last.close*0.95};
-  const atrVal=atr[i]||last.close*0.02;const t1=last.close+atrVal*2;const t2=last.close+atrVal*4;const t3=last.close+atrVal*6;const sl=Math.max(wl||last.close*0.92,last.close-2*atrVal,last.close*0.92);const riskPct=((last.close-sl)/last.close*100);
+  const atrVal=atr[i]||last.close*0.02;const t1=last.close+atrVal*2;const t2=last.close+atrVal*4;const t3=last.close+atrVal*6;let sl=Math.max(wl||last.close*0.92,last.close-2*atrVal,last.close*0.92);if((last.close-sl)/last.close>0.08)sl=last.close*0.92;const riskPct=((last.close-sl)/last.close*100);
   let techScore=0;if(emaStacked)techScore+=1;if(rsi[i]>50&&rsi[i]<75)techScore+=1;if(adx[i]>20)techScore+=0.5;if(macdBull)techScore+=0.5;if(bullCloud)techScore+=1;if(above50&&above200)techScore+=0.5;if(rVol>1)techScore+=0.5;techScore=Math.min(5,Math.round(techScore*10)/10);
   const rrRatio=riskPct>0?((t2-last.close)/last.close*100)/riskPct:1;const rrScore=Math.min(5,Math.round(rrRatio*2*10)/10);
   const totalScore=techScore+rrScore;let verdict="HOLD";let verdictColor="#FFA000";
@@ -155,7 +155,11 @@ function StockReport(){
   if((q0.epsYoY||0)>20)badges.push({label:"Earnings Growth",color:"#00E676"});
   if((q0.salesYoY||0)>15)badges.push({label:"Revenue Growth",color:"#00E676"});
   if((q0.opm||0)>15)badges.push({label:"High Margins",color:"#00E676"});
+  if((inf.pe||99)>0&&(inf.pe||99)<15)badges.push({label:"Undervalued",color:"#00E676"});
+  if(diiDelta>0.5)badges.push({label:"DII Accumulation",color:"#00E676"});
+  if(qtrs.length>=2&&(qtrs[0].opm||0)>(qtrs[1].opm||0))badges.push({label:"Margin Expansion",color:"#00E676"});
   if(proDelta<-1)badges.push({label:"Promoter Selling",color:"#FF5252"});
+  if(fiiDelta<-1)badges.push({label:"FII Selling",color:"#FF5252"});
 
   return<div>
     {/* Search */}
@@ -223,13 +227,15 @@ function StockReport(){
           <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:"3px solid #FFD700"}}>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#FFD700",marginBottom:8}}>FUNDAMENTAL STRENGTHS</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              {(()=>{const mcap=inf.mcapCr||0;const mcapLabel=mcap>20000?'Large Cap':mcap>5000?'Mid Cap':'Small Cap';const mcapColor=mcap>20000?'#00E676':mcap>5000?'#FFA000':'#FF5252';
-                const pe=inf.pe||0;const peLabel=pe<15?'Cheap':pe<25?'Fair':pe<40?'Premium':'Expensive';const peColor=pe>0&&pe<25?'#00E676':pe<40?'#FFA000':'#FF5252';
+              {(()=>{const mcap=inf.mcapCr||0;const mcapLabel=mcap>20000?'Large Cap':mcap>5000?'Mid Cap':'Small Cap';const mcapColor=mcap>5000?'#00E676':mcap>1000?'#FFA000':'#FF5252';
+                const pe=inf.pe||0;const peLabel=pe<=0?'N/A':pe<15?'Cheap':pe<25?'Fair':pe<40?'Premium':'Expensive';const peColor=pe>0&&pe<=25?'#00E676':pe>0&&pe<=40?'#FFA000':'#FF5252';
+                const epsC=(q0.epsYoY||0)>15?'#00E676':(q0.epsYoY||0)>=0?'#FFA000':'#FF5252';
+                const opmC=(q0.opm||0)>12?'#00E676':(q0.opm||0)>=5?'#FFA000':'#FF5252';
                 return[
                   {label:'Market Cap',value:mcap>0?'₹'+(mcap>1000?(mcap/1000).toFixed(1)+'K Cr':mcap.toFixed(0)+' Cr'):'—',sub:mcapLabel,color:mcapColor},
                   {label:'Valuation',value:pe>0?'P/E '+pe.toFixed(1):'—',sub:peLabel,color:peColor},
-                  {label:'Earnings',value:(q0.epsYoY!=null?pct(q0.epsYoY):'—'),sub:'EPS YoY'+(q0.salesYoY!=null?' · Rev '+pct(q0.salesYoY):''),color:(q0.epsYoY||0)>15?'#00E676':(q0.epsYoY||0)>0?'#FFA000':'#FF5252'},
-                  {label:'Efficiency',value:(q0.opm!=null?q0.opm.toFixed(1)+'% OPM':'—'),sub:'ROE '+(inf.roe?inf.roe.toFixed(1)+'%':'—'),color:(q0.opm||0)>15?'#00E676':(q0.opm||0)>8?'#FFA000':'#FF5252'},
+                  {label:'Earnings',value:(q0.epsYoY!=null?pct(q0.epsYoY):'—'),sub:'EPS YoY'+(q0.salesYoY!=null?' · Rev '+pct(q0.salesYoY):''),color:epsC},
+                  {label:'Efficiency',value:(q0.opm!=null?q0.opm.toFixed(1)+'% OPM':'—'),sub:'ROE '+(inf.roe?inf.roe.toFixed(1)+'%':'—'),color:opmC},
                 ].map(m=><div key={m.label} style={{padding:"6px 8px",background:"#0a0a14",borderRadius:4,borderTop:`2px solid ${m.color}`}}>
                   <div style={{fontSize:8,color:"#666"}}>{m.label}</div>
                   <div style={{fontSize:11,fontWeight:700,color:m.color,fontFamily:"'JetBrains Mono',monospace"}}>{m.value}</div>
@@ -237,8 +243,8 @@ function StockReport(){
                 </div>)})()}
             </div>
             {/* Performance row */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginTop:6}}>
-              {[["Day",a.chg1d],["1W",a.chg1w],["1M",a.chg1m],["3M",a.chg3m]].map(([l,v])=><div key={l} style={{padding:"3px 4px",background:"#0a0a14",borderRadius:4,textAlign:"center"}}><div style={{fontSize:7,color:"#666"}}>{l}</div><div style={{fontSize:9,fontWeight:700,color:(v||0)>=0?"#00E676":"#FF5252",fontFamily:"'JetBrains Mono',monospace"}}>{pct(v)}</div></div>)}
+            <div style={{display:"flex",gap:6,marginTop:8}}>
+              {[["Day",a.chg1d],["1W",a.chg1w],["1M",a.chg1m],["3M",a.chg3m],["From High",a.fromHigh]].map(([l,v])=><div key={l} style={{flex:1,padding:"5px 6px",background:"#0a0a14",borderRadius:4,textAlign:"center"}}><div style={{fontSize:8,color:"#666",marginBottom:2}}>{l}</div><div style={{fontSize:11,fontWeight:700,color:(v||0)>=0?"#00E676":"#FF5252",fontFamily:"'JetBrains Mono',monospace"}}>{pct(v)}</div></div>)}
             </div>
           </div>
           {/* Catalysts & Ownership */}
@@ -286,6 +292,14 @@ function StockReport(){
               <span style={{fontSize:12,fontWeight:800,color:verdictColor2,fontFamily:"'JetBrains Mono',monospace",width:36,textAlign:"right"}}>{avgScore.toFixed(1)}</span>
             </div>
           </div>
+          {(()=>{const risks=[];
+            if(a.fusion==='FADE')risks.push({label:'Bearish Trend',color:'#FF5252',level:'High'});
+            if((inf.pe||0)>40)risks.push({label:'Overvalued',color:'#FFA000',level:'Med'});
+            if(proArr.length&&proArr[proArr.length-1]<30)risks.push({label:'Low Promoter',color:'#FFA000',level:'Med'});
+            if((a.adx||0)<15)risks.push({label:'No Trend',color:'#888',level:'Low'});
+            if((a.fromHigh||0)<-20)risks.push({label:'Far from High',color:'#FFA000',level:'Med'});
+            if((a.bbw||99)<8)risks.push({label:'Squeeze Building',color:'#B388FF',level:'Info'});
+            return risks.length>0?<div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:8}}>{risks.map(r=><span key={r.label} style={{padding:'2px 8px',borderRadius:4,fontSize:8,fontWeight:700,background:`${r.color}15`,color:r.color,border:`1px solid ${r.color}30`}}>{r.level}: {r.label}</span>)}</div>:null})()}
           <div style={{textAlign:"center",padding:14,background:`${verdictColor2}08`,border:`2px solid ${verdictColor2}30`,borderRadius:8}}>
             <div style={{fontSize:10,color:"#888",marginBottom:4}}>FINAL VERDICT</div>
             <div style={{fontSize:28,fontWeight:900,color:verdictColor2,letterSpacing:".02em"}}>{verdict2}</div>
