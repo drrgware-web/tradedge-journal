@@ -423,8 +423,8 @@ def run_scans(
                             detail["updated_at"] = datetime.now().isoformat()
                             with open(detail_path, "w") as df:
                                 json.dump(detail, df, indent=2, default=str)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"      ⚠ Price update failed for {symbol}: {e}")
 
                 # Run each scan against this stock
                 matched_scans = []
