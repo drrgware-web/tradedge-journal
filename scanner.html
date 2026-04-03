@@ -275,7 +275,7 @@ const FALLBACK=[
   {symbol:"HAL",name:"HAL",sector:"Defence",price:4850,change_pct:3.1,rsi:72.3,composite_score:5,circuit:{band:"No Band",is_restricted:false},earnings_alert:null,catalysts:[{type:"earnings_blockbuster",priority:10,title:"Blockbuster EPS +62%",direction:"bullish"}],fundamentals:{pe_ratio:38.5,market_cap_cr:324000,mcap_category:"large_cap",eps:126,roe:28.5,debt_to_equity:0},fund_holdings:{no_of_funds:189,fund_shares_change_pct:2.4},macd:{crossover:"bullish"},ema:{cross_9_21:"golden_cross",cross_50_200:"golden_cross"},breakout:{signal:"new_52w_high"},volume:{ratio:3.2,signal:"extreme_spike"},bollinger:{signal:"upper_breakout"},returns:{"1d":3.1,"1w":5.8,"1m":12.4,"3m":28.7}},
 ];
 
-const SCAN_CATS=[{id:"all",label:"ALL",icon:"◉"},{id:"catalyst",label:"CATALYSTS",icon:"⚡"},{id:"bullish",label:"BULLISH",icon:"▲"},{id:"bearish",label:"BEARISH",icon:"▼"},{id:"earnings",label:"EARNINGS",icon:"📊"},{id:"volume",label:"VOLUME",icon:"📈"},{id:"breakout",label:"BREAKOUT",icon:"💥"},{id:"momentum",label:"MOMENTUM",icon:"🚀"},{id:"shapers",label:"SHAPERS",icon:"🔮"}];
+const SCAN_CATS=[{id:"all",label:"ALL",icon:"◉"},{id:"combo",label:"COMBOS",icon:"⚡"},{id:"catalyst",label:"CATALYSTS",icon:"⚡"},{id:"bullish",label:"BULLISH",icon:"▲"},{id:"bearish",label:"BEARISH",icon:"▼"},{id:"earnings",label:"EARNINGS",icon:"📊"},{id:"volume",label:"VOLUME",icon:"📈"},{id:"breakout",label:"BREAKOUT",icon:"💥"},{id:"momentum",label:"MOMENTUM",icon:"🚀"},{id:"shapers",label:"SHAPERS",icon:"🔮"}];
 const SHAPER_SUBS=[{id:"loki",label:"LOKI"},{id:"oversold",label:"OVERSOLD"},{id:"bad_break",label:"BAD BREAK RECOVERY"},{id:"mini_coil",label:"MINI COIL"},{id:"123_pre",label:"1-2-3 PRE-BO"},{id:"3touch_pre",label:"3-TOUCH TL"}];
 
 // ═══ SHAPER FILTER FUNCTIONS ═══
@@ -934,6 +934,8 @@ const ScannerDashboard=()=>{
   const[excludeCircuit,setExcludeCircuit]=useState(true);
   const[expandedStock,setExpandedStock]=useState(null);
   const[orderDialog,setOrderDialog]=useState(null);
+  const[comboData,setComboData]=useState(null);const[comboFilter,setComboFilter]=useState('all');const[comboRunning,setComboRunning]=useState(false);
+  useEffect(()=>{fetch('./data/combo_scanner.json?t='+Date.now()).then(r=>r.ok?r.json():null).then(d=>{if(d)setComboData(d)}).catch(()=>{})},[]);
   const[activeFundaScan,setActiveFundaScan]=useState(null);
   const[fundaFilterSyms,setFundaFilterSyms]=useState(null);
   const[scanState,setScanState]=useState('idle');
@@ -967,7 +969,8 @@ const ScannerDashboard=()=>{
     if(appliedFilters.chartink?.length>0){const sy=new Set(appliedFilters.chartink);list=list.filter(s=>sy.has(s.symbol.toUpperCase()))}
     if(fundaFilterSyms?.length>0){const fs=new Set(fundaFilterSyms.map(s=>s.toUpperCase()));list=list.filter(s=>fs.has(s.symbol.toUpperCase()))}
     if(appliedFilters.funda){const ff=appliedFilters.funda;list=list.filter(s=>{const f=s.fundamentals||{};if(ff.pe_on&&f.pe_ratio!=null&&(f.pe_ratio<ff.pe_min||f.pe_ratio>ff.pe_max))return false;if(ff.roe_on&&(f.roe==null||f.roe<ff.roe_min))return false;if(ff.de_on&&f.debt_to_equity!=null&&f.debt_to_equity>ff.de_max)return false;return true})}
-    if(activePreset==="catalyst")list=list.filter(s=>s.catalysts?.length>0);
+    if(activePreset==="combo"&&comboData?.hits){const cSyms=new Set(comboData.hits.filter(h=>comboFilter==='all'||h.signals.some(s=>s.includes(comboFilter))).map(h=>h.symbol.toUpperCase()));list=list.filter(s=>cSyms.has(s.symbol.toUpperCase()))}
+    else if(activePreset==="catalyst")list=list.filter(s=>s.catalysts?.length>0);
     else if(activePreset==="bullish")list=list.filter(s=>s.composite_score>=70);
     else if(activePreset==="bearish")list=list.filter(s=>s.composite_score>0&&s.composite_score<40);
     else if(activePreset==="earnings")list=list.filter(s=>s.earnings_alert);
@@ -980,7 +983,7 @@ const ScannerDashboard=()=>{
     if(searchQuery){const q=searchQuery.toUpperCase();list=list.filter(s=>s.symbol.includes(q)||s.name.toUpperCase().includes(q)||s.sector.toUpperCase().includes(q))}
     const srt={score_desc:(a,b)=>b.composite_score-a.composite_score,score_asc:(a,b)=>a.composite_score-b.composite_score,change_desc:(a,b)=>b.change_pct-a.change_pct,rsi_desc:(a,b)=>(b.rsi||0)-(a.rsi||0),funds_desc:(a,b)=>(b.fund_holdings?.no_of_funds||0)-(a.fund_holdings?.no_of_funds||0),mcap_desc:(a,b)=>(b.fundamentals?.market_cap_cr||0)-(a.fundamentals?.market_cap_cr||0)};
     list.sort(srt[sortBy]||srt.score_desc);return list;
-  },[stocks,activePreset,activeShaperSub,sortBy,searchQuery,excludeCircuit,fundaFilterSyms,appliedFilters,activeScans,activeWL,savedWLs]);
+  },[stocks,activePreset,activeShaperSub,sortBy,searchQuery,excludeCircuit,fundaFilterSyms,appliedFilters,activeScans,activeWL,savedWLs,comboData,comboFilter]);
 
   const scanCounts=useMemo(()=>{if(!stocks.length)return{};const m={};SCAN_PRESETS.forEach(p=>{m[p.id]=runScan(stocks,p).length});return m},[stocks]);
 
@@ -1069,13 +1072,43 @@ const ScannerDashboard=()=>{
       <ScanBuilder onApplyFilter={setAppliedFilters} onScanResults={setChartinkResults} fundaData={fundaData} activeFundaScan={activeFundaScan} setActiveFundaScan={setActiveFundaScan} onFilterByFunda={setFundaFilterSyms} allStocks={stocks}/>
 
       <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10,padding:"8px 0",borderTop:"1px solid var(--border-dim)",borderBottom:"1px solid var(--border-dim)"}}>
-        {SCAN_CATS.map(p=><button key={p.id} onClick={()=>setActivePreset(activePreset===p.id?"all":p.id)} style={{background:activePreset===p.id?"var(--accent-dim)":"rgba(255,255,255,0.02)",border:`1px solid ${activePreset===p.id?"var(--accent)":"rgba(255,255,255,0.06)"}`,borderRadius:4,padding:"4px 10px",color:activePreset===p.id?"var(--accent)":"var(--text-muted)",fontSize:10,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer"}}>{p.icon} {p.label}</button>)}
+        {SCAN_CATS.map(p=>{const isCombo=p.id==='combo';const active=activePreset===p.id;return<button key={p.id} onClick={()=>setActivePreset(active?"all":p.id)} style={{background:active?(isCombo?"rgba(0,229,255,0.15)":"var(--accent-dim)"):"rgba(255,255,255,0.02)",border:`1px solid ${active?(isCombo?"#00e5ff":"var(--accent)"):"rgba(255,255,255,0.06)"}`,borderRadius:4,padding:"4px 10px",color:active?(isCombo?"#00e5ff":"var(--accent)"):(isCombo?"#00e5ff80":"var(--text-muted)"),fontSize:10,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer"}}>{p.icon} {p.label}{isCombo&&comboData?' ('+comboData.total_hits+')':''}</button>})}
         <div style={{marginLeft:"auto",display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>SORT:</span><select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{fontSize:10,padding:"3px 6px"}}><option value="score_desc">Score ↓</option><option value="score_asc">Score ↑</option><option value="change_desc">Change% ↓</option><option value="rsi_desc">RSI ↓</option><option value="funds_desc">Funds ↓</option><option value="mcap_desc">MCap ↓</option></select></div>
       </div>
 
       {activePreset==="shapers"&&<div style={{display:"flex",gap:6,marginBottom:10,padding:"6px 10px",background:"rgba(136,68,255,0.04)",border:"1px solid rgba(136,68,255,0.15)",borderRadius:6}}>
         <span style={{fontSize:9,fontWeight:700,color:"#8844ff",fontFamily:"var(--font-mono)",display:"flex",alignItems:"center",gap:4}}>🔮 SHAPERS:</span>
         {SHAPER_SUBS.map((sub,i)=><Fragment key={sub.id}>{i>0&&<span style={{color:"rgba(136,68,255,0.3)",fontSize:10}}>|</span>}<button onClick={()=>setActiveShaperSub(sub.id)} style={{background:activeShaperSub===sub.id?"rgba(136,68,255,0.2)":"transparent",border:`1px solid ${activeShaperSub===sub.id?"rgba(136,68,255,0.5)":"rgba(136,68,255,0.12)"}`,borderRadius:4,padding:"3px 10px",color:activeShaperSub===sub.id?"#aa88ff":"var(--text-muted)",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",transition:"all 0.15s",letterSpacing:0.5}}>{sub.label} <span style={{fontSize:8,opacity:0.7}}>({stocks.filter(SHAPER_FNS[sub.id]).length})</span></button></Fragment>)}
+      </div>}
+
+      {activePreset==="combo"&&<div style={{marginBottom:10}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",padding:"6px 10px",background:"rgba(0,229,255,0.04)",border:"1px solid rgba(0,229,255,0.15)",borderRadius:6,flexWrap:"wrap"}}>
+          <span style={{fontSize:9,fontWeight:700,color:"#00e5ff",fontFamily:"var(--font-mono)"}}>⚡ COMBO:</span>
+          {[['all','ALL'],['BO','BO+PPV'],['PB','PB+PPV']].map(([k,l])=><button key={k} onClick={()=>setComboFilter(k)} style={{background:comboFilter===k?"rgba(0,229,255,0.15)":"transparent",border:`1px solid ${comboFilter===k?"#00e5ff":"rgba(0,229,255,0.12)"}`,borderRadius:4,padding:"3px 10px",color:comboFilter===k?"#00e5ff":"var(--text-muted)",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer"}}>{l} {comboData?'('+comboData.hits.filter(h=>k==='all'||h.signals.some(s=>s.includes(k))).length+')':''}</button>)}
+          <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+            {comboData&&<span style={{fontSize:8,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>Scanned: {comboData.generated_at?.slice(11,16)} IST · Every 30min</span>}
+            <button onClick={async()=>{const t=localStorage.getItem('te_github_token');if(!t){alert('Set GitHub token in Settings');return}setComboRunning(true);try{await fetch('https://api.github.com/repos/drrgware-web/tradedge-journal/actions/workflows/combo-scanner.yml/dispatches',{method:'POST',headers:{'Authorization':'Bearer '+t,'Accept':'application/vnd.github.v3+json'},body:JSON.stringify({ref:'main'})});setTimeout(()=>setComboRunning(false),3000)}catch(e){setComboRunning(false)}}} disabled={comboRunning} style={{padding:"3px 8px",fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,color:comboRunning?"var(--text-muted)":"#00e5ff",background:comboRunning?"transparent":"rgba(0,229,255,0.08)",border:"1px solid rgba(0,229,255,0.2)",borderRadius:3,cursor:"pointer"}}>{comboRunning?"Running...":"⚡ Run Now"}</button>
+          </div>
+        </div>
+        {comboData?.hits?.length>0&&<div style={{marginTop:6,overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:"var(--font-mono)"}}>
+            <thead><tr style={{background:"rgba(0,229,255,0.03)"}}>
+              {["SYMBOL","SIGNAL","CLOSE","CHG%","FUSION","CLOUD","RSI","ADX"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:8,fontWeight:700,color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)",letterSpacing:".5px"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{comboData.hits.filter(h=>comboFilter==='all'||h.signals.some(s=>s.includes(comboFilter))).map(h=>{
+              const FC={IGNITION:"#FFD700",THRUST:"#00E676",FADE:"#FF5252",COIL:"#B388FF",DRIFT:"#888"};
+              return<tr key={h.symbol} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`techart.html?s=${h.symbol}`,'_blank')}>
+                <td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{h.symbol}</td>
+                <td style={{padding:"5px 8px"}}>{h.signals.map((s,i)=><span key={i} style={{padding:"1px 6px",borderRadius:3,fontSize:8,fontWeight:700,background:"rgba(0,229,255,0.12)",color:"#00e5ff",marginRight:3}}>{s}</span>)}</td>
+                <td style={{padding:"5px 8px",color:"var(--text-secondary)"}}>₹{h.close?.toFixed(2)}</td>
+                <td style={{padding:"5px 8px",fontWeight:600,color:h.change_pct>=0?"#00ff88":"#ff4455"}}>{h.change_pct>=0?"+":""}{h.change_pct?.toFixed(1)}%</td>
+                <td style={{padding:"5px 8px"}}><span style={{padding:"1px 5px",borderRadius:3,fontSize:8,fontWeight:700,background:`${FC[h.fusion]||'#888'}18`,color:FC[h.fusion]||'#888'}}>{h.fusion}</span></td>
+                <td style={{padding:"5px 8px",color:h.cloud==="BULL"?"#00ff88":"#ff4455",fontWeight:600,fontSize:9}}>{h.cloud}</td>
+                <td style={{padding:"5px 8px",color:h.rsi>55?"#00ff88":h.rsi<45?"#ff4455":"var(--text-muted)"}}>{h.rsi}</td>
+                <td style={{padding:"5px 8px",color:h.adx>25?"#ffaa00":"var(--text-muted)"}}>{h.adx?.toFixed(1)}</td>
+              </tr>})}</tbody>
+          </table>
+        </div>}
       </div>}
 
       <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:8,fontFamily:"var(--font-mono)"}}>Showing <span style={{color:"var(--accent)",fontWeight:700}}>{filteredStocks.length}</span> stocks • Click row to expand chart</div>
