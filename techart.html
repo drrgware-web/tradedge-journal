@@ -524,8 +524,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         mainSeries=chart.addAreaSeries({topColor:dk?'rgba(66,165,245,0.15)':'rgba(33,150,243,0.12)',bottomColor:'transparent',lineColor:'#2196F3',lineWidth:2,crosshairMarkerRadius:4});
         mainSeries.setData(ohlc.map(d=>({time:d.time,value:d.close})));
       }else{
-        mainSeries=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350',borderVisible:false});
-        mainSeries.setData(ohlc.map(d=>({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close})));
+        mainSeries=chart.addBarSeries({upColor:'#00e676',downColor:'#ef5350',thinBars:false,openVisible:false});
+        mainSeries.setData(ohlc.map((d,i)=>({time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close})));
       }
 
       // Pocket Pivot detection (volume chart created separately below)
@@ -550,32 +550,25 @@ function LWChart({symbol,w,h,mode,isDark}){
       const fusionStates=calcAllFusionStates(ohlc,ecCfg);
       fusionRef.current=fusionStates;
 
-      // Cloud fill BETWEEN WL and RL — colored by fusion state per bar
+      // Cloud fill BETWEEN WL and RL — green when bullish, red when bearish
       if(ecCfg.showCloud){
-        const FC={IGNITION:'rgba(255,215,0,0.18)',THRUST:'rgba(38,166,154,0.15)',FADE:'rgba(239,83,80,0.15)',COIL:'rgba(179,136,255,0.12)',DRIFT:'rgba(97,97,97,0.08)'};
-        // Build per-state top/bot arrays; inactive bars get zero-height (lo=lo)
-        const stateTopData={},stateBotData={};const maskBotD=[];
-        const states=Object.keys(FC);
-        states.forEach(s=>{stateTopData[s]=[];stateBotData[s]=[]});
+        const bullTop=[],bullBot=[],bearTop=[],bearBot=[];
         for(let i=0;i<ohlc.length;i++){
           if(walking[i]==null||running[i]==null)continue;
           const t=ohlc[i].time;const hi=Math.max(walking[i],running[i]);const lo=Math.min(walking[i],running[i]);
-          const fs=fusionStates[i]?.state||'DRIFT';
-          maskBotD.push({time:t,value:lo});
-          states.forEach(s=>{
-            if(s===fs){stateTopData[s].push({time:t,value:hi});stateBotData[s].push({time:t,value:lo})}
-            else{stateTopData[s].push({time:t,value:lo});stateBotData[s].push({time:t,value:lo})}
-          });
+          if(walking[i]>=running[i]){
+            bullTop.push({time:t,value:hi});bullBot.push({time:t,value:lo});
+            bearTop.push({time:t,value:lo});bearBot.push({time:t,value:lo});
+          }else{
+            bearTop.push({time:t,value:hi});bearBot.push({time:t,value:lo});
+            bullTop.push({time:t,value:lo});bullBot.push({time:t,value:lo});
+          }
         }
-        // Create area series per state + one shared bg mask
-        states.forEach(s=>{
-          if(!stateTopData[s].length)return;
-          const a=chart.addAreaSeries({topColor:FC[s],bottomColor:FC[s],lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-          a.setData(stateTopData[s]);
-        });
-        // Background mask at lower boundary erases fill below the cloud
-        const mask=chart.addAreaSeries({topColor:bgCol,bottomColor:bgCol,lineColor:'transparent',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
-        mask.setData(maskBotD);
+        const aOpts={lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false};
+        chart.addAreaSeries({...aOpts,topColor:'rgba(0,230,118,0.08)',bottomColor:'rgba(0,230,118,0.08)',lineColor:'rgba(0,230,118,0.3)',lineWidth:1}).setData(bullTop);
+        chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bullBot);
+        chart.addAreaSeries({...aOpts,topColor:'rgba(239,83,80,0.08)',bottomColor:'rgba(239,83,80,0.08)',lineColor:'rgba(239,83,80,0.3)',lineWidth:1}).setData(bearTop);
+        chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bearBot);
       }
 
       // ── Donchian Channel (20) ──
@@ -641,7 +634,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'F'});
         else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
       // Pocket Pivot
-      ppFlags.forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#2196F3',shape:'arrowUp',text:'PP'})});
+      const ppCutoff=Math.max(0,ohlc.length-60);
+      ppFlags.filter(i=>i>=ppCutoff).forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#2196F3',shape:'arrowUp',text:'PP'})});
       // Donchian breakouts
       boFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
         if(type==='bull')markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#FFEB3B80':'#FFEB3B',shape:'arrowUp',text:'BO'});
@@ -848,23 +842,20 @@ function LWChart({symbol,w,h,mode,isDark}){
       </div>}
       {/* Top-right weekly badge */}
       {showWeekly&&weeklyState&&<div style={{position:'absolute',top:6,right:8,zIndex:2,font:'700 9px var(--fm)',color:weeklyState.color,padding:'3px 10px',background:`${weeklyState.color}15`,border:`1px solid ${weeklyState.color}30`,borderRadius:4,backdropFilter:'blur(4px)'}}>Wkly: {weeklyState.state}</div>}
+      {/* Crosshair tooltip — top-right of chart */}
+      {hovered&&<div style={{position:'absolute',top:8,right:8,zIndex:10,display:'flex',gap:8,padding:'5px 8px',background:'rgba(0,0,0,0.85)',border:'1px solid var(--bdr)',borderRadius:4,font:'500 9px var(--fm)',flexWrap:'wrap',alignItems:'center',maxWidth:400,backdropFilter:'blur(4px)'}}>
+        <span style={{color:'var(--t2)'}}>{hovered.date}</span>
+        <span style={{color:'var(--t3)'}}>O <span style={{color:'var(--t1)'}}>{hovered.open?.toFixed(2)}</span> H <span style={{color:'var(--t1)'}}>{hovered.high?.toFixed(2)}</span> L <span style={{color:'var(--t1)'}}>{hovered.low?.toFixed(2)}</span> C <span style={{color:'var(--t1)'}}>{hovered.close?.toFixed(2)}</span></span>
+        <span style={{color:'var(--t3)'}}>Vol <span style={{color:'var(--t2)'}}>{hovered.volume?(hovered.volume/1e6).toFixed(2)+'M':'—'}</span></span>
+        {hovered.state&&<span style={{font:'700 8px var(--fm)',color:hovered.color,padding:'1px 6px',background:`${hovered.color}18`,borderRadius:3}}>{hovered.state}</span>}
+        {hovered.bbw!=null&&<span style={{color:'var(--t3)'}}>BB <span style={{color:hovered.bbw<10?'#B388FF':'var(--t2)'}}>{hovered.bbw.toFixed(1)}%</span></span>}
+        {hovered.rsi!=null&&<span style={{color:'var(--t3)'}}>RSI <span style={{color:hovered.rsi>55?'#00E676':hovered.rsi<45?'#FF5252':'var(--t2)'}}>{hovered.rsi.toFixed(1)}</span></span>}
+        {hovered.adx!=null&&<span style={{color:'var(--t3)'}}>ADX <span style={{color:hovered.adx>25?'#FFA000':'var(--t2)'}}>{hovered.adx.toFixed(1)}</span></span>}
+        {hovered.walking!=null&&<span style={{color:'#26a69a',fontSize:8}}>WL {hovered.walking.toFixed(1)}</span>}
+        {hovered.running!=null&&<span style={{color:'#ff9800',fontSize:8}}>RL {hovered.running.toFixed(1)}</span>}
+        {hovered.cloudBull!=null&&<span style={{font:'600 8px var(--fm)',color:hovered.cloudBull?'#26A69A':'#EF5350'}}>{hovered.cloudBull?'Bull':'Bear'}</span>}
+      </div>}
     </div>
-
-    {/* Crosshair tooltip */}
-    {hovered&&<div style={{display:'flex',gap:12,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:4,margin:'4px 0',font:'500 9px var(--fm)',flexWrap:'wrap',alignItems:'center'}}>
-      <span style={{color:'var(--t2)'}}>{hovered.date}</span>
-      <span style={{color:'var(--t3)'}}>O <span style={{color:'var(--t1)'}}>{hovered.open?.toFixed(2)}</span> H <span style={{color:'var(--t1)'}}>{hovered.high?.toFixed(2)}</span> L <span style={{color:'var(--t1)'}}>{hovered.low?.toFixed(2)}</span> C <span style={{color:'var(--t1)'}}>{hovered.close?.toFixed(2)}</span></span>
-      <span style={{color:'var(--t3)'}}>Vol <span style={{color:'var(--t2)'}}>{hovered.volume?(hovered.volume/1e6).toFixed(2)+'M':'—'}</span></span>
-      {hovered.state&&<span style={{font:'700 8px var(--fm)',color:hovered.color,padding:'1px 6px',background:`${hovered.color}18`,borderRadius:3}}>{hovered.state}</span>}
-      {hovered.bbw!=null&&<span style={{color:'var(--t3)'}}>BB <span style={{color:hovered.bbw<10?'#B388FF':'var(--t2)'}}>{hovered.bbw.toFixed(1)}%</span></span>}
-      {hovered.rsi!=null&&<span style={{color:'var(--t3)'}}>RSI <span style={{color:hovered.rsi>55?'#00E676':hovered.rsi<45?'#FF5252':'var(--t2)'}}>{hovered.rsi.toFixed(1)}</span></span>}
-      {hovered.adx!=null&&<span style={{color:'var(--t3)'}}>ADX <span style={{color:hovered.adx>25?'#FFA000':'var(--t2)'}}>{hovered.adx.toFixed(1)}</span></span>}
-      {hovered.st1Val!=null&&<span style={{color:hovered.st1Dir===1?'#26A69A':'#EF5350',fontSize:8}}>ST1 {hovered.st1Val.toFixed(1)}</span>}
-      {hovered.st2Val!=null&&<span style={{color:hovered.st2Dir===1?'#26A69A':'#EF5350',fontSize:8}}>ST2 {hovered.st2Val.toFixed(1)}</span>}
-      {hovered.walking!=null&&<span style={{color:ecCfg.wlColor,fontSize:8}}>WL {hovered.walking.toFixed(1)}</span>}
-      {hovered.running!=null&&<span style={{color:ecCfg.rlColor,fontSize:8}}>RL {hovered.running.toFixed(1)}</span>}
-      {hovered.cloudBull!=null&&<span style={{font:'600 8px var(--fm)',color:hovered.cloudBull?'#26A69A':'#EF5350'}}>{hovered.cloudBull?'Bull':'Bear'}</span>}
-    </div>}
 
     <div style={{padding:'0'}}>
       {sep()}
