@@ -631,16 +631,16 @@ function LWChart({symbol,w,h,mode,isDark}){
         wasSqueeze=isSq;
       }
 
-      // Blue overlay bars for PP, BO, PB signal days
+      // Blue overlay bars ONLY for combo signals: BO+PP or PB+PP
       const ppCutoff=Math.max(0,ohlc.length-60);
-      const signalIdxs=new Set([
-        ...ppFlags.filter(i=>i>=ppCutoff),
-        ...boFlags.filter(b=>b.type==='bull').map(b=>b.idx),
-        ...pbFlags
-      ]);
-      if(signalIdxs.size>0){
+      const ppSetAll=new Set(ppFlags);
+      const boIdxSet=new Set(boFlags.filter(b=>b.type==='bull').map(b=>b.idx));
+      const pbSet=new Set(pbFlags);
+      const comboIdxs=[];
+      ppSetAll.forEach(i=>{if(boIdxSet.has(i)||pbSet.has(i))comboIdxs.push(i)});
+      if(comboIdxs.length>0){
         const blueBars=chart.addBarSeries({upColor:'#00e5ff',downColor:'#00e5ff',thinBars:false,openVisible:false,lastValueVisible:false,priceLineVisible:false});
-        blueBars.setData([...signalIdxs].sort((a,b)=>a-b).map(i=>{const d=ohlc[i];return{time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close}}));
+        blueBars.setData(comboIdxs.sort((a,b)=>a-b).map(i=>{const d=ohlc[i];return{time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close}}));
       }
 
       // ── All markers ──
