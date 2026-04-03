@@ -281,6 +281,7 @@ def refresh_prices(details: List[Dict]) -> Dict[str, Dict]:
         return {}
 
     fresh = {}  # {SYMBOL: {close, change_pct}}
+    failed = []
     BATCH = 100
     total_batches = (len(symbols) + BATCH - 1) // BATCH
 
@@ -301,6 +302,12 @@ def refresh_prices(details: List[Dict]) -> Dict[str, Dict]:
                 progress=False,
             )
 
+            # Debug: print shape and columns for first batch
+            if batch_num == 1:
+                print(f"    [DEBUG] Batch 1 shape: {data.shape}")
+                print(f"    [DEBUG] Batch 1 columns (first 5): {list(data.columns[:5])}")
+                print(f"    [DEBUG] Batch 1 index (last 2): {list(data.index[-2:])}")
+
             for sym in batch:
                 yf_sym = f"{sym}.NS"
                 try:
@@ -308,10 +315,12 @@ def refresh_prices(details: List[Dict]) -> Dict[str, Dict]:
                         df = data
                     else:
                         if yf_sym not in data.columns.get_level_values(0):
+                            failed.append((sym, "not in download columns"))
                             continue
                         df = data[yf_sym].dropna(how="all")
 
                     if len(df) < 2:
+                        failed.append((sym, f"only {len(df)} rows"))
                         continue
 
                     latest = float(df["Close"].iloc[-1])
@@ -321,17 +330,29 @@ def refresh_prices(details: List[Dict]) -> Dict[str, Dict]:
                             "close": round(latest, 2),
                             "change_pct": round((latest - prev) / prev * 100, 2),
                         }
-                except Exception:
-                    pass
+                    else:
+                        failed.append((sym, f"invalid prices: latest={latest}, prev={prev}"))
+                except Exception as e:
+                    failed.append((sym, str(e)))
 
-            print(f"    Batch {batch_num}/{total_batches}: {len([s for s in batch if s in fresh])}/{len(batch)} prices updated")
+            ok_count = len([s for s in batch if s in fresh])
+            print(f"    Batch {batch_num}/{total_batches}: {ok_count}/{len(batch)} prices updated")
         except Exception as e:
-            print(f"    Batch {batch_num}/{total_batches} failed: {e}")
+            print(f"    Batch {batch_num}/{total_batches} FAILED: {e}")
+            for sym in batch:
+                failed.append((sym, f"batch error: {e}"))
 
         if i + BATCH < len(symbols):
             time.sleep(1)  # Rate limit between batches
 
-    print(f"  ✅ Refreshed {len(fresh)}/{len(symbols)} prices")
+    print(f"  ✅ Refreshed {len(fresh)}/{len(symbols)} prices, {len(failed)} failed")
+    if failed and len(failed) <= 20:
+        for sym, reason in failed:
+            print(f"    ✗ {sym}: {reason}")
+    elif failed:
+        print(f"    First 10 failures:")
+        for sym, reason in failed[:10]:
+            print(f"    ✗ {sym}: {reason}")
     return fresh
 
 
@@ -344,7 +365,12 @@ def generate_summary():
         return
 
     # Refresh prices from yfinance
-    fresh_prices = refresh_prices(details)
+    fresh_prices = {}
+    try:
+        fresh_prices = refresh_prices(details)
+    except Exception as e:
+        print(f"  ❌ refresh_prices() crashed: {e}")
+        import traceback; traceback.print_exc()
     if fresh_prices:
         for detail in details:
             sym = detail.get("symbol", "")
