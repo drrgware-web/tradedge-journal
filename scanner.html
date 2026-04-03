@@ -275,7 +275,42 @@ const FALLBACK=[
   {symbol:"HAL",name:"HAL",sector:"Defence",price:4850,change_pct:3.1,rsi:72.3,composite_score:5,circuit:{band:"No Band",is_restricted:false},earnings_alert:null,catalysts:[{type:"earnings_blockbuster",priority:10,title:"Blockbuster EPS +62%",direction:"bullish"}],fundamentals:{pe_ratio:38.5,market_cap_cr:324000,mcap_category:"large_cap",eps:126,roe:28.5,debt_to_equity:0},fund_holdings:{no_of_funds:189,fund_shares_change_pct:2.4},macd:{crossover:"bullish"},ema:{cross_9_21:"golden_cross",cross_50_200:"golden_cross"},breakout:{signal:"new_52w_high"},volume:{ratio:3.2,signal:"extreme_spike"},bollinger:{signal:"upper_breakout"},returns:{"1d":3.1,"1w":5.8,"1m":12.4,"3m":28.7}},
 ];
 
-const SCAN_CATS=[{id:"all",label:"ALL",icon:"◉"},{id:"catalyst",label:"CATALYSTS",icon:"⚡"},{id:"bullish",label:"BULLISH",icon:"▲"},{id:"bearish",label:"BEARISH",icon:"▼"},{id:"earnings",label:"EARNINGS",icon:"📊"},{id:"volume",label:"VOLUME",icon:"📈"},{id:"breakout",label:"BREAKOUT",icon:"💥"},{id:"momentum",label:"MOMENTUM",icon:"🚀"}];
+const SCAN_CATS=[{id:"all",label:"ALL",icon:"◉"},{id:"catalyst",label:"CATALYSTS",icon:"⚡"},{id:"bullish",label:"BULLISH",icon:"▲"},{id:"bearish",label:"BEARISH",icon:"▼"},{id:"earnings",label:"EARNINGS",icon:"📊"},{id:"volume",label:"VOLUME",icon:"📈"},{id:"breakout",label:"BREAKOUT",icon:"💥"},{id:"momentum",label:"MOMENTUM",icon:"🚀"},{id:"shapers",label:"SHAPERS",icon:"🔮"}];
+const SHAPER_SUBS=[{id:"loki",label:"LOKI"},{id:"oversold",label:"OVERSOLD"},{id:"bad_break",label:"BAD BREAK RECOVERY"},{id:"mini_coil",label:"MINI COIL"}];
+
+// ═══ SHAPER FILTER FUNCTIONS ═══
+// These use proxy logic from available scanner fields (no price_history needed)
+function shaperLoki(s){
+  // LOKI: Shakeout + recovery pattern proxy
+  // Volume spike (shakeout signal) + price recovering above short-term avg + bullish MACD
+  return s.volume_ratio>=1.5 && s.change_pct>0 && s.close>s.sma_20
+    && s.macd?.crossover==="bullish"
+    && s.return_1w>0 && s.return_1m>-5
+    && s.rsi>=40 && s.rsi<=65;
+}
+function shaperOversold(s){
+  // OVERSOLD SHAPER: Stage 2 proxy (close>sma50) + recovering from oversold
+  return s.close>s.sma_50 && s.sma_20>s.sma_50  // Stage 2 proxy: EMA10>EMA20 ≈ SMA20>SMA50
+    && s.rsi>=35 && s.rsi<=50                     // Recovering from oversold zone
+    && s.change_pct>0;                            // Up day
+}
+function shaperBadBreak(s){
+  // BAD BREAK RECOVERY: Reclaimed SMA50 + 52w position recovering + volume spike
+  return s.close>s.sma_50 && s.close>s.sma_200
+    && s.high_52w_proximity>=50 && s.high_52w_proximity<=85  // Recovering, not at highs
+    && s.volume_ratio>=1.5
+    && s.return_1w>0 && s.return_1m>0
+    && s.macd?.crossover!=="bearish";
+}
+function shaperMiniCoil(s){
+  // MINI COIL: Tight consolidation (low vol) + recent volume spike potential + tight range
+  return s.close>s.sma_50
+    && s.volume_ratio<=0.8                        // Low volume = coiling/contracting
+    && Math.abs(s.change_pct)<1.5                 // Tight daily range
+    && (s.return_1m>=0 && s.return_1m<=8)         // Flat-ish base, not trending hard
+    && s.price_strength>=50;                      // Still relatively strong RS
+}
+const SHAPER_FNS={loki:shaperLoki,oversold:shaperOversold,bad_break:shaperBadBreak,mini_coil:shaperMiniCoil};
 const CAT_COLORS={growth:{bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"},ownership:{bg:"rgba(0,200,255,0.08)",border:"rgba(0,200,255,0.25)",color:"#00c8ff"},capex:{bg:"rgba(255,170,0,0.08)",border:"rgba(255,170,0,0.25)",color:"#ffaa00"},momentum:{bg:"rgba(136,68,255,0.08)",border:"rgba(136,68,255,0.25)",color:"#8844ff"},earnings:{bg:"rgba(255,100,0,0.08)",border:"rgba(255,100,0,0.25)",color:"#ff6400"},quality:{bg:"rgba(0,230,200,0.08)",border:"rgba(0,230,200,0.25)",color:"#00e6c8"}};
 
 // ═══════════════════════════════════════════════════════════════
@@ -860,6 +895,7 @@ const ScannerDashboard=()=>{
   const{stocks,loading,error,meta,cmpLoading,refetch}=useStockData();
   const{fundaData}=useFundaData();
   const[activePreset,setActivePreset]=useState("all");
+  const[activeShaperSub,setActiveShaperSub]=useState("loki");
   const[sortBy,setSortBy]=useState("score_desc");
   const[searchQuery,setSearchQuery]=useState("");
   const[excludeCircuit,setExcludeCircuit]=useState(true);
@@ -905,12 +941,13 @@ const ScannerDashboard=()=>{
     else if(activePreset==="volume")list=list.filter(s=>["spike","extreme_spike"].includes(s.volume?.signal));
     else if(activePreset==="breakout")list=list.filter(s=>["new_52w_high","near_52w_high"].includes(s.breakout?.signal));
     else if(activePreset==="momentum")list=list.filter(s=>s.rsi>55&&s.rsi<80&&s.composite_score>0);
+    else if(activePreset==="shapers"){const fn=SHAPER_FNS[activeShaperSub];if(fn)list=list.filter(fn)}
     if(activeScans.size>0){const presets=SCAN_PRESETS.filter(p=>activeScans.has(p.id));const symSets=presets.map(p=>new Set(runScan(stocks,p).map(s=>s.symbol)));list=list.filter(s=>symSets.every(set=>set.has(s.symbol)))}
     if(activeWL){const wl=savedWLs.find(w=>w.id===activeWL);if(wl){const sy=new Set(wl.symbols.map(s=>s.toUpperCase()));list=list.filter(s=>sy.has(s.symbol.toUpperCase()))}}
     if(searchQuery){const q=searchQuery.toUpperCase();list=list.filter(s=>s.symbol.includes(q)||s.name.toUpperCase().includes(q)||s.sector.toUpperCase().includes(q))}
     const srt={score_desc:(a,b)=>b.composite_score-a.composite_score,score_asc:(a,b)=>a.composite_score-b.composite_score,change_desc:(a,b)=>b.change_pct-a.change_pct,rsi_desc:(a,b)=>(b.rsi||0)-(a.rsi||0),funds_desc:(a,b)=>(b.fund_holdings?.no_of_funds||0)-(a.fund_holdings?.no_of_funds||0),mcap_desc:(a,b)=>(b.fundamentals?.market_cap_cr||0)-(a.fundamentals?.market_cap_cr||0)};
     list.sort(srt[sortBy]||srt.score_desc);return list;
-  },[stocks,activePreset,sortBy,searchQuery,excludeCircuit,fundaFilterSyms,appliedFilters,activeScans,activeWL,savedWLs]);
+  },[stocks,activePreset,activeShaperSub,sortBy,searchQuery,excludeCircuit,fundaFilterSyms,appliedFilters,activeScans,activeWL,savedWLs]);
 
   const scanCounts=useMemo(()=>{if(!stocks.length)return{};const m={};SCAN_PRESETS.forEach(p=>{m[p.id]=runScan(stocks,p).length});return m},[stocks]);
 
@@ -1002,6 +1039,11 @@ const ScannerDashboard=()=>{
         {SCAN_CATS.map(p=><button key={p.id} onClick={()=>setActivePreset(activePreset===p.id?"all":p.id)} style={{background:activePreset===p.id?"var(--accent-dim)":"rgba(255,255,255,0.02)",border:`1px solid ${activePreset===p.id?"var(--accent)":"rgba(255,255,255,0.06)"}`,borderRadius:4,padding:"4px 10px",color:activePreset===p.id?"var(--accent)":"var(--text-muted)",fontSize:10,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer"}}>{p.icon} {p.label}</button>)}
         <div style={{marginLeft:"auto",display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:10,color:"var(--text-muted)",fontFamily:"var(--font-mono)"}}>SORT:</span><select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{fontSize:10,padding:"3px 6px"}}><option value="score_desc">Score ↓</option><option value="score_asc">Score ↑</option><option value="change_desc">Change% ↓</option><option value="rsi_desc">RSI ↓</option><option value="funds_desc">Funds ↓</option><option value="mcap_desc">MCap ↓</option></select></div>
       </div>
+
+      {activePreset==="shapers"&&<div style={{display:"flex",gap:6,marginBottom:10,padding:"6px 10px",background:"rgba(136,68,255,0.04)",border:"1px solid rgba(136,68,255,0.15)",borderRadius:6}}>
+        <span style={{fontSize:9,fontWeight:700,color:"#8844ff",fontFamily:"var(--font-mono)",display:"flex",alignItems:"center",gap:4}}>🔮 SHAPERS:</span>
+        {SHAPER_SUBS.map((sub,i)=><Fragment key={sub.id}>{i>0&&<span style={{color:"rgba(136,68,255,0.3)",fontSize:10}}>|</span>}<button onClick={()=>setActiveShaperSub(sub.id)} style={{background:activeShaperSub===sub.id?"rgba(136,68,255,0.2)":"transparent",border:`1px solid ${activeShaperSub===sub.id?"rgba(136,68,255,0.5)":"rgba(136,68,255,0.12)"}`,borderRadius:4,padding:"3px 10px",color:activeShaperSub===sub.id?"#aa88ff":"var(--text-muted)",fontSize:9,fontWeight:700,fontFamily:"var(--font-mono)",cursor:"pointer",transition:"all 0.15s",letterSpacing:0.5}}>{sub.label} <span style={{fontSize:8,opacity:0.7}}>({stocks.filter(SHAPER_FNS[sub.id]).length})</span></button></Fragment>)}
+      </div>}
 
       <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:8,fontFamily:"var(--font-mono)"}}>Showing <span style={{color:"var(--accent)",fontWeight:700}}>{filteredStocks.length}</span> stocks • Click row to expand chart</div>
 
