@@ -490,7 +490,7 @@ function cfgToast(msg){const t=document.createElement('div');t.className='cfg-to
 function cfgStatusBadge(id,ok,label){const el=document.getElementById(id);if(!el)return;el.className='cfg-status '+(ok?'cfg-ok':'cfg-none');el.textContent=ok?'✓ '+(label||'Connected'):(label||'Not set')}
 
 function cfgLoadAll(){
-  const gk=localStorage.getItem('groq_key')||'';
+  const gk=localStorage.getItem('groq_key')||localStorage.getItem('groq_api_key')||localStorage.getItem('te_groq_key')||'';
   document.getElementById('cfgGroqKey').value=gk;
   cfgStatusBadge('cfgGroqStatus',gk.startsWith('gsk_'),'Connected','Not set');
 
@@ -515,7 +515,7 @@ function cfgLoadAll(){
   document.getElementById('cfgSt3Btn').className='cfg-st-btn'+(stm==='3'?' active':'');
 }
 
-function cfgSaveGroq(){const v=document.getElementById('cfgGroqKey').value.trim();if(v)localStorage.setItem('groq_key',v);else localStorage.removeItem('groq_key');cfgStatusBadge('cfgGroqStatus',v.startsWith('gsk_'));cfgToast(v?'Groq key saved':'Groq key cleared')}
+function cfgSaveGroq(){const v=document.getElementById('cfgGroqKey').value.trim();['groq_key','groq_api_key','te_groq_key'].forEach(k=>{if(v)localStorage.setItem(k,v);else localStorage.removeItem(k)});cfgStatusBadge('cfgGroqStatus',v.startsWith('gsk_'));cfgToast(v?'Groq key saved (all pages)':'Groq key cleared')}
 function cfgSaveTelegram(){const b=document.getElementById('cfgTgBot').value.trim(),c=document.getElementById('cfgTgChat').value.trim();if(b)localStorage.setItem('te_tg_bot',b);else localStorage.removeItem('te_tg_bot');if(c)localStorage.setItem('te_tg_chat',c);else localStorage.removeItem('te_tg_chat');cfgStatusBadge('cfgTgStatus',b&&c,'Configured');cfgToast('Telegram settings saved')}
 function cfgTestTelegram(){const b=localStorage.getItem('te_tg_bot'),c=localStorage.getItem('te_tg_chat');if(!b||!c){alert('Save bot token and chat ID first');return}fetch('https://api.telegram.org/bot'+b+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:c,text:'✅ TradEdge test alert — settings working!',parse_mode:'HTML'})}).then(r=>r.json()).then(d=>{if(d.ok)cfgToast('Test message sent!');else alert('Telegram error: '+JSON.stringify(d))}).catch(e=>alert('Error: '+e.message))}
 function cfgSaveDhan(){const i=document.getElementById('cfgDhanId').value.trim(),t=document.getElementById('cfgDhanTk').value.trim();if(i)localStorage.setItem('dhan_id',i);else localStorage.removeItem('dhan_id');if(t)localStorage.setItem('dhan_tk',t);else localStorage.removeItem('dhan_tk');cfgStatusBadge('cfgDhanStatus',i&&t);cfgToast('Dhan settings saved')}
