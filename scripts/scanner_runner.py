@@ -414,10 +414,10 @@ def run_scans(
                         if detail_path.exists():
                             with open(detail_path) as df:
                                 detail = json.load(df)
-                            if "technicals" not in detail:
-                                detail["technicals"] = {}
-                            detail["technicals"]["close"] = fresh_close
-                            detail["technicals"]["change_pct"] = fresh_chg
+                            if "technical" not in detail:
+                                detail["technical"] = {}
+                            detail["technical"]["close"] = fresh_close
+                            detail["technical"]["change_pct"] = fresh_chg
                             detail["price"] = fresh_close
                             detail["change_pct"] = fresh_chg
                             detail["updated_at"] = datetime.now().isoformat()
