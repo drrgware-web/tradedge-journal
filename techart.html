@@ -796,6 +796,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
         <button onClick={()=>setShowWeekly(!showWeekly)} style={{padding:'3px 8px',fontSize:9,fontFamily:'var(--fm)',fontWeight:showWeekly?700:500,color:showWeekly?'#B388FF':'var(--t3)',background:showWeekly?'rgba(179,136,255,.12)':'transparent',border:`1px solid ${showWeekly?'rgba(179,136,255,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>Wkly</button>
         <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
+        {[[7,3],[10,2],[10,3]].map(([p,m])=>{const active=ecCfg.stPeriod===p&&ecCfg.stMult1===m;return<button key={p+','+m} onClick={()=>{updateCfg('stPeriod',p);updateCfg('stMult1',m);localStorage.setItem('ec_st_multiplier',String(m))}} style={{padding:'3px 8px',fontSize:9,fontFamily:'var(--fm)',fontWeight:active?700:500,color:active?'#26a69a':'var(--t3)',background:active?'rgba(38,166,154,.12)':'transparent',border:`1px solid ${active?'rgba(38,166,154,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>ST {p},{m}</button>})}
+        <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
         <span style={{font:'600 7px var(--fm)',color:'#26a69a',opacity:.7}}>╌ WL({ecCfg.stPeriod},{ecCfg.stMult1}{ecCfg.dualST?'+'+ecCfg.stMult2:''})</span>
         <span style={{font:'600 7px var(--fm)',color:'#ff9800',opacity:.7}}>— RL({ecCfg.emaPeriod})</span>
         <span style={{font:'600 7px var(--fm)',color:'#2196F3',opacity:.7}}>▲ PP</span>
