@@ -120,6 +120,29 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .eod-btn:disabled{opacity:.4;cursor:not-allowed}
 .eod-btn.running{border-color:var(--yellow);color:var(--yellow);animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+/* SETTINGS TAB */
+.cfg-wrap{max-width:720px;margin:0 auto;padding:0 20px}
+.cfg-section{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:18px;margin-bottom:14px}
+.cfg-section-title{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:1px;color:var(--t2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.cfg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.cfg-row:last-child{margin-bottom:0}
+.cfg-label{font-family:var(--mono);font-size:10px;color:var(--t3);width:120px;flex-shrink:0;letter-spacing:.3px}
+.cfg-input{flex:1;font-family:var(--mono);font-size:11px;padding:7px 10px;border-radius:5px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);outline:none;transition:border-color .15s}
+.cfg-input:focus{border-color:var(--cyan)}
+.cfg-input::placeholder{color:var(--t4)}
+.cfg-btn{font-family:var(--mono);font-size:10px;padding:6px 14px;border-radius:5px;border:1px solid var(--bd2);background:var(--s2);color:var(--t2);cursor:pointer;transition:all .15s;letter-spacing:.5px;white-space:nowrap}
+.cfg-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.cfg-btn.save{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.06)}
+.cfg-btn.save:hover{background:rgba(0,255,136,.12)}
+.cfg-btn.test{border-color:var(--yellow);color:var(--yellow)}
+.cfg-btn.test:hover{background:rgba(255,208,0,.08)}
+.cfg-status{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:3px;letter-spacing:.5px}
+.cfg-ok{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}
+.cfg-none{background:rgba(255,255,255,.03);color:var(--t3);border:1px solid var(--bd)}
+.cfg-st-btn{font-family:var(--mono);font-size:10px;padding:6px 16px;border-radius:5px;border:1px solid var(--bd2);background:var(--s2);color:var(--t3);cursor:pointer;transition:all .15s}
+.cfg-st-btn:hover{border-color:var(--cyan);color:var(--t2)}
+.cfg-st-btn.active{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08)}
+.cfg-toast{position:fixed;bottom:20px;right:20px;font-family:var(--mono);font-size:11px;padding:10px 18px;border-radius:6px;background:var(--s2);border:1px solid var(--green);color:var(--green);z-index:999;animation:fadeUp .3s ease-out;pointer-events:none}
 </style>
 </head>
 <body>
@@ -136,6 +159,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 <div class="dash-tabs">
   <button class="dash-tab active" onclick="switchTab('hub',this)">◈ HUB</button>
   <button class="dash-tab" onclick="switchTab('eod',this)">✦ EOD</button>
+  <button class="dash-tab" onclick="switchTab('settings',this)">⚙ SETTINGS</button>
 </div>
 
 <!-- ═══ HUB TAB ═══ -->
@@ -337,6 +361,78 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 </div>
 </div><!-- end tab-eod -->
 
+<!-- ═══ SETTINGS TAB ═══ -->
+<div id="tab-settings" class="tab-content">
+<div class="cfg-wrap">
+
+  <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--t1);margin-bottom:4px;letter-spacing:.5px">⚙ SETTINGS</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:20px;letter-spacing:.3px">API keys and service configuration · Syncs across all TradEdge pages via localStorage</div>
+
+  <!-- GROQ AI -->
+  <div class="cfg-section">
+    <div class="cfg-section-title">✦ GROQ AI <span id="cfgGroqStatus" class="cfg-status cfg-none">Not set</span></div>
+    <div class="cfg-row">
+      <div class="cfg-label">API Key</div>
+      <input id="cfgGroqKey" type="password" class="cfg-input" placeholder="gsk_xxxxxxxx...">
+      <button class="cfg-btn" onclick="document.getElementById('cfgGroqKey').type=document.getElementById('cfgGroqKey').type==='password'?'text':'password'">👁</button>
+      <button class="cfg-btn save" onclick="cfgSaveGroq()">Save</button>
+    </div>
+  </div>
+
+  <!-- TELEGRAM -->
+  <div class="cfg-section">
+    <div class="cfg-section-title">📨 TELEGRAM ALERTS <span id="cfgTgStatus" class="cfg-status cfg-none">Not set</span></div>
+    <div class="cfg-row">
+      <div class="cfg-label">Bot Token</div>
+      <input id="cfgTgBot" type="password" class="cfg-input" placeholder="123456:ABCdefGHI...">
+    </div>
+    <div class="cfg-row">
+      <div class="cfg-label">Chat ID</div>
+      <input id="cfgTgChat" type="text" class="cfg-input" placeholder="-100xxxxxxxxxx">
+      <button class="cfg-btn test" onclick="cfgTestTelegram()">Test</button>
+      <button class="cfg-btn save" onclick="cfgSaveTelegram()">Save</button>
+    </div>
+  </div>
+
+  <!-- DHAN -->
+  <div class="cfg-section">
+    <div class="cfg-section-title">🏦 DHAN API <span id="cfgDhanStatus" class="cfg-status cfg-none">Not set</span></div>
+    <div class="cfg-row">
+      <div class="cfg-label">Client ID</div>
+      <input id="cfgDhanId" type="text" class="cfg-input" placeholder="1100xxxxxx">
+    </div>
+    <div class="cfg-row">
+      <div class="cfg-label">Access Token</div>
+      <input id="cfgDhanTk" type="password" class="cfg-input" placeholder="eyJhbGciOiJI...">
+      <button class="cfg-btn" onclick="document.getElementById('cfgDhanTk').type=document.getElementById('cfgDhanTk').type==='password'?'text':'password'">👁</button>
+      <button class="cfg-btn save" onclick="cfgSaveDhan()">Save</button>
+    </div>
+  </div>
+
+  <!-- CLOUDFLARE WORKER -->
+  <div class="cfg-section">
+    <div class="cfg-section-title">☁ CLOUDFLARE WORKER <span id="cfgWorkerStatus" class="cfg-status cfg-none">Not set</span></div>
+    <div class="cfg-row">
+      <div class="cfg-label">Worker URL</div>
+      <input id="cfgWorkerUrl" type="text" class="cfg-input" placeholder="https://xxx.workers.dev">
+      <button class="cfg-btn save" onclick="cfgSaveWorker()">Save</button>
+    </div>
+  </div>
+
+  <!-- EDGECLOUD SUPERTRENT -->
+  <div class="cfg-section">
+    <div class="cfg-section-title">📡 EDGECLOUD INDICATORS <span class="cfg-status cfg-ok">Active</span></div>
+    <div class="cfg-row">
+      <div class="cfg-label">SuperTrend</div>
+      <button id="cfgSt2Btn" class="cfg-st-btn" onclick="cfgSetST(2)">10, 2</button>
+      <button id="cfgSt3Btn" class="cfg-st-btn" onclick="cfgSetST(3)">10, 3</button>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--t3);margin-left:8px">Period, Multiplier</span>
+    </div>
+  </div>
+
+</div>
+</div><!-- end tab-settings -->
+
 <div class="footer">TRADEDGE COMMAND CENTER · v4.4 · Built by <a href="https://github.com/drrgware-web" target="_blank">drrgware</a> · Define Your Edge With TradEdge · ✦</div>
 
 <script>
@@ -387,6 +483,50 @@ async function eodLoadAll(){document.getElementById('eodNoteDate').textContent=n
 
 // Auto-switch to EOD tab if URL hash
 if(window.location.hash==='#eod'){document.querySelector('.dash-tab:nth-child(2)').click()}
+if(window.location.hash==='#settings'){document.querySelector('.dash-tab:nth-child(3)').click()}
+
+// ═══ SETTINGS TAB LOGIC ═══
+function cfgToast(msg){const t=document.createElement('div');t.className='cfg-toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2000)}
+function cfgStatusBadge(id,ok,label){const el=document.getElementById(id);if(!el)return;el.className='cfg-status '+(ok?'cfg-ok':'cfg-none');el.textContent=ok?'✓ '+(label||'Connected'):(label||'Not set')}
+
+function cfgLoadAll(){
+  const gk=localStorage.getItem('groq_key')||'';
+  document.getElementById('cfgGroqKey').value=gk;
+  cfgStatusBadge('cfgGroqStatus',gk.startsWith('gsk_'),'Connected','Not set');
+
+  const tb=localStorage.getItem('te_tg_bot')||'';
+  const tc=localStorage.getItem('te_tg_chat')||'';
+  document.getElementById('cfgTgBot').value=tb;
+  document.getElementById('cfgTgChat').value=tc;
+  cfgStatusBadge('cfgTgStatus',tb&&tc,'Configured','Not set');
+
+  const di=localStorage.getItem('dhan_id')||'';
+  const dt=localStorage.getItem('dhan_tk')||'';
+  document.getElementById('cfgDhanId').value=di;
+  document.getElementById('cfgDhanTk').value=dt;
+  cfgStatusBadge('cfgDhanStatus',di&&dt,'Connected','Not set');
+
+  const wu=localStorage.getItem('zd_worker_url')||'';
+  document.getElementById('cfgWorkerUrl').value=wu;
+  cfgStatusBadge('cfgWorkerStatus',!!wu,'Connected','Not set');
+
+  const stm=localStorage.getItem('ec_st_multiplier')||'2';
+  document.getElementById('cfgSt2Btn').className='cfg-st-btn'+(stm==='2'?' active':'');
+  document.getElementById('cfgSt3Btn').className='cfg-st-btn'+(stm==='3'?' active':'');
+}
+
+function cfgSaveGroq(){const v=document.getElementById('cfgGroqKey').value.trim();if(v)localStorage.setItem('groq_key',v);else localStorage.removeItem('groq_key');cfgStatusBadge('cfgGroqStatus',v.startsWith('gsk_'));cfgToast(v?'Groq key saved':'Groq key cleared')}
+function cfgSaveTelegram(){const b=document.getElementById('cfgTgBot').value.trim(),c=document.getElementById('cfgTgChat').value.trim();if(b)localStorage.setItem('te_tg_bot',b);else localStorage.removeItem('te_tg_bot');if(c)localStorage.setItem('te_tg_chat',c);else localStorage.removeItem('te_tg_chat');cfgStatusBadge('cfgTgStatus',b&&c,'Configured');cfgToast('Telegram settings saved')}
+function cfgTestTelegram(){const b=localStorage.getItem('te_tg_bot'),c=localStorage.getItem('te_tg_chat');if(!b||!c){alert('Save bot token and chat ID first');return}fetch('https://api.telegram.org/bot'+b+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:c,text:'✅ TradEdge test alert — settings working!',parse_mode:'HTML'})}).then(r=>r.json()).then(d=>{if(d.ok)cfgToast('Test message sent!');else alert('Telegram error: '+JSON.stringify(d))}).catch(e=>alert('Error: '+e.message))}
+function cfgSaveDhan(){const i=document.getElementById('cfgDhanId').value.trim(),t=document.getElementById('cfgDhanTk').value.trim();if(i)localStorage.setItem('dhan_id',i);else localStorage.removeItem('dhan_id');if(t)localStorage.setItem('dhan_tk',t);else localStorage.removeItem('dhan_tk');cfgStatusBadge('cfgDhanStatus',i&&t);cfgToast('Dhan settings saved')}
+function cfgSaveWorker(){const v=document.getElementById('cfgWorkerUrl').value.trim();if(v)localStorage.setItem('zd_worker_url',v);else localStorage.removeItem('zd_worker_url');cfgStatusBadge('cfgWorkerStatus',!!v);cfgToast('Worker URL saved')}
+function cfgSetST(m){localStorage.setItem('ec_st_multiplier',String(m));document.getElementById('cfgSt2Btn').className='cfg-st-btn'+(m===2?' active':'');document.getElementById('cfgSt3Btn').className='cfg-st-btn'+(m===3?' active':'');cfgToast('SuperTrend set to 10,'+m)}
+
+// Load settings when settings tab is activated
+const origSwitch=switchTab;
+switchTab=function(id,btn){origSwitch(id,btn);if(id==='settings')cfgLoadAll()};
+// Also load if directly navigated
+if(window.location.hash==='#settings')cfgLoadAll();
 </script>
 </body>
 </html>
