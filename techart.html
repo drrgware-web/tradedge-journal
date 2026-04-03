@@ -476,6 +476,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       const result=data?.chart?.result?.[0];if(!result)throw new Error('No data');
       const ohlc=parseOHLCV(result);
       if(!ohlc.length)throw new Error('Empty OHLCV');
+      console.log('Last 3 bars:', ohlc.slice(-3).map((b,i) => ({i: ohlc.length-3+i, o:b.open, h:b.high, l:b.low, c:b.close, v:b.volume})));
       ohlcRef.current=ohlc;
 
       const dk=isDark!==false;
