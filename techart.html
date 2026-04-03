@@ -499,11 +499,11 @@ function LWChart({symbol,w,h,mode,isDark}){
       ohlcRef.current=ohlc;
 
       const dk=isDark!==false;
-      const bgCol=dk?'#0d1117':'#ffffff';
-      const gridCol=dk?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
-      const txtCol=dk?'#888':'#333333';
+      const bgCol=dk?'#000000':'#ffffff';
+      const gridCol=dk?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.06)';
+      const txtCol=dk?'#d1d4dc':'#333333';
       const crossBg=dk?'#1a2030':'#e8e8e8';
-      const bdr=dk?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)';
+      const bdr=dk?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.08)';
 
       const chartH=Math.max(h||440,440);
       // Wait for layout to settle, then measure true width
@@ -524,9 +524,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         mainSeries=chart.addAreaSeries({topColor:dk?'rgba(66,165,245,0.15)':'rgba(33,150,243,0.12)',bottomColor:'transparent',lineColor:'#2196F3',lineWidth:2,crosshairMarkerRadius:4});
         mainSeries.setData(ohlc.map(d=>({time:d.time,value:d.close})));
       }else{
-        // HLC bars: vertical line High→Low + close tick on right
-        mainSeries=chart.addBarSeries({upColor:'#26A69A',downColor:'#EF5350',thinBars:false,openVisible:false});
-        mainSeries.setData(ohlc.map((d,i)=>({time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close})));
+        mainSeries=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350',borderVisible:false});
+        mainSeries.setData(ohlc.map(d=>({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close})));
       }
 
       // Pocket Pivot detection (volume chart created separately below)
@@ -539,12 +538,12 @@ function LWChart({symbol,w,h,mode,isDark}){
 
       const{walking,walkDir,running,st1,st2}=calcEdgeCloud(ohlc,ecCfg);
       walkRef.current=walking;runRef.current=running;
-      const wlStyle=ecCfg.wlStyle==='solid'?LightweightCharts.LineStyle.Solid:ecCfg.wlStyle==='dotted'?LightweightCharts.LineStyle.Dotted:LightweightCharts.LineStyle.Dashed;
-      const rlStyle=ecCfg.rlStyle==='dashed'?LightweightCharts.LineStyle.Dashed:ecCfg.rlStyle==='dotted'?LightweightCharts.LineStyle.Dotted:LightweightCharts.LineStyle.Solid;
-      const wkSeries=chart.addLineSeries({lineWidth:ecCfg.wlWidth,lineStyle:wlStyle,lastValueVisible:true,priceLineVisible:false,color:ecCfg.wlColor,title:'WL'});
-      const wkD=[];for(let i=0;i<ohlc.length;i++){if(walking[i]!=null)wkD.push({time:ohlc[i].time,value:walking[i]})}
+      // Walking Line — dashed, green when bullish, red when bearish (per-bar color)
+      const wkSeries=chart.addLineSeries({lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,lastValueVisible:true,priceLineVisible:false,color:'#26a69a',title:'WL'});
+      const wkD=[];for(let i=0;i<ohlc.length;i++){if(walking[i]!=null)wkD.push({time:ohlc[i].time,value:walking[i],color:walkDir[i]===1?'#26a69a':'#ef5350'})}
       wkSeries.setData(wkD);
-      const rnSeries=chart.addLineSeries({color:ecCfg.rlColor,lineWidth:ecCfg.rlWidth,lineStyle:rlStyle,lastValueVisible:true,priceLineVisible:false,title:'RL'});
+      // Running Line — solid orange
+      const rnSeries=chart.addLineSeries({color:'#ff9800',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Solid,lastValueVisible:true,priceLineVisible:false,title:'RL'});
       const rnD=[];for(let i=0;i<ohlc.length;i++){if(running[i]!=null)rnD.push({time:ohlc[i].time,value:running[i]})}
       rnSeries.setData(rnD);
 
@@ -553,7 +552,7 @@ function LWChart({symbol,w,h,mode,isDark}){
 
       // Cloud fill BETWEEN WL and RL — colored by fusion state per bar
       if(ecCfg.showCloud){
-        const FC={IGNITION:'rgba(255,215,0,0.14)',THRUST:'rgba(0,230,118,0.12)',FADE:'rgba(255,82,82,0.12)',COIL:'rgba(179,136,255,0.10)',DRIFT:'rgba(97,97,97,0.08)'};
+        const FC={IGNITION:'rgba(255,215,0,0.18)',THRUST:'rgba(38,166,154,0.15)',FADE:'rgba(239,83,80,0.15)',COIL:'rgba(179,136,255,0.12)',DRIFT:'rgba(97,97,97,0.08)'};
         // Build per-state top/bot arrays; inactive bars get zero-height (lo=lo)
         const stateTopData={},stateBotData={};const maskBotD=[];
         const states=Object.keys(FC);
@@ -712,7 +711,7 @@ function LWChart({symbol,w,h,mode,isDark}){
           handleScroll:{vertTouchDrag:false},
         });
         volChartRef.current=vc;
-        const vhs=vc.addHistogramSeries({color:'#26A69A',priceFormat:{type:'volume'},lastValueVisible:false,priceLineVisible:false});
+        const vhs=vc.addHistogramSeries({color:'#26a69a',priceFormat:{type:'volume'},lastValueVisible:false,priceLineVisible:false});
         vhs.setData(ohlc.map((bar,i)=>{
           const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;const isPP=ppFlags.includes(i);
           return{time:bar.time,value:bar.volume||0,color:isPP?'rgba(33,150,243,0.6)':isUp?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)'};
@@ -797,8 +796,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         <div style={{display:'flex',gap:3}}>{[['1M','1mo'],['3M','3mo'],['6M','6mo'],['1Y','1y']].map(([l,v])=>tfBtn(l,v))}</div>
         <button onClick={()=>setShowWeekly(!showWeekly)} style={{padding:'3px 8px',fontSize:9,fontFamily:'var(--fm)',fontWeight:showWeekly?700:500,color:showWeekly?'#B388FF':'var(--t3)',background:showWeekly?'rgba(179,136,255,.12)':'transparent',border:`1px solid ${showWeekly?'rgba(179,136,255,.3)':'var(--bdr)'}`,borderRadius:3,cursor:'pointer'}}>Wkly</button>
         <div style={{width:1,height:12,background:'var(--bdr)',margin:'0 2px'}}/>
-        <span style={{font:'600 7px var(--fm)',color:ecCfg.wlColor,opacity:.7}}>╌ WL({ecCfg.stPeriod},{ecCfg.stMult1}{ecCfg.dualST?'+'+ecCfg.stMult2:''})</span>
-        <span style={{font:'600 7px var(--fm)',color:ecCfg.rlColor,opacity:.7}}>— RL({ecCfg.emaPeriod})</span>
+        <span style={{font:'600 7px var(--fm)',color:'#26a69a',opacity:.7}}>╌ WL({ecCfg.stPeriod},{ecCfg.stMult1}{ecCfg.dualST?'+'+ecCfg.stMult2:''})</span>
+        <span style={{font:'600 7px var(--fm)',color:'#ff9800',opacity:.7}}>— RL({ecCfg.emaPeriod})</span>
         <span style={{font:'600 7px var(--fm)',color:'#2196F3',opacity:.7}}>▲ PP</span>
         <span style={{font:'600 7px var(--fm)',color:'#FFEB3B',opacity:.7}}>▲ BO</span>
         <span style={{font:'600 7px var(--fm)',color:'#26A69A',opacity:.7}}>● PB</span>
