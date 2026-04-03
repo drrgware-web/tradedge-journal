@@ -290,7 +290,7 @@ function shaperLoki(s){
 }
 function shaperOversold(s){
   // OVERSOLD SHAPER: Stochastic/RSI oversold + recovering above MA in Stage 2
-  return (s.stochastic_k<30 || s.rsi<45)             // Oversold reached
+  return (s.stochastic_k>0 && s.stochastic_k<25 && s.rsi<50) // Oversold (AND, exclude default 0)
     && s.close>s.sma_20                               // Recovering above MA
     && s.sma_20>s.sma_50                              // Stage 2
     && s.macd?.crossover!=="bearish_crossover"        // MACD not deep bearish (ticking up proxy)
@@ -307,7 +307,7 @@ function shaperBadBreak(s){
 function shaperMiniCoil(s){
   // MINI COIL: Tight consolidation (low vol) + recent volume spike potential + tight range
   return s.close>s.sma_50
-    && s.volume_ratio<=0.8                        // Low volume = coiling/contracting
+    && s.volume_ratio>0 && s.volume_ratio<=0.6     // Tight volume dry-up, exclude zero
     && Math.abs(s.change_pct)<1.5                 // Tight daily range
     && (s.return_1m>=0 && s.return_1m<=8)         // Flat-ish base, not trending hard
     && s.price_strength>=50;                      // Still relatively strong RS
