@@ -100,6 +100,7 @@ function Sparkline({data,height=60}){if(!data||data.length<5)return null;const c
 function StockReport(){
   const[symbol,setSymbol]=useState("");const[input,setInput]=useState("");
   const[loading,setLoading]=useState(false);const[ohlc,setOhlc]=useState(null);const[analysis,setAnalysis]=useState(null);const[error,setError]=useState(null);
+  const[nseSyms,setNseSyms]=useState([]);const[suggestions,setSuggestions]=useState([]);const[showSug,setShowSug]=useState(false);const sugRef=useRef(null);const debRef=useRef(null);
 
   const fetchData=useCallback(async(sym)=>{
     setLoading(true);setError(null);
@@ -117,8 +118,15 @@ function StockReport(){
   },[]);
 
   const handleSubmit=()=>{const sym=input.trim().toUpperCase();if(sym)fetchData(sym)};
-  // Auto-load from URL param
-  useEffect(()=>{const p=new URLSearchParams(window.location.search);const s=p.get('s')||p.get('symbol');if(s){setInput(s.toUpperCase());fetchData(s.toUpperCase())}},[]);
+  // Auto-load from URL param + load symbols
+  useEffect(()=>{
+    const p=new URLSearchParams(window.location.search);const s=p.get('s')||p.get('symbol');if(s){setInput(s.toUpperCase());fetchData(s.toUpperCase())}
+    fetch('data/nse_symbols.json').then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d))setNseSyms(d)}).catch(()=>{});
+  },[]);
+  // Search debounce
+  useEffect(()=>{if(!input.trim()){setSuggestions([]);return}clearTimeout(debRef.current);debRef.current=setTimeout(()=>{const q=input.toUpperCase();setSuggestions(nseSyms.filter(s=>s.symbol.includes(q)||s.name.toUpperCase().includes(q)).slice(0,8))},150)},[input,nseSyms]);
+  // Close on outside click
+  useEffect(()=>{const fn=e=>{if(sugRef.current&&!sugRef.current.contains(e.target))setShowSug(false)};document.addEventListener('mousedown',fn);return()=>document.removeEventListener('mousedown',fn)},[]);
 
   const FC={IGNITION:"#FFD700",THRUST:"#00E676",FADE:"#FF5252",COIL:"#B388FF",DRIFT:"#888"};
   const a=analysis;const fmt=(v,d=2)=>v!=null?`₹${v.toFixed(d)}`:"—";const pct=(v)=>v!=null?`${v>=0?"+":""}${v.toFixed(1)}%`:"—";
@@ -126,7 +134,15 @@ function StockReport(){
   return<div>
     {/* Search */}
     <div style={{display:"flex",gap:8,padding:"16px 20px",background:"#0d0d18",borderBottom:"1px solid #1a1a2e"}}>
-      <input value={input} onChange={e=>setInput(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&handleSubmit()} placeholder="Enter NSE Symbol (e.g. BLISSGVS)" style={{flex:1,padding:"8px 14px",background:"#12121e",border:"1px solid #2a2a3e",borderRadius:6,color:"#e8e8f0",fontSize:14,fontFamily:"'JetBrains Mono',monospace"}}/>
+      <div ref={sugRef} style={{flex:1,position:"relative"}}>
+        <input value={input} onChange={e=>{setInput(e.target.value.toUpperCase());setShowSug(true)}} onFocus={()=>setShowSug(true)} onKeyDown={e=>{if(e.key==="Enter"){if(suggestions.length&&showSug){setInput(suggestions[0].symbol);setShowSug(false);fetchData(suggestions[0].symbol)}else handleSubmit()}}} placeholder="Enter NSE Symbol (e.g. BLISSGVS)" style={{width:"100%",padding:"8px 14px",background:"#12121e",border:"1px solid #2a2a3e",borderRadius:6,color:"#e8e8f0",fontSize:14,fontFamily:"'JetBrains Mono',monospace"}}/>
+        {showSug&&suggestions.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,maxHeight:280,overflowY:"auto",background:"#12121e",border:"1px solid #2a2a3e",borderRadius:6,boxShadow:"0 8px 24px rgba(0,0,0,.7)",zIndex:20,marginTop:2}}>
+          {suggestions.map(s=><div key={s.symbol} onClick={()=>{setInput(s.symbol);setShowSug(false);fetchData(s.symbol)}} style={{padding:"8px 14px",cursor:"pointer",borderBottom:"1px solid #1a1a2e",display:"flex",gap:10,alignItems:"center"}} onMouseEnter={e=>e.currentTarget.style.background='#1a1a2e'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            <span style={{fontWeight:700,color:"#e8e8f0",fontFamily:"'JetBrains Mono',monospace",fontSize:13,minWidth:90}}>{s.symbol}</span>
+            <span style={{color:"#666",fontSize:11,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</span>
+          </div>)}
+        </div>}
+      </div>
       <button onClick={handleSubmit} disabled={loading} style={{padding:"8px 24px",background:"linear-gradient(135deg,#00e5ff,#00bcd4)",border:"none",borderRadius:6,color:"#000",fontWeight:700,fontSize:13,cursor:"pointer",opacity:loading?0.5:1}}>{loading?"Scanning...":"Generate Report"}</button>
     </div>
 
