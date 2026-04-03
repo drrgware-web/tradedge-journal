@@ -276,7 +276,7 @@ const FALLBACK=[
 ];
 
 const SCAN_CATS=[{id:"all",label:"ALL",icon:"◉"},{id:"catalyst",label:"CATALYSTS",icon:"⚡"},{id:"bullish",label:"BULLISH",icon:"▲"},{id:"bearish",label:"BEARISH",icon:"▼"},{id:"earnings",label:"EARNINGS",icon:"📊"},{id:"volume",label:"VOLUME",icon:"📈"},{id:"breakout",label:"BREAKOUT",icon:"💥"},{id:"momentum",label:"MOMENTUM",icon:"🚀"},{id:"shapers",label:"SHAPERS",icon:"🔮"}];
-const SHAPER_SUBS=[{id:"loki",label:"LOKI"},{id:"oversold",label:"OVERSOLD"},{id:"bad_break",label:"BAD BREAK RECOVERY"},{id:"mini_coil",label:"MINI COIL"}];
+const SHAPER_SUBS=[{id:"loki",label:"LOKI"},{id:"oversold",label:"OVERSOLD"},{id:"bad_break",label:"BAD BREAK RECOVERY"},{id:"mini_coil",label:"MINI COIL"},{id:"123_pre",label:"1-2-3 PRE-BO"},{id:"3touch_pre",label:"3-TOUCH TL"}];
 
 // ═══ SHAPER FILTER FUNCTIONS ═══
 // These use proxy logic from available scanner fields (no price_history needed)
@@ -310,7 +310,29 @@ function shaperMiniCoil(s){
     && (s.return_1m>=0 && s.return_1m<=8)         // Flat-ish base, not trending hard
     && s.price_strength>=50;                      // Still relatively strong RS
 }
-const SHAPER_FNS={loki:shaperLoki,oversold:shaperOversold,bad_break:shaperBadBreak,mini_coil:shaperMiniCoil};
+function shaper123Pre(s){
+  // 1-2-3 PRE-BREAKOUT: Stage 2 stock pulling back quietly below resistance, MACD resetting
+  return s.sma_20>s.sma_50                          // Stage 2 minimum: SMA20 > SMA50
+    && s.close>s.sma_50                              // Still above key support
+    && s.macd?.crossover!=="bearish_crossover"       // MACD not deep bearish
+    && s.return_1w<2                                 // Not already running — in pullback
+    && s.high_52w_proximity>=40 && s.high_52w_proximity<=80  // Near but below resistance
+    && s.rsi>=40 && s.rsi<=60                        // Reset from overbought, building energy
+    && s.volume_ratio<=1.0;                          // Quiet consolidation, volume drying
+}
+function shaper3TouchPre(s){
+  // 3-TOUCH TL PRE-BREAKOUT: Tighter coil — multiple-week base in uptrend, even quieter
+  return s.sma_20>s.sma_50                           // Stage 2
+    && s.close>s.sma_50                              // Above key support
+    && s.macd?.crossover!=="bearish_crossover"        // MACD not deep bearish
+    && s.return_3m>0                                 // Base forming in uptrend
+    && s.return_1m>=-8 && s.return_1m<=3             // Sideways/slight pullback for weeks
+    && s.return_1w<2                                 // Not already running
+    && s.high_52w_proximity>=35 && s.high_52w_proximity<=75  // Below resistance, tighter band
+    && s.rsi>=40 && s.rsi<=60                        // Energy building
+    && s.volume_ratio<=0.9;                          // Even quieter — tighter coil
+}
+const SHAPER_FNS={loki:shaperLoki,oversold:shaperOversold,bad_break:shaperBadBreak,mini_coil:shaperMiniCoil,"123_pre":shaper123Pre,"3touch_pre":shaper3TouchPre};
 const CAT_COLORS={growth:{bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"},ownership:{bg:"rgba(0,200,255,0.08)",border:"rgba(0,200,255,0.25)",color:"#00c8ff"},capex:{bg:"rgba(255,170,0,0.08)",border:"rgba(255,170,0,0.25)",color:"#ffaa00"},momentum:{bg:"rgba(136,68,255,0.08)",border:"rgba(136,68,255,0.25)",color:"#8844ff"},earnings:{bg:"rgba(255,100,0,0.08)",border:"rgba(255,100,0,0.25)",color:"#ff6400"},quality:{bg:"rgba(0,230,200,0.08)",border:"rgba(0,230,200,0.25)",color:"#00e6c8"}};
 
 // ═══════════════════════════════════════════════════════════════
