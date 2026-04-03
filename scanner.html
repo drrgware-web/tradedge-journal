@@ -279,20 +279,22 @@ const SCAN_CATS=[{id:"all",label:"ALL",icon:"◉"},{id:"catalyst",label:"CATALYS
 const SHAPER_SUBS=[{id:"loki",label:"LOKI"},{id:"oversold",label:"OVERSOLD"},{id:"bad_break",label:"BAD BREAK RECOVERY"},{id:"mini_coil",label:"MINI COIL"},{id:"123_pre",label:"1-2-3 PRE-BO"},{id:"3touch_pre",label:"3-TOUCH TL"}];
 
 // ═══ SHAPER FILTER FUNCTIONS ═══
-// These use proxy logic from available scanner fields (no price_history needed)
+// Uses macd_histogram, stochastic_k, ema_3, ema_10 from scanner pipeline
 function shaperLoki(s){
-  // LOKI: Shakeout + recovery pattern proxy
-  // Volume spike (shakeout signal) + price recovering above short-term avg + bullish MACD
-  return s.volume_ratio>=1.5 && s.change_pct>0 && s.close>s.sma_20
-    && s.macd?.crossover==="bullish"
-    && s.return_1w>0 && s.return_1m>-5
-    && s.rsi>=40 && s.rsi<=65;
+  // LOKI: 3-EMA Shakeout Recovery — price reclaimed ema3, MACD-H positive, volume spike
+  return (s.ema_3?s.close>s.ema_3:s.close>s.sma_20) // close > ema_3 (fallback sma_20)
+    && s.macd_histogram>0                             // MACD-H ticking up
+    && s.volume_ratio>=1.5                            // Volume spike on shakeout/recovery
+    && s.rsi>=35 && s.rsi<=65                         // Recovery zone, not overbought
+    && s.sma_20>s.sma_50;                             // Stage 2
 }
 function shaperOversold(s){
-  // OVERSOLD SHAPER: Stage 2 proxy (close>sma50) + recovering from oversold
-  return s.close>s.sma_50 && s.sma_20>s.sma_50  // Stage 2 proxy: EMA10>EMA20 ≈ SMA20>SMA50
-    && s.rsi>=35 && s.rsi<=50                     // Recovering from oversold zone
-    && s.change_pct>0;                            // Up day
+  // OVERSOLD SHAPER: Stochastic/RSI oversold + recovering above MA in Stage 2
+  return (s.stochastic_k<30 || s.rsi<45)             // Oversold reached
+    && s.close>s.sma_20                               // Recovering above MA
+    && s.sma_20>s.sma_50                              // Stage 2
+    && s.macd?.crossover!=="bearish_crossover"        // MACD not deep bearish (ticking up proxy)
+    && s.change_pct>0;                                // Up day
 }
 function shaperBadBreak(s){
   // BAD BREAK RECOVERY: Reclaimed SMA50 + 52w position recovering + volume spike
@@ -311,26 +313,23 @@ function shaperMiniCoil(s){
     && s.price_strength>=50;                      // Still relatively strong RS
 }
 function shaper123Pre(s){
-  // 1-2-3 PRE-BREAKOUT: Stage 2 stock pulling back quietly below resistance, MACD resetting
-  return s.sma_20>s.sma_50                          // Stage 2 minimum: SMA20 > SMA50
-    && s.close>s.sma_50                              // Still above key support
-    && s.macd?.crossover!=="bearish_crossover"       // MACD not deep bearish
-    && s.return_1w<2                                 // Not already running — in pullback
-    && s.high_52w_proximity>=40 && s.high_52w_proximity<=80  // Near but below resistance
-    && s.rsi>=40 && s.rsi<=60                        // Reset from overbought, building energy
-    && s.volume_ratio<=1.0;                          // Quiet consolidation, volume drying
+  // 1-2-3 PRE-BREAKOUT: MACD-H resetting (negative but shallow), stoch pulling back, vol drying
+  return s.sma_20>s.sma_50                            // Stage 2
+    && s.close>s.sma_50                               // Above key support
+    && s.macd_histogram<0 && s.macd_histogram>-2      // MACD-H resetting, not deeply negative
+    && s.stochastic_k>=20 && s.stochastic_k<=50       // Pulling back, building energy
+    && s.volume_ratio<=1.0                            // Volume drying — quiet consolidation
+    && s.rsi>=40 && s.rsi<=60;                        // Reset zone
 }
 function shaper3TouchPre(s){
-  // 3-TOUCH TL PRE-BREAKOUT: Tighter coil — multiple-week base in uptrend, even quieter
-  return s.sma_20>s.sma_50                           // Stage 2
-    && s.close>s.sma_50                              // Above key support
-    && s.macd?.crossover!=="bearish_crossover"        // MACD not deep bearish
-    && s.return_3m>0                                 // Base forming in uptrend
-    && s.return_1m>=-8 && s.return_1m<=3             // Sideways/slight pullback for weeks
-    && s.return_1w<2                                 // Not already running
-    && s.high_52w_proximity>=35 && s.high_52w_proximity<=75  // Below resistance, tighter band
-    && s.rsi>=40 && s.rsi<=60                        // Energy building
-    && s.volume_ratio<=0.9;                          // Even quieter — tighter coil
+  // 3-TOUCH TL PRE-BREAKOUT: Deeper stoch reset, tighter vol, sideways base
+  return s.sma_20>s.sma_50                            // Stage 2
+    && s.close>s.sma_50                               // Above key support
+    && s.macd_histogram<0 && s.macd_histogram>-2      // MACD-H resetting
+    && s.stochastic_k<40                              // Deeper reset than 1-2-3
+    && s.return_1m>=-10 && s.return_1m<=2             // Sideways/slight pullback for weeks
+    && s.volume_ratio<=0.85                           // Even quieter — tighter coil
+    && s.rsi>=40 && s.rsi<=60;                        // Energy building
 }
 const SHAPER_FNS={loki:shaperLoki,oversold:shaperOversold,bad_break:shaperBadBreak,mini_coil:shaperMiniCoil,"123_pre":shaper123Pre,"3touch_pre":shaper3TouchPre};
 const CAT_COLORS={growth:{bg:"rgba(0,255,136,0.08)",border:"rgba(0,255,136,0.25)",color:"#00ff88"},ownership:{bg:"rgba(0,200,255,0.08)",border:"rgba(0,200,255,0.25)",color:"#00c8ff"},capex:{bg:"rgba(255,170,0,0.08)",border:"rgba(255,170,0,0.25)",color:"#ffaa00"},momentum:{bg:"rgba(136,68,255,0.08)",border:"rgba(136,68,255,0.25)",color:"#8844ff"},earnings:{bg:"rgba(255,100,0,0.08)",border:"rgba(255,100,0,0.25)",color:"#ff6400"},quality:{bg:"rgba(0,230,200,0.08)",border:"rgba(0,230,200,0.25)",color:"#00e6c8"}};
