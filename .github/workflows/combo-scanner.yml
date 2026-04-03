@@ -1,0 +1,86 @@
+# .github/workflows/combo-scanner.yml
+# EdgeCloud Combo Scanner — BO+PPV & PB+PPV intraday alerts
+
+name: Combo Scanner
+
+on:
+  schedule:
+    # Every 30 min during IST market hours (9:30 AM - 3:30 PM IST = 4:00 AM - 10:00 AM UTC)
+    - cron: '0 4 * * 1-5'     # 9:30 AM IST
+    - cron: '30 4 * * 1-5'    # 10:00 AM IST
+    - cron: '0 5 * * 1-5'     # 10:30 AM IST
+    - cron: '30 5 * * 1-5'    # 11:00 AM IST
+    - cron: '0 6 * * 1-5'     # 11:30 AM IST
+    - cron: '30 6 * * 1-5'    # 12:00 PM IST
+    - cron: '0 7 * * 1-5'     # 12:30 PM IST
+    - cron: '30 7 * * 1-5'    # 1:00 PM IST
+    - cron: '0 8 * * 1-5'     # 1:30 PM IST
+    - cron: '30 8 * * 1-5'    # 2:00 PM IST
+    - cron: '0 9 * * 1-5'     # 2:30 PM IST
+    - cron: '30 9 * * 1-5'    # 3:00 PM IST
+    - cron: '0 10 * * 1-5'    # 3:30 PM IST (closing)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Scan mode'
+        required: false
+        default: 'top500'
+        type: choice
+        options:
+          - top500
+          - nifty100
+          - full
+          - test
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: Run Combo Scanner
+        run: |
+          MODE="${{ github.event.inputs.mode || 'top500' }}"
+          python scripts/combo_scanner.py --mode "$MODE" --notify
+      
+      - name: Commit results
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/combo_scanner.json
+          
+          HITS=$(python3 -c "import json; d=json.load(open('data/combo_scanner.json')); print(d.get('total_hits',0))" 2>/dev/null || echo "0")
+          
+          git commit -m "🔵 Combo Scanner: ${HITS} hits [$(TZ=Asia/Kolkata date +'%H:%M IST')]" || true
+          git pull --rebase origin main
+          git push
+      
+      - name: Summary
+        run: |
+          echo "## 🔵 Combo Scanner Results" >> $GITHUB_STEP_SUMMARY
+          python3 -c "
+          import json
+          d = json.load(open('data/combo_scanner.json'))
+          print(f'- **Scanned**: {d[\"scanned\"]} stocks')
+          print(f'- **BO+PPV**: {d[\"bo_ppv_count\"]} hits')
+          print(f'- **PB+PPV**: {d[\"pb_ppv_count\"]} hits')
+          if d.get('hits'):
+              print()
+              print('| Symbol | Signal | Close | Change | Fusion | Cloud |')
+              print('|--------|--------|-------|--------|--------|-------|')
+              for h in d['hits']:
+                  sigs = ' + '.join(h['signals'])
+                  print(f'| {h[\"symbol\"]} | {sigs} | ₹{h[\"close\"]} | {h[\"change_pct\"]:+.1f}% | {h[\"fusion\"]} | {h[\"cloud\"]} |')
+          " >> $GITHUB_STEP_SUMMARY
