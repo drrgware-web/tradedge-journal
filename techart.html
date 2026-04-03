@@ -556,7 +556,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         for(let i=0;i<ohlc.length;i++){
           if(walking[i]==null||running[i]==null)continue;
           const t=ohlc[i].time;const hi=Math.max(walking[i],running[i]);const lo=Math.min(walking[i],running[i]);
-          if(walking[i]>=running[i]){
+          if(walking[i]<running[i]){
             bullTop.push({time:t,value:hi});bullBot.push({time:t,value:lo});
             bearTop.push({time:t,value:lo});bearBot.push({time:t,value:lo});
           }else{
@@ -565,9 +565,11 @@ function LWChart({symbol,w,h,mode,isDark}){
           }
         }
         const aOpts={lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false};
-        chart.addAreaSeries({...aOpts,topColor:'rgba(0,230,118,0.08)',bottomColor:'rgba(0,230,118,0.08)',lineColor:'rgba(0,230,118,0.3)',lineWidth:1}).setData(bullTop);
+        // Bullish = WL above RL → green cloud
+        chart.addAreaSeries({...aOpts,topColor:'rgba(0,230,118,0.10)',bottomColor:'rgba(0,230,118,0.10)',lineColor:'transparent'}).setData(bullTop);
         chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bullBot);
-        chart.addAreaSeries({...aOpts,topColor:'rgba(239,83,80,0.08)',bottomColor:'rgba(239,83,80,0.08)',lineColor:'rgba(239,83,80,0.3)',lineWidth:1}).setData(bearTop);
+        // Bearish = WL below RL → red cloud
+        chart.addAreaSeries({...aOpts,topColor:'rgba(239,83,80,0.10)',bottomColor:'rgba(239,83,80,0.10)',lineColor:'transparent'}).setData(bearTop);
         chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bearBot);
       }
 
@@ -706,9 +708,10 @@ function LWChart({symbol,w,h,mode,isDark}){
         });
         volChartRef.current=vc;
         const vhs=vc.addHistogramSeries({color:'#26a69a',priceFormat:{type:'volume'},lastValueVisible:false,priceLineVisible:false});
+        const ppSet=new Set(ppFlags.filter(idx=>idx>=ohlc.length-60));
         vhs.setData(ohlc.map((bar,i)=>{
-          const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;const isPP=ppFlags.includes(i);
-          return{time:bar.time,value:bar.volume||0,color:isPP?'rgba(33,150,243,0.6)':isUp?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)'};
+          const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;
+          return{time:bar.time,value:bar.volume||0,color:ppSet.has(i)?'rgba(33,150,243,0.7)':isUp?'rgba(0,230,118,0.5)':'rgba(239,83,80,0.5)'};
         }));
         vc.timeScale().fitContent();
         // Sync time scales
