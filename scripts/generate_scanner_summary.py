@@ -6,10 +6,22 @@ Creates category-based scan results for quick filtering.
 """
 
 import json
+import math
 import os
 import time
 from datetime import datetime
 from typing import Dict, List, Any
+
+
+def safe_num(val, default=0):
+    """Return val if it's a valid finite number, else default."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        return default if math.isnan(f) or math.isinf(f) else f
+    except (TypeError, ValueError):
+        return default
 
 import yfinance as yf
 
@@ -217,59 +229,59 @@ def create_summary_entry(detail: Dict) -> Dict:
         "symbol": symbol,
         "name": detail.get("name", symbol),
         "sector": detail.get("sector", ""),
-        
+
         # Price & Returns
-        "close": close_price,
-        "cmp": close_price,
-        "change_pct": change_pct,
-        "return_1w": returns.get("1w", 0) or root_returns.get("1w", 0),
-        "return_1m": return_1m,
-        "return_3m": return_3m,
-        "return_6m": return_6m,
-        "return_1y": return_1y,
-        
+        "close": safe_num(close_price),
+        "cmp": safe_num(close_price),
+        "change_pct": safe_num(change_pct),
+        "return_1w": safe_num(returns.get("1w", 0) or root_returns.get("1w", 0)),
+        "return_1m": safe_num(return_1m),
+        "return_3m": safe_num(return_3m),
+        "return_6m": safe_num(return_6m),
+        "return_1y": safe_num(return_1y),
+
         # Technicals
-        "rsi": indicators.get("rsi", 0) or detail.get("rsi", 50),
-        "sma_20": indicators.get("sma_20", 0),
-        "sma_50": indicators.get("sma_50", 0),
-        "sma_200": indicators.get("sma_200", 0),
-        "high_52w": tech.get("high_52w", 0) or breakout.get("high_52w", 0),
-        "low_52w": tech.get("low_52w", 0) or breakout.get("low_52w", 0),
-        
+        "rsi": safe_num(indicators.get("rsi", 0) or detail.get("rsi", 50)),
+        "sma_20": safe_num(indicators.get("sma_20", 0)),
+        "sma_50": safe_num(indicators.get("sma_50", 0)),
+        "sma_200": safe_num(indicators.get("sma_200", 0)),
+        "high_52w": safe_num(tech.get("high_52w", 0) or breakout.get("high_52w", 0)),
+        "low_52w": safe_num(tech.get("low_52w", 0) or breakout.get("low_52w", 0)),
+
         # Fundamentals
-        "market_cap_cr": fund.get("market_cap_cr", 0),
-        "pe": fund.get("pe_ratio", 0) or fund.get("pe", 0),
-        "pb": fund.get("pb_ratio", 0) or fund.get("pb", 0),
-        "roe": fund.get("roe") or 0,
-        "roce": fund.get("roce") or 0,
-        "debt_equity": fund.get("debt_to_equity", 0) or fund.get("debt_equity", 0),
-        "revenue_growth": fund.get("revenue_growth", 0),
-        "profit_margin": fund.get("profit_margin", 0),
-        
+        "market_cap_cr": safe_num(fund.get("market_cap_cr", 0)),
+        "pe": safe_num(fund.get("pe_ratio", 0) or fund.get("pe", 0)),
+        "pb": safe_num(fund.get("pb_ratio", 0) or fund.get("pb", 0)),
+        "roe": safe_num(fund.get("roe")),
+        "roce": safe_num(fund.get("roce")),
+        "debt_equity": safe_num(fund.get("debt_to_equity", 0) or fund.get("debt_equity", 0)),
+        "revenue_growth": safe_num(fund.get("revenue_growth", 0)),
+        "profit_margin": safe_num(fund.get("profit_margin", 0)),
+
         # O'Neil
         "oneil_grade": oneil.get("master_score", "-"),
-        "composite_score": oneil.get("composite_score", 0),
-        "eps_strength": oneil.get("eps_strength", 0),
-        "price_strength": oneil.get("price_strength", 0),
+        "composite_score": safe_num(oneil.get("composite_score", 0)),
+        "eps_strength": safe_num(oneil.get("eps_strength", 0)),
+        "price_strength": safe_num(oneil.get("price_strength", 0)),
         "buyer_demand": oneil.get("buyer_demand", "-"),
-        "group_rank": oneil.get("group_rank", 0),
-        "buyer_demand_score": oneil.get("buyer_demand_score", 50),
+        "group_rank": safe_num(oneil.get("group_rank", 0)),
+        "buyer_demand_score": safe_num(oneil.get("buyer_demand_score", 50)),
 
         # Best Guru
         "best_guru": best_guru.get("strategy", "-"),
-        "best_guru_score": best_guru.get("score_pct", 0),
-        
+        "best_guru_score": safe_num(best_guru.get("score_pct", 0)),
+
         # Surveillance
         "surveillance_status": surv_status,
-        "red_flag_count": red_flags,
-        
+        "red_flag_count": safe_num(red_flags),
+
         # Volume
-        "volume_ratio": volume_ratio,
-        
+        "volume_ratio": safe_num(volume_ratio),
+
         # Ownership
-        "promoter_holding": fund_hold.get("promoter_pct", 0),
-        "institutional_holding": fund_hold.get("institutional_pct", 0),
-        
+        "promoter_holding": safe_num(fund_hold.get("promoter_pct", 0)),
+        "institutional_holding": safe_num(fund_hold.get("institutional_pct", 0)),
+
         # Update time
         "updated_at": detail.get("updated_at", "")
     }
