@@ -531,7 +531,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       // Pocket Pivot detection (volume chart created separately below)
       const ppFlags=[];
       ohlc.forEach((bar,i)=>{
-        if(i<2)return;const prevC=ohlc[i-1].close;if(bar.close<prevC)return;
+        if(i<2||i===ohlc.length-1)return;const prevC=ohlc[i-1].close;if(bar.close<prevC)return;
         let maxDV=0;for(let j=Math.max(0,i-(ecCfg.ppLookback||10));j<i;j++){const pC=j>0?ohlc[j-1].close:ohlc[j].close;if(ohlc[j].close<pC&&ohlc[j].volume>maxDV)maxDV=ohlc[j].volume}
         if(maxDV>0&&bar.volume>maxDV)ppFlags.push(i);
       });
@@ -552,25 +552,24 @@ function LWChart({symbol,w,h,mode,isDark}){
 
       // Cloud fill BETWEEN WL and RL — green when bullish, red when bearish
       if(ecCfg.showCloud){
-        const bullTop=[],bullBot=[],bearTop=[],bearBot=[];
+        const bullUpper=[],bullLower=[],bearUpper=[],bearLower=[];
         for(let i=0;i<ohlc.length;i++){
           if(walking[i]==null||running[i]==null)continue;
           const t=ohlc[i].time;const hi=Math.max(walking[i],running[i]);const lo=Math.min(walking[i],running[i]);
-          if(walking[i]<running[i]){
-            bullTop.push({time:t,value:hi});bullBot.push({time:t,value:lo});
-            bearTop.push({time:t,value:lo});bearBot.push({time:t,value:lo});
+          const isBull=walking[i]>running[i];
+          if(isBull){
+            bullUpper.push({time:t,value:hi});bullLower.push({time:t,value:lo});
+            bearUpper.push({time:t,value:lo});bearLower.push({time:t,value:lo});
           }else{
-            bearTop.push({time:t,value:hi});bearBot.push({time:t,value:lo});
-            bullTop.push({time:t,value:lo});bullBot.push({time:t,value:lo});
+            bearUpper.push({time:t,value:hi});bearLower.push({time:t,value:lo});
+            bullUpper.push({time:t,value:lo});bullLower.push({time:t,value:lo});
           }
         }
         const aOpts={lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false};
-        // Bullish = WL above RL → green cloud
-        chart.addAreaSeries({...aOpts,topColor:'rgba(0,230,118,0.10)',bottomColor:'rgba(0,230,118,0.10)',lineColor:'transparent'}).setData(bullTop);
-        chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bullBot);
-        // Bearish = WL below RL → red cloud
-        chart.addAreaSeries({...aOpts,topColor:'rgba(239,83,80,0.10)',bottomColor:'rgba(239,83,80,0.10)',lineColor:'transparent'}).setData(bearTop);
-        chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bearBot);
+        chart.addAreaSeries({...aOpts,topColor:'rgba(0,230,118,0.12)',bottomColor:'rgba(0,230,118,0.02)',lineColor:'transparent'}).setData(bullUpper);
+        chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bullLower);
+        chart.addAreaSeries({...aOpts,topColor:'rgba(239,83,80,0.12)',bottomColor:'rgba(239,83,80,0.02)',lineColor:'transparent'}).setData(bearUpper);
+        chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bearLower);
       }
 
       // ── Donchian Channel (20) ──
@@ -712,8 +711,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         const boSet=new Set(boFlags.map(b=>b.idx));
         vhs.setData(ohlc.map((bar,i)=>{
           const prevC=i>0?ohlc[i-1].close:bar.open;const isUp=bar.close>=prevC;
-          const isSignal=ppSet.has(i)||boSet.has(i);
-          return{time:bar.time,value:bar.volume||0,color:isSignal?'rgba(0,229,255,0.8)':isUp?'rgba(0,230,118,0.5)':'rgba(239,83,80,0.5)'};
+          const isSignal=ppSet.has(i)||boSet.has(i);const vol=bar.volume||0;
+          return{time:bar.time,value:isSignal?Math.max(vol,vol*1.15):vol,color:isSignal?'#00e5ff':isUp?'rgba(0,230,118,0.4)':'rgba(239,83,80,0.4)'};
         }));
         vc.timeScale().fitContent();
         // Sync time scales
@@ -846,20 +845,34 @@ function LWChart({symbol,w,h,mode,isDark}){
         <div style={{marginTop:6,font:'400 8px var(--fm)',color:'var(--t4)'}}>{ecCfg.dualST?`avg(ST(${ecCfg.stPeriod},${ecCfg.stMult1}) + ST(${ecCfg.stPeriod2||10},${ecCfg.stMult2||2}))`:`ST(${ecCfg.stPeriod},${ecCfg.stMult1})`} = Walking · EMA({ecCfg.emaPeriod}) = Running</div>
       </div>}
       {/* Top-right weekly badge */}
-      {showWeekly&&weeklyState&&<div style={{position:'absolute',top:6,right:8,zIndex:2,font:'700 9px var(--fm)',color:weeklyState.color,padding:'3px 10px',background:`${weeklyState.color}15`,border:`1px solid ${weeklyState.color}30`,borderRadius:4,backdropFilter:'blur(4px)'}}>Wkly: {weeklyState.state}</div>}
-      {/* Crosshair tooltip — top-right of chart */}
-      {hovered&&<div style={{position:'absolute',top:8,right:8,zIndex:10,display:'flex',gap:8,padding:'5px 8px',background:'rgba(0,0,0,0.85)',border:'1px solid var(--bdr)',borderRadius:4,font:'500 9px var(--fm)',flexWrap:'wrap',alignItems:'center',maxWidth:400,backdropFilter:'blur(4px)'}}>
+      {showWeekly&&weeklyState&&<div style={{position:'absolute',top:6,right:220,zIndex:2,font:'700 9px var(--fm)',color:weeklyState.color,padding:'3px 10px',background:`${weeklyState.color}15`,border:`1px solid ${weeklyState.color}30`,borderRadius:4,backdropFilter:'blur(4px)'}}>Wkly: {weeklyState.state}</div>}
+      {/* Crosshair tooltip — top-left below toolbar */}
+      {hovered&&<div style={{position:'absolute',top:28,left:8,zIndex:10,display:'flex',gap:8,padding:'4px 8px',background:'rgba(0,0,0,0.8)',border:'1px solid var(--bdr)',borderRadius:4,font:'500 9px var(--fm)',flexWrap:'wrap',alignItems:'center',maxWidth:500,backdropFilter:'blur(4px)'}}>
         <span style={{color:'var(--t2)'}}>{hovered.date}</span>
         <span style={{color:'var(--t3)'}}>O <span style={{color:'var(--t1)'}}>{hovered.open?.toFixed(2)}</span> H <span style={{color:'var(--t1)'}}>{hovered.high?.toFixed(2)}</span> L <span style={{color:'var(--t1)'}}>{hovered.low?.toFixed(2)}</span> C <span style={{color:'var(--t1)'}}>{hovered.close?.toFixed(2)}</span></span>
         <span style={{color:'var(--t3)'}}>Vol <span style={{color:'var(--t2)'}}>{hovered.volume?(hovered.volume/1e6).toFixed(2)+'M':'—'}</span></span>
-        {hovered.state&&<span style={{font:'700 8px var(--fm)',color:hovered.color,padding:'1px 6px',background:`${hovered.color}18`,borderRadius:3}}>{hovered.state}</span>}
-        {hovered.bbw!=null&&<span style={{color:'var(--t3)'}}>BB <span style={{color:hovered.bbw<10?'#B388FF':'var(--t2)'}}>{hovered.bbw.toFixed(1)}%</span></span>}
-        {hovered.rsi!=null&&<span style={{color:'var(--t3)'}}>RSI <span style={{color:hovered.rsi>55?'#00E676':hovered.rsi<45?'#FF5252':'var(--t2)'}}>{hovered.rsi.toFixed(1)}</span></span>}
-        {hovered.adx!=null&&<span style={{color:'var(--t3)'}}>ADX <span style={{color:hovered.adx>25?'#FFA000':'var(--t2)'}}>{hovered.adx.toFixed(1)}</span></span>}
-        {hovered.walking!=null&&<span style={{color:'#26a69a',fontSize:8}}>WL {hovered.walking.toFixed(1)}</span>}
-        {hovered.running!=null&&<span style={{color:'#ff9800',fontSize:8}}>RL {hovered.running.toFixed(1)}</span>}
-        {hovered.cloudBull!=null&&<span style={{font:'600 8px var(--fm)',color:hovered.cloudBull?'#26A69A':'#EF5350'}}>{hovered.cloudBull?'Bull':'Bear'}</span>}
       </div>}
+      {/* EdgeCloud info table — top-right */}
+      {(()=>{const d=hovered||fusion;if(!d)return null;
+        const n=ohlcRef.current.length-1;const lastC=n>=0?ohlcRef.current[n].close:0;
+        const wl=d.walking!=null?d.walking:(walkRef.current[n]||0);
+        const rl=d.running!=null?d.running:(runRef.current[n]||0);
+        const cloudBull=d.cloudBull!=null?d.cloudBull:wl>rl;
+        const cloudW=Math.abs(wl-rl);
+        const disp=rl>0?((lastC-rl)/rl*100):0;
+        const stLabel=d.state==='THRUST'||d.state==='IGNITION'?(cloudBull?'STRONG BULL':'BULL'):d.state==='FADE'?(!cloudBull?'STRONG BEAR':'BEAR'):cloudBull?'BULL':'BEAR';
+        const stColor=d.state==='THRUST'||d.state==='IGNITION'?'#00E676':d.state==='FADE'?'#FF5252':cloudBull?'#26a69a':'#ef5350';
+        const r=(l,v,c)=><div key={l} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'1px 0'}}><span style={{color:'var(--t4)',fontSize:9}}>{l}</span><span style={{color:c,fontWeight:700,fontSize:10}}>{v}</span></div>;
+        return<div style={{position:'absolute',top:8,right:8,zIndex:10,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'8px 12px',minWidth:160}}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{font:'700 9px var(--fm)',color:'#00e5ff',letterSpacing:'.08em'}}>EdgeCloud v3</span><span style={{font:'500 8px var(--fm)',color:'#00e5ff'}}>ST({ecCfg.stPeriod},{ecCfg.stMult1})</span></div>
+          {r('State',stLabel,stColor)}
+          {r('Walking','₹'+wl.toFixed(2),wl>=rl?'#26a69a':'#ef5350')}
+          {r('Running','₹'+rl.toFixed(2),'#ff9800')}
+          {r('Cloud','₹'+cloudW.toFixed(0),cloudBull?'#26a69a':'#ef5350')}
+          {r('Disparity',disp.toFixed(1)+'%',disp>0?'#26a69a':'#ef5350')}
+          {d.rsi!=null&&r('RSI',d.rsi.toFixed(0),d.rsi>55?'#00E676':d.rsi<45?'#FF5252':'var(--t2)')}
+          {r('TSL','₹'+wl.toFixed(2),'#00e5ff')}
+        </div>})()}
     </div>
 
     <div style={{padding:'0'}}>
@@ -934,12 +947,12 @@ function LWChart({symbol,w,h,mode,isDark}){
       {sep()}
       {/* Entry Decision Matrix + Exit Layer */}
       <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:240,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:12}}>
+        <div style={{flex:1,minWidth:240,background:'var(--bg2)',border:'1px solid var(--bdr)',borderLeft:'3px solid #00e5ff',borderRadius:6,padding:12}}>
           <div style={{font:'700 12px var(--fm)',color:'var(--t2)',letterSpacing:'.1em',marginBottom:10}}>ENTRY DECISION MATRIX</div>
           <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid var(--bdl)'}}>
-            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Signal</th>
-            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>State</th>
-            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t3)',textAlign:'left'}}>Signal</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t3)',textAlign:'left'}}>State</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t3)',textAlign:'left'}}>Action</th>
           </tr></thead><tbody>
             {entryRow('Star','IGNITION','Full position (P1)','#FFD700',0)}
             {entryRow('Star','THRUST','75% position','#00E676',1)}
@@ -950,11 +963,11 @@ function LWChart({symbol,w,h,mode,isDark}){
             {entryRow('Pyramid','FADE','Tighten SL','#FF5252',6)}
           </tbody></table>
         </div>
-        <div style={{flex:1,minWidth:240,background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,padding:12}}>
+        <div style={{flex:1,minWidth:240,background:'var(--bg2)',border:'1px solid var(--bdr)',borderLeft:'3px solid #FF5252',borderRadius:6,padding:12}}>
           <div style={{font:'700 12px var(--fm)',color:'var(--t2)',letterSpacing:'.1em',marginBottom:10}}>EXIT LAYER TABLE</div>
           <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid var(--bdl)'}}>
-            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Transition</th>
-            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t4)',textAlign:'left'}}>Action</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t3)',textAlign:'left'}}>Transition</th>
+            <th style={{padding:'10px 14px',font:'600 12px var(--fm)',color:'var(--t3)',textAlign:'left'}}>Action</th>
           </tr></thead><tbody>
             {exitRow('THRUST','Trail EMA(21), let RUN ride','#00E676',0)}
             {exitRow('IGN → THRUST','Breakeven fast, T1 at 1R','#FFD700',1)}
