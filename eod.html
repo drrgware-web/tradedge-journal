@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradEdge · EOD Research</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #090b0f;
+  --bg2: #0d1117;
+  --bg3: #111820;
+  --border: #1e2a38;
+  --border2: #243040;
+  --accent: #00ff88;
+  --accent2: #00c8ff;
+  --accent3: #ff6b35;
+  --warn: #ffcc00;
+  --red: #ff4455;
+  --text: #e2e8f0;
+  --text2: #8899aa;
+  --text3: #556677;
+  --font-mono: 'Space Mono', monospace;
+  --font-display: 'Syne', sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 12px; min-height: 100vh; }
+
+/* NAV */
+.nav { position: sticky; top: 0; z-index: 100; background: #070a0e; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 4px; padding: 0 16px; height: 36px; }
+.nav img { height: 22px; width: 22px; border-radius: 4px; margin-right: 8px; }
+.nav-link { color: var(--text2); text-decoration: none; font-family: var(--font-mono); font-size: 11px; padding: 4px 8px; border-radius: 3px; transition: all 0.15s; white-space: nowrap; }
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-link.active { color: var(--accent); background: rgba(0,255,136,0.08); }
+
+/* HEADER */
+.header { padding: 24px 24px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.header-left { display: flex; flex-direction: column; gap: 4px; }
+.header-title { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); display: flex; align-items: center; gap: 10px; }
+.header-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+.header-meta { font-size: 10px; color: var(--text3); letter-spacing: 0.5px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.btn { font-family: var(--font-mono); font-size: 10px; padding: 6px 12px; border-radius: 4px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); cursor: pointer; transition: all 0.15s; letter-spacing: 0.5px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { border-color: var(--accent); color: var(--accent); background: rgba(0,255,136,0.08); }
+.btn.primary:hover { background: rgba(0,255,136,0.15); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.running { border-color: var(--warn); color: var(--warn); animation: blink 1s infinite; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+
+/* MAIN LAYOUT */
+.main { padding: 16px 24px 40px; display: flex; flex-direction: column; gap: 16px; }
+
+/* STATUS BAR */
+.status-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; font-size: 10px; color: var(--text3); }
+.status-bar .tag { padding: 2px 8px; border-radius: 3px; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; }
+.tag-success { background: rgba(0,255,136,0.1); color: var(--accent); border: 1px solid rgba(0,255,136,0.2); }
+.tag-warn { background: rgba(255,204,0,0.1); color: var(--warn); border: 1px solid rgba(255,204,0,0.2); }
+.tag-error { background: rgba(255,68,85,0.1); color: var(--red); border: 1px solid rgba(255,68,85,0.2); }
+.tag-info { background: rgba(0,200,255,0.1); color: var(--accent2); border: 1px solid rgba(0,200,255,0.2); }
+.status-bar .sep { color: var(--border2); }
+
+/* GRID */
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+/* CARDS */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.card-title { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.card-title .icon { font-size: 12px; }
+
+/* MPS CARD */
+.mps-score { font-family: var(--font-display); font-size: 48px; font-weight: 800; line-height: 1; }
+.mps-label { font-size: 10px; color: var(--text3); margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+.mps-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 10px 0; overflow: hidden; }
+.mps-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
+.mps-pillars { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.pillar-row { display: flex; align-items: center; gap: 8px; }
+.pillar-name { font-size: 9px; color: var(--text3); width: 80px; flex-shrink: 0; }
+.pillar-bar { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.pillar-fill { height: 100%; border-radius: 2px; }
+.pillar-val { font-size: 9px; color: var(--text2); width: 28px; text-align: right; }
+
+/* INDEX CARDS */
+.index-val { font-family: var(--font-display); font-size: 20px; font-weight: 700; line-height: 1; }
+.index-chng { font-size: 11px; margin-top: 4px; }
+.index-chng.up { color: var(--accent); }
+.index-chng.down { color: var(--red); }
+.index-sub { font-size: 9px; color: var(--text3); margin-top: 2px; }
+
+/* SECTOR TABLE */
+.sector-table { width: 100%; border-collapse: collapse; }
+.sector-table th { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 8px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.sector-table td { padding: 6px 8px; border-bottom: 1px solid rgba(30,42,56,0.5); font-size: 10px; }
+.sector-table tr:last-child td { border-bottom: none; }
+.quadrant-pill { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9px; letter-spacing: 0.3px; }
+.q-leading { background: rgba(0,255,136,0.1); color: var(--accent); }
+.q-improving { background: rgba(0,200,255,0.1); color: var(--accent2); }
+.q-weakening { background: rgba(255,204,0,0.1); color: var(--warn); }
+.q-lagging { background: rgba(255,68,85,0.1); color: var(--red); }
+
+/* SHAPER STOCKS */
+.shaper-list { display: flex; flex-direction: column; gap: 6px; }
+.shaper-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; transition: border-color 0.15s; cursor: pointer; }
+.shaper-item:hover { border-color: var(--border2); }
+.shaper-symbol { font-family: var(--font-display); font-size: 12px; font-weight: 700; color: var(--text); width: 100px; }
+.shaper-sector { font-size: 9px; color: var(--text3); flex: 1; }
+.shaper-type { font-size: 9px; padding: 1px 6px; border-radius: 3px; }
+.type-loki { background: rgba(255,107,53,0.1); color: var(--accent3); border: 1px solid rgba(255,107,53,0.2); }
+.type-oversold { background: rgba(0,200,255,0.1); color: var(--accent2); border: 1px solid rgba(0,200,255,0.2); }
+.type-mini-coil { background: rgba(0,255,136,0.1); color: var(--accent); border: 1px solid rgba(0,255,136,0.2); }
+.type-123 { background: rgba(255,204,0,0.1); color: var(--warn); border: 1px solid rgba(255,204,0,0.2); }
+.type-bbr { background: rgba(180,100,255,0.1); color: #b46cff; border: 1px solid rgba(180,100,255,0.2); }
+.shaper-score { font-size: 11px; font-weight: 700; color: var(--text2); width: 28px; text-align: right; }
+.shaper-chng { font-size: 10px; width: 52px; text-align: right; }
+
+/* AI NOTE */
+.ai-note { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; position: relative; overflow: hidden; }
+.ai-note::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3)); }
+.ai-note-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.ai-badge { font-size: 9px; padding: 2px 8px; border-radius: 3px; background: rgba(0,255,136,0.1); color: var(--accent); border: 1px solid rgba(0,255,136,0.2); letter-spacing: 0.5px; }
+.ai-model { font-size: 9px; color: var(--text3); }
+.ai-content { font-size: 12px; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
+.ai-content h3 { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--accent2); margin: 16px 0 6px; letter-spacing: 0.5px; }
+.ai-content h3:first-child { margin-top: 0; }
+.ai-content .bull { color: var(--accent); }
+.ai-content .bear { color: var(--red); }
+
+/* LOADING SKELETON */
+.skeleton { background: linear-gradient(90deg, var(--bg3) 25%, var(--border) 50%, var(--bg3) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+.skel-line { height: 12px; margin-bottom: 8px; }
+.skel-line.short { width: 40%; }
+.skel-line.med { width: 70%; }
+
+/* EMPTY STATE */
+.empty { text-align: center; padding: 32px; color: var(--text3); font-size: 11px; }
+.empty .icon { font-size: 28px; margin-bottom: 8px; }
+
+/* POSITIONS */
+.pos-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; margin-bottom: 5px; }
+.pos-symbol { font-family: var(--font-display); font-size: 12px; font-weight: 700; width: 90px; }
+.pos-pnl { font-size: 11px; font-weight: 700; margin-left: auto; }
+.pos-pnl.up { color: var(--accent); }
+.pos-pnl.down { color: var(--red); }
+.pos-detail { font-size: 9px; color: var(--text3); }
+
+/* BREADTH */
+.breadth-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.breadth-item { padding: 10px; background: var(--bg3); border-radius: 5px; border: 1px solid var(--border); }
+.breadth-val { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.breadth-label { font-size: 9px; color: var(--text3); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* SCROLLABLE */
+.scroll-y { overflow-y: auto; max-height: 320px; }
+.scroll-y::-webkit-scrollbar { width: 4px; }
+.scroll-y::-webkit-scrollbar-track { background: transparent; }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.section-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+
+.divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+.chng-up { color: var(--accent); }
+.chng-down { color: var(--red); }
+.chng-neu { color: var(--text3); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html"><img src="assets/logo.jpeg" alt="TradEdge" onerror="this.style.display='none'"></a>
+  <a href="dashboard.html" class="nav-link">Dashboard</a>
+  <a href="scanner.html" class="nav-link">Scanner</a>
+  <a href="sectors.html" class="nav-link">Sectors</a>
+  <a href="matrix.html" class="nav-link">Matrix</a>
+  <a href="mps.html" class="nav-link">MPS</a>
+  <a href="edge-intel.html" class="nav-link">Edge Intel</a>
+  <a href="index.html" class="nav-link">Journal</a>
+  <a href="watchlist.html" class="nav-link">Watchlist</a>
+  <a href="eod.html" class="nav-link active">EOD</a>
+</nav>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">
+      <span class="dot"></span>
+      EOD RESEARCH NOTE
+    </div>
+    <div class="header-meta" id="noteDate">Loading market data...</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn" id="btnRefresh" onclick="loadAll()">↻ Refresh</button>
+    <button class="btn primary" id="btnGenerate" onclick="generateNote()">✦ Generate Note</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- STATUS BAR -->
+  <div class="status-bar" id="statusBar">
+    <span id="statusMPS">MPS: —</span>
+    <span class="sep">·</span>
+    <span id="statusRegime">Regime: —</span>
+    <span class="sep">·</span>
+    <span id="statusScanner">Scanner: —</span>
+    <span class="sep">·</span>
+    <span id="statusTime">—</span>
+  </div>
+
+  <!-- ROW 1: INDICES + MPS -->
+  <div class="grid-4" id="indexCards">
+    <div class="card"><div class="card-title"><span class="icon">📈</span>NIFTY 50</div><div class="index-val" id="niftyVal">—</div><div class="index-chng" id="niftyChng">—</div><div class="index-sub" id="nifty52w">—</div></div>
+    <div class="card"><div class="card-title"><span class="icon">🏦</span>BANK NIFTY</div><div class="index-val" id="bnkVal">—</div><div class="index-chng" id="bnkChng">—</div><div class="index-sub" id="bnk52w">—</div></div>
+    <div class="card"><div class="card-title"><span class="icon">🔹</span>MIDCAP 100</div><div class="index-val" id="midVal">—</div><div class="index-chng" id="midChng">—</div><div class="index-sub" id="mid52w">—</div></div>
+    <div class="card"><div class="card-title"><span class="icon">🔸</span>SMALLCAP 100</div><div class="index-val" id="smlVal">—</div><div class="index-chng" id="smlChng">—</div><div class="index-sub" id="sml52w">—</div></div>
+  </div>
+
+  <!-- ROW 2: MPS + SECTORS + SHAPERS -->
+  <div class="grid-3">
+
+    <!-- MPS -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🧭</span>MARKET PULSE SCORE</div>
+      <div id="mpsContent">
+        <div class="skeleton skel-line short"></div>
+        <div class="skeleton skel-line med"></div>
+        <div class="skeleton skel-line"></div>
+      </div>
+    </div>
+
+    <!-- TOP SECTORS -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🔄</span>SECTOR ROTATION</div>
+      <div class="section-label">LEADING ↑</div>
+      <div id="leadingSectors"><div class="skeleton skel-line"></div></div>
+      <div class="section-label" style="margin-top:10px">LAGGING ↓</div>
+      <div id="laggingSectors"><div class="skeleton skel-line"></div></div>
+    </div>
+
+    <!-- TOP SHAPERS -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🔮</span>TODAY'S SETUPS</div>
+      <div class="scroll-y" id="shapersList">
+        <div class="skeleton skel-line"></div>
+        <div class="skeleton skel-line med"></div>
+        <div class="skeleton skel-line short"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ROW 3: OPEN POSITIONS + BREADTH -->
+  <div class="grid-2">
+
+    <!-- OPEN POSITIONS -->
+    <div class="card">
+      <div class="card-title"><span class="icon">💼</span>OPEN POSITIONS</div>
+      <div id="positionsList">
+        <div class="skeleton skel-line"></div>
+        <div class="skeleton skel-line med"></div>
+      </div>
+    </div>
+
+    <!-- MARKET BREADTH from scanner -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📊</span>MARKET BREADTH</div>
+      <div class="breadth-grid" id="breadthGrid">
+        <div class="breadth-item"><div class="breadth-val skeleton" style="width:60px;height:20px"></div><div class="breadth-label">Bullish</div></div>
+        <div class="breadth-item"><div class="breadth-val skeleton" style="width:60px;height:20px"></div><div class="breadth-label">Bearish</div></div>
+        <div class="breadth-item"><div class="breadth-val skeleton" style="width:60px;height:20px"></div><div class="breadth-label">Vol Spike</div></div>
+        <div class="breadth-item"><div class="breadth-val skeleton" style="width:60px;height:20px"></div><div class="breadth-label">Shapers</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ROW 4: AI NOTE (full width) -->
+  <div class="ai-note" id="aiNoteCard">
+    <div class="ai-note-header">
+      <span class="ai-badge">✦ AI RESEARCH NOTE</span>
+      <span class="ai-model">llama-3.3-70b · Groq</span>
+      <span id="aiNoteTime" style="font-size:9px;color:var(--text3);margin-left:auto"></span>
+    </div>
+    <div class="ai-content" id="aiContent">
+      <div class="empty">
+        <div class="icon">✦</div>
+        Click "Generate Note" to create today's EOD research note using AI analysis of market data, sector rotation, and trading setups.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const WORKER = localStorage.getItem('zd_worker_url') || 'https://spring-fire-41a0.drrgware.workers.dev/';
+const GROQ_KEY = localStorage.getItem('te_groq_key') || localStorage.getItem('groq_api_key');
+const BASE = '';
+
+// ── DATA FETCHERS ────────────────────────────────────────────────────────────
+
+async function fetchJSON(path) {
+  const r = await fetch(path + '?t=' + Date.now());
+  if (!r.ok) throw new Error(`${path} → ${r.status}`);
+  return r.json();
+}
+
+async function fetchIndex(ticker) {
+  try {
+    const r = await fetch(WORKER, {
+      method: 'POST',
+      headers: { 'X-Kite-Action': 'yahoo-proxy', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, range: '1d', interval: '1m' })
+    });
+    const d = await r.json();
+    const meta = d?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+    const chng = meta.regularMarketPrice - meta.previousClose;
+    const chngPct = (chng / meta.previousClose) * 100;
+    return {
+      price: meta.regularMarketPrice,
+      chng, chngPct,
+      high52w: meta.fiftyTwoWeekHigh,
+      low52w: meta.fiftyTwoWeekLow,
+      prev: meta.previousClose
+    };
+  } catch { return null; }
+}
+
+function fmt(n, dec=2) { return n == null ? '—' : Number(n).toLocaleString('en-IN', {minimumFractionDigits:dec, maximumFractionDigits:dec}); }
+function fmtPct(n) { if (n == null) return '—'; const s = n >= 0 ? '+' : ''; return s + fmt(n) + '%'; }
+function chngClass(n) { return n > 0 ? 'chng-up' : n < 0 ? 'chng-down' : 'chng-neu'; }
+
+// ── INDICES ──────────────────────────────────────────────────────────────────
+
+async function loadIndices() {
+  const indices = [
+    { ticker: '^NSEI',    valId: 'niftyVal', chngId: 'niftyChng', subId: 'nifty52w', label: 'NSE' },
+    { ticker: '^NSEBANK', valId: 'bnkVal',   chngId: 'bnkChng',   subId: 'bnk52w',   label: 'NSEBANK' },
+    { ticker: 'NIFMID150.NS', valId: 'midVal', chngId: 'midChng', subId: 'mid52w',   label: 'MIDCAP' },
+    { ticker: 'NIFSMCP100.NS', valId: 'smlVal', chngId: 'smlChng', subId: 'sml52w', label: 'SMALLCAP' },
+  ];
+  await Promise.all(indices.map(async idx => {
+    const d = await fetchIndex(idx.ticker);
+    if (!d) return;
+    document.getElementById(idx.valId).textContent = fmt(d.price, 0);
+    const chngEl = document.getElementById(idx.chngId);
+    chngEl.textContent = fmtPct(d.chngPct) + ' (' + (d.chng >= 0 ? '+' : '') + fmt(d.chng, 0) + ')';
+    chngEl.className = 'index-chng ' + (d.chng >= 0 ? 'up' : 'down');
+    const prox = ((d.price - d.low52w) / (d.high52w - d.low52w) * 100).toFixed(0);
+    document.getElementById(idx.subId).textContent = `52W: ${fmt(d.low52w,0)} – ${fmt(d.high52w,0)} · ${prox}%`;
+  }));
+}
+
+// ── MPS ──────────────────────────────────────────────────────────────────────
+
+async function loadMPS() {
+  try {
+    const d = await fetchJSON('data/mps_latest.json');
+    const cur = d.current || d;
+    const score = cur.mps_score ?? cur.total_score ?? cur.score ?? 0;
+    const regime = cur.regime || cur.market_regime || (score >= 70 ? 'BULL' : score >= 40 ? 'NEUTRAL' : 'BEAR');
+    const pillars = cur.pillar_scores || cur.pillars || [];
+
+    const color = score >= 70 ? 'var(--accent)' : score >= 40 ? 'var(--warn)' : 'var(--red)';
+    let html = `
+      <div class="mps-score" style="color:${color}">${Math.round(score)}</div>
+      <div class="mps-label">${regime}</div>
+      <div class="mps-bar"><div class="mps-fill" style="width:${score}%;background:${color}"></div></div>
+      <div class="mps-pillars">`;
+
+    pillars.slice(0, 6).forEach(p => {
+      const name = p.name || p.pillar || '';
+      const val = p.weighted_score ?? p.score ?? p.raw_score ?? 0;
+      const maxVal = p.weight ? p.weight * 100 : 20;
+      const pct = Math.min((val / maxVal) * 100, 100);
+      const pc = pct > 60 ? 'var(--accent)' : pct > 30 ? 'var(--warn)' : 'var(--red)';
+      html += `<div class="pillar-row">
+        <div class="pillar-name">${name.substring(0,12)}</div>
+        <div class="pillar-bar"><div class="pillar-fill" style="width:${pct}%;background:${pc}"></div></div>
+        <div class="pillar-val">${val.toFixed ? val.toFixed(1) : val}</div>
+      </div>`;
+    });
+    html += '</div>';
+
+    document.getElementById('mpsContent').innerHTML = html;
+    document.getElementById('statusMPS').textContent = `MPS: ${Math.round(score)}`;
+    document.getElementById('statusRegime').innerHTML = `<span class="tag ${score>=70?'tag-success':score>=40?'tag-warn':'tag-error'}">${regime}</span>`;
+    return { score, regime, pillars };
+  } catch(e) {
+    document.getElementById('mpsContent').innerHTML = `<div class="empty">MPS data unavailable</div>`;
+    return { score: 50, regime: 'UNKNOWN', pillars: [] };
+  }
+}
+
+// ── RRM SECTORS ──────────────────────────────────────────────────────────────
+
+async function loadSectors() {
+  try {
+    const d = await fetchJSON('data/rrm_data.json');
+    const bench = d.default_benchmark || '^NSEI';
+    const daily = d.benchmarks_data?.[bench]?.daily || d.benchmarks_data?.[Object.keys(d.benchmarks_data)[0]]?.daily;
+    if (!daily) throw new Error('no daily data');
+
+    const sectors = daily.sectors || [];
+    const leading = sectors.filter(s => s.quadrant === 'Leading').slice(0, 5);
+    const lagging = sectors.filter(s => s.quadrant === 'Lagging').slice(0, 5);
+    const improving = sectors.filter(s => s.quadrant === 'Improving').slice(0, 3);
+
+    const renderSectors = (list, cls) => list.map(s =>
+      `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid rgba(30,42,56,0.4)">
+        <span style="flex:1;font-size:10px;color:var(--text)">${s.name || s.symbol}</span>
+        <span class="quadrant-pill ${cls}">${s.quadrant}</span>
+      </div>`
+    ).join('') || '<div class="empty" style="padding:8px">None</div>';
+
+    document.getElementById('leadingSectors').innerHTML = renderSectors(leading, 'q-leading') + renderSectors(improving, 'q-improving');
+    document.getElementById('laggingSectors').innerHTML = renderSectors(lagging, 'q-lagging');
+    return { leading, lagging, improving, sectors };
+  } catch(e) {
+    document.getElementById('leadingSectors').innerHTML = `<div class="empty">RRM data unavailable</div>`;
+    document.getElementById('laggingSectors').innerHTML = '';
+    return { leading: [], lagging: [], improving: [], sectors: [] };
+  }
+}
+
+// ── SCANNER / SHAPERS ────────────────────────────────────────────────────────
+
+function detectShapers(stocks) {
+  const results = [];
+  for (const s of stocks) {
+    const types = [];
+    const ema3 = s.ema_3 || 0;
+    const stochK = s.stochastic_k ?? 50;
+    const macdH = s.macd_histogram ?? 0;
+    const volR = s.volume_ratio ?? 1;
+    const rsi = s.rsi ?? 50;
+    const sma20 = s.sma_20 ?? 0;
+    const sma50 = s.sma_50 ?? 0;
+    const close = s.close ?? s.cmp ?? 0;
+    const chng = s.change_pct ?? 0;
+
+    // LOKI
+    if (ema3 > 0 && close > ema3 && macdH > 0 && volR >= 1.5 && rsi >= 35 && rsi <= 65 && sma20 > sma50)
+      types.push({ type: 'LOKI', cls: 'type-loki' });
+    // MINI COIL
+    if (volR > 0 && volR <= 0.6 && close > sma50 && sma20 > sma50 && rsi >= 40 && rsi <= 65)
+      types.push({ type: 'MINI COIL', cls: 'type-mini-coil' });
+    // OVERSOLD
+    if (stochK > 0 && stochK < 25 && rsi < 50 && close > sma20 && sma20 > sma50 && chng > 0)
+      types.push({ type: 'OVERSOLD', cls: 'type-oversold' });
+    // 1-2-3
+    if (macdH < 0 && macdH > -2 && stochK >= 20 && stochK <= 50 && sma20 > sma50 && close > sma50 && volR <= 1.0)
+      types.push({ type: '1-2-3', cls: 'type-123' });
+    // BBR
+    if (close > sma50 && close > (s.sma_200 ?? 0) && volR >= 1.5 && (s.return_1w ?? 0) > 0 && (s.return_1m ?? 0) > 0)
+      types.push({ type: 'BBR', cls: 'type-bbr' });
+
+    if (types.length > 0) results.push({ ...s, shaperTypes: types });
+  }
+  return results.sort((a, b) => (b.composite_score || 0) - (a.composite_score || 0)).slice(0, 20);
+}
+
+async function loadScanner() {
+  try {
+    const d = await fetchJSON('data/scanner_results.json');
+    const stocks = d.stocks || d.all_stocks || d.scan_results || [];
+
+    // Breadth
+    const bullish = stocks.filter(s => (s.composite_score || 0) >= 50).length;
+    const bearish = stocks.filter(s => (s.composite_score || 0) > 0 && (s.composite_score || 0) < 40).length;
+    const volSpike = stocks.filter(s => (s.volume_ratio || 0) >= 1.5).length;
+    const shapers = detectShapers(stocks);
+
+    document.getElementById('breadthGrid').innerHTML = `
+      <div class="breadth-item"><div class="breadth-val" style="color:var(--accent)">${bullish}</div><div class="breadth-label">Bullish ≥50</div></div>
+      <div class="breadth-item"><div class="breadth-val" style="color:var(--red)">${bearish}</div><div class="breadth-label">Bearish &lt;40</div></div>
+      <div class="breadth-item"><div class="breadth-val" style="color:var(--warn)">${volSpike}</div><div class="breadth-label">Vol Spike</div></div>
+      <div class="breadth-item"><div class="breadth-val" style="color:var(--accent2)">${shapers.length}</div><div class="breadth-label">Setups</div></div>`;
+
+    // Shapers list
+    if (shapers.length === 0) {
+      document.getElementById('shapersList').innerHTML = '<div class="empty">No setups detected today</div>';
+    } else {
+      document.getElementById('shapersList').innerHTML = shapers.slice(0, 12).map(s => {
+        const chng = s.change_pct ?? 0;
+        const typeTags = s.shaperTypes.map(t => `<span class="shaper-type ${t.cls}">${t.type}</span>`).join(' ');
+        return `<div class="shaper-item">
+          <div class="shaper-symbol">${s.symbol}</div>
+          <div class="shaper-sector">${(s.sector||'').substring(0,18)}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">${typeTags}</div>
+          <div class="shaper-score">${s.composite_score || '—'}</div>
+          <div class="shaper-chng ${chngClass(chng)}">${fmtPct(chng)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('statusScanner').textContent = `${stocks.length} stocks · ${shapers.length} setups`;
+    return { stocks, shapers, bullish, bearish, volSpike };
+  } catch(e) {
+    document.getElementById('shapersList').innerHTML = `<div class="empty">Scanner data unavailable</div>`;
+    return { stocks: [], shapers: [], bullish: 0, bearish: 0, volSpike: 0 };
+  }
+}
+
+// ── OPEN POSITIONS ────────────────────────────────────────────────────────────
+
+async function loadPositions() {
+  try {
+    const trades = JSON.parse(localStorage.getItem('te_trades') || '[]');
+    const open = trades.filter(t => t.status === 'Open' || t.status === 'Partial');
+    if (open.length === 0) {
+      document.getElementById('positionsList').innerHTML = '<div class="empty">No open positions</div>';
+      return [];
+    }
+
+    // Fetch CMPs
+    const cmps = {};
+    await Promise.all(open.map(async t => {
+      const d = await fetchIndex(t.symbol + '.NS');
+      if (d) cmps[t.symbol] = d.price;
+    }));
+
+    const html = open.map(t => {
+      const entry = t.entries?.[0]?.price || 0;
+      const qty = (t.entries || []).reduce((s, e) => s + (e.qty || 0), 0);
+      const cmp = cmps[t.symbol] || t.cmp || entry;
+      const pnl = ((cmp - entry) / entry) * 100;
+      const pnlAmt = (cmp - entry) * qty;
+      return `<div class="pos-item">
+        <div class="pos-symbol">${t.symbol}</div>
+        <div class="pos-detail">Qty: ${qty} · Entry: ₹${fmt(entry)}</div>
+        <div class="pos-detail" style="margin-left:auto">CMP: ₹${fmt(cmp)}</div>
+        <div class="pos-pnl ${pnl >= 0 ? 'up' : 'down'}">${fmtPct(pnl)}<br><span style="font-size:9px">₹${fmt(pnlAmt,0)}</span></div>
+      </div>`;
+    }).join('');
+    document.getElementById('positionsList').innerHTML = html;
+    return open.map(t => ({ ...t, cmp: cmps[t.symbol] || t.cmp }));
+  } catch(e) {
+    document.getElementById('positionsList').innerHTML = '<div class="empty">Could not load positions</div>';
+    return [];
+  }
+}
+
+// ── AI NOTE GENERATOR ────────────────────────────────────────────────────────
+
+async function generateNote() {
+  if (!GROQ_KEY) {
+    alert('Set te_groq_key in localStorage first');
+    return;
+  }
+  const btn = document.getElementById('btnGenerate');
+  btn.textContent = '⏳ Generating...';
+  btn.classList.add('running');
+  btn.disabled = true;
+
+  document.getElementById('aiContent').innerHTML = `
+    <div class="skeleton skel-line"></div>
+    <div class="skeleton skel-line med"></div>
+    <div class="skeleton skel-line short"></div>
+    <div class="skeleton skel-line"></div>
+    <div class="skeleton skel-line med"></div>`;
+
+  try {
+    // Gather context
+    const [mpsData, sectorData, scanData, positions] = await Promise.all([
+      fetchJSON('data/mps_latest.json').catch(() => null),
+      fetchJSON('data/rrm_data.json').catch(() => null),
+      fetchJSON('data/scanner_results.json').catch(() => null),
+      Promise.resolve(JSON.parse(localStorage.getItem('te_trades') || '[]').filter(t => t.status === 'Open' || t.status === 'Partial'))
+    ]);
+
+    // Build context summary
+    const mpsScore = mpsData?.current?.mps_score ?? mpsData?.current?.total_score ?? '?';
+    const regime = mpsData?.current?.regime || (mpsScore >= 70 ? 'BULLISH' : mpsScore >= 40 ? 'NEUTRAL' : 'BEARISH');
+
+    const bench = sectorData?.default_benchmark || '^NSEI';
+    const daily = sectorData?.benchmarks_data?.[bench]?.daily;
+    const leading = (daily?.sectors || []).filter(s => s.quadrant === 'Leading').slice(0, 5).map(s => s.name || s.symbol).join(', ');
+    const lagging = (daily?.sectors || []).filter(s => s.quadrant === 'Lagging').slice(0, 5).map(s => s.name || s.symbol).join(', ');
+    const improving = (daily?.sectors || []).filter(s => s.quadrant === 'Improving').slice(0, 3).map(s => s.name || s.symbol).join(', ');
+
+    const stocks = scanData?.stocks || scanData?.all_stocks || [];
+    const bullish = stocks.filter(s => (s.composite_score || 0) >= 50).length;
+    const bearish = stocks.filter(s => (s.composite_score || 0) > 0 && s.composite_score < 40).length;
+    const topStocks = stocks.filter(s => s.composite_score >= 60).slice(0, 10).map(s => `${s.symbol}(${s.composite_score})`).join(', ');
+    const shapers = detectShapers(stocks).slice(0, 8).map(s => `${s.symbol}[${s.shaperTypes.map(t=>t.type).join('+')}]`).join(', ');
+
+    const posStr = positions.slice(0, 8).map(t => {
+      const entry = t.entries?.[0]?.price || 0;
+      return `${t.symbol}@₹${entry}`;
+    }).join(', ');
+
+    const today = new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+    const prompt = `You are a professional Indian equity market analyst writing an EOD (End of Day) research note for a systematic trader using Minervini SEPA / O'Neil CANSLIM methodology on NSE.
+
+Today is ${today}.
+
+MARKET DATA:
+- Market Pulse Score (MPS): ${mpsScore}/100 — Regime: ${regime}
+- Leading Sectors: ${leading || 'None identified'}
+- Improving Sectors: ${improving || 'None'}
+- Lagging Sectors: ${lagging || 'None identified'}
+- Bullish stocks (O'Neil score ≥50): ${bullish}
+- Bearish stocks (score <40): ${bearish}
+- Top O'Neil scored stocks: ${topStocks || 'None'}
+- Today's Shaper Setups: ${shapers || 'None detected'}
+- Open Positions: ${posStr || 'None'}
+
+Write a concise, actionable EOD research note with these sections:
+1. MARKET VERDICT (2-3 sentences on overall market health and regime)
+2. SECTOR WATCH (key rotations, what's leading/lagging, what to watch tomorrow)
+3. SETUPS TO WATCH (comment on the shaper setups, which look most compelling)
+4. POSITION REVIEW (brief comment on open positions in context of today's market)
+5. TOMORROW'S GAME PLAN (1-3 specific actionable points for tomorrow's session)
+
+Keep it sharp, data-driven, and under 400 words. Use trader language. No fluff.`;
+
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${GROQ_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 800,
+        temperature: 0.7
+      })
+    });
+
+    if (!resp.ok) throw new Error(`Groq API: ${resp.status}`);
+    const data = await resp.json();
+    const text = data.choices?.[0]?.message?.content || 'No response';
+
+    // Render with section formatting
+    const formatted = text
+      .replace(/#{1,3}\s*(.*)/g, '<h3>$1</h3>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\b(BULLISH|BULL|bullish)\b/g, '<span class="bull">$1</span>')
+      .replace(/\b(BEARISH|BEAR|bearish)\b/g, '<span class="bear">$1</span>');
+
+    document.getElementById('aiContent').innerHTML = formatted;
+    document.getElementById('aiNoteTime').textContent = new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+
+    // Save to localStorage
+    localStorage.setItem('te_eod_note', JSON.stringify({ text, date: new Date().toISOString() }));
+
+  } catch(e) {
+    document.getElementById('aiContent').innerHTML = `<div class="empty"><div class="icon">⚠</div>${e.message}</div>`;
+  } finally {
+    btn.textContent = '✦ Generate Note';
+    btn.classList.remove('running');
+    btn.disabled = false;
+  }
+}
+
+// ── LOAD ALL ──────────────────────────────────────────────────────────────────
+
+async function loadAll() {
+  document.getElementById('noteDate').textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  document.getElementById('statusTime').textContent = 'Updated: ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+
+  await Promise.all([
+    loadIndices(),
+    loadMPS(),
+    loadSectors(),
+    loadScanner(),
+    loadPositions()
+  ]);
+
+  // Restore saved note if same day
+  const saved = JSON.parse(localStorage.getItem('te_eod_note') || 'null');
+  if (saved) {
+    const savedDate = new Date(saved.date).toDateString();
+    const today = new Date().toDateString();
+    if (savedDate === today) {
+      const formatted = saved.text
+        .replace(/#{1,3}\s*(.*)/g, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\b(BULLISH|BULL|bullish)\b/g, '<span class="bull">$1</span>')
+        .replace(/\b(BEARISH|BEAR|bearish)\b/g, '<span class="bear">$1</span>');
+      document.getElementById('aiContent').innerHTML = formatted;
+      document.getElementById('aiNoteTime').textContent = new Date(saved.date).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) + ' (saved)';
+    }
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+loadAll();
+
+// Auto-refresh every 5 minutes
+setInterval(loadAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
