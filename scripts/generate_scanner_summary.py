@@ -282,6 +282,14 @@ def create_summary_entry(detail: Dict) -> Dict:
         "ema_3": safe_num(detail.get("ema_3", 0)),
         "ema_10": safe_num(detail.get("ema_10", 0)),
 
+        # Nested objects expected by scanner.html table columns
+        "macd": detail.get("macd") if isinstance(detail.get("macd"), dict) else {"crossover": "-", "histogram": 0},
+        "ema": detail.get("ema") if isinstance(detail.get("ema"), dict) else {"cross_9_21": "-", "cross_50_200": "-"},
+        "fund_holdings": {
+            "no_of_funds": safe_num(fund_hold.get("no_of_funds", 0)),
+            "fund_shares_change_pct": safe_num(fund_hold.get("fund_shares_change_pct", 0)),
+        },
+
         # Volume
         "volume_ratio": safe_num(volume_ratio),
 
