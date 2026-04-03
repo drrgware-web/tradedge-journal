@@ -21,6 +21,7 @@ body{background:#0a0a12;color:#e8e8f0;font-family:'Outfit',system-ui,sans-serif;
 .na{padding:5px 12px;font:600 11px 'JetBrains Mono',monospace;color:#566178;border-radius:4px;transition:all .15s;text-decoration:none}
 .na:hover{color:#e8e8f0;background:rgba(255,255,255,.04)}.na.on{color:#00e5ff;background:rgba(0,229,255,.08)}
 input:focus{outline:none;border-color:#00e5ff!important}
+@media print{body{background:#fff!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.nv,.search-bar{display:none!important}*{color-adjust:exact;-webkit-print-color-adjust:exact}}
 </style>
 </head>
 <body>
@@ -99,7 +100,7 @@ function Sparkline({data,height=60}){if(!data||data.length<5)return null;const c
 // ═══ MAIN REPORT ═══
 function StockReport(){
   const[symbol,setSymbol]=useState("");const[input,setInput]=useState("");
-  const[loading,setLoading]=useState(false);const[ohlc,setOhlc]=useState(null);const[analysis,setAnalysis]=useState(null);const[error,setError]=useState(null);
+  const[loading,setLoading]=useState(false);const[ohlc,setOhlc]=useState(null);const[analysis,setAnalysis]=useState(null);const[funda,setFunda]=useState(null);const[error,setError]=useState(null);
   const[nseSyms,setNseSyms]=useState([]);const[suggestions,setSuggestions]=useState([]);const[showSug,setShowSug]=useState(false);const sugRef=useRef(null);const debRef=useRef(null);
 
   const fetchData=useCallback(async(sym)=>{
@@ -113,6 +114,8 @@ function StockReport(){
         parsed.push({date:d.toISOString().slice(0,10),open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],close:q.close[i],volume:q.volume?.[i]||0})}
       if(parsed.length<60)throw new Error("Insufficient data");
       setOhlc(parsed);setAnalysis(analyzeStock(parsed));setSymbol(sym);
+      // Fetch fundamentals from screener (non-blocking)
+      try{const sr=await fetch(wUrl,{method:'GET',headers:{'X-Kite-Action':'screener','X-Screener-Symbol':sym},signal:AbortSignal.timeout(15000)});const sd=await sr.json();if(sd)setFunda(sd)}catch(e2){setFunda(null)}
     }catch(e){setError(e.message)}
     setLoading(false);
   },[]);
@@ -129,11 +132,34 @@ function StockReport(){
   useEffect(()=>{const fn=e=>{if(sugRef.current&&!sugRef.current.contains(e.target))setShowSug(false)};document.addEventListener('mousedown',fn);return()=>document.removeEventListener('mousedown',fn)},[]);
 
   const FC={IGNITION:"#FFD700",THRUST:"#00E676",FADE:"#FF5252",COIL:"#B388FF",DRIFT:"#888"};
-  const a=analysis;const fmt=(v,d=2)=>v!=null?`₹${v.toFixed(d)}`:"—";const pct=(v)=>v!=null?`${v>=0?"+":""}${v.toFixed(1)}%`:"—";
+  const a=analysis;const f=funda;const inf=f?.info||{};const qtrs=f?.quarters||[];const sh=f?.shareholding||{};
+  const fmt=(v,d=2)=>v!=null?`₹${v.toFixed(d)}`:"—";const pct=(v)=>v!=null?`${v>=0?"+":""}${v.toFixed(1)}%`:"—";
+  const stars=(n,max=5)=>Array.from({length:max},(_,i)=>i<Math.round(n)?'★':'☆').join('');
+  // Fundamental score
+  const q0=qtrs[0]||{};
+  const fundaScore=a?Math.min(5,(((inf.pe||99)>0&&(inf.pe||99)<25?1:0)+((inf.roe||0)>15?1:0)+((q0.epsYoY||0)>15?1:0)+((q0.salesYoY||0)>10?1:0)+((q0.opm||0)>12?1:0))):0;
+  // Catalyst score
+  const proArr=sh.promoter||[];const fiiArr=sh.fii||[];const diiArr=sh.dii||[];
+  const proDelta=proArr.length>=2?proArr[proArr.length-1]-proArr[proArr.length-2]:0;
+  const fiiDelta=fiiArr.length>=2?fiiArr[fiiArr.length-1]-fiiArr[fiiArr.length-2]:0;
+  const diiDelta=diiArr.length>=2?diiArr[diiArr.length-1]-diiArr[diiArr.length-2]:0;
+  const catScore=a?Math.min(5,((fiiDelta>0?1:0)+(diiDelta>0?1:0)+(proDelta>=0?1:0)+((q0.epsYoY||0)>25?1:0)+((q0.salesYoY||0)>20?1:0))):0;
+  // Overall
+  const avgScore=a?(a.techScore+fundaScore+(a.rrScore||0)+catScore)/4:0;
+  let verdict2="HOLD",verdictColor2="#FFA000";
+  if(a){if(avgScore>=4&&a.fusion!=="FADE"){verdict2="STRONG BUY";verdictColor2="#00C853"}else if(avgScore>=3){verdict2="BUY";verdictColor2="#4CAF50"}else if(avgScore<2||a.fusion==="FADE"){verdict2="AVOID";verdictColor2="#FF5252"}}
+  // Catalysts badges
+  const badges=[];
+  if(fiiDelta>0.5)badges.push({label:"FII Accumulation",color:"#00E676"});
+  if(proDelta>0)badges.push({label:"Promoter Buying",color:"#00E676"});
+  if((q0.epsYoY||0)>20)badges.push({label:"Earnings Growth",color:"#00E676"});
+  if((q0.salesYoY||0)>15)badges.push({label:"Revenue Growth",color:"#00E676"});
+  if((q0.opm||0)>15)badges.push({label:"High Margins",color:"#00E676"});
+  if(proDelta<-1)badges.push({label:"Promoter Selling",color:"#FF5252"});
 
   return<div>
     {/* Search */}
-    <div style={{display:"flex",gap:8,padding:"16px 20px",background:"#0d0d18",borderBottom:"1px solid #1a1a2e"}}>
+    <div className="search-bar" style={{display:"flex",gap:8,padding:"16px 20px",background:"#0d0d18",borderBottom:"1px solid #1a1a2e"}}>
       <div ref={sugRef} style={{flex:1,position:"relative"}}>
         <input value={input} onChange={e=>{setInput(e.target.value.toUpperCase());setShowSug(true)}} onFocus={()=>setShowSug(true)} onKeyDown={e=>{if(e.key==="Enter"){if(suggestions.length&&showSug){setInput(suggestions[0].symbol);setShowSug(false);fetchData(suggestions[0].symbol)}else handleSubmit()}}} placeholder="Enter NSE Symbol (e.g. BLISSGVS)" style={{width:"100%",padding:"8px 14px",background:"#12121e",border:"1px solid #2a2a3e",borderRadius:6,color:"#e8e8f0",fontSize:14,fontFamily:"'JetBrains Mono',monospace"}}/>
         {showSug&&suggestions.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,maxHeight:280,overflowY:"auto",background:"#12121e",border:"1px solid #2a2a3e",borderRadius:6,boxShadow:"0 8px 24px rgba(0,0,0,.7)",zIndex:20,marginTop:2}}>
@@ -144,6 +170,7 @@ function StockReport(){
         </div>}
       </div>
       <button onClick={handleSubmit} disabled={loading} style={{padding:"8px 24px",background:"linear-gradient(135deg,#00e5ff,#00bcd4)",border:"none",borderRadius:6,color:"#000",fontWeight:700,fontSize:13,cursor:"pointer",opacity:loading?0.5:1}}>{loading?"Scanning...":"Generate Report"}</button>
+      {a&&<button onClick={()=>window.print()} style={{padding:"8px 16px",background:"#1a1a2e",border:"1px solid #2a2a3e",borderRadius:6,color:"#888",fontWeight:600,fontSize:12,cursor:"pointer"}}>Print</button>}
     </div>
 
     {error&&<div style={{padding:20,color:"#FF5252",textAlign:"center"}}>{error}</div>}
@@ -151,10 +178,10 @@ function StockReport(){
     {a&&<div style={{padding:"12px 16px",maxWidth:1200,margin:"0 auto"}}>
       {/* HEADER */}
       <div style={{textAlign:"center",marginBottom:12,paddingBottom:10,borderBottom:"2px solid #1a1a2e"}}>
-        <h1 style={{fontSize:24,fontWeight:800,letterSpacing:".02em",margin:0,color:"#fff"}}>{symbol}</h1>
+        <h1 style={{fontSize:24,fontWeight:800,letterSpacing:".02em",margin:0,color:"#fff"}}>{symbol}{inf.name&&<span style={{fontSize:13,fontWeight:400,color:"#8a8a9a",marginLeft:8}}>{inf.name}</span>}</h1>
         <div style={{fontSize:11,color:"#8a8a9a",marginTop:2,letterSpacing:".08em"}}>TECHNICAL & FUNDAMENTAL 1-PAGE SUMMARY REPORT</div>
         <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:12}}>EXPERT RATING: <span style={{color:a.verdictColor,fontWeight:800}}>{a.verdict}</span></span>
+          <span style={{fontSize:12}}>EXPERT RATING: <span style={{color:verdictColor2,fontWeight:800}}>{verdict2}</span></span>
           <span style={{fontSize:12}}>TARGET: <span style={{color:"#00E676",fontWeight:700}}>{fmt(a.t1,0)}–{fmt(a.t3,0)}</span></span>
           <span style={{fontSize:12}}>STOP LOSS: <span style={{color:"#FF5252",fontWeight:700}}>{fmt(a.sl,0)}</span></span>
           <span style={{fontSize:12,padding:"1px 8px",background:"rgba(0,229,255,0.1)",borderRadius:4,color:"#00e5ff"}}><span style={{fontWeight:700}}>{a.fusion}</span> · {a.bullCloud?"BULL":"BEAR"} CLOUD</span>
@@ -190,19 +217,40 @@ function StockReport(){
           </div>
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT: FUNDAMENTALS & CATALYSTS */}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {/* Fundamental Strengths */}
           <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:"3px solid #FFD700"}}>
-            <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#FFD700",marginBottom:8}}>PRICE & PERFORMANCE</div>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#FFD700",marginBottom:8}}>FUNDAMENTAL STRENGTHS</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              {[["CMP",fmt(a.close),"#fff"],["Day Chg",pct(a.chg1d),a.chg1d>=0?"#00E676":"#FF5252"],["1 Week",pct(a.chg1w),a.chg1w>=0?"#00E676":"#FF5252"],["1 Month",pct(a.chg1m),a.chg1m>=0?"#00E676":"#FF5252"],["3 Month",pct(a.chg3m),a.chg3m>=0?"#00E676":"#FF5252"],["From High",pct(a.fromHigh),"#FF5252"],["52W High",fmt(a.yearHigh,0),"#00E676"],["52W Low",fmt(a.yearLow,0),"#FF5252"]].map(([l,v,c])=><div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 8px",background:"#0a0a14",borderRadius:4}}><span style={{fontSize:9,color:"#8a8a9a"}}>{l}</span><span style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v}</span></div>)}
+              {(()=>{const mcap=inf.mcapCr||0;const mcapLabel=mcap>20000?'Large Cap':mcap>5000?'Mid Cap':'Small Cap';const mcapColor=mcap>20000?'#00E676':mcap>5000?'#FFA000':'#FF5252';
+                const pe=inf.pe||0;const peLabel=pe<15?'Cheap':pe<25?'Fair':pe<40?'Premium':'Expensive';const peColor=pe>0&&pe<25?'#00E676':pe<40?'#FFA000':'#FF5252';
+                return[
+                  {label:'Market Cap',value:mcap>0?'₹'+(mcap>1000?(mcap/1000).toFixed(1)+'K Cr':mcap.toFixed(0)+' Cr'):'—',sub:mcapLabel,color:mcapColor},
+                  {label:'Valuation',value:pe>0?'P/E '+pe.toFixed(1):'—',sub:peLabel,color:peColor},
+                  {label:'Earnings',value:(q0.epsYoY!=null?pct(q0.epsYoY):'—'),sub:'EPS YoY'+(q0.salesYoY!=null?' · Rev '+pct(q0.salesYoY):''),color:(q0.epsYoY||0)>15?'#00E676':(q0.epsYoY||0)>0?'#FFA000':'#FF5252'},
+                  {label:'Efficiency',value:(q0.opm!=null?q0.opm.toFixed(1)+'% OPM':'—'),sub:'ROE '+(inf.roe?inf.roe.toFixed(1)+'%':'—'),color:(q0.opm||0)>15?'#00E676':(q0.opm||0)>8?'#FFA000':'#FF5252'},
+                ].map(m=><div key={m.label} style={{padding:"6px 8px",background:"#0a0a14",borderRadius:4,borderTop:`2px solid ${m.color}`}}>
+                  <div style={{fontSize:8,color:"#666"}}>{m.label}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:m.color,fontFamily:"'JetBrains Mono',monospace"}}>{m.value}</div>
+                  <div style={{fontSize:8,color:"#8a8a9a"}}>{m.sub}</div>
+                </div>)})()}
+            </div>
+            {/* Performance row */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginTop:6}}>
+              {[["Day",a.chg1d],["1W",a.chg1w],["1M",a.chg1m],["3M",a.chg3m]].map(([l,v])=><div key={l} style={{padding:"3px 4px",background:"#0a0a14",borderRadius:4,textAlign:"center"}}><div style={{fontSize:7,color:"#666"}}>{l}</div><div style={{fontSize:9,fontWeight:700,color:(v||0)>=0?"#00E676":"#FF5252",fontFamily:"'JetBrains Mono',monospace"}}>{pct(v)}</div></div>)}
             </div>
           </div>
+          {/* Catalysts & Ownership */}
           <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:`3px solid ${FC[a.fusion]}`}}>
-            <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#00e5ff",marginBottom:8}}>EDGECLOUD FUSION STATE</div>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}><span style={{fontSize:22,fontWeight:800,color:FC[a.fusion]}}>{a.fusion}</span><span style={{fontSize:11,color:a.bullCloud?"#00E676":"#FF5252",fontWeight:600,padding:"2px 8px",background:a.bullCloud?"rgba(0,230,118,0.1)":"rgba(255,82,82,0.1)",borderRadius:4}}>{a.bullCloud?"BULLISH":"BEARISH"} CLOUD</span></div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4,fontSize:9}}>
-              {[["Walking",fmt(a.wl),a.walkDir===1?"#00E676":"#FF5252"],["Running",fmt(a.rl),"#FFA000"],["Cloud ₹",a.cloudWidth?.toFixed(0),a.bullCloud?"#00E676":"#FF5252"],["ATR(14)",fmt(a.atr),"#00e5ff"],["BBW",`${a.bbw?.toFixed(1)}%`,a.bbw<10?"#B388FF":"#888"],["R:R",`${a.rrRatio?.toFixed(1)}x`,a.rrRatio>2?"#00E676":"#FFA000"]].map(([l,v,c])=><div key={l} style={{padding:"3px 6px",background:"#0a0a14",borderRadius:4,textAlign:"center"}}><div style={{color:"#666",fontSize:8}}>{l}</div><div style={{color:c,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontSize:10}}>{v}</div></div>)}
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:"#00e5ff",marginBottom:8}}>CATALYSTS & OWNERSHIP</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+              {[["Promoter",proArr[proArr.length-1],proDelta],["FII",fiiArr[fiiArr.length-1],fiiDelta],["DII",diiArr[diiArr.length-1],diiDelta]].map(([l,v,d])=><div key={l} style={{padding:"4px 6px",background:"#0a0a14",borderRadius:4,textAlign:"center"}}><div style={{fontSize:8,color:"#666"}}>{l}</div><div style={{fontSize:11,fontWeight:700,color:"#fff",fontFamily:"'JetBrains Mono',monospace"}}>{v!=null?v.toFixed(1)+'%':'—'}</div>{d!=null&&<div style={{fontSize:8,color:d>0?"#00E676":d<0?"#FF5252":"#888"}}>{d>0?'▲':d<0?'▼':'—'} {Math.abs(d).toFixed(1)}%</div>}</div>)}
+            </div>
+            {badges.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{badges.map(b=><span key={b.label} style={{padding:"2px 8px",borderRadius:4,fontSize:8,fontWeight:700,background:`${b.color}18`,color:b.color,border:`1px solid ${b.color}30`}}>{b.label}</span>)}</div>}
+            {/* EdgeCloud mini */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4,marginTop:8,fontSize:9}}>
+              {[["Fusion",a.fusion,FC[a.fusion]],["Cloud",a.bullCloud?"BULL":"BEAR",a.bullCloud?"#00E676":"#FF5252"],["R:R",`${a.rrRatio?.toFixed(1)}x`,a.rrRatio>2?"#00E676":"#FFA000"]].map(([l,v,c])=><div key={l} style={{padding:"3px 6px",background:"#0a0a14",borderRadius:4,textAlign:"center"}}><div style={{color:"#666",fontSize:8}}>{l}</div><div style={{color:c,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontSize:10}}>{v}</div></div>)}
             </div>
           </div>
         </div>
@@ -224,17 +272,27 @@ function StockReport(){
             </div>
           </div>
         </div>
-        <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:`3px solid ${a.verdictColor}`,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
-          <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:a.verdictColor,marginBottom:8}}>CONCLUSION SCORECARD</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:12}}>
-            {[["Technical",a.techScore,"#00e5ff"],["Risk/Reward",a.rrScore,"#FFD700"]].map(([l,v,c])=><div key={l} style={{padding:"6px 8px",background:"#0a0a14",borderRadius:4}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:9,color:"#888"}}>{l}</span><span style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v.toFixed(1)}/5</span></div><div style={{height:4,background:"#1a1a2e",borderRadius:2,overflow:"hidden"}}><div style={{width:`${v/5*100}%`,height:"100%",background:c,borderRadius:2}}/></div></div>)}
+        <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:`3px solid ${verdictColor2}`,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",color:verdictColor2,marginBottom:8}}>RISKS & CONCLUSION SCORECARD</div>
+          <div style={{marginBottom:10}}>
+            {[["Technical Setup",a.techScore,"#00e5ff"],["Fundamentals",fundaScore,"#FFD700"],["Risk/Reward",a.rrScore,"#00E676"],["Catalysts",catScore,"#B388FF"]].map(([l,v,c])=><div key={l} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid #1a1a2e"}}>
+              <span style={{fontSize:9,color:"#888",width:90}}>{l}</span>
+              <span style={{color:"#FFD700",fontSize:12,letterSpacing:1,flex:1}}>{stars(v)}</span>
+              <span style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace",width:36,textAlign:"right"}}>{v.toFixed(1)}/5</span>
+            </div>)}
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
+              <span style={{fontSize:10,color:"#fff",fontWeight:700,width:90}}>OVERALL</span>
+              <span style={{color:"#FFD700",fontSize:14,letterSpacing:1,flex:1}}>{stars(avgScore)}</span>
+              <span style={{fontSize:12,fontWeight:800,color:verdictColor2,fontFamily:"'JetBrains Mono',monospace",width:36,textAlign:"right"}}>{avgScore.toFixed(1)}</span>
+            </div>
           </div>
-          <div style={{textAlign:"center",padding:16,background:`${a.verdictColor}08`,border:`2px solid ${a.verdictColor}30`,borderRadius:8}}>
+          <div style={{textAlign:"center",padding:14,background:`${verdictColor2}08`,border:`2px solid ${verdictColor2}30`,borderRadius:8}}>
             <div style={{fontSize:10,color:"#888",marginBottom:4}}>FINAL VERDICT</div>
-            <div style={{fontSize:28,fontWeight:900,color:a.verdictColor,letterSpacing:".02em"}}>{a.verdict}</div>
-            <div style={{fontSize:10,color:"#666",marginTop:4}}>{a.verdict==="STRONG BUY"?"All systems align — high conviction setup":a.verdict==="BUY"?"Positive setup — proceed with normal sizing":a.verdict==="HOLD"?"Mixed signals — wait for clarity":"Adverse conditions — protect capital"}</div>
+            <div style={{fontSize:28,fontWeight:900,color:verdictColor2,letterSpacing:".02em"}}>{verdict2}</div>
+            <div style={{fontSize:10,color:"#666",marginTop:4}}>{verdict2==="STRONG BUY"?"All systems align — high conviction setup":verdict2==="BUY"?"Positive setup — proceed with normal sizing":verdict2==="HOLD"?"Mixed signals — wait for clarity":"Adverse conditions — protect capital"}</div>
           </div>
-          <div style={{fontSize:7,color:"#444",marginTop:8,lineHeight:1.4}}>This report is auto-generated from technical data only. Not investment advice. Always do your own research.</div>
+          <div style={{fontSize:8,color:"#666",marginTop:6}}>Position sizing: Risk 1-2% of capital per trade</div>
+          <div style={{fontSize:7,color:"#444",marginTop:4,lineHeight:1.4}}>Auto-generated from technical + fundamental data. Not investment advice.</div>
         </div>
       </div>
 
