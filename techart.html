@@ -476,7 +476,26 @@ function LWChart({symbol,w,h,mode,isDark}){
       const result=data?.chart?.result?.[0];if(!result)throw new Error('No data');
       const ohlc=parseOHLCV(result);
       if(!ohlc.length)throw new Error('Empty OHLCV');
-      console.log('Last 3 bars:', ohlc.slice(-3).map((b,i) => ({i: ohlc.length-3+i, o:b.open, h:b.high, l:b.low, c:b.close, v:b.volume})));
+
+      // Append/update today's live bar from meta if market data is newer
+      const meta=result.meta||{};
+      const liveCMP=meta.regularMarketPrice;const liveVol=meta.regularMarketVolume||0;
+      if(liveCMP&&liveCMP>0){
+        const now=new Date();const todayKey={year:now.getFullYear(),month:now.getMonth()+1,day:now.getDate()};
+        const last=ohlc[ohlc.length-1];
+        const lastIsToday=last.time.year===todayKey.year&&last.time.month===todayKey.month&&last.time.day===todayKey.day;
+        if(lastIsToday){
+          // Update today's bar with live data
+          last.high=Math.max(last.high,liveCMP);
+          last.low=Math.min(last.low,liveCMP);
+          last.close=liveCMP;
+          if(liveVol>last.volume)last.volume=liveVol;
+        }else{
+          // Append new bar for today
+          ohlc.push({time:todayKey,_ts:Math.floor(now.getTime()/1000),open:last.close,high:Math.max(last.close,liveCMP),low:Math.min(last.close,liveCMP),close:liveCMP,volume:liveVol});
+        }
+      }
+
       ohlcRef.current=ohlc;
 
       const dk=isDark!==false;
