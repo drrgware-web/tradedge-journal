@@ -275,6 +275,13 @@ def create_summary_entry(detail: Dict) -> Dict:
         "surveillance_status": surv_status,
         "red_flag_count": safe_num(red_flags),
 
+        # MACD / Stochastic / Short EMAs (root-level from compute_technicals via **tech spread)
+        "macd_histogram": safe_num(detail.get("macd", {}).get("histogram", 0) if isinstance(detail.get("macd"), dict) else tech.get("macd", {}).get("histogram", 0)),
+        "stochastic_k": safe_num(detail.get("stochastic_k", 50)),
+        "stochastic_d": safe_num(detail.get("stochastic_d", 50)),
+        "ema_3": safe_num(detail.get("ema_3", 0)),
+        "ema_10": safe_num(detail.get("ema_10", 0)),
+
         # Volume
         "volume_ratio": safe_num(volume_ratio),
 

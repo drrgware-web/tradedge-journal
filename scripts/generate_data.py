@@ -111,7 +111,14 @@ def compute_technicals(df: pd.DataFrame) -> dict:
         elif macd_hist > 0: macd_crossover = "bullish"
         elif macd_hist < 0: macd_crossover = "bearish"
 
+    # Stochastic (5,3,3)
+    stoch = ind.stochastic(high, low, close, k_period=5, d_period=3)
+    stoch_k = safe_float(stoch["k"].iloc[-1])
+    stoch_d = safe_float(stoch["d"].iloc[-1])
+
     # EMAs
+    ema3 = ind.ema(close, 3)
+    ema10 = ind.ema(close, 10)
     ema9 = ind.ema(close, 9)
     ema21 = ind.ema(close, 21)
     ema50 = ind.ema(close, 50)
@@ -188,6 +195,10 @@ def compute_technicals(df: pd.DataFrame) -> dict:
         "rsi": rsi_val,
         "composite_score": score,
         "macd": {"crossover": macd_crossover, "histogram": safe_float(macd_hist)},
+        "stochastic_k": stoch_k,
+        "stochastic_d": stoch_d,
+        "ema_3": safe_float(ema3.iloc[-1]),
+        "ema_10": safe_float(ema10.iloc[-1]),
         "ema": {
             "cross_9_21": ema_9_21,
             "cross_50_200": ema_50_200,
