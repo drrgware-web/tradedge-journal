@@ -1090,25 +1090,51 @@ const ScannerDashboard=()=>{
             <button onClick={async()=>{const t=localStorage.getItem('te_github_token');if(!t){alert('Set GitHub token in Settings');return}setComboRunning(true);try{await fetch('https://api.github.com/repos/drrgware-web/tradedge-journal/actions/workflows/combo-scanner.yml/dispatches',{method:'POST',headers:{'Authorization':'Bearer '+t,'Accept':'application/vnd.github.v3+json'},body:JSON.stringify({ref:'main'})});setTimeout(()=>setComboRunning(false),3000)}catch(e){setComboRunning(false)}}} disabled={comboRunning} style={{padding:"3px 8px",fontSize:8,fontFamily:"var(--font-mono)",fontWeight:700,color:comboRunning?"var(--text-muted)":"#00e5ff",background:comboRunning?"transparent":"rgba(0,229,255,0.08)",border:"1px solid rgba(0,229,255,0.2)",borderRadius:3,cursor:"pointer"}}>{comboRunning?"Running...":"⚡ Run Now"}</button>
           </div>
         </div>
-        {comboData?.hits?.length>0&&<div style={{marginTop:6,overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:"var(--font-mono)"}}>
-            <thead><tr style={{background:"rgba(0,229,255,0.03)"}}>
-              {["SYMBOL","SIGNAL","CLOSE","CHG%","FUSION","CLOUD","RSI","ADX"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:8,fontWeight:700,color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)",letterSpacing:".5px"}}>{h}</th>)}
-            </tr></thead>
-            <tbody>{comboData.hits.filter(h=>comboFilter==='all'||h.signals.some(s=>s.includes(comboFilter))).map(h=>{
-              const FC={IGNITION:"#FFD700",THRUST:"#00E676",FADE:"#FF5252",COIL:"#B388FF",DRIFT:"#888"};
-              return<tr key={h.symbol} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`techart.html?s=${h.symbol}`,'_blank')}>
-                <td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{h.symbol}</td>
-                <td style={{padding:"5px 8px"}}>{h.signals.map((s,i)=><span key={i} style={{padding:"1px 6px",borderRadius:3,fontSize:8,fontWeight:700,background:"rgba(0,229,255,0.12)",color:"#00e5ff",marginRight:3}}>{s}</span>)}</td>
-                <td style={{padding:"5px 8px",color:"var(--text-secondary)"}}>₹{h.close?.toFixed(2)}</td>
-                <td style={{padding:"5px 8px",fontWeight:600,color:h.change_pct>=0?"#00ff88":"#ff4455"}}>{h.change_pct>=0?"+":""}{h.change_pct?.toFixed(1)}%</td>
-                <td style={{padding:"5px 8px"}}><span style={{padding:"1px 5px",borderRadius:3,fontSize:8,fontWeight:700,background:`${FC[h.fusion]||'#888'}18`,color:FC[h.fusion]||'#888'}}>{h.fusion}</span></td>
-                <td style={{padding:"5px 8px",color:h.cloud==="BULL"?"#00ff88":"#ff4455",fontWeight:600,fontSize:9}}>{h.cloud}</td>
-                <td style={{padding:"5px 8px",color:h.rsi>55?"#00ff88":h.rsi<45?"#ff4455":"var(--text-muted)"}}>{h.rsi}</td>
-                <td style={{padding:"5px 8px",color:h.adx>25?"#ffaa00":"var(--text-muted)"}}>{h.adx?.toFixed(1)}</td>
-              </tr>})}</tbody>
-          </table>
-        </div>}
+        {comboData?.hits?.length>0&&(()=>{
+          const FC={IGNITION:"#FFD700",THRUST:"#00E676",FADE:"#FF5252",COIL:"#B388FF",DRIFT:"#888"};
+          // Compute derived fields client-side
+          const enriched=comboData.hits.map(h=>{
+            const sl=Math.max(h.walking||h.close*0.92,h.close*0.92);
+            const riskPct=h.close>0?Math.min(((h.close-sl)/h.close*100),8):0;
+            const rrT1=riskPct>0?((h.dc_upper||h.close*1.1)-h.close)/(h.close-sl):0;
+            let grade='C';if(h.cloud==='BULL'&&(h.fusion==='THRUST'||h.fusion==='IGNITION')&&riskPct<=5)grade='A+';
+            else if(h.cloud==='BULL'&&h.fusion!=='FADE'&&riskPct<=8)grade='A';
+            else if(h.fusion!=='FADE'&&riskPct<=8)grade='B';
+            return{...h,sl,riskPct,rrT1,grade};
+          });
+          const filtered=enriched.filter(h=>{
+            if(comboFilter!=='all'&&!h.signals.some(s=>s.includes(comboFilter)))return false;
+            if(comboFilter==='low')return h.riskPct<=5;
+            if(comboFilter==='high')return h.riskPct>5;
+            return true;
+          });
+          return<div style={{marginTop:6}}>
+            <div style={{display:"flex",gap:4,marginBottom:6}}>
+              {[['low','🟢 Low Risk (≤5%)'],['high','🟡 Higher Risk (>5%)']].map(([k,l])=><button key={k} onClick={()=>setComboFilter(comboFilter===k?'all':k)} style={{padding:"2px 8px",fontSize:8,fontFamily:"var(--font-mono)",fontWeight:600,color:comboFilter===k?"#00e5ff":"var(--text-muted)",background:comboFilter===k?"rgba(0,229,255,0.1)":"transparent",border:`1px solid ${comboFilter===k?"rgba(0,229,255,0.2)":"rgba(255,255,255,0.06)"}`,borderRadius:3,cursor:"pointer"}}>{l}</button>)}
+            </div>
+            <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:"var(--font-mono)"}}>
+              <thead><tr style={{background:"rgba(0,229,255,0.03)"}}>
+                {["SYMBOL","SIGNAL","GRADE","CLOSE","CHG%","RISK%","SL","R:R","FUSION","CLOUD","RSI","ADX"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontSize:8,fontWeight:700,color:"var(--text-muted)",borderBottom:"1px solid var(--border-dim)",letterSpacing:".5px"}}>{h}</th>)}
+              </tr></thead>
+              <tbody>{filtered.map(h=>{
+                const gc=h.grade==='A+'?'#00ff88':h.grade==='A'?'#00e5ff':h.grade==='B'?'#ffaa00':'#ff4455';
+                return<tr key={h.symbol} style={{borderBottom:"1px solid var(--border-dim)",cursor:"pointer"}} onClick={()=>window.open(`techart.html?s=${h.symbol}`,'_blank')}>
+                  <td style={{padding:"5px 8px",fontWeight:700,color:"#fff"}}>{h.symbol}</td>
+                  <td style={{padding:"5px 8px"}}>{h.signals.map((s,i)=><span key={i} style={{padding:"1px 6px",borderRadius:3,fontSize:8,fontWeight:700,background:"rgba(0,229,255,0.12)",color:"#00e5ff",marginRight:3}}>{s}</span>)}</td>
+                  <td style={{padding:"5px 8px"}}><span style={{fontWeight:800,fontSize:11,color:gc}}>{h.grade}</span></td>
+                  <td style={{padding:"5px 8px",color:"var(--text-secondary)"}}>₹{h.close?.toFixed(0)}</td>
+                  <td style={{padding:"5px 8px",fontWeight:600,color:h.change_pct>=0?"#00ff88":"#ff4455"}}>{h.change_pct>=0?"+":""}{h.change_pct?.toFixed(1)}%</td>
+                  <td style={{padding:"5px 8px",fontWeight:700,color:h.riskPct<=5?"#00ff88":h.riskPct<=8?"#ffaa00":"#ff4455"}}>{h.riskPct.toFixed(1)}%</td>
+                  <td style={{padding:"5px 8px",color:"var(--text-muted)"}}>₹{h.sl?.toFixed(0)}</td>
+                  <td style={{padding:"5px 8px",color:h.rrT1>=2?"#00ff88":h.rrT1>=1?"#ffaa00":"#ff4455"}}>1:{h.rrT1.toFixed(1)}</td>
+                  <td style={{padding:"5px 8px"}}><span style={{padding:"1px 5px",borderRadius:3,fontSize:8,fontWeight:700,background:`${FC[h.fusion]||'#888'}18`,color:FC[h.fusion]||'#888'}}>{h.fusion}</span></td>
+                  <td style={{padding:"5px 8px",color:h.cloud==="BULL"?"#00ff88":"#ff4455",fontWeight:600,fontSize:9}}>{h.cloud}</td>
+                  <td style={{padding:"5px 8px",color:h.rsi>55?"#00ff88":h.rsi<45?"#ff4455":"var(--text-muted)"}}>{h.rsi?.toFixed(0)}</td>
+                  <td style={{padding:"5px 8px",color:h.adx>25?"#ffaa00":"var(--text-muted)"}}>{h.adx?.toFixed(1)}</td>
+                </tr>})}</tbody>
+            </table></div>
+          </div>})()}
       </div>}
 
       <div style={{fontSize:11,color:"var(--text-muted)",marginBottom:8,fontFamily:"var(--font-mono)"}}>Showing <span style={{color:"var(--accent)",fontWeight:700}}>{filteredStocks.length}</span> stocks • Click row to expand chart</div>
