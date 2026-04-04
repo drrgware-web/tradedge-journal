@@ -638,7 +638,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       const comboIdxs=[];
       ppSetAll.forEach(i=>{if(boIdxSet.has(i)||pbSet.has(i))comboIdxs.push(i)});
       if(comboIdxs.length>0){
-        const blueBars=chart.addBarSeries({upColor:'#00e5ff',downColor:'#00e5ff',thinBars:true,openVisible:false,lastValueVisible:false,priceLineVisible:false});
+        const blueBars=chart.addBarSeries({upColor:'#00e5ff',downColor:'#00e5ff',thinBars:false,openVisible:false,lastValueVisible:false,priceLineVisible:false});
         blueBars.setData(comboIdxs.sort((a,b)=>a-b).map(i=>{const d=ohlc[i];return{time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close}}));
       }
 
@@ -650,16 +650,19 @@ function LWChart({symbol,w,h,mode,isDark}){
         else if(prev==='IGNITION'&&cur==='THRUST')markers.push({time:t,position:'belowBar',color:'#00E676',shape:'arrowUp',text:'T'});
         else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'F'});
         else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
-      // Pocket Pivot — standalone PP markers removed (blue combo bars already indicate PP+BO/PP+PB)
-      // Donchian breakouts — BO last 30 bars, BD most recent only
-      const boCut=ohlc.length-30;
+      // Pocket Pivot — faint arrows, last 60 bars
+      const ppCut2=ohlc.length-60;
+      ppFlags.filter(i=>i>=ppCut2).forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#00e5ff44',shape:'arrowUp',text:''})});
+      // Donchian breakouts — BO last 90 bars, BD last 3
+      const boCut=ohlc.length-90;
       boFlags.filter(b=>b.type==='bull'&&b.idx>=boCut).forEach(({idx})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
         markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowUp',text:'BO'})});
-      const lastBD=boFlags.filter(b=>b.type==='bear').slice(-1);
-      lastBD.forEach(({idx})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
+      const lastBDs=boFlags.filter(b=>b.type==='bear').slice(-3);
+      lastBDs.forEach(({idx})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
         markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#FF525260':'#FF5252',shape:'arrowDown',text:'BD'})});
-      // Pullbacks — subtle dots, no text
-      pbFlags.forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#26A69A66',shape:'circle',text:''})});
+      // Pullbacks — solid green, last 60 bars
+      const pbCut=ohlc.length-60;
+      pbFlags.filter(i=>i>=pbCut).forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#26A69A',shape:'circle',text:'PB'})});
       // BB Squeeze — last 30 bars only
       const sqCut=ohlc.length-30;
       sqFlags.filter(s=>s.idx>=sqCut).forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;
