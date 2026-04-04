@@ -7,10 +7,12 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/tradedge.css">
 <style>
-/* ═══ Edge Pilot Inline Styles ═══ */
+/* ═══ Edge Pilot Inline Styles — Premium Edition ═══ */
 @keyframes fusionShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes slPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,69,96,.3)}50%{box-shadow:0 0 8px 2px rgba(255,69,96,.15)}}
+@keyframes heroGlow{0%,100%{text-shadow:0 0 8px currentColor}50%{text-shadow:0 0 2px currentColor}}
 .ep-lifecycle { display:flex; gap:2px; align-items:center; margin:6px 0; }
-.ep-lc-step { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; border:1.5px solid var(--b1); color:var(--t3); background:var(--bg3); transition:all .3s; }
+.ep-lc-step { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; border:1.5px solid var(--b1); color:var(--t3); background:var(--bg3); transition:all .3s; }
 .ep-lc-step.done { background:rgba(0,229,160,.15); border-color:var(--g); color:var(--g); }
 .ep-lc-step.active { background:rgba(0,187,255,.15); border-color:var(--c); color:var(--c); animation:ep-pulse 1.5s ease infinite; }
 .ep-lc-step.pending { opacity:.4; }
@@ -28,8 +30,8 @@
 
 /* ATR Meter */
 .ep-atr-wrap { margin:6px 0; }
-.ep-atr-bar { height:14px; border-radius:7px; background:var(--bg3); overflow:hidden; position:relative; }
-.ep-atr-fill { height:100%; border-radius:7px; transition:width .5s ease, background .5s; }
+.ep-atr-bar { height:6px; border-radius:3px; background:var(--bg3); overflow:hidden; position:relative; }
+.ep-atr-fill { height:100%; border-radius:3px; transition:width .5s ease, background .5s; }
 .ep-atr-marks { display:flex; justify-content:space-between; margin-top:3px; }
 .ep-atr-marks span { font-size:9px; color:var(--t2); font-family:'IBM Plex Mono',monospace; }
 .ep-atr-sell-tag { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:6px; }
@@ -42,8 +44,10 @@
 .ep-pyr-label { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; }
 
 /* Enhanced Position Card */
-.ep-pos-card { position:relative; background:var(--bg2); border:1px solid var(--b1); border-radius:12px; padding:0; overflow:hidden; transition:border-color .2s, box-shadow .2s; }
-.ep-pos-card:hover { border-color:rgba(0,187,255,.3); box-shadow:0 0 20px rgba(0,187,255,.06); }
+.ep-pos-card { position:relative; background:#0c1018; border:1px solid rgba(255,255,255,.04); border-radius:12px; padding:0; overflow:hidden; transition:border-color .2s, box-shadow .2s; border-top:2px solid transparent; }
+.ep-pos-card:hover { border-color:rgba(0,187,255,.2); box-shadow:0 4px 24px rgba(0,0,0,.4); }
+.ep-pos-card[data-pnl-pos="true"] { border-top-color:var(--g); }
+.ep-pos-card[data-pnl-pos="false"] { border-top-color:var(--r); }
 .ep-pos-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px 6px; gap:8px; flex-wrap:wrap; }
 .ep-pos-sym { font-size:15px; font-weight:800; color:var(--t1); letter-spacing:.3px; }
 .ep-pos-badges { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
@@ -57,15 +61,16 @@
 .ep-metric { text-align:center; }
 .ep-metric-label { font-size:9px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
 .ep-metric-val { font-size:13px; font-weight:700; font-family:'IBM Plex Mono',monospace; }
+.ep-metric-val.sl-danger { animation:slPulse 1.5s ease infinite; color:var(--r)!important; }
 
-.ep-pos-section { padding:6px 14px; border-top:1px solid rgba(255,255,255,.06); }
-.ep-section-label { font-size:9px; font-weight:700; color:var(--t2); text-transform:uppercase; letter-spacing:.8px; margin-bottom:4px; }
+.ep-pos-section { padding:8px 14px; border-top:1px solid rgba(255,255,255,.04); }
+.ep-section-label { font-size:9px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:.1em; margin-bottom:4px; }
 
-.ep-pos-actions { display:flex; gap:5px; padding:10px 14px 12px; border-top:1px solid var(--b1); flex-wrap:wrap; }
-.ep-act-btn { padding:6px 12px; font-size:11px; font-weight:700; border:1px solid var(--b1); border-radius:6px; background:var(--bg3); color:var(--t1); cursor:pointer; font-family:'Outfit',sans-serif; transition:all .15s; }
-.ep-act-btn:hover { background:var(--bg4,rgba(255,255,255,.08)); border-color:var(--c); color:var(--c); }
-.ep-act-btn.close { border-color:rgba(255,69,96,.3); color:var(--r); }
-.ep-act-btn.close:hover { background:rgba(255,69,96,.1); }
+.ep-pos-actions { display:flex; gap:5px; padding:10px 14px 12px; border-top:1px solid rgba(255,255,255,.04); flex-wrap:wrap; }
+.ep-act-btn { padding:7px 14px; font-size:11px; font-weight:700; border:1px solid rgba(255,255,255,.06); border-radius:6px; background:#0c1018; color:var(--t1); cursor:pointer; font-family:'Outfit',sans-serif; transition:all .15s; }
+.ep-act-btn:hover { background:rgba(0,187,255,.06); border-color:var(--c); color:var(--c); transform:scale(1.02); }
+.ep-act-btn.close { border-color:rgba(255,69,96,.3); color:var(--r); background:transparent; }
+.ep-act-btn.close:hover { background:rgba(255,69,96,.1); transform:scale(1.02); }
 .ep-act-btn.chart { border-color:rgba(168,85,247,.3); color:var(--p); }
 .ep-act-btn.sl { border-color:rgba(255,193,7,.3); color:var(--y); }
 
@@ -82,11 +87,11 @@
 .ep-ob-tab { flex:1; padding:8px; font-size:11px; font-weight:700; border:none; cursor:pointer; background:var(--bg3); color:var(--t2); font-family:'Outfit',sans-serif; transition:all .15s; }
 .ep-ob-tab.active { background:rgba(0,187,255,.1); color:var(--c); }
 
-/* Capital Bar */
-.ep-cap-bar { display:flex; gap:10px; align-items:center; padding:8px 14px; background:var(--bg2); border:1px solid var(--b1); border-radius:10px; margin-bottom:14px; flex-wrap:wrap; }
-.ep-cap-item { text-align:center; }
-.ep-cap-label { font-size:9px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
-.ep-cap-val { font-size:13px; font-weight:700; font-family:'IBM Plex Mono',monospace; }
+/* Capital Bar — Sleek */
+.ep-cap-bar { display:flex; gap:10px; align-items:center; padding:10px 16px; background:linear-gradient(135deg,#0a0f18,#0d1220); border:1px solid rgba(255,255,255,.04); border-radius:10px; margin-bottom:14px; flex-wrap:wrap; }
+.ep-cap-item { text-align:center; flex:1; min-width:80px; }
+.ep-cap-label { font-size:8px; color:var(--t3); text-transform:uppercase; letter-spacing:.1em; font-weight:600; }
+.ep-cap-val { font-size:18px; font-weight:800; font-family:'IBM Plex Mono',monospace; }
 
 /* Pyramid warning banner */
 .ep-pyr-warn { padding:8px 12px; border-radius:8px; border:1px solid rgba(255,69,96,.3); background:rgba(255,69,96,.06); margin:8px 0; display:none; }
@@ -95,11 +100,23 @@
 /* Position grid */
 .ep-pos-grid { display:flex; flex-direction:column; gap:10px; }
 
+/* P&L bar glow */
+.exec-pnl-bar { box-shadow:0 1px 0 rgba(0,229,255,.06); }
+
+/* Responsive: stack order panel on narrow screens */
+@media(max-width:1200px){
+  .exec-main-grid{flex-direction:column!important}
+  .exec-main-grid>*{width:100%!important;max-width:100%!important}
+}
+
+/* Scanline background */
+body::after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.008) 2px,rgba(0,229,255,.008) 4px);pointer-events:none;z-index:9999}
+
 /* Tranche Exit Plan */
 .ep-tranche-row { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:10px; border-bottom:1px solid rgba(255,255,255,.04); }
 .ep-tranche-row:last-child { border-bottom:none; }
 .ep-tranche-row.done { opacity:.45; }
-.ep-tranche-row.next { background:rgba(0,229,160,.06); border-radius:6px; padding:4px 6px; margin:0 -6px; }
+.ep-tranche-row.next { background:rgba(0,229,255,.04); border-radius:6px; padding:4px 6px; margin:0 -6px; border-left:2px solid var(--c); }
 .ep-tr-tag { font-size:8px; font-weight:700; padding:2px 6px; border-radius:4px; min-width:24px; text-align:center; }
 .ep-tr-trigger { font-family:'IBM Plex Mono',monospace; font-weight:600; min-width:65px; }
 .ep-tr-qty { font-family:'IBM Plex Mono',monospace; color:var(--t2); min-width:40px; }
