@@ -570,10 +570,13 @@ function LWChart({symbol,w,h,mode,isDark}){
             bullUpper.push({time:t,value:lo});bullLower.push({time:t,value:lo});
           }
         }
+        // Adaptive opacity: reduce when cloud is very wide (gap-downs)
+        let maxCloudPct=0;for(let j=0;j<ohlc.length;j++){if(walking[j]!=null&&running[j]!=null){const cp=Math.abs(walking[j]-running[j])/(Math.min(walking[j],running[j])||1)*100;if(cp>maxCloudPct)maxCloudPct=cp}}
+        const cloudOp=maxCloudPct>10?0.04:0.12;const cloudOp2=maxCloudPct>10?0.01:0.02;
         const aOpts={lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false};
-        chart.addAreaSeries({...aOpts,topColor:'rgba(0,230,118,0.12)',bottomColor:'rgba(0,230,118,0.02)',lineColor:'transparent'}).setData(bullUpper);
+        chart.addAreaSeries({...aOpts,topColor:`rgba(0,230,118,${cloudOp})`,bottomColor:`rgba(0,230,118,${cloudOp2})`,lineColor:'transparent'}).setData(bullUpper);
         chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bullLower);
-        chart.addAreaSeries({...aOpts,topColor:'rgba(239,83,80,0.12)',bottomColor:'rgba(239,83,80,0.02)',lineColor:'transparent'}).setData(bearUpper);
+        chart.addAreaSeries({...aOpts,topColor:`rgba(239,83,80,${cloudOp})`,bottomColor:`rgba(239,83,80,${cloudOp2})`,lineColor:'transparent'}).setData(bearUpper);
         chart.addAreaSeries({...aOpts,topColor:bgCol,bottomColor:bgCol,lineColor:'transparent'}).setData(bearLower);
       }
 
@@ -584,8 +587,8 @@ function LWChart({symbol,w,h,mode,isDark}){
         let hh=-Infinity,ll=Infinity;for(let j=i-dcPeriod+1;j<=i;j++){if(ohlc[j].high>hh)hh=ohlc[j].high;if(ohlc[j].low<ll)ll=ohlc[j].low}
         dcUpper.push(hh);dcLower.push(ll);
       }
-      const dcUpSeries=chart.addLineSeries({color:'rgba(0,188,212,0.3)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,lastValueVisible:false,priceLineVisible:false});
-      const dcDnSeries=chart.addLineSeries({color:'rgba(0,188,212,0.3)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,lastValueVisible:false,priceLineVisible:false});
+      const dcUpSeries=chart.addLineSeries({color:'rgba(0,188,212,0.1)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,lastValueVisible:false,priceLineVisible:false});
+      const dcDnSeries=chart.addLineSeries({color:'rgba(0,188,212,0.1)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,lastValueVisible:false,priceLineVisible:false});
       const dcUpD=[],dcDnD=[];
       for(let i=0;i<ohlc.length;i++){if(dcUpper[i]!=null){dcUpD.push({time:ohlc[i].time,value:dcUpper[i]});dcDnD.push({time:ohlc[i].time,value:dcLower[i]})}}
       dcUpSeries.setData(dcUpD);dcDnSeries.setData(dcDnD);
@@ -652,15 +655,18 @@ function LWChart({symbol,w,h,mode,isDark}){
         else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'F'});
         else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
       // Pocket Pivot — standalone PP markers removed (blue combo bars already indicate PP+BO/PP+PB)
-      // Donchian breakouts
-      boFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
-        if(type==='bull')markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowUp',text:'BO'});
-        else markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#FF525260':'#FF5252',shape:'arrowDown',text:'BD'})});
-      // Pullbacks
-      pbFlags.forEach(i=>{const fs=fusionStates[i]?.state;const bright=fs==='THRUST';
-        markers.push({time:ohlc[i].time,position:'belowBar',color:bright?'#26A69A':'#26A69A99',shape:'circle',text:'PB'})});
-      // BB Squeeze
-      sqFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;
+      // Donchian breakouts — BO last 30 bars, BD most recent only
+      const boCut=ohlc.length-30;
+      boFlags.filter(b=>b.type==='bull'&&b.idx>=boCut).forEach(({idx})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
+        markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowUp',text:'BO'})});
+      const lastBD=boFlags.filter(b=>b.type==='bear').slice(-1);
+      lastBD.forEach(({idx})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
+        markers.push({time:ohlc[idx].time,position:'aboveBar',color:dim?'#FF525260':'#FF5252',shape:'arrowDown',text:'BD'})});
+      // Pullbacks — subtle dots, no text
+      pbFlags.forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#26A69A66',shape:'circle',text:''})});
+      // BB Squeeze — last 30 bars only
+      const sqCut=ohlc.length-30;
+      sqFlags.filter(s=>s.idx>=sqCut).forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;
         if(type==='enter')markers.push({time:ohlc[idx].time,position:'belowBar',color:'#B388FF88',shape:'square',text:'SQ'});
         else markers.push({time:ohlc[idx].time,position:'aboveBar',color:(fs==='IGNITION')?'#FFD700':'#B388FF',shape:'circle',text:'SQ'})});
       markers.sort((a,b)=>a.time-b.time);
