@@ -529,7 +529,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         mainSeries=chart.addAreaSeries({topColor:dk?'rgba(66,165,245,0.15)':'rgba(33,150,243,0.12)',bottomColor:'transparent',lineColor:'#2196F3',lineWidth:2,crosshairMarkerRadius:4});
         mainSeries.setData(ohlc.map(d=>({time:d.time,value:d.close})));
       }else{
-        mainSeries=chart.addBarSeries({upColor:'#00e676',downColor:'#ef5350',thinBars:false,openVisible:false});
+        mainSeries=chart.addBarSeries({upColor:'#00e676',downColor:'#ef5350',thinBars:true,openVisible:false});
         mainSeries.setData(ohlc.map((d,i)=>({time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close})));
       }
 
@@ -639,7 +639,7 @@ function LWChart({symbol,w,h,mode,isDark}){
       const comboIdxs=[];
       ppSetAll.forEach(i=>{if(boIdxSet.has(i)||pbSet.has(i))comboIdxs.push(i)});
       if(comboIdxs.length>0){
-        const blueBars=chart.addBarSeries({upColor:'#00e5ff',downColor:'#00e5ff',thinBars:false,openVisible:false,lastValueVisible:false,priceLineVisible:false});
+        const blueBars=chart.addBarSeries({upColor:'#00e5ff',downColor:'#00e5ff',thinBars:true,openVisible:false,lastValueVisible:false,priceLineVisible:false});
         blueBars.setData(comboIdxs.sort((a,b)=>a-b).map(i=>{const d=ohlc[i];return{time:d.time,open:i>0?ohlc[i-1].close:d.open,high:d.high,low:d.low,close:d.close}}));
       }
 
