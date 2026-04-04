@@ -341,6 +341,9 @@ def detect_combos(ohlc: List[dict]) -> dict:
                     and ohlc[i]["close"] < ohlc[i]["open"]):
                 pb_flags.add(i)
 
+    # ── ATR for risk calculation ──
+    atr = calc_atr(ohlc, 14)
+
     # ── Check LAST bar for combo signals ──
     last = n - 1
     signals = []
@@ -361,27 +364,139 @@ def detect_combos(ohlc: List[dict]) -> dict:
     bull_cloud = (rl or 0) > (wl or 0)
     cloud_width = abs((wl or 0) - (rl or 0))
 
-    # Build result
     bar = ohlc[last]
+    close = bar["close"]
+    atr_val = atr[last] if atr[last] else close * 0.02
+
+    # ═══ MULTI-STRATEGY SL & RISK CALCULATION ═══
+    #
+    # Strategy 1: WL SL — Stop below Walking Line (SuperTrend)
+    #   SL = WL - 0.5 × ATR
+    #   Best for: Pullback entries near the cloud
+    #
+    # Strategy 2: Cloud Bottom SL — Stop below the cloud zone
+    #   SL = min(WL, RL) - 0.5 × ATR
+    #   Best for: Breakout entries, wider stop
+    #
+    # Strategy 3: Swing Low SL — Stop below recent 5-bar low
+    #   SL = min(low of last 5 bars) - 0.25 × ATR
+    #   Best for: Tight mechanical stop
+    #
+    # Strategy 4: ATR SL — Fixed 2× ATR below close
+    #   SL = Close - 2 × ATR
+    #   Best for: Volatility-adjusted universal stop
+
+    sl_strategies = {}
+
+    # Strategy 1: Walking Line SL
+    if wl and wl > 0:
+        sl_wl = wl - 0.5 * atr_val
+        risk_wl = (close - sl_wl) / close * 100 if close > sl_wl else 99
+        sl_strategies["wl"] = {
+            "sl": round(sl_wl, 2),
+            "risk_pct": round(risk_wl, 2),
+            "label": "Walking Line",
+        }
+
+    # Strategy 2: Cloud Bottom SL
+    cloud_bot = min(wl or close, rl or close)
+    sl_cloud = cloud_bot - 0.5 * atr_val
+    risk_cloud = (close - sl_cloud) / close * 100 if close > sl_cloud else 99
+    sl_strategies["cloud"] = {
+        "sl": round(sl_cloud, 2),
+        "risk_pct": round(risk_cloud, 2),
+        "label": "Cloud Bottom",
+    }
+
+    # Strategy 3: Swing Low SL (5-bar low)
+    lookback = min(5, last)
+    swing_low = min(ohlc[j]["low"] for j in range(last - lookback, last + 1))
+    sl_swing = swing_low - 0.25 * atr_val
+    risk_swing = (close - sl_swing) / close * 100 if close > sl_swing else 99
+    sl_strategies["swing"] = {
+        "sl": round(sl_swing, 2),
+        "risk_pct": round(risk_swing, 2),
+        "label": "Swing Low (5)",
+    }
+
+    # Strategy 4: ATR SL (2× ATR)
+    sl_atr = close - 2 * atr_val
+    risk_atr = (close - sl_atr) / close * 100 if close > sl_atr else 99
+    sl_strategies["atr2x"] = {
+        "sl": round(sl_atr, 2),
+        "risk_pct": round(risk_atr, 2),
+        "label": "2× ATR",
+    }
+
+    # ── Best SL: lowest risk that's still valid (> 0.5%) ──
+    valid_strategies = {k: v for k, v in sl_strategies.items() if 0.5 <= v["risk_pct"] <= 15}
+    if valid_strategies:
+        best_key = min(valid_strategies, key=lambda k: valid_strategies[k]["risk_pct"])
+        best_sl = valid_strategies[best_key]
+    else:
+        best_key = "atr2x"
+        best_sl = sl_strategies["atr2x"]
+
+    # ── Is this a LOW RISK entry? ──
+    is_low_risk = best_sl["risk_pct"] <= 5.0
+
+    # ── R:R Ratio (reward to risk) ──
+    # T1 = 2× ATR above close, T2 = 4× ATR
+    t1 = close + 2 * atr_val
+    t2 = close + 4 * atr_val
+    t3 = close + 6 * atr_val
+    risk_amt = close - best_sl["sl"]
+    rr_t1 = (t1 - close) / risk_amt if risk_amt > 0 else 0
+    rr_t2 = (t2 - close) / risk_amt if risk_amt > 0 else 0
+
+    # ── Entry Quality Grade ──
+    # A+ = Low risk + IGNITION/THRUST + Bull cloud + RSI > 50
+    # A  = Low risk + Bull cloud + RSI > 45
+    # B  = Low risk but neutral fusion/cloud
+    # C  = Higher risk or bearish
+    grade = "C"
+    fs = fusion_states[last]
+    rsi_val = rsi[last] or 50
+    if is_low_risk and bull_cloud and fs in ("IGNITION", "THRUST") and rsi_val > 50:
+        grade = "A+"
+    elif is_low_risk and bull_cloud and rsi_val > 45:
+        grade = "A"
+    elif is_low_risk:
+        grade = "B"
+
+    # Build result
     result = {
         "signals": signals,
-        "fusion": fusion_states[last],
+        "fusion": fs,
         "cloud": "BULL" if bull_cloud else "BEAR",
-        "close": round(bar["close"], 2),
+        "close": round(close, 2),
         "volume": bar["volume"],
-        "change_pct": round((bar["close"] - ohlc[last - 1]["close"]) / ohlc[last - 1]["close"] * 100, 2) if last > 0 else 0,
+        "change_pct": round((close - ohlc[last - 1]["close"]) / ohlc[last - 1]["close"] * 100, 2) if last > 0 else 0,
         "walking": round(wl, 2) if wl else None,
         "running": round(rl, 2) if rl else None,
         "cloud_width": round(cloud_width, 2),
-        "rsi": round(rsi[last], 1) if rsi[last] else None,
+        "rsi": round(rsi_val, 1),
         "adx": round(adx_line[last], 1) if adx_line[last] else None,
         "bbw": round(bbw[last], 1) if bbw[last] else None,
+        "atr": round(atr_val, 2),
         "is_pp": is_pp,
         "is_bo": is_bo,
         "is_bd": is_bd,
         "is_pb": is_pb,
         "dc_upper": round(dc_upper[last], 2) if dc_upper[last] else None,
         "dc_lower": round(dc_lower[last], 2) if dc_lower[last] else None,
+        # ── Risk fields ──
+        "sl_strategies": sl_strategies,
+        "best_sl": best_sl["sl"],
+        "best_sl_strategy": best_sl["label"],
+        "risk_pct": best_sl["risk_pct"],
+        "is_low_risk": is_low_risk,
+        "t1": round(t1, 2),
+        "t2": round(t2, 2),
+        "t3": round(t3, 2),
+        "rr_t1": round(rr_t1, 1),
+        "rr_t2": round(rr_t2, 1),
+        "grade": grade,
     }
     return result
 
@@ -501,42 +616,59 @@ def format_telegram_alert(hits: List[dict]) -> str:
     now = datetime.now().strftime("%H:%M IST")
     lines = [f"🔵 <b>EdgeCloud Combo Scanner</b> — {now}\n"]
 
+    # Split by signal type AND low risk
     bo_ppv = [h for h in hits if "BO+PPV" in h["signals"]]
     pb_ppv = [h for h in hits if "PB+PPV" in h["signals"]]
+    low_risk = [h for h in hits if h.get("is_low_risk")]
+
+    if low_risk:
+        lines.append(f"🎯 <b>LOW RISK ENTRIES (≤5% SL): {len(low_risk)}</b>\n")
 
     if bo_ppv:
         lines.append("━━ <b>BO + PPV (Breakout + Pocket Pivot)</b> ━━")
-        for h in bo_ppv:
-            emoji = "🟢" if h["cloud"] == "BULL" else "🔴"
+        for h in sorted(bo_ppv, key=lambda x: x.get("risk_pct", 99)):
+            risk_emoji = "🟢" if h.get("risk_pct", 99) <= 5 else "🟡" if h.get("risk_pct", 99) <= 8 else "🔴"
+            cloud_emoji = "🟢" if h["cloud"] == "BULL" else "🔴"
             lines.append(
-                f"{emoji} <b>{h['symbol']}</b> ₹{h['close']} "
-                f"({h['change_pct']:+.1f}%) · {h['fusion']} · {h['cloud']}"
+                f"{cloud_emoji} <b>{h['symbol']}</b> ₹{h['close']} "
+                f"({h['change_pct']:+.1f}%) · {h['fusion']} · {h['cloud']} · <b>{h.get('grade','—')}</b>"
             )
             lines.append(
-                f"   RSI {h.get('rsi','—')} · ADX {h.get('adx','—')} · "
-                f"BBW {h.get('bbw','—')}% · DC↑ ₹{h.get('dc_upper','—')}"
+                f"   {risk_emoji} SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')}) "
+                f"Risk <b>{h.get('risk_pct','—')}%</b> · R:R 1:{h.get('rr_t1','—')}"
+            )
+            lines.append(
+                f"   T1 ₹{h.get('t1','—')} · T2 ₹{h.get('t2','—')} · "
+                f"RSI {h.get('rsi','—')} · ADX {h.get('adx','—')}"
             )
         lines.append("")
 
     if pb_ppv:
         lines.append("━━ <b>PB + PPV (Pullback + Pocket Pivot)</b> ━━")
-        for h in pb_ppv:
-            emoji = "🟢" if h["cloud"] == "BULL" else "🔴"
+        for h in sorted(pb_ppv, key=lambda x: x.get("risk_pct", 99)):
+            risk_emoji = "🟢" if h.get("risk_pct", 99) <= 5 else "🟡" if h.get("risk_pct", 99) <= 8 else "🔴"
+            cloud_emoji = "🟢" if h["cloud"] == "BULL" else "🔴"
             lines.append(
-                f"{emoji} <b>{h['symbol']}</b> ₹{h['close']} "
-                f"({h['change_pct']:+.1f}%) · {h['fusion']} · {h['cloud']}"
+                f"{cloud_emoji} <b>{h['symbol']}</b> ₹{h['close']} "
+                f"({h['change_pct']:+.1f}%) · {h['fusion']} · {h['cloud']} · <b>{h.get('grade','—')}</b>"
             )
             lines.append(
-                f"   RSI {h.get('rsi','—')} · ADX {h.get('adx','—')} · "
-                f"WL ₹{h.get('walking','—')} · RL ₹{h.get('running','—')}"
+                f"   {risk_emoji} SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')}) "
+                f"Risk <b>{h.get('risk_pct','—')}%</b> · R:R 1:{h.get('rr_t1','—')}"
+            )
+            lines.append(
+                f"   WL ₹{h.get('walking','—')} · RL ₹{h.get('running','—')} · "
+                f"Cloud ₹{h.get('cloud_width','—')}"
             )
         lines.append("")
 
     if not bo_ppv and not pb_ppv:
         lines.append("No combo signals found in this scan.")
 
-    lines.append(f"Scanned {len(hits)} stocks" if not bo_ppv and not pb_ppv
-                 else f"✅ {len(bo_ppv)} BO+PPV · {len(pb_ppv)} PB+PPV")
+    summary = f"✅ {len(bo_ppv)} BO+PPV · {len(pb_ppv)} PB+PPV"
+    if low_risk:
+        summary += f" · 🎯 {len(low_risk)} low risk (≤5%)"
+    lines.append(summary)
     return "\n".join(lines)
 
 
@@ -544,7 +676,7 @@ def format_telegram_alert(hits: List[dict]) -> str:
 # MAIN SCANNER
 # ════════════════════════════════════════════════════════════════════════════
 
-def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False):
+def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False, low_risk_only: bool = False):
     start = time.time()
     session = requests.Session()
     session.headers.update({
@@ -564,10 +696,28 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False):
         print(f"Fusion: {result['fusion']} | Cloud: {result['cloud']}")
         print(f"WL: ₹{result['walking']} | RL: ₹{result['running']} | Cloud Width: ₹{result['cloud_width']}")
         print(f"RSI: {result['rsi']} | ADX: {result['adx']} | BBW: {result['bbw']}%")
-        print(f"DC Upper: ₹{result['dc_upper']} | DC Lower: ₹{result['dc_lower']}")
+        print(f"ATR(14): ₹{result.get('atr','—')} | DC Upper: ₹{result['dc_upper']} | DC Lower: ₹{result['dc_lower']}")
         print(f"\nPP: {'✅' if result['is_pp'] else '—'} | BO: {'✅' if result['is_bo'] else '—'} | "
               f"BD: {'✅' if result['is_bd'] else '—'} | PB: {'✅' if result['is_pb'] else '—'}")
         print(f"\n🔵 COMBO SIGNALS: {result['signals'] if result['signals'] else 'None'}")
+        
+        # Risk analysis
+        print(f"\n{'═' * 50}")
+        print(f"📊 RISK ANALYSIS")
+        print(f"{'─' * 50}")
+        for key, strat in result.get('sl_strategies', {}).items():
+            risk = strat['risk_pct']
+            emoji = '🟢' if risk <= 5 else '🟡' if risk <= 8 else '🔴'
+            best = ' ← BEST' if strat['sl'] == result.get('best_sl') else ''
+            print(f"  {emoji} {strat['label']:15s} SL ₹{strat['sl']:>8.2f}  Risk {risk:>5.2f}%{best}")
+        
+        print(f"\n  Best SL: ₹{result.get('best_sl','—')} ({result.get('best_sl_strategy','—')})")
+        print(f"  Risk: {result.get('risk_pct','—')}%")
+        print(f"  Low Risk Entry: {'✅ YES' if result.get('is_low_risk') else '❌ NO'}")
+        print(f"\n  T1: ₹{result.get('t1','—')} (R:R 1:{result.get('rr_t1','—')})")
+        print(f"  T2: ₹{result.get('t2','—')} (R:R 1:{result.get('rr_t2','—')})")
+        print(f"  T3: ₹{result.get('t3','—')}")
+        print(f"\n  Entry Grade: {result.get('grade','—')}")
         return
 
     # Batch scan mode
@@ -581,6 +731,7 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False):
     print(f"\n═══ EdgeCloud Combo Scanner v1.0 ═══")
     print(f"Mode: {mode} | Universe: {total} stocks")
     print(f"Signals: BO+PPV, PB+PPV")
+    print(f"Risk Filter: {'≤5% ONLY' if low_risk_only else 'All (showing risk %)'}")
     print(f"Start: {datetime.now().strftime('%Y-%m-%d %H:%M:%S IST')}\n")
 
     hits = []  # Stocks with combo signals
@@ -603,10 +754,18 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False):
                 all_results.append(result)
 
                 if result["signals"]:
+                    # Apply low-risk filter if enabled
+                    if low_risk_only and not result.get("is_low_risk"):
+                        scanned += 1
+                        time.sleep(YAHOO_DELAY)
+                        continue
+                    
                     hits.append(result)
                     sig_str = " + ".join(result["signals"])
+                    risk_emoji = "🟢" if result.get("risk_pct", 99) <= 5 else "🟡" if result.get("risk_pct", 99) <= 8 else "🔴"
                     print(f"  🔵 {sym:>15s} │ {sig_str:12s} │ ₹{result['close']:>8.2f} │ "
-                          f"{result['change_pct']:+5.1f}% │ {result['fusion']:8s} │ {result['cloud']:4s}")
+                          f"{result['change_pct']:+5.1f}% │ {result['fusion']:8s} │ {result['cloud']:4s} │ "
+                          f"{risk_emoji} {result.get('risk_pct',99):>4.1f}% │ {result.get('grade','—')}")
 
                 scanned += 1
                 time.sleep(YAHOO_DELAY)
@@ -629,18 +788,31 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False):
 
     bo_ppv = [h for h in hits if "BO+PPV" in h["signals"]]
     pb_ppv = [h for h in hits if "PB+PPV" in h["signals"]]
+    low_risk_hits = [h for h in hits if h.get("is_low_risk")]
 
     if bo_ppv:
         print(f"\n🔵 BO + PPV ({len(bo_ppv)}):")
-        for h in bo_ppv:
+        for h in sorted(bo_ppv, key=lambda x: x.get("risk_pct", 99)):
+            risk_emoji = '🟢' if h.get('risk_pct', 99) <= 5 else '🟡' if h.get('risk_pct', 99) <= 8 else '🔴'
             print(f"   {h['symbol']:>15s} ₹{h['close']:>8.2f} {h['change_pct']:+5.1f}% "
-                  f"│ {h['fusion']:8s} {h['cloud']:4s} │ RSI {h.get('rsi','—')} ADX {h.get('adx','—')}")
+                  f"│ {h['fusion']:8s} {h['cloud']:4s} │ {risk_emoji} SL ₹{h.get('best_sl','—')} "
+                  f"Risk {h.get('risk_pct','—')}% R:R 1:{h.get('rr_t1','—')} │ {h.get('grade','—')}")
 
     if pb_ppv:
         print(f"\n🔵 PB + PPV ({len(pb_ppv)}):")
-        for h in pb_ppv:
+        for h in sorted(pb_ppv, key=lambda x: x.get("risk_pct", 99)):
+            risk_emoji = '🟢' if h.get('risk_pct', 99) <= 5 else '🟡' if h.get('risk_pct', 99) <= 8 else '🔴'
             print(f"   {h['symbol']:>15s} ₹{h['close']:>8.2f} {h['change_pct']:+5.1f}% "
-                  f"│ {h['fusion']:8s} {h['cloud']:4s} │ WL ₹{h.get('walking','—')} RL ₹{h.get('running','—')}")
+                  f"│ {h['fusion']:8s} {h['cloud']:4s} │ {risk_emoji} SL ₹{h.get('best_sl','—')} "
+                  f"Risk {h.get('risk_pct','—')}% R:R 1:{h.get('rr_t1','—')} │ {h.get('grade','—')}")
+
+    if low_risk_hits:
+        print(f"\n🎯 LOW RISK ENTRIES ≤5% ({len(low_risk_hits)}):")
+        for h in sorted(low_risk_hits, key=lambda x: x.get("grade", "Z")):
+            print(f"   {'⭐' if h.get('grade') == 'A+' else '★' if h.get('grade') == 'A' else '●'} "
+                  f"{h['symbol']:>15s} ₹{h['close']:>8.2f} │ Risk {h.get('risk_pct','—')}% │ "
+                  f"SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')}) │ "
+                  f"R:R 1:{h.get('rr_t1','—')} │ Grade {h.get('grade','—')}")
 
     if not hits:
         print("\n   No combo signals found today.")
@@ -649,12 +821,14 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False):
     output = {
         "generated_at": datetime.now().isoformat(),
         "mode": mode,
+        "low_risk_only": low_risk_only,
         "scanned": scanned,
         "errors": errors,
         "total_hits": len(hits),
         "bo_ppv_count": len(bo_ppv),
         "pb_ppv_count": len(pb_ppv),
-        "hits": hits,
+        "low_risk_count": len(low_risk_hits),
+        "hits": sorted(hits, key=lambda x: (x.get("grade", "Z"), x.get("risk_pct", 99))),
         "config": EC,
     }
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -680,6 +854,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="top500", choices=["full", "top500", "nifty100", "test"])
     parser.add_argument("--symbol", help="Single stock debug mode")
     parser.add_argument("--notify", action="store_true", help="Send Telegram alerts")
+    parser.add_argument("--low-risk", action="store_true", dest="low_risk", help="Only show entries with ≤5%% SL risk")
     args = parser.parse_args()
 
-    run_scanner(mode=args.mode, symbol=args.symbol, notify=args.notify)
+    run_scanner(mode=args.mode, symbol=args.symbol, notify=args.notify, low_risk_only=args.low_risk)
