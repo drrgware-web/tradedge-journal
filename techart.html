@@ -651,8 +651,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         else if(prev==='IGNITION'&&cur==='THRUST')markers.push({time:t,position:'belowBar',color:'#00E676',shape:'arrowUp',text:'T'});
         else if(prev==='THRUST'&&cur==='FADE')markers.push({time:t,position:'aboveBar',color:'#FF5252',shape:'arrowDown',text:'F'});
         else if(cur==='COIL'&&prev!=='COIL')markers.push({time:t,position:'belowBar',color:'#B388FF',shape:'square',text:'C'})}
-      // Pocket Pivot
-      ppFlags.filter(i=>i>=ppCutoff).forEach(i=>{markers.push({time:ohlc[i].time,position:'belowBar',color:'#00e5ff',shape:'arrowUp',text:'PP'})});
+      // Pocket Pivot — standalone PP markers removed (blue combo bars already indicate PP+BO/PP+PB)
       // Donchian breakouts
       boFlags.forEach(({idx,type})=>{const fs=fusionStates[idx]?.state;const dim=fs==='DRIFT'||fs==='COIL';
         if(type==='bull')markers.push({time:ohlc[idx].time,position:'belowBar',color:dim?'#00e5ff60':'#00e5ff',shape:'arrowUp',text:'BO'});
@@ -717,7 +716,7 @@ function LWChart({symbol,w,h,mode,isDark}){
           layout:{background:{color:bgCol},textColor:txtCol,fontFamily:'IBM Plex Mono'},
           grid:{vertLines:{color:gridCol},horzLines:{color:'transparent'}},
           rightPriceScale:{visible:false,borderColor:bdr},
-          timeScale:{visible:false,borderColor:bdr},
+          timeScale:{visible:false,borderColor:bdr,rightOffset:5},
           crosshair:{mode:1},
           handleScroll:{vertTouchDrag:false},
         });
@@ -731,7 +730,10 @@ function LWChart({symbol,w,h,mode,isDark}){
           return{time:bar.time,value:isSignal?Math.max(vol,vol*1.15):vol,color:isSignal?'#00e5ff':isUp?'rgba(0,230,118,0.4)':'rgba(239,83,80,0.4)'};
         }));
         vc.timeScale().fitContent();
-        // Sync time scales
+        // Force sync initial visible range
+        const mainRange=chart.timeScale().getVisibleLogicalRange();
+        if(mainRange)vc.timeScale().setVisibleLogicalRange(mainRange);
+        // Sync time scales on scroll/zoom
         chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range&&volChartRef.current)volChartRef.current.timeScale().setVisibleLogicalRange(range)});
         vc.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range&&chartObjRef.current)chartObjRef.current.timeScale().setVisibleLogicalRange(range)});
       }
@@ -1133,7 +1135,7 @@ function App(){
       <div className="ib">
         <span style={{font:'800 15px var(--fu)',color:'var(--t1)'}}>{sel.s}</span>
         <div ref={searchRef} style={{position:'relative'}}>
-          <input value={searchQ} onChange={e=>{setSearchQ(e.target.value);setShowSearch(true)}} onFocus={()=>setShowSearch(true)} placeholder="Search..." style={{width:140,padding:'3px 8px',font:'400 10px var(--fm)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:4,color:'var(--t1)',outline:'none'}} onKeyDown={e=>{if(e.key==='Enter'&&searchResults.length){setSel({s:searchResults[0].symbol,n:searchResults[0].name,x:'NSE'});setSearchQ('');setShowSearch(false)}}}/>
+          <input value={searchQ} onChange={e=>{setSearchQ(e.target.value);setShowSearch(true)}} onFocus={e=>{setShowSearch(true);e.target.style.borderColor='rgba(0,229,255,.4)'}} onBlur={e=>{e.target.style.borderColor='var(--bdr)'}} placeholder="Search symbol..." style={{minWidth:200,padding:'6px 12px',font:'400 14px var(--fm)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:4,color:'var(--t1)',outline:'none',transition:'border-color .15s'}} onKeyDown={e=>{if(e.key==='Enter'&&searchResults.length){setSel({s:searchResults[0].symbol,n:searchResults[0].name,x:'NSE'});setSearchQ('');setShowSearch(false)}}}/>
           {showSearch&&searchResults.length>0&&<div style={{position:'absolute',top:'100%',left:0,width:260,maxHeight:240,overflowY:'auto',background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:6,boxShadow:'0 8px 24px rgba(0,0,0,.6)',zIndex:20,marginTop:2}}>
             {searchResults.map(r=><div key={r.symbol} onClick={()=>{setSel({s:r.symbol,n:r.name,x:'NSE'});setSearchQ('');setShowSearch(false)}} style={{padding:'6px 10px',cursor:'pointer',borderBottom:'1px solid var(--bdr)',font:'400 10px var(--fm)',color:'var(--t2)',display:'flex',gap:8,alignItems:'center'}} onMouseEnter={e=>e.currentTarget.style.background='var(--bgh)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
               <span style={{font:'700 11px var(--fm)',color:'var(--t1)',minWidth:80}}>{r.symbol}</span>
