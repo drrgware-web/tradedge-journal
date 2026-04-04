@@ -4075,6 +4075,23 @@ function startLive() {
 // ── Boot ──
 renderGTTList();
 startLive();
+
+// ── URL param pre-fill from report.html ──
+(function(){
+  const p=new URLSearchParams(window.location.search);
+  const sym=p.get('symbol');
+  if(sym){
+    const sl=p.get('sl');const t1=p.get('t1');const t2=p.get('t2');const t3=p.get('t3');const entry=p.get('entry');
+    // Show toast with pre-filled data
+    if(typeof toast==='function')toast(`Pre-loaded: ${sym} Entry:₹${entry||'—'} SL:₹${sl||'—'} T1:₹${t1||'—'}`,'⚡');
+    // Store in sessionStorage for order builder to pick up
+    sessionStorage.setItem('te_prefill',JSON.stringify({symbol:sym,sl:sl?+sl:null,t1:t1?+t1:null,t2:t2?+t2:null,t3:t3?+t3:null,entry:entry?+entry:null}));
+    // Try to open order builder with symbol
+    if(typeof openOrderBuilder==='function'){
+      setTimeout(()=>openOrderBuilder(sym,'BUY',0,+(entry||0),+(sl||0)),1000);
+    }
+  }
+})();
 </script>
 </body>
 </html>

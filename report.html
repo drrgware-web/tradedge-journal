@@ -190,6 +190,7 @@ function StockReport(){
           <span style={{fontSize:12}}>TARGET: <span style={{color:"#00E676",fontWeight:700}}>{fmt(a.t1,0)}–{fmt(a.t3,0)}</span></span>
           <span style={{fontSize:12}}>STOP LOSS: <span style={{color:"#FF5252",fontWeight:700}}>{fmt(a.sl,0)}</span></span>
           <span style={{fontSize:12,padding:"1px 8px",background:"rgba(0,229,255,0.1)",borderRadius:4,color:"#00e5ff"}}><span style={{fontWeight:700}}>{a.fusion}</span> · {a.bullCloud?"BULL":"BEAR"} CLOUD</span>
+          <a href={`execution.html?symbol=${symbol}&sl=${a.sl?.toFixed(0)}&t1=${a.t1?.toFixed(0)}&t2=${a.t2?.toFixed(0)}&t3=${a.t3?.toFixed(0)}&entry=${a.close?.toFixed(0)}`} style={{padding:"2px 10px",background:"rgba(0,229,255,0.12)",border:"1px solid rgba(0,229,255,0.3)",borderRadius:4,color:"#00e5ff",fontSize:10,fontWeight:700,textDecoration:"none"}}>⚡ Execute</a>
         </div>
       </div>
 
@@ -277,6 +278,13 @@ function StockReport(){
               {[["T1",fmt(a.t1,0),`+${((a.t1-a.close)/a.close*100).toFixed(1)}%`,"#00E676"],["T2",fmt(a.t2,0),`+${((a.t2-a.close)/a.close*100).toFixed(1)}%`,"#00C853"],["T3",fmt(a.t3,0),`+${((a.t3-a.close)/a.close*100).toFixed(1)}%`,"#00BFA5"]].map(([l,v,p,c])=><div key={l} style={{padding:"4px 6px",marginBottom:3,background:"#0a0a14",borderRadius:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontWeight:800,color:c,fontSize:11}}>{l}</span><span style={{fontSize:10,fontWeight:700,color:c,fontFamily:"'JetBrains Mono',monospace"}}>{v}</span><span style={{fontSize:8,color:"#888"}}>{p}</span></div>)}
               <div style={{padding:"4px 6px",background:"rgba(255,82,82,0.08)",borderRadius:4,borderLeft:"2px solid #FF5252",marginTop:4}}><div style={{fontSize:8,color:"#FF5252"}}>STOP LOSS</div><div style={{fontSize:12,fontWeight:800,color:"#FF5252",fontFamily:"'JetBrains Mono',monospace"}}>{fmt(a.sl,0)} <span style={{fontSize:9,fontWeight:500}}>(-{a.riskPct?.toFixed(1)}%)</span></div></div>
             </div>
+          </div>
+          <a href={`execution.html?symbol=${symbol}&sl=${a.sl?.toFixed(0)}&t1=${a.t1?.toFixed(0)}&t2=${a.t2?.toFixed(0)}&t3=${a.t3?.toFixed(0)}&entry=${a.close?.toFixed(0)}`} style={{display:"block",textAlign:"center",padding:10,background:"linear-gradient(135deg,#00e5ff,#00bcd4)",color:"#000",fontWeight:800,fontSize:13,borderRadius:6,textDecoration:"none",marginTop:8,letterSpacing:".05em"}}>⚡ TRADE NOW — Open in Execution</a>
+          <div style={{display:"flex",gap:6,marginTop:6}}>
+            <a href={`techart.html?s=${symbol}`} style={{flex:1,textAlign:"center",padding:6,background:"#1a1a2e",border:"1px solid #2a2a3e",borderRadius:4,color:"#00e5ff",fontSize:9,fontWeight:600,textDecoration:"none"}}>📊 TEChart</a>
+            <a href={`stock.html?s=${symbol}`} style={{flex:1,textAlign:"center",padding:6,background:"#1a1a2e",border:"1px solid #2a2a3e",borderRadius:4,color:"#00e5ff",fontSize:9,fontWeight:600,textDecoration:"none"}}>🔍 Edge Intel</a>
+            <a href={`https://in.tradingview.com/chart/8RFOgQZr/?symbol=NSE:${symbol}`} target="_blank" rel="noopener" style={{flex:1,textAlign:"center",padding:6,background:"#1a1a2e",border:"1px solid #2a2a3e",borderRadius:4,color:"#00e5ff",fontSize:9,fontWeight:600,textDecoration:"none"}}>📈 TV Pro</a>
+            <a href={`https://zone.definedge.com/chart?symbol=${symbol}&exchange=NSE&chartType=pnf`} target="_blank" rel="noopener" style={{flex:1,textAlign:"center",padding:6,background:"#1a1a2e",border:"1px solid #2a2a3e",borderRadius:4,color:"#00e5ff",fontSize:9,fontWeight:600,textDecoration:"none"}}>📉 RZone</a>
           </div>
         </div>
         <div style={{background:"#0f0f1a",border:"1px solid #1a1a2e",borderRadius:8,padding:12,borderLeft:`3px solid ${verdictColor2}`,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
