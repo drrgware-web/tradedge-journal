@@ -3526,6 +3526,9 @@ async function buildMergedPositions() {
 // RENDER ENHANCED POSITIONS
 // ═══════════════════════════════════════════════════════════════
 
+function displaySL(trade,ltp){if(!trade)return'<span style="color:#FFA000;font-size:8px;font-weight:700;letter-spacing:.05em">⚠ NOT SET</span>';const sl=parseFloat(trade.sl);if(!sl||isNaN(sl)||sl<=0)return'<span style="color:#FFA000;font-size:8px;font-weight:700;letter-spacing:.05em">⚠ NOT SET</span>';return'₹'+sl.toFixed(0)}
+function slDangerClass(trade,ltp){const sl=parseFloat(trade?.sl);if(!sl||isNaN(sl)||sl<=0||!ltp)return'';return((ltp-sl)/ltp*100)<3?' sl-danger':''}
+
 function renderPositions() {
   const positions = [..._mergedPositions];
   document.getElementById('pos-badge').textContent = positions.length;
@@ -3617,11 +3620,12 @@ function renderPositions() {
       </div>
 
       <!-- Metrics Row -->
-      <div class="ep-pos-metrics-row">
+      <div class="ep-pos-metrics-row" style="grid-template-columns:repeat(6,1fr)">
         <div class="ep-metric"><div class="ep-metric-label">CMP ${cmpDot}</div><div class="ep-metric-val" style="color:var(--c)">₹${(+ltp).toFixed(0)}</div></div>
         <div class="ep-metric"><div class="ep-metric-label">P&L%</div><div class="ep-metric-val" style="color:${pnlColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</div></div>
-        <div class="ep-metric"><div class="ep-metric-label">SL</div><div class="ep-metric-val${trade?.sl&&+trade.sl>0&&ltp>0&&((ltp-trade.sl)/ltp*100)<3?' sl-danger':''}" style="color:var(--r)">${trade?.sl&&+trade.sl>0?'₹'+(+trade.sl).toFixed(0):'<span style="color:#FFA000;font-size:8px;font-weight:700;letter-spacing:.05em">⚠ NOT SET</span>'}</div></div>
-        <div class="ep-metric"><div class="ep-metric-label">Risk%</div><div class="ep-metric-val" style="color:${riskPct>15?'#FF1744':riskPct>10?'var(--r)':riskPct>5?'var(--y)':'var(--t2)'}">${riskPct.toFixed(1)}%${riskPct>15?'<div style="font-size:7px;color:#FF1744;margin-top:1px">⚠ HIGH</div>':''}</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">SL</div><div class="ep-metric-val${slDangerClass(trade,ltp)}" style="color:${parseFloat(trade?.sl)>0?'var(--r)':'#FFA000'}">${displaySL(trade,ltp)}</div></div>
+        <div class="ep-metric"><div class="ep-metric-label">Exposure</div><div class="ep-metric-val" style="color:${riskPct>20?'#FF1744':riskPct>10?'var(--r)':riskPct>5?'var(--y)':'var(--t2)'}">${riskPct.toFixed(1)}%${riskPct>20?'<div style="font-size:7px;color:#FF1744;margin-top:1px">⚠ CONCENTRATED</div>':riskPct>15?'<div style="font-size:7px;color:var(--y);margin-top:1px">⚠ HIGH</div>':''}</div></div>
+        ${(()=>{const slV=parseFloat(trade?.sl)||0;const slRA=slV>0?Math.abs(ltp-slV)*Math.abs(qty):0;const slRC=_capForCards.current>0&&slV>0?(slRA/_capForCards.current*100):0;return`<div class="ep-metric"><div class="ep-metric-label">SL Risk</div><div class="ep-metric-val" style="color:${slRC>3?'var(--r)':slRC>1.5?'var(--y)':'var(--t2)'}">${slV>0?slRC.toFixed(1)+'%':'<span style="font-size:8px;color:#FFA000">—</span>'}${slRC>3?'<div style="font-size:7px;color:var(--r);margin-top:1px">⚠ >3%</div>':''}</div></div>`})()}
         <div class="ep-metric"><div class="ep-metric-label">Qty</div><div class="ep-metric-val" style="color:var(--t2)">${Math.abs(qty)}</div></div>
       </div>
      
