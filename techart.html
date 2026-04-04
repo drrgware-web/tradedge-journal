@@ -880,11 +880,11 @@ function LWChart({symbol,w,h,mode,isDark}){
         const disp=rl>0?((lastC-rl)/rl*100):0;
         const stLabel=d.state==='THRUST'||d.state==='IGNITION'?(cloudBull?'STRONG BULL':'BULL'):d.state==='FADE'?(!cloudBull?'STRONG BEAR':'BEAR'):cloudBull?'BULL':'BEAR';
         const stColor=d.state==='THRUST'||d.state==='IGNITION'?'#00E676':d.state==='FADE'?'#FF5252':cloudBull?'#26a69a':'#ef5350';
-        const r=(l,v,c)=><div key={l} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'2px 0'}}><span style={{color:'var(--t4)',fontSize:9}}>{l}</span><span style={{color:c,fontWeight:700,fontSize:10}}>{v}</span></div>;
-        return<div style={{position:'absolute',bottom:90,right:8,zIndex:10,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'8px 12px',minWidth:180,opacity:.85,transition:'opacity .2s'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='.85'}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{font:'700 9px var(--fm)',color:'#00e5ff',letterSpacing:'.08em'}}>EdgeCloud v3</span><span style={{font:'500 8px var(--fm)',color:'#00e5ff'}}>ST({ecCfg.stPeriod},{ecCfg.stMult1})</span></div>
+        const r=(l,v,c)=><div key={l} style={{display:'flex',justifyContent:'space-between',gap:20,padding:'2px 0'}}><span style={{color:'var(--t3)',fontSize:10}}>{l}</span><span style={{color:c,fontWeight:700,fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>{v}</span></div>;
+        return<div style={{position:'absolute',bottom:90,right:8,zIndex:10,background:'rgba(0,0,0,0.88)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'10px 16px',minWidth:200,opacity:.85,transition:'opacity .2s'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='.85'}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><span style={{font:'700 11px var(--fm)',color:'#00e5ff',letterSpacing:'.08em'}}>EdgeCloud v3</span><span style={{font:'500 10px var(--fm)',color:'#00e5ff'}}>ST({ecCfg.stPeriod},{ecCfg.stMult1})</span></div>
           <div style={{height:1,background:'rgba(255,255,255,0.06)',margin:'2px 0 4px'}}/>
-          {r('State',stLabel,stColor)}
+          <div style={{display:'flex',justifyContent:'space-between',gap:20,padding:'2px 0'}}><span style={{color:'var(--t3)',fontSize:10}}>State</span><span style={{color:stColor,fontWeight:800,fontSize:14,fontFamily:"'JetBrains Mono',monospace"}}>{stLabel}</span></div>
           {r('Walking','₹'+wl.toFixed(2),rl>=wl?'#26a69a':'#ef5350')}
           {r('Running','₹'+rl.toFixed(2),'#ff9800')}
           {r('Cloud','₹'+cloudW.toFixed(0),cloudBull?'#26a69a':'#ef5350')}
