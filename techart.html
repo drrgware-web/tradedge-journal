@@ -715,7 +715,7 @@ function LWChart({symbol,w,h,mode,isDark}){
           width:chartW,height:80,
           layout:{background:{color:bgCol},textColor:txtCol,fontFamily:'IBM Plex Mono'},
           grid:{vertLines:{color:gridCol},horzLines:{color:'transparent'}},
-          rightPriceScale:{visible:false,borderColor:bdr},
+          rightPriceScale:{visible:true,borderColor:'transparent',borderVisible:false,drawTicks:false,textColor:'transparent'},
           timeScale:{visible:false,borderColor:bdr,rightOffset:5},
           crosshair:{mode:1},
           handleScroll:{vertTouchDrag:false},
@@ -881,7 +881,7 @@ function LWChart({symbol,w,h,mode,isDark}){
         const stLabel=d.state==='THRUST'||d.state==='IGNITION'?(cloudBull?'STRONG BULL':'BULL'):d.state==='FADE'?(!cloudBull?'STRONG BEAR':'BEAR'):cloudBull?'BULL':'BEAR';
         const stColor=d.state==='THRUST'||d.state==='IGNITION'?'#00E676':d.state==='FADE'?'#FF5252':cloudBull?'#26a69a':'#ef5350';
         const r=(l,v,c)=><div key={l} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'2px 0'}}><span style={{color:'var(--t4)',fontSize:9}}>{l}</span><span style={{color:c,fontWeight:700,fontSize:10}}>{v}</span></div>;
-        return<div style={{position:'absolute',top:8,right:8,zIndex:10,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'8px 12px',minWidth:180}}>
+        return<div style={{position:'absolute',bottom:90,right:8,zIndex:10,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:6,padding:'8px 12px',minWidth:180,opacity:.85,transition:'opacity .2s'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='.85'}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{font:'700 9px var(--fm)',color:'#00e5ff',letterSpacing:'.08em'}}>EdgeCloud v3</span><span style={{font:'500 8px var(--fm)',color:'#00e5ff'}}>ST({ecCfg.stPeriod},{ecCfg.stMult1})</span></div>
           <div style={{height:1,background:'rgba(255,255,255,0.06)',margin:'2px 0 4px'}}/>
           {r('State',stLabel,stColor)}
