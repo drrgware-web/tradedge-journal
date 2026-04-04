@@ -115,7 +115,7 @@ function StockReport(){
       if(parsed.length<60)throw new Error("Insufficient data");
       setOhlc(parsed);setAnalysis(analyzeStock(parsed));setSymbol(sym);
       // Fetch fundamentals from screener (non-blocking)
-      try{const sr=await fetch(wUrl,{method:'GET',headers:{'X-Kite-Action':'screener','X-Screener-Symbol':sym},signal:AbortSignal.timeout(15000)});const sd=await sr.json();if(sd)setFunda(sd)}catch(e2){setFunda(null)}
+      try{const sr=await fetch(wUrl,{method:'GET',headers:{'X-Kite-Action':'screener','X-Screener-Symbol':sym},signal:AbortSignal.timeout(15000)});const sd=await sr.json();console.log('Screener data:',sd);console.log('Quarterly:',sd?.quarters);console.log('Info:',sd?.info);if(sd)setFunda(sd)}catch(e2){console.log('Screener fetch failed:',e2.message);setFunda(null)}
     }catch(e){setError(e.message)}
     setLoading(false);
   },[]);
@@ -137,7 +137,7 @@ function StockReport(){
   const stars=(n,max=5)=>Array.from({length:max},(_,i)=>i<Math.round(n)?'★':'☆').join('');
   // Fundamental score
   const q0=qtrs[0]||{};
-  const fundaScore=a?Math.min(5,(((inf.pe||99)>0&&(inf.pe||99)<25?1:0)+((inf.roe||0)>15?1:0)+((q0.epsYoY||0)>15?1:0)+((q0.salesYoY||0)>10?1:0)+((q0.opm||0)>12?1:0))):0;
+  const fundaScore=a?Math.min(5,(((inf.pe||99)>0&&(inf.pe||99)<=40?1:0)+((inf.roe||0)>10?1:0)+((q0.epsYoY||0)>0?1:0)+((q0.salesYoY||0)>0?1:0)+((q0.opm||0)>8?1:0))):0;
   // Catalyst score
   const proArr=sh.promoter||[];const fiiArr=sh.fii||[];const diiArr=sh.dii||[];
   const proDelta=proArr.length>=2?proArr[proArr.length-1]-proArr[proArr.length-2]:0;
@@ -147,7 +147,7 @@ function StockReport(){
   // Overall
   const avgScore=a?(a.techScore+fundaScore+(a.rrScore||0)+catScore)/4:0;
   let verdict2="HOLD",verdictColor2="#FFA000";
-  if(a){if(avgScore>=4&&a.fusion!=="FADE"){verdict2="STRONG BUY";verdictColor2="#00C853"}else if(avgScore>=3){verdict2="BUY";verdictColor2="#4CAF50"}else if(avgScore<2||a.fusion==="FADE"){verdict2="AVOID";verdictColor2="#FF5252"}}
+  if(a){if(avgScore>=3.5&&a.fusion!=="FADE"&&a.bullCloud){verdict2="STRONG BUY";verdictColor2="#00C853"}else if(avgScore>=2.5){verdict2="BUY";verdictColor2="#4CAF50"}else if(avgScore<1.5||(a.fusion==="FADE"&&!a.bullCloud)){verdict2="AVOID";verdictColor2="#FF5252"}}
   // Catalysts badges
   const badges=[];
   if(fiiDelta>0.5)badges.push({label:"FII Accumulation",color:"#00E676"});
@@ -158,7 +158,8 @@ function StockReport(){
   if((inf.pe||99)>0&&(inf.pe||99)<15)badges.push({label:"Undervalued",color:"#00E676"});
   if(diiDelta>0.5)badges.push({label:"DII Accumulation",color:"#00E676"});
   if(qtrs.length>=2&&(qtrs[0].opm||0)>(qtrs[1].opm||0))badges.push({label:"Margin Expansion",color:"#00E676"});
-  if(proDelta<-1)badges.push({label:"Promoter Selling",color:"#FF5252"});
+  if(proArr.length&&proArr[proArr.length-1]>50&&Math.abs(proDelta)<0.5)badges.push({label:"Promoter Stable",color:"#00E676"});
+  if(proDelta<-2)badges.push({label:"Promoter Selling",color:"#FF5252"});
   if(fiiDelta<-1)badges.push({label:"FII Selling",color:"#FF5252"});
 
   return<div>
