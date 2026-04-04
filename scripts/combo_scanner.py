@@ -59,6 +59,7 @@ YAHOO_DELAY = 0.12  # 120ms between requests
 MAX_RETRIES = 2
 BATCH_SIZE = 50
 MIN_BARS = 40  # Need at least 40 bars for indicators
+LOW_RISK_THRESHOLD = 5.0  # Default SL threshold for low/high risk split
 
 # EdgeCloud defaults (match techart.html EC_DEFAULTS)
 EC = {
@@ -252,6 +253,10 @@ def detect_combos(ohlc: List[dict]) -> dict:
     walking, walk_dir = calc_supertrend(ohlc, EC["st_period"], EC["st_mult"])
     running = calc_ema(closes, EC["ema_period"])
 
+    # ── Trend Structure (Minervini Stage 2 filters) ──
+    ema50 = calc_ema(closes, 50)
+    ema200 = calc_ema(closes, 200)
+
     # ── Fusion state (for filtering) ──
     bbw = calc_bb_width(closes, 20)
     rsi = calc_rsi(closes, 14)
@@ -348,15 +353,77 @@ def detect_combos(ohlc: List[dict]) -> dict:
     last = n - 1
     signals = []
 
+    # ═══ MANDATORY TREND FILTERS (Minervini Stage 2) ═══
+    # These MUST pass for any signal to be generated:
+    #   1. EMA(50) > EMA(200)  — long-term trend is UP
+    #   2. Price > EMA(50)     — price is above the trend
+    #   3. Fusion is NOT FADE  — not in bearish pressure
+    e50 = ema50[last]
+    e200 = ema200[last]
+    close_price = ohlc[last]["close"]
+    fusion_last = fusion_states[last]
+
+    trend_ok = (
+        e50 is not None and e200 is not None
+        and e50 > e200                      # EMA 50 above EMA 200
+        and close_price > e50               # Price above EMA 50
+        and fusion_last != "FADE"           # Not in bearish FADE
+    )
+
+    # ═══ EXTENSION / CLIMAX FILTERS ═══
+    # Reject stocks that are over-extended (chasing territory):
+    #
+    #   1. Price > 25% above EMA(50) → too stretched, pullback likely
+    #   2. Price > 50% above EMA(200) → climax territory
+    #   3. RSI > 80 → overbought exhaustion
+    #   4. ATR sell ratio > 3× → today's range is 3× normal = climax day
+    #   5. 20-day return > 40% → parabolic move, not a base breakout
+
+    extension_pct_50 = ((close_price - e50) / e50 * 100) if e50 and e50 > 0 else 0
+    extension_pct_200 = ((close_price - e200) / e200 * 100) if e200 and e200 > 0 else 0
+    rsi_last = rsi[last] or 50
+
+    # 20-day return
+    lookback_20 = min(20, last)
+    ret_20d = ((close_price - ohlc[last - lookback_20]["close"]) / ohlc[last - lookback_20]["close"] * 100) if lookback_20 > 0 else 0
+
+    # ATR sell ratio (today's range vs ATR)
+    atr_val_check = atr[last] if atr[last] else close_price * 0.02
+    today_range = ohlc[last]["high"] - ohlc[last]["low"]
+    atr_sell_ratio = today_range / atr_val_check if atr_val_check > 0 else 1
+
+    not_extended = (
+        extension_pct_50 <= 25              # Not > 25% above EMA50
+        and extension_pct_200 <= 50         # Not > 50% above EMA200
+        and rsi_last <= 80                  # Not overbought exhaustion
+        and atr_sell_ratio <= 3.0           # Not a climax range day
+        and ret_20d <= 40                   # Not parabolic in last 20 days
+    )
+
+    # Extension warning flags (for display even if not filtered)
+    ext_warnings = []
+    if extension_pct_50 > 25:
+        ext_warnings.append(f">{extension_pct_50:.0f}% above EMA50")
+    if extension_pct_200 > 50:
+        ext_warnings.append(f">{extension_pct_200:.0f}% above EMA200")
+    if rsi_last > 80:
+        ext_warnings.append(f"RSI {rsi_last:.0f} overbought")
+    if atr_sell_ratio > 3.0:
+        ext_warnings.append(f"ATR ratio {atr_sell_ratio:.1f}× climax")
+    if ret_20d > 40:
+        ext_warnings.append(f"+{ret_20d:.0f}% in 20 days")
+
     is_pp = last in pp_flags
     is_bo = last in bo_flags and bo_flags[last] == "bull"
     is_bd = last in bo_flags and bo_flags[last] == "bear"
     is_pb = last in pb_flags
 
-    if is_pp and is_bo:
-        signals.append("BO+PPV")
-    if is_pp and is_pb:
-        signals.append("PB+PPV")
+    # Only generate signals if BOTH trend and extension filters pass
+    if trend_ok and not_extended:
+        if is_pp and is_bo:
+            signals.append("BO+PPV")
+        if is_pp and is_pb:
+            signals.append("PB+PPV")
 
     # Cloud direction
     wl = walking[last]
@@ -438,7 +505,7 @@ def detect_combos(ohlc: List[dict]) -> dict:
         best_sl = sl_strategies["atr2x"]
 
     # ── Is this a LOW RISK entry? ──
-    is_low_risk = best_sl["risk_pct"] <= 5.0
+    is_low_risk = best_sl["risk_pct"] <= LOW_RISK_THRESHOLD
 
     # ── R:R Ratio (reward to risk) ──
     # T1 = 2× ATR above close, T2 = 4× ATR
@@ -485,6 +552,19 @@ def detect_combos(ohlc: List[dict]) -> dict:
         "is_pb": is_pb,
         "dc_upper": round(dc_upper[last], 2) if dc_upper[last] else None,
         "dc_lower": round(dc_lower[last], 2) if dc_lower[last] else None,
+        # ── Trend filters ──
+        "ema50": round(e50, 2) if e50 else None,
+        "ema200": round(e200, 2) if e200 else None,
+        "ema50_above_200": bool(e50 and e200 and e50 > e200),
+        "price_above_ema50": bool(e50 and close_price > e50),
+        "trend_ok": trend_ok,
+        # ── Extension filters ──
+        "ext_pct_50": round(extension_pct_50, 1),
+        "ext_pct_200": round(extension_pct_200, 1),
+        "ret_20d": round(ret_20d, 1),
+        "atr_sell_ratio": round(atr_sell_ratio, 1),
+        "not_extended": not_extended,
+        "ext_warnings": ext_warnings,
         # ── Risk fields ──
         "sl_strategies": sl_strategies,
         "best_sl": best_sl["sl"],
@@ -616,59 +696,51 @@ def format_telegram_alert(hits: List[dict]) -> str:
     now = datetime.now().strftime("%H:%M IST")
     lines = [f"🔵 <b>EdgeCloud Combo Scanner</b> — {now}\n"]
 
-    # Split by signal type AND low risk
-    bo_ppv = [h for h in hits if "BO+PPV" in h["signals"]]
-    pb_ppv = [h for h in hits if "PB+PPV" in h["signals"]]
-    low_risk = [h for h in hits if h.get("is_low_risk")]
+    # Split into risk groups
+    low_risk = [h for h in hits if h.get("risk_pct", 99) <= LOW_RISK_THRESHOLD]
+    high_risk = [h for h in hits if h.get("risk_pct", 99) > LOW_RISK_THRESHOLD]
 
+    # ── Section 1: LOW RISK ──
     if low_risk:
-        lines.append(f"🎯 <b>LOW RISK ENTRIES (≤5% SL): {len(low_risk)}</b>\n")
-
-    if bo_ppv:
-        lines.append("━━ <b>BO + PPV (Breakout + Pocket Pivot)</b> ━━")
-        for h in sorted(bo_ppv, key=lambda x: x.get("risk_pct", 99)):
-            risk_emoji = "🟢" if h.get("risk_pct", 99) <= 5 else "🟡" if h.get("risk_pct", 99) <= 8 else "🔴"
-            cloud_emoji = "🟢" if h["cloud"] == "BULL" else "🔴"
+        lines.append(f"🟢 <b>LOW RISK (SL ≤ {LOW_RISK_THRESHOLD}%) — {len(low_risk)} stocks</b>")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        for h in sorted(low_risk, key=lambda x: x.get("risk_pct", 99)):
+            sigs = " + ".join(h["signals"])
             lines.append(
-                f"{cloud_emoji} <b>{h['symbol']}</b> ₹{h['close']} "
-                f"({h['change_pct']:+.1f}%) · {h['fusion']} · {h['cloud']} · <b>{h.get('grade','—')}</b>"
+                f"⭐ <b>{h['symbol']}</b> ₹{h['close']} ({h['change_pct']:+.1f}%)"
+                f" · {sigs} · {h['fusion']} · {h['cloud']} · <b>{h.get('grade','—')}</b>"
             )
             lines.append(
-                f"   {risk_emoji} SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')}) "
-                f"Risk <b>{h.get('risk_pct','—')}%</b> · R:R 1:{h.get('rr_t1','—')}"
+                f"   🟢 SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')})"
+                f" · Risk <b>{h.get('risk_pct','—')}%</b> · R:R 1:{h.get('rr_t1','—')}"
             )
             lines.append(
-                f"   T1 ₹{h.get('t1','—')} · T2 ₹{h.get('t2','—')} · "
-                f"RSI {h.get('rsi','—')} · ADX {h.get('adx','—')}"
+                f"   T1 ₹{h.get('t1','—')} · T2 ₹{h.get('t2','—')}"
+                f" · RSI {h.get('rsi','—')} · ADX {h.get('adx','—')}"
             )
         lines.append("")
 
-    if pb_ppv:
-        lines.append("━━ <b>PB + PPV (Pullback + Pocket Pivot)</b> ━━")
-        for h in sorted(pb_ppv, key=lambda x: x.get("risk_pct", 99)):
-            risk_emoji = "🟢" if h.get("risk_pct", 99) <= 5 else "🟡" if h.get("risk_pct", 99) <= 8 else "🔴"
-            cloud_emoji = "🟢" if h["cloud"] == "BULL" else "🔴"
+    # ── Section 2: HIGHER RISK ──
+    if high_risk:
+        lines.append(f"🟡 <b>HIGHER RISK (SL > {LOW_RISK_THRESHOLD}%) — {len(high_risk)} stocks</b>")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        for h in sorted(high_risk, key=lambda x: x.get("risk_pct", 99)):
+            sigs = " + ".join(h["signals"])
+            risk_emoji = "🟡" if h.get("risk_pct", 99) <= 8 else "🔴"
             lines.append(
-                f"{cloud_emoji} <b>{h['symbol']}</b> ₹{h['close']} "
-                f"({h['change_pct']:+.1f}%) · {h['fusion']} · {h['cloud']} · <b>{h.get('grade','—')}</b>"
+                f"● <b>{h['symbol']}</b> ₹{h['close']} ({h['change_pct']:+.1f}%)"
+                f" · {sigs} · {h['fusion']} · {h['cloud']} · {h.get('grade','—')}"
             )
             lines.append(
-                f"   {risk_emoji} SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')}) "
-                f"Risk <b>{h.get('risk_pct','—')}%</b> · R:R 1:{h.get('rr_t1','—')}"
-            )
-            lines.append(
-                f"   WL ₹{h.get('walking','—')} · RL ₹{h.get('running','—')} · "
-                f"Cloud ₹{h.get('cloud_width','—')}"
+                f"   {risk_emoji} SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')})"
+                f" · Risk <b>{h.get('risk_pct','—')}%</b> · R:R 1:{h.get('rr_t1','—')}"
             )
         lines.append("")
 
-    if not bo_ppv and not pb_ppv:
+    if not hits:
         lines.append("No combo signals found in this scan.")
 
-    summary = f"✅ {len(bo_ppv)} BO+PPV · {len(pb_ppv)} PB+PPV"
-    if low_risk:
-        summary += f" · 🎯 {len(low_risk)} low risk (≤5%)"
-    lines.append(summary)
+    lines.append(f"✅ Total: {len(hits)} · 🟢 Low risk: {len(low_risk)} · 🟡 Higher risk: {len(high_risk)}")
     return "\n".join(lines)
 
 
@@ -697,6 +769,19 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False, 
         print(f"WL: ₹{result['walking']} | RL: ₹{result['running']} | Cloud Width: ₹{result['cloud_width']}")
         print(f"RSI: {result['rsi']} | ADX: {result['adx']} | BBW: {result['bbw']}%")
         print(f"ATR(14): ₹{result.get('atr','—')} | DC Upper: ₹{result['dc_upper']} | DC Lower: ₹{result['dc_lower']}")
+        print(f"\n📈 TREND FILTERS (Minervini Stage 2):")
+        print(f"  EMA(50): ₹{result.get('ema50','—')} | EMA(200): ₹{result.get('ema200','—')}")
+        print(f"  EMA50 > EMA200: {'✅' if result.get('ema50_above_200') else '❌'}")
+        print(f"  Price > EMA50:  {'✅' if result.get('price_above_ema50') else '❌'}")
+        print(f"  Fusion ≠ FADE:  {'✅' if result['fusion'] != 'FADE' else '❌'}")
+        print(f"  TREND OK:       {'✅ PASS' if result.get('trend_ok') else '❌ FAIL — no signals generated'}")
+        print(f"\n🔥 EXTENSION / CLIMAX CHECK:")
+        print(f"  Price vs EMA50:  {result.get('ext_pct_50',0):+.1f}% {'⚠ EXTENDED' if result.get('ext_pct_50',0) > 25 else '✅ OK'}")
+        print(f"  Price vs EMA200: {result.get('ext_pct_200',0):+.1f}% {'⚠ CLIMAX' if result.get('ext_pct_200',0) > 50 else '✅ OK'}")
+        print(f"  RSI:             {result.get('rsi',0):.0f} {'⚠ OVERBOUGHT' if result.get('rsi',0) > 80 else '✅ OK'}")
+        print(f"  ATR Sell Ratio:  {result.get('atr_sell_ratio',0):.1f}× {'⚠ CLIMAX DAY' if result.get('atr_sell_ratio',0) > 3 else '✅ OK'}")
+        print(f"  20-Day Return:   {result.get('ret_20d',0):+.1f}% {'⚠ PARABOLIC' if result.get('ret_20d',0) > 40 else '✅ OK'}")
+        print(f"  NOT EXTENDED:    {'✅ PASS' if result.get('not_extended') else '❌ FAIL — ' + ', '.join(result.get('ext_warnings', []))}")
         print(f"\nPP: {'✅' if result['is_pp'] else '—'} | BO: {'✅' if result['is_bo'] else '—'} | "
               f"BD: {'✅' if result['is_bd'] else '—'} | PB: {'✅' if result['is_pb'] else '—'}")
         print(f"\n🔵 COMBO SIGNALS: {result['signals'] if result['signals'] else 'None'}")
@@ -788,34 +873,33 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False, 
 
     bo_ppv = [h for h in hits if "BO+PPV" in h["signals"]]
     pb_ppv = [h for h in hits if "PB+PPV" in h["signals"]]
-    low_risk_hits = [h for h in hits if h.get("is_low_risk")]
+    low_risk_hits = [h for h in hits if h.get("risk_pct", 99) <= LOW_RISK_THRESHOLD]
+    high_risk_hits = [h for h in hits if h.get("risk_pct", 99) > LOW_RISK_THRESHOLD]
 
-    if bo_ppv:
-        print(f"\n🔵 BO + PPV ({len(bo_ppv)}):")
-        for h in sorted(bo_ppv, key=lambda x: x.get("risk_pct", 99)):
-            risk_emoji = '🟢' if h.get('risk_pct', 99) <= 5 else '🟡' if h.get('risk_pct', 99) <= 8 else '🔴'
-            print(f"   {h['symbol']:>15s} ₹{h['close']:>8.2f} {h['change_pct']:+5.1f}% "
-                  f"│ {h['fusion']:8s} {h['cloud']:4s} │ {risk_emoji} SL ₹{h.get('best_sl','—')} "
-                  f"Risk {h.get('risk_pct','—')}% R:R 1:{h.get('rr_t1','—')} │ {h.get('grade','—')}")
-
-    if pb_ppv:
-        print(f"\n🔵 PB + PPV ({len(pb_ppv)}):")
-        for h in sorted(pb_ppv, key=lambda x: x.get("risk_pct", 99)):
-            risk_emoji = '🟢' if h.get('risk_pct', 99) <= 5 else '🟡' if h.get('risk_pct', 99) <= 8 else '🔴'
-            print(f"   {h['symbol']:>15s} ₹{h['close']:>8.2f} {h['change_pct']:+5.1f}% "
-                  f"│ {h['fusion']:8s} {h['cloud']:4s} │ {risk_emoji} SL ₹{h.get('best_sl','—')} "
-                  f"Risk {h.get('risk_pct','—')}% R:R 1:{h.get('rr_t1','—')} │ {h.get('grade','—')}")
-
+    # ── Group 1: LOW RISK ──
     if low_risk_hits:
-        print(f"\n🎯 LOW RISK ENTRIES ≤5% ({len(low_risk_hits)}):")
-        for h in sorted(low_risk_hits, key=lambda x: x.get("grade", "Z")):
-            print(f"   {'⭐' if h.get('grade') == 'A+' else '★' if h.get('grade') == 'A' else '●'} "
-                  f"{h['symbol']:>15s} ₹{h['close']:>8.2f} │ Risk {h.get('risk_pct','—')}% │ "
-                  f"SL ₹{h.get('best_sl','—')} ({h.get('best_sl_strategy','—')}) │ "
-                  f"R:R 1:{h.get('rr_t1','—')} │ Grade {h.get('grade','—')}")
+        print(f"\n🟢 LOW RISK (SL ≤ {LOW_RISK_THRESHOLD}%) — {len(low_risk_hits)} stocks:")
+        print(f"   {'Symbol':>15s} │ {'Signal':12s} │ {'Close':>8s} │ {'Chg':>6s} │ {'Fusion':8s} │ {'SL':>8s} │ {'Risk':>5s} │ {'R:R':>5s} │ Grd")
+        print(f"   {'─'*15} │ {'─'*12} │ {'─'*8} │ {'─'*6} │ {'─'*8} │ {'─'*8} │ {'─'*5} │ {'─'*5} │ {'─'*3}")
+        for h in sorted(low_risk_hits, key=lambda x: x.get("risk_pct", 99)):
+            sigs = "+".join(h["signals"])
+            print(f"   {h['symbol']:>15s} │ {sigs:12s} │ ₹{h['close']:>6.0f} │ {h['change_pct']:+5.1f}% │ {h['fusion']:8s} │ "
+                  f"₹{h.get('best_sl',0):>6.0f} │ {h.get('risk_pct',0):>4.1f}% │ 1:{h.get('rr_t1',0):>3.1f} │ {h.get('grade','—')}")
+
+    # ── Group 2: HIGHER RISK ──
+    if high_risk_hits:
+        print(f"\n🟡 HIGHER RISK (SL > {LOW_RISK_THRESHOLD}%) — {len(high_risk_hits)} stocks:")
+        print(f"   {'Symbol':>15s} │ {'Signal':12s} │ {'Close':>8s} │ {'Chg':>6s} │ {'Fusion':8s} │ {'SL':>8s} │ {'Risk':>5s} │ {'R:R':>5s} │ Grd")
+        print(f"   {'─'*15} │ {'─'*12} │ {'─'*8} │ {'─'*6} │ {'─'*8} │ {'─'*8} │ {'─'*5} │ {'─'*5} │ {'─'*3}")
+        for h in sorted(high_risk_hits, key=lambda x: x.get("risk_pct", 99)):
+            sigs = "+".join(h["signals"])
+            print(f"   {h['symbol']:>15s} │ {sigs:12s} │ ₹{h['close']:>6.0f} │ {h['change_pct']:+5.1f}% │ {h['fusion']:8s} │ "
+                  f"₹{h.get('best_sl',0):>6.0f} │ {h.get('risk_pct',0):>4.1f}% │ 1:{h.get('rr_t1',0):>3.1f} │ {h.get('grade','—')}")
 
     if not hits:
         print("\n   No combo signals found today.")
+
+    print(f"\n   Total: {len(hits)} │ 🟢 Low risk ≤{LOW_RISK_THRESHOLD}%: {len(low_risk_hits)} │ 🟡 Higher risk >{LOW_RISK_THRESHOLD}%: {len(high_risk_hits)}")
 
     # ── Save JSON ──
     output = {
@@ -828,6 +912,9 @@ def run_scanner(mode: str = "top500", symbol: str = None, notify: bool = False, 
         "bo_ppv_count": len(bo_ppv),
         "pb_ppv_count": len(pb_ppv),
         "low_risk_count": len(low_risk_hits),
+        "high_risk_count": len(high_risk_hits),
+        "low_risk_hits": sorted(low_risk_hits, key=lambda x: (x.get("grade", "Z"), x.get("risk_pct", 99))),
+        "high_risk_hits": sorted(high_risk_hits, key=lambda x: x.get("risk_pct", 99)),
         "hits": sorted(hits, key=lambda x: (x.get("grade", "Z"), x.get("risk_pct", 99))),
         "config": EC,
     }
@@ -855,6 +942,11 @@ if __name__ == "__main__":
     parser.add_argument("--symbol", help="Single stock debug mode")
     parser.add_argument("--notify", action="store_true", help="Send Telegram alerts")
     parser.add_argument("--low-risk", action="store_true", dest="low_risk", help="Only show entries with ≤5%% SL risk")
+    parser.add_argument("--sl", type=float, default=5.0, help="SL threshold %% for low/high risk split (default: 5.0)")
     args = parser.parse_args()
+
+    # Override the low-risk threshold globally if --sl is set
+    global LOW_RISK_THRESHOLD
+    LOW_RISK_THRESHOLD = args.sl
 
     run_scanner(mode=args.mode, symbol=args.symbol, notify=args.notify, low_risk_only=args.low_risk)
