@@ -59,6 +59,7 @@
     <span class="stk-sym" id="sym">—</span>
     <span class="stk-nm" id="nm">Loading...</span>
     <span id="badges"></span>
+    <span id="quick-links" style="display:inline-flex;gap:4px;margin-left:8px"></span>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="stk-gear" onclick="toggleStockSettings()" title="API Settings">⚙️</button>
@@ -86,6 +87,7 @@ async function init(){
   await loadSyms();setupSrch();
   if(!s){empty();return;}
   $('sym').textContent=s;document.title=s+' | TradEdge';
+  $('quick-links').innerHTML=`<a href="report.html?s=${s}" style="padding:3px 10px;font-size:10px;font-weight:700;border-radius:4px;text-decoration:none;background:linear-gradient(135deg,rgba(0,229,255,0.15),rgba(0,188,212,0.1));border:1px solid rgba(0,229,255,0.3);color:#00e5ff">📄 1-Pager</a><a href="techart.html?s=${s}" style="padding:3px 10px;font-size:10px;font-weight:600;border-radius:4px;text-decoration:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:var(--t3)">📊 TEChart</a>`;
 
   scannerStock=allS.find(x=>x.s===s.toUpperCase());
 
