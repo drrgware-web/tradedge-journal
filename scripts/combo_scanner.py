@@ -941,12 +941,10 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="top500", choices=["full", "top500", "nifty100", "test"])
     parser.add_argument("--symbol", help="Single stock debug mode")
     parser.add_argument("--notify", action="store_true", help="Send Telegram alerts")
-    parser.add_argument("--low-risk", action="store_true", dest="low_risk", help="Only show entries with ≤5%% SL risk")
-    parser.add_argument("--sl", type=float, default=5.0, help="SL threshold %% for low/high risk split (default: 5.0)")
+    parser.add_argument("--low-risk", action="store_true", dest="low_risk", help="Only show entries with SL risk below threshold")
+    parser.add_argument("--sl", type=float, default=5.0, help="SL threshold for low/high risk split (default: 5.0)")
     args = parser.parse_args()
 
-    # Override the low-risk threshold globally if --sl is set
-    global LOW_RISK_THRESHOLD
     LOW_RISK_THRESHOLD = args.sl
 
     run_scanner(mode=args.mode, symbol=args.symbol, notify=args.notify, low_risk_only=args.low_risk)
